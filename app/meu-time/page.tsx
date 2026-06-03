@@ -39,9 +39,9 @@ function KimonoAvatar({ country, captain }: { country: string; captain?: boolean
         position: "relative",
         width: "100%",
         aspectRatio: "1 / 1",
-        borderRadius: 14,
-        background: captain ? "#1f4234" : "#21362c",
-        border: captain ? `2px solid ${GOLD}` : "1px solid rgba(0,0,0,0.18)",
+        borderRadius: 12,
+        background: captain ? "rgba(31,66,52,0.55)" : "rgba(12,14,13,0.28)",
+        border: captain ? `2px solid ${GOLD}` : "1px solid rgba(0,0,0,0.22)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -122,27 +122,35 @@ export default function MeuTime() {
           </div>
         </header>
 
-        {/* Tatame */}
+        {/* Tatame — área de competição */}
         <section
           style={{
-            background: "repeating-linear-gradient(45deg, #1c3a2e 0 14px, #1a352a 14px 28px)",
-            border: "1px solid #2a4d3e",
-            borderRadius: 18,
-            padding: 16,
+            background: "#2f6fb3",
+            border: "1px solid #25588f",
+            borderRadius: 16,
+            padding: 22,
           }}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
-            {cards.map((c) => (
-              <div key={c.name} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <KimonoAvatar country={c.country} captain={c.isCaptain} />
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.15, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {c.name}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#93a39a" }}>{c.category}</div>
-                  <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 4 }}>
-                    <span style={{ fontSize: 11, color: GOLD, fontWeight: 700 }}>JC {c.price}</span>
-                    <span
+          <div
+            style={{
+              background: "#e6b422",
+              border: "3px solid #f0cf6a",
+              borderRadius: 4,
+              padding: 16,
+            }}
+          >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
+              {cards.map((c) => (
+                <div key={c.name} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <KimonoAvatar country={c.country} captain={c.isCaptain} />
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.15, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {c.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#93a39a" }}>{c.category}</div>
+                    <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 4 }}>
+                      <span style={{ fontSize: 11, color: GOLD, fontWeight: 700 }}>JC {c.price}</span>
+                      <span
                       style={{
                         fontSize: 11,
                         fontWeight: 700,
@@ -155,7 +163,8 @@ export default function MeuTime() {
                   </div>
                 </div>
               </div>
-            ))}
+              ))}
+            </div>
           </div>
         </section>
 
