@@ -132,7 +132,7 @@ export default function Mercado() {
         </div>
 
         {/* Lista */}
-        <div style={{ padding: "12px 14px 24px" }}>
+        <div style={{ padding: "12px 14px 92px" }}>
           {filtered.length === 0 ? (
             <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "24px 0" }}>Sem atletas para este filtro (mais em breve).</div>
           ) : (
@@ -182,6 +182,17 @@ export default function Mercado() {
               );
             })
           )}
+        </div>
+      </div>
+
+      {/* Barra inferior: progresso + voltar ao dojo */}
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 40 }}>
+        <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ fontSize: 12, color: "#cfd8d2" }}>
+            <span style={{ fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 16 }}>{countM + countF}</span>
+            <span style={{ fontFamily: FD, fontWeight: 700, color: "#93a39a", fontSize: 13 }}>/8</span> atletas
+          </div>
+          <a href="/criar-equipa" style={{ background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 18px", borderRadius: 10, fontSize: 14, textDecoration: "none" }}>Voltar ao Dojo</a>
         </div>
       </div>
 
@@ -248,7 +259,7 @@ function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: numbe
   }
 
   return (
-    <div style={{ position: "fixed", left: 0, right: 0, bottom: 14, padding: "0 12px", zIndex: 100 }}>
+    <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
       <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
         <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt="#efeadd" expression="feliz" /></div>
         <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px" }}>
