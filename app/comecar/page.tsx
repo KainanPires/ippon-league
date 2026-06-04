@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode, type CSSProperties } from "react";
+import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
 
 const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
@@ -91,18 +91,7 @@ export default function Comecar() {
 
             <Field label="Contacto" error={errors.contact}>
               <div style={{ display: "flex", gap: 8 }}>
-                <select
-                  aria-label="Indicativo do país"
-                  style={{ ...inputStyle(false), width: 130, flexShrink: 0, appearance: "none" }}
-                  value={form.dialIso}
-                  onChange={(e) => update("dialIso", e.target.value)}
-                >
-                  {COUNTRIES.map((c) => (
-                    <option key={c.iso2} value={c.iso2}>
-                      {flagEmoji(c.iso2)} {c.dial}
-                    </option>
-                  ))}
-                </select>
+                <CountrySelect value={form.dialIso} onChange={(iso) => update("dialIso", iso)} />
                 <input
                   style={inputStyle(!!errors.contact)}
                   inputMode="tel"
@@ -212,4 +201,110 @@ function inputStyle(hasError: boolean): CSSProperties {
     fontFamily: FONT_BODY,
     outline: "none",
   };
+}
+
+function CountrySelect({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  const selected = COUNTRIES.find((c) => c.iso2 === value) ?? COUNTRIES[0];
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const q = norm(query.trim());
+  const filtered = q
+    ? COUNTRIES.filter((c) => norm(c.name).includes(q) || c.dial.includes(query.trim()) || c.iso2.toLowerCase().includes(q))
+    : COUNTRIES;
+
+  return (
+    <div ref={ref} style={{ position: "relative", width: 132, flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        style={{ ...inputStyle(false), width: "100%", textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+      >
+        <span>
+          {flagEmoji(selected.iso2)} {selected.dial}
+        </span>
+        <span style={{ color: "#93a39a", fontSize: 12 }}>▾</span>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            width: 280,
+            maxWidth: "80vw",
+            background: "#0f1411",
+            border: "1px solid #2a3a33",
+            borderRadius: 12,
+            zIndex: 30,
+            boxShadow: "0 12px 30px rgba(0,0,0,0.5)",
+            overflow: "hidden",
+          }}
+        >
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Procurar país..."
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "10px 12px",
+              background: "#0c0e0d",
+              border: "none",
+              borderBottom: "1px solid #2a3a33",
+              color: "#f1ede2",
+              fontSize: 14,
+              outline: "none",
+              fontFamily: FONT_BODY,
+            }}
+          />
+          <div style={{ maxHeight: 240, overflowY: "auto" }}>
+            {filtered.length === 0 && <div style={{ padding: 12, color: "#93a39a", fontSize: 13 }}>Sem resultados</div>}
+            {filtered.map((c) => (
+              <button
+                key={c.iso2}
+                type="button"
+                onClick={() => {
+                  onChange(c.iso2);
+                  setOpen(false);
+                  setQuery("");
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "9px 12px",
+                  background: c.iso2 === value ? "#16201b" : "transparent",
+                  border: "none",
+                  color: "#f1ede2",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  fontFamily: FONT_BODY,
+                }}
+              >
+                <span>{flagEmoji(c.iso2)}</span>
+                <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</span>
+                <span style={{ color: "#93a39a" }}>{c.dial}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
