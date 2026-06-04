@@ -104,15 +104,20 @@ export default function Inicio() {
           ))}
         </Card>
 
-        <Card>
-          <CardTitle>As tuas ligas</CardTitle>
-          {[["Mundial", "#1.243"], ["Continental · Europa", "#312"], ["Nacional · Portugal", "#14"]].map(([l, p]) => (
-            <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
-              <span style={{ fontSize: 13 }}>{l}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: GOLD }}>{p}</span>
+        <a href="/ligas" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+          <Card>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <CardTitle>As tuas ligas</CardTitle>
+              <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: GOLD }}>Ver todas ›</span>
             </div>
-          ))}
-        </Card>
+            {[["Mundial", "#1.243"], ["Continental · Europa", "#312"], ["Nacional · Portugal", "#14"]].map(([l, p]) => (
+              <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                <span style={{ fontSize: 13 }}>{l}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: GOLD }}>{p}</span>
+              </div>
+            ))}
+          </Card>
+        </a>
 
         <div style={{ marginTop: 4 }}>
           <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 9 }}>Notícias e novidades</div>
@@ -135,6 +140,7 @@ export default function Inicio() {
         <Tab label="Início" active icon={<HomeIcon />} />
         <Tab label="Competições" icon={<TrophyIcon />} />
         <Tab label="Pro" icon={<BoltIcon />} />
+        <Tab label="Amigos" icon={<FriendsIcon />} />
       </nav>
 
       {phase === "welcome" && <Welcome name={name} onYosh={() => { setStep(0); setPhase("tutorial"); }} />}
@@ -328,6 +334,13 @@ function BoltIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" />
+    </svg>
+  );
+}
+function FriendsIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }
