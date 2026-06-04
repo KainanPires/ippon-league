@@ -5,7 +5,7 @@
 export type MascotExpression = "feliz" | "determinado";
 
 export function Mascot({
-  belt = "#7a4fa3",
+  belt = "#141110",
   expression = "feliz",
 }: {
   belt?: string;
@@ -22,18 +22,9 @@ export function Mascot({
       {/* manga esquerda */}
       <path d="M33,47 L21,54 L25,63 L35,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
       <circle cx="23" cy="62" r="4.2" fill="#E65100" />
-      {/* braço direito: levantado a acenar (feliz) ou em guarda (determinado) */}
-      {happy ? (
-        <>
-          <path d="M67,47 L80,34 L86,24 L73,30 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
-          <circle cx="86" cy="22" r="4.4" fill="#E65100" />
-        </>
-      ) : (
-        <>
-          <path d="M67,47 L79,54 L75,63 L65,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
-          <circle cx="77" cy="62" r="4.2" fill="#E65100" />
-        </>
-      )}
+      {/* braço direito (em repouso, simétrico ao esquerdo) */}
+      <path d="M67,47 L79,54 L75,63 L65,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
+      <circle cx="77" cy="62" r="4.2" fill="#E65100" />
       {/* cabeça */}
       <path d="M34,30 C34,18 42,12 50,12 C58,12 66,18 66,30 C66,38 60,43 50,43 C40,43 34,38 34,30 Z" fill="#4DB6AC" stroke="#2f8a80" strokeWidth="1" />
       {/* gola */}
@@ -59,7 +50,7 @@ export function Mascot({
       <circle cx="55.7" cy="27" r="1.9" fill="#1A237E" />
       <circle cx="45" cy="26" r="0.7" fill="#fff" />
       <circle cx="57.2" cy="26" r="0.7" fill="#fff" />
-      {/* sobrancelhas: relaxadas/animadas (feliz) ou franzidas (determinado) */}
+      {/* sobrancelhas: relaxadas (feliz) ou franzidas (determinado) */}
       {happy ? (
         <>
           <path d="M40,20 Q43.5,18 47,20" fill="none" stroke="#E65100" strokeWidth="1.6" strokeLinecap="round" />
