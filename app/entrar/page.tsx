@@ -40,7 +40,7 @@ export default function Entrar() {
         </div>
         <div style={{ textAlign: "center", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#7c8a82", marginBottom: 14 }}>O jogo oficial dos fãs de judô</div>
 
-        <div style={{ width: 76, height: 76, margin: "0 auto 6px" }}><Mascot belt="#efeadd" expression="feliz" /></div>
+        <div style={{ width: 76, height: 76, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="feliz" /></div>
 
         <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 18, padding: 22 }}>
           <h1 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", textAlign: "center", margin: "0 0 18px" }}>Entrar no dojo</h1>
