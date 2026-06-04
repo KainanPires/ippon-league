@@ -8,7 +8,7 @@ const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
 const HAS_TEAM = false;
-const USER = { belt: "Roxa" };
+const USER = { belt: "Branca" };
 
 const STEPS = [
   { title: "Sou o teu sensei!", text: "Vou ensinar-te a jogar em 1 minuto. Avança quando quiseres — ou pula." },
@@ -54,7 +54,7 @@ export default function Inicio() {
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: "1px solid #243029", borderRadius: 999, padding: "5px 14px 5px 5px" }}>
             <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
-              <Mascot belt="#7a4fa3" expression="feliz" />
+              <Mascot belt="#efeadd" expression="feliz" />
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{name}</div>
