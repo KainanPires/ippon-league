@@ -21,7 +21,7 @@ const STEPS = [
 const PRO_BENEFITS = ["Scout avançado dos atletas", "Valorização esperada da rodada", "Dicas e capitães recomendados", "Ligas e badges exclusivos"];
 
 export default function Inicio() {
-  const [phase, setPhase] = useState<"welcome" | "tutorial" | null>(null);
+  const [phase, setPhase] = useState<"tutorial" | null>(null);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("campeão");
 
@@ -30,7 +30,8 @@ export default function Inicio() {
       const savedName = localStorage.getItem("ippon_name");
       if (savedName) setName(savedName);
       if (localStorage.getItem("ippon_onboarding") === "pending") {
-        setPhase("welcome");
+        setStep(0);
+        setPhase("tutorial");
       }
     } catch {}
   }, []);
@@ -143,8 +144,7 @@ export default function Inicio() {
         <Tab label="Amigos" icon={<FriendsIcon />} />
       </nav>
 
-      {phase === "welcome" && <Welcome name={name} onYosh={() => { setStep(0); setPhase("tutorial"); }} />}
-      {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} />}
+      {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={name} />}
     </main>
   );
 }
@@ -228,30 +228,11 @@ function Overlay({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Welcome({ name, onYosh }: { name: string; onYosh: () => void }) {
-  return (
-    <Overlay>
-      <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
-        <div style={{ width: 92, height: 92, margin: "0 auto 4px" }}>
-          <Mascot belt="#141110" expression="comemorando" />
-        </div>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>Bem-vindo ao dojo</div>
-        <h1 style={{ fontFamily: FD, fontSize: 24, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Olá, {name}!</h1>
-        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 20px" }}>
-          Conseguiste! A tua conta está pronta e nós vamos divertir-nos muito. Monta a tua equipa, chama os amigos e vê quem é o melhor sensei!
-        </p>
-        <button onClick={onYosh} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 17, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", cursor: "pointer" }}>
-          Yosh!
-        </button>
-        <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 8 }}>“Yosh!” — vamos lá, em japonês</div>
-      </div>
-    </Overlay>
-  );
-}
-
-function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: number) => void; onClose: () => void }) {
-  const isPro = step >= STEPS.length;
-  const total = STEPS.length + 1;
+function Tutorial({ step, setStep, onClose, name }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string }) {
+  const total = STEPS.length + 2;
+  const isWelcome = step === 0;
+  const isPro = step === STEPS.length + 1;
+  const teach = STEPS[step - 1];
   return (
     <Overlay>
       <div style={{ textAlign: "right", marginBottom: 8 }}>
@@ -265,19 +246,34 @@ function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: numbe
         ))}
       </div>
 
-      {!isPro ? (
+      {isWelcome ? (
+        <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <div style={{ width: 64, height: 64, flexShrink: 0 }}>
+              <Mascot belt="#141110" expression="comemorando" />
+            </div>
+            <div>
+              <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>Bem-vindo, {name}!</div>
+              <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>Conseguiste! Vamos divertir-nos muito — tenho a certeza de que vais adorar. Bora começar?</p>
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+            <button onClick={() => setStep(1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 20px", borderRadius: 9, fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Vamos!</button>
+          </div>
+        </div>
+      ) : !isPro ? (
         <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
             <div style={{ width: 64, height: 64, flexShrink: 0 }}>
               <Mascot belt="#141110" expression="indicando" />
             </div>
             <div>
-              <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>{STEPS[step].title}</div>
-              <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{STEPS[step].text}</p>
+              <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>{teach.title}</div>
+              <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{teach.text}</p>
             </div>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
-            <button onClick={() => step > 0 && setStep(step - 1)} style={{ background: "transparent", border: "none", color: step === 0 ? "#3c463f" : "#93a39a", fontSize: 13, fontWeight: 700, cursor: step === 0 ? "default" : "pointer", fontFamily: FB }}>Anterior</button>
+            <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>Anterior</button>
             <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
             <button onClick={() => setStep(step + 1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Seguinte</button>
           </div>
