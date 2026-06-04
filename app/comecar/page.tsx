@@ -119,7 +119,7 @@ export default function Comecar() {
             <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 700, color: GOLD, textTransform: "uppercase" }}>Ippon!</div>
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 700, margin: "10px 0 6px", textTransform: "uppercase" }}>Bem-vindo, {form.name.split(" ")[0]}</h2>
             <p style={{ fontSize: 14, color: "#93a39a", margin: "0 0 20px" }}>A tua conta está pronta. Anda daí que eu ensino-te a jogar num minuto.</p>
-            <a href="/como-jogar" style={{ display: "inline-block", padding: "12px 22px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>Aprender a jogar</a>
+            <a href="/inicio" style={{ display: "inline-block", padding: "12px 22px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>Entrar no jogo</a>
             <div style={{ marginTop: 12 }}>
               <a href="/meu-time" style={{ fontSize: 12, color: "#93a39a", textDecoration: "none" }}>Saltar para o meu time</a>
             </div>
