@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
+import { Mascot } from "@/components/Mascot";
 
 const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
 const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
@@ -112,10 +113,16 @@ export default function Comecar() {
           </div>
         ) : (
           <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 18, padding: 28, textAlign: "center" }}>
+            <div style={{ width: 96, height: 96, margin: "0 auto 6px" }}>
+              <Mascot belt="#efeadd" expression="feliz" />
+            </div>
             <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 700, color: GOLD, textTransform: "uppercase" }}>Ippon!</div>
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 700, margin: "10px 0 6px", textTransform: "uppercase" }}>Bem-vindo, {form.name.split(" ")[0]}</h2>
-            <p style={{ fontSize: 14, color: "#93a39a", margin: "0 0 20px" }}>A tua conta está pronta. Vamos montar a tua equipa de 8 atletas com 100 Judocoins.</p>
-            <a href="/meu-time" style={{ display: "inline-block", padding: "12px 22px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>Ir para o meu time</a>
+            <p style={{ fontSize: 14, color: "#93a39a", margin: "0 0 20px" }}>A tua conta está pronta. Anda daí que eu ensino-te a jogar num minuto.</p>
+            <a href="/como-jogar" style={{ display: "inline-block", padding: "12px 22px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>Aprender a jogar</a>
+            <div style={{ marginTop: 12 }}>
+              <a href="/meu-time" style={{ fontSize: 12, color: "#93a39a", textDecoration: "none" }}>Saltar para o meu time</a>
+            </div>
           </div>
         )}
       </div>
