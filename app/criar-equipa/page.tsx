@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
 import { loadDraft, saveDraft, loadSaved, commitSaved, resolve, jcLeft, counts, isComplete, missing, type TeamState } from "@/lib/team";
+import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -25,11 +26,13 @@ export default function CriarEquipa() {
   const [draft, setDraft] = useState<TeamState>({ ids: [], captain: null });
   const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null });
   const [modal, setModal] = useState<Modal>(null);
+  const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
 
   useEffect(() => {
     try {
       setDraft(loadDraft());
       setSaved(loadSaved());
+      setIdentity(loadIdentity());
       if (!localStorage.getItem("ippon_team_tutorial")) setGuide("welcome");
     } catch {}
   }, []);
@@ -77,11 +80,13 @@ export default function CriarEquipa() {
             <a href="/inicio" aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
               <BackIcon />
             </a>
-            <div style={{ width: 40, height: 46, flexShrink: 0 }}><EscudoPlaceholder /></div>
-            <div style={{ minWidth: 0 }}>
-              <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>A tua equipa</h1>
-              <div style={{ fontSize: 11, color: "#93a39a" }}>1 por categoria · 4 masc + 4 fem</div>
-            </div>
+            <a href="/escudo" style={{ display: "flex", alignItems: "center", gap: 11, textDecoration: "none", color: "#f1ede2", minWidth: 0 }}>
+              <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={identity} size={40} /></div>
+              <div style={{ minWidth: 0 }}>
+                <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name}</h1>
+                <div style={{ fontSize: 11, color: "#93a39a" }}>Toca para editar o escudo ✎</div>
+              </div>
+            </a>
           </div>
           <button onClick={openGuide} aria-label="Como montar a equipa" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
@@ -100,7 +105,6 @@ export default function CriarEquipa() {
         </p>
       </div>
 
-      {/* Barra inferior */}
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 50 }}>
         <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <div className={guide === "counter" ? "ilglow" : undefined} style={{ padding: "2px 6px" }}>
@@ -119,7 +123,6 @@ export default function CriarEquipa() {
         </div>
       </div>
 
-      {/* Onboarding guiado */}
       {guide === "welcome" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -145,7 +148,6 @@ export default function CriarEquipa() {
         </CoachBubble>
       )}
 
-      {/* Modais */}
       {modal?.kind === "missing" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -266,15 +268,6 @@ function GiGhost() {
       <path d="M16 16 L7 25 L13 34 L20 29 L20 60 Q30 64 40 60 L40 29 L47 34 L53 25 L44 16 Q37 12 30 12 Q23 12 16 16 Z" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.40)" strokeWidth="1.6" strokeLinejoin="round" />
       <path d="M26 16 L30 26 L34 16" fill="none" stroke="rgba(255,255,255,0.40)" strokeWidth="1.4" />
       <rect x="18" y="44" width="24" height="5" rx="1" fill="rgba(255,255,255,0.28)" />
-    </svg>
-  );
-}
-
-function EscudoPlaceholder() {
-  return (
-    <svg viewBox="0 0 48 56" width="100%" height="100%" aria-hidden="true">
-      <path d="M24 2 L44 9 V28 C44 42 35 50 24 54 C13 50 4 42 4 28 V9 Z" fill="#1c3a2e" stroke={GOLD} strokeWidth="2" strokeLinejoin="round" />
-      <path d="M24 16 l2.6 5.3 5.8 0.8 -4.2 4.1 1 5.8 -5.2 -2.7 -5.2 2.7 1 -5.8 -4.2 -4.1 5.8 -0.8 Z" fill={GOLD} opacity="0.85" />
     </svg>
   );
 }
