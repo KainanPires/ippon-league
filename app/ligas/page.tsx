@@ -12,8 +12,8 @@ type Tab = "ativas" | "mercado" | "resultados";
 function esc(p: Partial<Identity>): Identity { return { ...DEFAULT_IDENTITY, ...p }; }
 
 const OFICIAIS = [
-  { id: "mundial", name: "Liga Mundial", sub: "Todos os jogadores", pos: "#1.243", cfg: esc({ bg1: "#1c3a2e", bg2: "#102a20", border: GOLD, symbol: "estrela" }) },
-  { id: "europa", name: "Continental · Europa", sub: "Jogadores da Europa", pos: "#312", cfg: esc({ bg1: "#2f6fb3", bg2: "#25588f", border: "#7fb8f5", symbol: "estrela" }) },
+  { id: "mundial", name: "Liga Mundial", sub: "Todos os jogadores", pos: "#1.243", cfg: esc({ bg1: "#1c3a2e", bg2: "#102a20", border: GOLD, symbol: "mundo" }) },
+  { id: "europa", name: "Continental · Europa", sub: "Jogadores da Europa", pos: "#312", cfg: esc({ bg1: "#2f6fb3", bg2: "#25588f", border: "#eaf2fd", symbol: "mapa-europa" }) },
   { id: "portugal", name: "Nacional · Portugal", sub: "Jogadores de Portugal", pos: "#14", cfg: esc({ bg1: "#c0392b", bg2: "#7a1f17", border: "#efeadd", symbol: "estrela" }) },
 ];
 
