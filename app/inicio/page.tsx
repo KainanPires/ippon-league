@@ -233,12 +233,12 @@ function Welcome({ name, onYosh }: { name: string; onYosh: () => void }) {
     <Overlay>
       <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
         <div style={{ width: 92, height: 92, margin: "0 auto 4px" }}>
-          <Mascot belt="#efeadd" expression="feliz" />
+          <Mascot belt="#141110" expression="comemorando" />
         </div>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>Bem-vindo ao dojo</div>
         <h1 style={{ fontFamily: FD, fontSize: 24, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Olá, {name}!</h1>
         <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 20px" }}>
-          O judô nunca foi tão divertido. Monta a tua equipa, chama os amigos e vê quem é o melhor sensei — a diversão é garantida.
+          Conseguiste! A tua conta está pronta e nós vamos divertir-nos muito. Monta a tua equipa, chama os amigos e vê quem é o melhor sensei!
         </p>
         <button onClick={onYosh} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 17, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", cursor: "pointer" }}>
           Yosh!
@@ -269,7 +269,7 @@ function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: numbe
         <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
             <div style={{ width: 64, height: 64, flexShrink: 0 }}>
-              <Mascot belt="#efeadd" expression="feliz" />
+              <Mascot belt="#141110" expression="indicando" />
             </div>
             <div>
               <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>{STEPS[step].title}</div>
@@ -285,7 +285,7 @@ function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: numbe
       ) : (
         <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18, textAlign: "center" }}>
           <div style={{ width: 72, height: 72, margin: "0 auto 2px" }}>
-            <Mascot belt="#141110" expression="feliz" />
+            <Mascot belt="#141110" expression="sabio" />
           </div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>Oferta de lançamento</div>
           <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0" }}>Ippon Pro</div>
