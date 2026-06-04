@@ -1,8 +1,8 @@
 // Mascote ornitorrinco judoca da Ippon League.
-// Cores da página inicial. Expressão "feliz" (recebe/ensina) ou "determinado" (compete).
-// A faixa muda de cor conforme o nível do jogador.
+// Expressões: feliz, determinado, comemorando, indicando, sabio (óculos).
+// A faixa muda de cor conforme o contexto.
 
-export type MascotExpression = "feliz" | "determinado";
+export type MascotExpression = "feliz" | "determinado" | "comemorando" | "indicando" | "sabio";
 
 export function Mascot({
   belt = "#141110",
@@ -11,7 +11,10 @@ export function Mascot({
   belt?: string;
   expression?: MascotExpression;
 }) {
-  const happy = expression === "feliz";
+  const happy = expression !== "determinado";
+  const armsUp = expression === "comemorando";
+  const pointing = expression === "indicando";
+  const glasses = expression === "sabio";
   return (
     <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">
       {/* cauda */}
@@ -19,12 +22,30 @@ export function Mascot({
       <line x1="65" y1="70" x2="79" y2="73" stroke="#2d7a72" strokeWidth="0.8" transform="rotate(-18 72 72)" />
       {/* corpo (judogi) */}
       <path d="M50,40 C40,40 33,44 32,52 L30,80 C30,85 36,86 50,86 C64,86 70,85 70,80 L68,52 C67,44 60,40 50,40 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" />
-      {/* manga esquerda */}
-      <path d="M33,47 L21,54 L25,63 L35,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
-      <circle cx="23" cy="62" r="4.2" fill="#E65100" />
-      {/* braço direito (em repouso, simétrico ao esquerdo) */}
-      <path d="M67,47 L79,54 L75,63 L65,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
-      <circle cx="77" cy="62" r="4.2" fill="#E65100" />
+      {/* braço esquerdo: ao alto (comemorar) ou em repouso */}
+      {armsUp ? (
+        <>
+          <path d="M33,47 L20,34 L14,24 L27,30 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
+          <circle cx="14" cy="22" r="4.4" fill="#E65100" />
+        </>
+      ) : (
+        <>
+          <path d="M33,47 L21,54 L25,63 L35,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
+          <circle cx="23" cy="62" r="4.2" fill="#E65100" />
+        </>
+      )}
+      {/* braço direito: ao alto (comemorar/indicar) ou em repouso */}
+      {armsUp || pointing ? (
+        <>
+          <path d="M67,47 L80,34 L86,24 L73,30 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
+          <circle cx="86" cy="22" r="4.4" fill="#E65100" />
+        </>
+      ) : (
+        <>
+          <path d="M67,47 L79,54 L75,63 L65,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
+          <circle cx="77" cy="62" r="4.2" fill="#E65100" />
+        </>
+      )}
       {/* cabeça */}
       <path d="M34,30 C34,18 42,12 50,12 C58,12 66,18 66,30 C66,38 60,43 50,43 C40,43 34,38 34,30 Z" fill="#4DB6AC" stroke="#2f8a80" strokeWidth="1" />
       {/* gola */}
@@ -36,7 +57,7 @@ export function Mascot({
       <rect x="44" y="64" width="12" height="11" rx="2" fill="rgba(0,0,0,0.2)" />
       <rect x="46" y="74" width="3.5" height="10" rx="1.5" fill={belt} />
       <rect x="51" y="74" width="3.5" height="10" rx="1.5" fill={belt} />
-      {/* bochechas (só feliz) */}
+      {/* bochechas (faces felizes) */}
       {happy && (
         <>
           <ellipse cx="39" cy="33" rx="3" ry="2" fill="rgba(255,143,0,0.30)" />
@@ -50,6 +71,16 @@ export function Mascot({
       <circle cx="55.7" cy="27" r="1.9" fill="#1A237E" />
       <circle cx="45" cy="26" r="0.7" fill="#fff" />
       <circle cx="57.2" cy="26" r="0.7" fill="#fff" />
+      {/* óculos (sábio / dicas) */}
+      {glasses && (
+        <g fill="none" stroke="#1b211e" strokeWidth="1.6">
+          <circle cx="43.5" cy="26" r="5.4" />
+          <circle cx="56.5" cy="26" r="5.4" />
+          <path d="M48.9 26 H51.1" />
+          <path d="M38.1 24.6 L34.6 23.6" />
+          <path d="M61.9 24.6 L65.4 23.6" />
+        </g>
+      )}
       {/* sobrancelhas: relaxadas (feliz) ou franzidas (determinado) */}
       {happy ? (
         <>
@@ -66,7 +97,7 @@ export function Mascot({
       <ellipse cx="50" cy="37" rx="11" ry="4.6" fill="#FF8F00" stroke="#E65100" strokeWidth="0.7" />
       <circle cx="46" cy="35.5" r="0.9" fill="#E65100" />
       <circle cx="54" cy="35.5" r="0.9" fill="#E65100" />
-      {/* sorriso (só feliz) */}
+      {/* sorriso (faces felizes) */}
       {happy && <path d="M45.5,40.5 Q50,43.5 54.5,40.5" fill="none" stroke="#C2410C" strokeWidth="1" strokeLinecap="round" />}
       {/* patas */}
       <path d="M37,84 L46,84 L48,93 L35,93 Z" fill="#FF8F00" />
