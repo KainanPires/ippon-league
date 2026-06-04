@@ -61,7 +61,7 @@ export default function Inicio() {
               <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{name}</div>
               <div style={{ fontSize: 11, color: GOLD }}>Faixa {USER.belt}</div>
             </div>
-          </div>
+          </a>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={openTutorial} aria-label="Como se joga" style={iconBtn}>?</button>
             <div style={{ position: "relative", ...iconBtn, cursor: "default" }}>
