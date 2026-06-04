@@ -137,8 +137,8 @@ export default function Inicio() {
       </div>
 
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 62, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
-        <Tab label="Início" active icon={<HomeIcon />} />
-        <Tab label="Competições" icon={<TrophyIcon />} />
+        <Tab label="Início" active icon={<HomeIcon />} href="/inicio" />
+        <Tab label="Competições" icon={<TrophyIcon />} href="/ligas" />
         <Tab label="Pro" icon={<BoltIcon />} />
         <Tab label="Amigos" icon={<FriendsIcon />} />
       </nav>
@@ -209,13 +209,15 @@ function TeamBuilt() {
   );
 }
 
-function Tab({ label, icon, active }: { label: string; icon: React.ReactNode; active?: boolean }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? GOLD : "#6f7d76" }}>
+function Tab({ label, icon, active, href }: { label: string; icon: React.ReactNode; active?: boolean; href?: string }) {
+  const baseStyle: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? GOLD : "#6f7d76", textDecoration: "none" };
+  const content = (
+    <>
       {icon}
       <span style={{ fontSize: 11, fontWeight: active ? 700 : 400 }}>{label}</span>
-    </div>
+    </>
   );
+  return href ? <a href={href} style={baseStyle}>{content}</a> : <div style={baseStyle}>{content}</div>;
 }
 
 function Overlay({ children }: { children: React.ReactNode }) {
