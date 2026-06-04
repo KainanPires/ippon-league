@@ -80,13 +80,13 @@ export default function CriarEquipa() {
             <a href="/inicio" aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
               <BackIcon />
             </a>
-            <a href="/escudo" style={{ display: "flex", alignItems: "center", gap: 11, textDecoration: "none", color: "#f1ede2", minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11, color: "#f1ede2", minWidth: 0 }}>
               <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={identity} size={40} /></div>
               <div style={{ minWidth: 0 }}>
                 <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name}</h1>
-                <div style={{ fontSize: 11, color: "#93a39a" }}>Toca para editar o escudo ✎</div>
+                <div style={{ fontSize: 11, color: "#93a39a" }}>1 por categoria · 4 masc + 4 fem</div>
               </div>
-            </a>
+            </div>
           </div>
           <button onClick={openGuide} aria-label="Como montar a equipa" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
