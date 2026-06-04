@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
-import { Mascot } from "@/components/Mascot";
 
 const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
 const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
@@ -26,7 +25,6 @@ const EMPTY: Form = { name: "", email: "", contact: "", dialIso: "PT", belt: "",
 export default function Comecar() {
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
-  const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
 
   function update(field: keyof Form, value: string) {
@@ -60,71 +58,59 @@ export default function Comecar() {
     };
     // TODO: enviar `lead` para o Supabase + HubSpot (próximo passo)
     console.log("lead", lead);
-    await new Promise((r) => setTimeout(r, 600));
-    setSaving(false);
-    setSubmitted(true);
+    try {
+      localStorage.setItem("ippon_onboarding", "pending");
+      localStorage.setItem("ippon_name", form.name.trim().split(" ")[0] || "");
+    } catch {}
+    await new Promise((r) => setTimeout(r, 400));
+    window.location.href = "/inicio";
   }
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FONT_BODY, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}>
       <div style={{ width: "100%", maxWidth: 440 }}>
-        {!submitted ? (
-          <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 18, padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Ippon League</span>
-              <span style={{ borderRadius: 999, border: `1px solid ${GOLD}`, color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", padding: "1px 8px" }}>Beta</span>
-            </div>
-            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>Entra no jogo</h1>
-            <p style={{ fontSize: 14, color: "#93a39a", margin: "0 0 20px" }}>Cria a tua conta para montares a equipa e disputares com fãs de judô do mundo todo.</p>
-
-            <Field label="Nome" error={errors.name}>
-              <input style={inputStyle(!!errors.name)} value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="O teu nome" />
-            </Field>
-
-            <Field label="Email" error={errors.email}>
-              <input style={inputStyle(!!errors.email)} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="email@exemplo.com" />
-            </Field>
-
-            <Field label="Contacto" error={errors.contact}>
-              <div style={{ display: "flex", gap: 8 }}>
-                <CountrySelect value={form.dialIso} onChange={(iso) => update("dialIso", iso)} />
-                <input style={inputStyle(!!errors.contact)} inputMode="tel" value={form.contact} onChange={(e) => update("contact", e.target.value)} placeholder="Número de telemóvel" />
-              </div>
-            </Field>
-
-            <Field label="Faixa" error={errors.belt}>
-              <select style={{ ...inputStyle(!!errors.belt), appearance: "none" }} value={form.belt} onChange={(e) => update("belt", e.target.value)}>
-                <option value="" disabled>Seleciona a tua faixa</option>
-                {BELTS.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="País" error={errors.countryIso}>
-              <CountryPicker value={form.countryIso} hasError={!!errors.countryIso} onChange={(iso) => update("countryIso", iso)} />
-            </Field>
-
-            <button onClick={handleSubmit} disabled={saving} style={{ width: "100%", marginTop: 8, padding: "14px", borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
-              {saving ? "A entrar..." : "Começar a jogar"}
-            </button>
-
-            <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>Ao continuar, aceitas receber novidades da Ippon League.</p>
+        <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 18, padding: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <span style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Ippon League</span>
+            <span style={{ borderRadius: 999, border: `1px solid ${GOLD}`, color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", padding: "1px 8px" }}>Beta</span>
           </div>
-        ) : (
-          <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 18, padding: 28, textAlign: "center" }}>
-            <div style={{ width: 96, height: 96, margin: "0 auto 6px" }}>
-              <Mascot belt="#efeadd" expression="feliz" />
+          <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>Entra no jogo</h1>
+          <p style={{ fontSize: 14, color: "#93a39a", margin: "0 0 20px" }}>Cria a tua conta para montares a equipa e disputares com fãs de judô do mundo todo.</p>
+
+          <Field label="Nome" error={errors.name}>
+            <input style={inputStyle(!!errors.name)} value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="O teu nome" />
+          </Field>
+
+          <Field label="Email" error={errors.email}>
+            <input style={inputStyle(!!errors.email)} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="email@exemplo.com" />
+          </Field>
+
+          <Field label="Contacto" error={errors.contact}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <CountrySelect value={form.dialIso} onChange={(iso) => update("dialIso", iso)} />
+              <input style={inputStyle(!!errors.contact)} inputMode="tel" value={form.contact} onChange={(e) => update("contact", e.target.value)} placeholder="Número de telemóvel" />
             </div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 700, color: GOLD, textTransform: "uppercase" }}>Ippon!</div>
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 700, margin: "10px 0 6px", textTransform: "uppercase" }}>Bem-vindo, {form.name.split(" ")[0]}</h2>
-            <p style={{ fontSize: 14, color: "#93a39a", margin: "0 0 20px" }}>A tua conta está pronta. Anda daí que eu ensino-te a jogar num minuto.</p>
-            <a href="/inicio" style={{ display: "inline-block", padding: "12px 22px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>Entrar no jogo</a>
-            <div style={{ marginTop: 12 }}>
-              <a href="/meu-time" style={{ fontSize: 12, color: "#93a39a", textDecoration: "none" }}>Saltar para o meu time</a>
-            </div>
-          </div>
-        )}
+          </Field>
+
+          <Field label="Faixa" error={errors.belt}>
+            <select style={{ ...inputStyle(!!errors.belt), appearance: "none" }} value={form.belt} onChange={(e) => update("belt", e.target.value)}>
+              <option value="" disabled>Seleciona a tua faixa</option>
+              {BELTS.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="País" error={errors.countryIso}>
+            <CountryPicker value={form.countryIso} hasError={!!errors.countryIso} onChange={(iso) => update("countryIso", iso)} />
+          </Field>
+
+          <button onClick={handleSubmit} disabled={saving} style={{ width: "100%", marginTop: 8, padding: "14px", borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "A entrar..." : "Começar a jogar"}
+          </button>
+
+          <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>Ao continuar, aceitas receber novidades da Ippon League.</p>
+        </div>
       </div>
     </main>
   );
@@ -182,7 +168,6 @@ const optionStyle = (active: boolean): CSSProperties => ({
   fontFamily: FONT_BODY,
 });
 
-// Seletor de indicativo telefónico (mostra bandeira + código)
 function CountrySelect({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -225,7 +210,6 @@ function CountrySelect({ value, onChange }: { value: string; onChange: (iso: str
   );
 }
 
-// Seletor de país (mostra bandeira + nome), pesquisável
 function CountryPicker({ value, hasError, onChange }: { value: string; hasError: boolean; onChange: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
