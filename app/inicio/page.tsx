@@ -11,7 +11,7 @@ const HAS_TEAM = false;
 const USER = { belt: "Branca" };
 
 const STEPS = [
-  { title: "Sou o teu sensei!", text: "Vou ensinar-te a jogar em 1 minuto. Avança quando quiseres — ou pula." },
+  { title: "Como funciona", text: "Vou mostrar-te o essencial em 1 minuto. Avança quando quiseres — ou pula." },
   { title: "Monta a tua equipa", text: "100 Judocoins, 8 atletas e 1 capitão (pontua a dobrar). É por aqui que começas." },
   { title: "Pontua pelas ações", text: "Ippon +10, waza-ari +4, shido a favor +1. Acompanhas tudo ao vivo no início." },
   { title: "Competições e ligas", text: "Cada Grand Slam ou Mundial é uma rodada. Dispute ligas mundial, nacional e de amigos." },
@@ -253,8 +253,8 @@ function Tutorial({ step, setStep, onClose, name }: { step: number; setStep: (s:
               <Mascot belt="#141110" expression="comemorando" />
             </div>
             <div>
-              <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>Bem-vindo, {name}!</div>
-              <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>Conseguiste! Vamos divertir-nos muito — tenho a certeza de que vais adorar. Bora começar?</p>
+              <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>Olá, {name}! Sou o Dôdo</div>
+              <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>Sou o teu sensei aqui na Ippon League e vou guiar-te. Vamos divertir-nos muito — tenho a certeza de que vais adorar. Bora começar?</p>
             </div>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
