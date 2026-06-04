@@ -5,3 +5,29 @@ body {
   padding: 0;
   font-family: Arial, Helvetica, sans-serif;
 }
+/* ===== Ippon League · acerto responsivo (mobile-first) ===== */
+* { box-sizing: border-box; }
+html, body { overflow-x: hidden; }
+
+@media (min-width: 600px) {
+  body {
+    background:
+      radial-gradient(1100px 520px at 50% -8%, #163029 0%, rgba(22,48,41,0) 60%),
+      linear-gradient(180deg, #0a0c0b 0%, #070908 100%);
+    background-attachment: fixed;
+  }
+  main {
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+    box-shadow: 0 0 0 1px #1a221d, 0 24px 70px rgba(0, 0, 0, 0.55);
+    min-height: 100vh;
+  }
+  nav[style*="fixed"] {
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+  }
+}
