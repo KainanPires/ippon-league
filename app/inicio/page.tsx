@@ -27,8 +27,9 @@ export default function Inicio() {
 
   useEffect(() => {
     try {
+      const savedName = localStorage.getItem("ippon_name");
+      if (savedName) setName(savedName);
       if (localStorage.getItem("ippon_onboarding") === "pending") {
-        setName(localStorage.getItem("ippon_name") || "campeão");
         setPhase("welcome");
       }
     } catch {}
