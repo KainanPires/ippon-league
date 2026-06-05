@@ -19,12 +19,12 @@ const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
 type Guide = "welcome" | "counter" | "slot" | null;
-type Modal = { kind: "missing" | "saved" | "trash" } | { kind: "athlete"; a: Athlete } | null;
+type Modal = { kind: "missing" | "saved" | "trash" | "share" } | { kind: "athlete"; a: Athlete } | null;
 
 export default function CriarEquipa() {
   const [guide, setGuide] = useState<Guide>(null);
   const [draft, setDraft] = useState<TeamState>({ ids: [], captain: null });
-  const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null });
+  const [, setSaved] = useState<TeamState>({ ids: [], captain: null });
   const [modal, setModal] = useState<Modal>(null);
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
 
@@ -46,7 +46,6 @@ export default function CriarEquipa() {
     setModal(null);
   }
   function clearAll() { update({ ids: [], captain: null }); setModal(null); }
-  function revert() { setDraft(saved); saveDraft(saved); }
   function save() {
     if (isComplete(draft)) { commitSaved(draft); setSaved(draft); setModal({ kind: "saved" }); }
     else { setModal({ kind: "missing" }); }
@@ -57,7 +56,6 @@ export default function CriarEquipa() {
   const females = all.filter((a) => a.gender === "F");
   const total = all.length;
   const left = jcLeft(draft);
-  const changed = JSON.stringify(draft) !== JSON.stringify(saved);
   const firstEmpty = males.length < 4 ? { row: "M", i: males.length } : females.length < 4 ? { row: "F", i: females.length } : null;
 
   function renderRow(list: Athlete[], row: "M" | "F") {
@@ -74,7 +72,7 @@ export default function CriarEquipa() {
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <style>{`@keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.55)}50%{box-shadow:0 0 0 8px rgba(74,144,217,0.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:10px}`}</style>
 
-      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 104px" }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 150px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
             <a href="/inicio" aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
@@ -103,26 +101,45 @@ export default function CriarEquipa() {
         <p style={{ fontSize: 12, color: "#93a39a", textAlign: "center", marginTop: 14 }}>
           Toca num lugar livre para abrir o Mercado. Toca num atleta para o tornar capitão.
         </p>
-      </div>
 
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 50 }}>
-        <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <div className={guide === "counter" ? "ilglow" : undefined} style={{ padding: "2px 6px" }}>
-            <div><span style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: GOLD }}>{total}</span><span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#93a39a" }}>/8</span></div>
-            <div style={{ fontSize: 11, color: "#cfd8d2" }}>JC {fmt(left)}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Sê Pro e avalia a tua equipa</div>
+            <div style={{ fontSize: 11.5, color: "#5c4410", marginTop: 2 }}>Scout, valorização esperada e dicas da rodada.</div>
+            <span style={{ display: "inline-block", marginTop: 8, background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8 }}>Ver Ippon Pro</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {changed && saved.ids.length > 0 && (
-              <button onClick={revert} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>Reverter</button>
-            )}
-            <button onClick={() => setModal({ kind: "trash" })} aria-label="Limpar equipa" style={{ width: 42, height: 42, borderRadius: 10, border: "1px solid #3a2422", background: "transparent", color: "#ef8d83", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-              <TrashIcon />
-            </button>
-            <button onClick={save} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: "pointer" }}>Salvar equipa</button>
-          </div>
+          <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt="#141110" expression="sabio" /></div>
         </div>
       </div>
 
+      {/* Barra inferior: ações + navegação */}
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50 }}>
+        <div style={{ background: "#0f1411", borderTop: "1px solid #243029", padding: "9px 14px" }}>
+          <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div className={guide === "counter" ? "ilglow" : undefined} style={{ padding: "2px 6px" }}>
+              <div><span style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: GOLD }}>{total}</span><span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#93a39a" }}>/8</span></div>
+              <div style={{ fontSize: 11, color: "#cfd8d2" }}>JC {fmt(left)}</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button onClick={() => setModal({ kind: "trash" })} aria-label="Limpar equipa" style={roundBtn("#3a2422", "#ef8d83")}>
+                <TrashIcon />
+              </button>
+              <button onClick={() => setModal({ kind: "share" })} aria-label="Partilhar equipa" style={roundBtn("#243029", "#cfd8d2")}>
+                <ShareIcon />
+              </button>
+              <button onClick={save} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: "pointer" }}>Salvar equipa</button>
+            </div>
+          </div>
+        </div>
+        <nav style={{ height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
+          <NavTab label="Início" href="/inicio" icon={<HomeIcon />} />
+          <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} />
+          <NavTab label="Pro" icon={<BoltIcon />} />
+          <NavTab label="Amigos" icon={<FriendsIcon />} />
+        </nav>
+      </div>
+
+      {/* Onboarding guiado */}
       {guide === "welcome" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -148,6 +165,7 @@ export default function CriarEquipa() {
         </CoachBubble>
       )}
 
+      {/* Modais */}
       {modal?.kind === "missing" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -187,6 +205,16 @@ export default function CriarEquipa() {
           </div>
         </div>
       )}
+      {modal?.kind === "share" && (
+        <div style={overlayBg}>
+          <div style={cardBox}>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#141110" expression="comemorando" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Partilhar a equipa</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Em breve vais poder gerar um cartão da tua equipa para mostrares aos amigos. 🥋</p>
+            <button onClick={() => setModal(null)} style={primaryBtn}>Fechar</button>
+          </div>
+        </div>
+      )}
       {modal?.kind === "athlete" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -221,7 +249,7 @@ const coachP: React.CSSProperties = { fontSize: 13, color: "#f1ede2", margin: 0,
 
 function CoachBubble({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ position: "fixed", left: 0, right: 0, bottom: 88, display: "flex", justifyContent: "center", padding: "0 14px", zIndex: 90 }}>
+    <div style={{ position: "fixed", left: 0, right: 0, bottom: 134, display: "flex", justifyContent: "center", padding: "0 14px", zIndex: 90 }}>
       <div style={{ width: "100%", maxWidth: 432, display: "flex", alignItems: "flex-end", gap: 10 }}>
         <div style={{ width: 64, height: 64, flexShrink: 0 }}><Mascot belt="#efeadd" expression="feliz" /></div>
         <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", display: "flex", flexDirection: "column" }}>{children}</div>
@@ -281,4 +309,31 @@ function TrashIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>
   );
+}
+function ShareIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M8 7l4-4 4 4" /></svg>
+  );
+}
+
+function roundBtn(border: string, color: string): React.CSSProperties {
+  return { width: 42, height: 42, borderRadius: 10, border: `1px solid ${border}`, background: "transparent", color, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
+}
+
+function NavTab({ label, icon, href }: { label: string; icon: React.ReactNode; href?: string }) {
+  const style: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: "#6f7d76", textDecoration: "none" };
+  const inner = <>{icon}<span style={{ fontSize: 11 }}>{label}</span></>;
+  return href ? <a href={href} style={style}>{inner}</a> : <div style={style}>{inner}</div>;
+}
+function HomeIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></svg>;
+}
+function TrophyIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 6H5v2a3 3 0 0 0 3 3M16 6h3v2a3 3 0 0 1-3 3M10 17h4M9 21h6M12 13v4" /></svg>;
+}
+function BoltIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" /></svg>;
+}
+function FriendsIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>;
 }
