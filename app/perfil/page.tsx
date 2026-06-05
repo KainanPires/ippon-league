@@ -11,7 +11,7 @@ const GOLD = "#d9a441";
 const INFO: { label: string; href?: string; soon?: boolean }[] = [
   { label: "Como se joga", href: "/como-jogar" },
   { label: "Sobre a Ippon League", soon: true },
-  { label: "Ippon Pro", soon: true },
+  { label: "Ippon Pro", href: "/ippon-pro" },
   { label: "Termos de utilização", soon: true },
   { label: "Política de privacidade", soon: true },
   { label: "Ajuda e contacto", soon: true },
@@ -39,6 +39,7 @@ export default function Perfil() {
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Perfil</h1>
         </header>
 
+        {/* Cartão do jogador */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 22 }}>
           <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
             <Mascot belt="#efeadd" expression="feliz" />
@@ -49,6 +50,7 @@ export default function Perfil() {
           </div>
         </div>
 
+        {/* A minha equipa / escudo */}
         <SectionTitle>A minha equipa</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 14, background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 12 }}>
           <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={identity} size={52} /></div>
@@ -61,6 +63,7 @@ export default function Perfil() {
           Mudar escudo
         </a>
 
+        {/* Informações e políticas */}
         <SectionTitle>Informações e políticas</SectionTitle>
         <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden" }}>
           {INFO.map((it, i) => {
