@@ -1,46 +1,57 @@
 // Página de teste (escondida) para descobrir o acesso ao JudoBase.
-// Corre no servidor da Vercel (sem problemas de CORS) e mostra o que cada endpoint devolve.
+// Corre no servidor da Vercel. Mostra o que cada endpoint devolve.
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 const FD = "var(--font-geist-mono), ui-monospace, monospace";
-const BASE = "https://data.judobase.org/api/get_json";
+
+// Parênteses codificados (%5B = [  %5D = ]) para evitar problemas no pedido.
+const A = "%5Baction%5D";
+const P = (k: string) => `%5B${k}%5D`;
 
 type Target = { label: string; url: string };
 
 const TARGETS: Target[] = [
-  { label: "1 · Conectividade (atleta id 9194)", url: `${BASE}?access_token=&params[action]=competitor.wrl_current&params[id_person]=9194` },
-  { label: "2 · Competição id 2653 (Paris) — competition.get", url: `${BASE}?access_token=&params[action]=competition.get&params[id_competition]=2653` },
-  { label: "3 · Competição 2653 — competition.get_info", url: `${BASE}?access_token=&params[action]=competition.get_info&params[id_competition]=2653` },
-  { label: "4 · Combates da competição 2653 — contest.find", url: `${BASE}?access_token=&params[action]=contest.find&params[id_competition]=2653` },
-  { label: "5 · Procurar atleta — competitor.find (Riner)", url: `${BASE}?access_token=&params[action]=competitor.find&params[family_name]=Riner` },
-  { label: "6 · Lista de competições 2024 — competition.get_list", url: `${BASE}?access_token=&params[action]=competition.get_list&params[year]=2024` },
+  { label: "0 · SANIDADE (a Vercel sai para a net?)", url: "https://api.github.com/zen" },
+  { label: "1 · data.ijf.org — competição 2653 (Paris)", url: `https://data.ijf.org/api/get_json?access_token=&params${A}=competition.get&params${P("id_competition")}=2653` },
+  { label: "2 · data.judobase.org — competição 2653", url: `https://data.judobase.org/api/get_json?access_token=&params${A}=competition.get&params${P("id_competition")}=2653` },
+  { label: "3 · data.ijf.org — atleta id 9194 (wrl_current)", url: `https://data.ijf.org/api/get_json?access_token=&params${A}=competitor.wrl_current&params${P("id_person")}=9194` },
+  { label: "4 · data.ijf.org — procurar atleta (Riner)", url: `https://data.ijf.org/api/get_json?access_token=&params${A}=competitor.find&params${P("family_name")}=Riner` },
+  { label: "5 · data.ijf.org — lista competições 2024", url: `https://data.ijf.org/api/get_json?access_token=&params${A}=competition.get_list&params${P("year")}=2024` },
 ];
 
-type Probe = { ok: boolean; status: number; ctype: string; info: string; preview: string; len: number };
+type Probe = { ok: boolean; status: number; ctype: string; info: string; preview: string; len: number; ms: number };
 
 async function probe(url: string): Promise<Probe> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 9000);
+  const timer = setTimeout(() => ctrl.abort(), 14000);
+  const t0 = Date.now();
   try {
     const res = await fetch(url, {
       cache: "no-store",
       signal: ctrl.signal,
-      headers: { Accept: "application/json", "User-Agent": "IpponLeague/0.1 (test)" },
+      redirect: "follow",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "User-Agent": "Mozilla/5.0 (IpponLeague test)",
+        Referer: "https://www.judobase.org/",
+      },
     });
     const text = await res.text();
     clearTimeout(timer);
+    const ms = Date.now() - t0;
     let info = "";
     try {
       const json = JSON.parse(text);
       if (Array.isArray(json)) info = `JSON array · ${json.length} itens`;
       else info = `JSON · chaves: ${Object.keys(json).join(", ").slice(0, 240)}`;
     } catch {
-      info = "Resposta não é JSON (ver bruto abaixo)";
+      info = "Não é JSON (ver bruto abaixo)";
     }
-    return { ok: res.ok, status: res.status, ctype: res.headers.get("content-type") || "", info, preview: text.slice(0, 1600), len: text.length };
+    return { ok: res.ok, status: res.status, ctype: res.headers.get("content-type") || "", info, preview: text.slice(0, 1600), len: text.length, ms };
   } catch (e: any) {
     clearTimeout(timer);
-    return { ok: false, status: 0, ctype: "", info: "ERRO: " + (e?.message || String(e)), preview: "", len: 0 };
+    return { ok: false, status: 0, ctype: "", info: "ERRO: " + (e?.message || String(e)), preview: "", len: 0, ms: Date.now() - t0 };
   }
 }
 
@@ -52,7 +63,7 @@ export default async function TesteJudobase() {
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
         <h1 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase" }}>Teste JudoBase</h1>
         <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.5 }}>
-          Testa o acesso à API do JudoBase a partir do servidor. Verde = respondeu (200). Manda-me um print desta página.
+          Verde = respondeu (200). O teste 0 confirma se a Vercel consegue sair para a internet. Manda-me um print.
         </p>
 
         {results.map((row) => {
@@ -62,7 +73,7 @@ export default async function TesteJudobase() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                 <span style={{ fontWeight: 700, fontSize: 14 }}>{row.label}</span>
                 <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: good ? "#7fd1a3" : "#ef8d83", whiteSpace: "nowrap" }}>
-                  {row.r.status === 0 ? "FALHOU" : `HTTP ${row.r.status}`}
+                  {row.r.status === 0 ? "FALHOU" : `HTTP ${row.r.status}`} · {row.r.ms}ms
                 </span>
               </div>
               <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4, wordBreak: "break-all" }}>{row.url}</div>
@@ -78,9 +89,7 @@ export default async function TesteJudobase() {
           );
         })}
 
-        <p style={{ fontSize: 11, color: "#5f6f67", marginTop: 20 }}>
-          Página temporária de diagnóstico — apagamos depois de descobrirmos o acesso.
-        </p>
+        <p style={{ fontSize: 11, color: "#5f6f67", marginTop: 20 }}>Página temporária de diagnóstico.</p>
       </div>
     </main>
   );
