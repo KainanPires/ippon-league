@@ -46,6 +46,10 @@ export default function CriarEquipa() {
     setModal(null);
   }
   function clearAll() { update({ ids: [], captain: null }); setModal(null); }
+  function sell(id: string) {
+    update({ ids: draft.ids.filter((x) => x !== id), captain: draft.captain === id ? null : draft.captain });
+    setModal(null);
+  }
   function save() {
     if (isComplete(draft)) { commitSaved(draft); setSaved(draft); setModal({ kind: "saved" }); }
     else { setModal({ kind: "missing" }); }
@@ -230,7 +234,7 @@ export default function CriarEquipa() {
             <button onClick={() => setCaptain(modal.a.id)} style={{ ...primaryBtn, background: draft.captain === modal.a.id ? "#1c3a2e" : GOLD, color: draft.captain === modal.a.id ? "#aee9c9" : "#1b211e" }}>
               {draft.captain === modal.a.id ? "Remover capitão" : "Tornar capitão (pontua x2)"}
             </button>
-            <a href="/mercado" style={{ display: "block", marginTop: 10, textAlign: "center", border: "1px solid #243029", color: "#cfd8d2", padding: "11px", borderRadius: 12, textDecoration: "none", fontSize: 14, fontFamily: FB }}>Trocar no Mercado</a>
+            <button onClick={() => sell(modal.a.id)} style={{ display: "block", width: "100%", marginTop: 10, textAlign: "center", border: "1px solid #5a2f2c", background: "transparent", color: "#ef8d83", padding: "11px", borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer" }}>Vender</button>
             <button onClick={() => setModal(null)} style={ghostBtn}>Fechar</button>
           </div>
         </div>
