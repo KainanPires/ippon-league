@@ -19,15 +19,16 @@ const STEPS = [
   { title: "Sobe de faixa", text: "O teu desempenho mensal muda a tua faixa — e o visual do jogo. Boa sorte!" },
 ];
 
+const PRO_BENEFITS = ["Scout avançado dos atletas", "Valorização esperada da rodada", "Dicas e capitães recomendados", "Ligas e badges exclusivos"];
+
 // Passo do tutorial -> elemento do ecrã que acende e para onde o Dôdo aponta.
 type TutTarget = "team" | "ligas" | "belt" | "pro" | null;
 function targetForStep(step: number): TutTarget {
-  if (step === STEPS.length + 1) return "pro";
   const idx = step - 1; // índice do passo de ensino
   if (idx === 1) return "team";   // "Monta a tua equipa"
   if (idx === 3) return "ligas";  // "Competições e ligas"
   if (idx === 4) return "belt";   // "Sobe de faixa"
-  return null;
+  return null;                    // boas-vindas, conceitos e Ippon Pro -> cartão central
 }
 
 export default function Inicio() {
@@ -37,7 +38,6 @@ export default function Inicio() {
   const [teamInfo, setTeamInfo] = useState<{ name: string; value: string; last: number } | null>(null);
 
   const beltRef = useRef<HTMLAnchorElement | null>(null);
-  const proRef = useRef<HTMLDivElement | null>(null);
   const teamRef = useRef<HTMLDivElement | null>(null);
   const ligasRef = useRef<HTMLAnchorElement | null>(null);
   const tutTarget: TutTarget = phase === "tutorial" ? targetForStep(step) : null;
@@ -45,7 +45,7 @@ export default function Inicio() {
   useEffect(() => {
     if (phase !== "tutorial") return;
     const t = targetForStep(step);
-    const el = t === "team" ? teamRef.current : t === "ligas" ? ligasRef.current : t === "belt" ? beltRef.current : t === "pro" ? proRef.current : null;
+    const el = t === "team" ? teamRef.current : t === "ligas" ? ligasRef.current : t === "belt" ? beltRef.current : null;
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [phase, step]);
 
@@ -105,7 +105,7 @@ export default function Inicio() {
           </div>
         </header>
 
-        <div ref={proRef} className={glow("pro")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "11px 14px", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "11px 14px", marginBottom: 14 }}>
           <div>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Ippon Pro · 4,90€</div>
             <div style={{ fontSize: 11, color: "#5c4410" }}>Joga com vantagem competitiva</div>
@@ -322,6 +322,30 @@ function Tutorial({ step, setStep, onClose, name, target }: { step: number; setS
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
             <button onClick={() => setStep(1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 20px", borderRadius: 9, fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Vamos!</button>
           </div>
+        </div>
+      ) : isPro ? (
+        <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 20, textAlign: "center" }}>
+          <div style={{ width: 80, height: 80, margin: "0 auto 2px" }}>
+            <Mascot belt="#141110" expression="sabio" />
+          </div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>Oferta de lançamento</div>
+          <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0" }}>Ippon Pro</div>
+          <div style={{ margin: "6px 0 14px" }}>
+            <span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through" }}>9,90€</span>{" "}
+            <span style={{ fontFamily: FD, fontSize: 30, fontWeight: 700, color: GOLD }}>4,90€</span>
+            <span style={{ fontSize: 12, color: "#93a39a" }}>/mês</span>
+          </div>
+          <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
+            {PRO_BENEFITS.map((b) => (
+              <div key={b} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+                <span style={{ color: GOLD, fontWeight: 700 }}>✓</span>
+                <span style={{ fontSize: 13, color: "#c7d0c9" }}>{b}</span>
+              </div>
+            ))}
+          </div>
+          <a href="/ippon-pro" style={{ display: "block", width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 15, borderRadius: 12, fontSize: 16, textDecoration: "none", boxSizing: "border-box" }}>Seja Ippon Pro agora</a>
+          <a href="/ippon-pro" style={{ display: "block", marginTop: 9, textAlign: "center", color: GOLD, fontSize: 13, fontWeight: 700, textDecoration: "none", fontFamily: FB }}>Saber mais</a>
+          <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB }}>Continuar sem pagar</button>
         </div>
       ) : (
         <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
