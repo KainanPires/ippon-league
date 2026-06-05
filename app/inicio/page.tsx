@@ -105,13 +105,13 @@ export default function Inicio() {
           </div>
         </header>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "11px 14px", marginBottom: 14 }}>
+        <a href="/ippon-pro" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "11px 14px", marginBottom: 14, textDecoration: "none" }}>
           <div>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Ippon Pro · 4,90€</div>
             <div style={{ fontSize: 11, color: "#5c4410" }}>Joga com vantagem competitiva</div>
           </div>
           <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Assinar</span>
-        </div>
+        </a>
 
         <div ref={teamRef} className={glow("team")}>
           {teamInfo ? <TeamBuilt info={teamInfo} /> : <TeamCreate />}
@@ -175,7 +175,7 @@ export default function Inicio() {
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 62, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
         <Tab label="Início" active icon={<HomeIcon />} href="/inicio" />
         <Tab label="Competições" icon={<TrophyIcon />} href="/ligas" />
-        <Tab label="Pro" icon={<BoltIcon />} />
+        <Tab label="Pro" icon={<BoltIcon />} href="/ippon-pro" />
         <Tab label="Amigos" icon={<FriendsIcon />} />
       </nav>
 
