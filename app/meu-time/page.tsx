@@ -1,253 +1,220 @@
-import { scoreAthlete, type ActionType } from "@/lib/engine";
+"use client";
 
-type Athlete = {
-  name: string;
-  country: string;
-  category: string;
-  price: number;
-  variation: number; // valorização da rodada em %
-  isCaptain?: boolean;
-  actions: ActionType[];
-};
+import { useState, useEffect } from "react";
+import { Mascot } from "@/components/Mascot";
+import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+import { loadSaved, resolve, jcLeft, type TeamState } from "@/lib/team";
+import { type Athlete } from "@/lib/athletes";
+import { scoreAthlete, POINTS, type ActionType } from "@/lib/engine";
 
-const TEAM = {
-  teamName: "Dojo dos Sonhos",
-  belt: "Roxa",
-  patrimony: 100,
-  balance: 2,
-  rankNational: 14,
-  roundPosition: 3,
-};
-
-const ATHLETES: Athlete[] = [
-  { name: "Hifumi Abe", country: "JPN", category: "-66kg", price: 18, variation: 8, isCaptain: true, actions: ["ippon_feito", "waza_ari_feito", "shido_provocado"] },
-  { name: "C. Agbegnenou", country: "FRA", category: "-63kg", price: 17, variation: 12, actions: ["ippon_feito", "ippon_feito"] },
-  { name: "Teddy Riner", country: "FRA", category: "+100kg", price: 16, variation: -4, actions: ["waza_ari_feito", "shido_provocado"] },
-  { name: "Tato Grigalashvili", country: "GEO", category: "-81kg", price: 13, variation: 3, actions: ["ippon_feito"] },
-  { name: "Lasha Bekauri", country: "GEO", category: "-90kg", price: 12, variation: 6, actions: ["ippon_feito", "shido_recebido"] },
-  { name: "Christa Deguchi", country: "CAN", category: "-57kg", price: 11, variation: 5, actions: ["waza_ari_feito", "yuko_feito"] },
-  { name: "D. Krasniqi", country: "KOS", category: "-48kg", price: 6, variation: -2, actions: ["yuko_feito", "shido_provocado"] },
-  { name: "Joana Ramos", country: "POR", category: "-52kg", price: 5, variation: 9, actions: ["waza_ari_feito"] },
-];
-
-const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
-const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
+const FD = "var(--font-geist-mono), system-ui, sans-serif";
+const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
+const BELT = "Branca";
+const BELT_HEX = "#efeadd";
 
-// Cor da faixa do jogador (muda o mascote conforme o nível do mês)
-const BELT_HEX: Record<string, string> = {
-  Branca: "#efeadd",
-  Azul: "#2f6fb3",
-  Amarela: "#e6c84f",
-  Verde: "#3f8f5a",
-  Roxa: "#7a4fa3",
-  Marrom: "#6b4226",
-  Preta: "#141110",
+// Estado do mercado/competição. No passo C liga-se aos dados reais da rodada.
+// "aberto" = a montar (mostra preço) · "fechado" = à espera (mostra — — —) · "ao-vivo" = a competir (mostra pontuação)
+const MARKET_PHASE: "aberto" | "fechado" | "ao-vivo" = "fechado";
+
+const IOC: Record<string, string> = {
+  JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
+  TR: "TUR", UZ: "UZB", RU: "AIN", DE: "GER", XK: "KOS", IT: "ITA", CA: "CAN",
+  SI: "SLO", HR: "CRO", NL: "NED",
+};
+const code3 = (iso: string) => IOC[iso] || iso;
+const fmt = (n: number) => String(Math.round(n * 10) / 10);
+
+const ACTION_LABEL: Record<ActionType, string> = {
+  ippon_feito: "Ippon",
+  waza_ari_feito: "Waza-ari",
+  yuko_feito: "Yuko",
+  shido_provocado: "Shido provocado",
+  ippon_sofrido: "Ippon sofrido",
+  waza_ari_sofrido: "Waza-ari sofrido",
+  yuko_sofrido: "Yuko sofrido",
+  shido_recebido: "Shido recebido",
+  hansoku_make_recebido: "Hansoku-make",
 };
 
-// Mensagem determinada do mascote conforme a posição na rodada
-function roundMessage(pos: number): string {
-  if (pos <= 1) return "Líder da rodada — segura o topo!";
-  if (pos <= 3) return `${pos}º na rodada — vamos ao 1º!`;
-  if (pos <= 10) return `${pos}º — bora subir no ranking!`;
-  return `${pos}º — recuperação na próxima!`;
-}
-
-function KimonoAvatar({ country, captain }: { country: string; captain?: boolean }) {
-  return (
-    <div
-      style={{
-        position: "relative",
-        width: "100%",
-        aspectRatio: "1 / 1",
-        borderRadius: 12,
-        background: captain ? "rgba(31,66,52,0.55)" : "rgba(12,14,13,0.28)",
-        border: captain ? `2px solid ${GOLD}` : "1px solid rgba(0,0,0,0.22)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        padding: 6,
-      }}
-    >
-      <svg viewBox="0 0 100 112" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-        <path d="M31,29 L11,33 L7,53 L21,57 L32,46 Z" fill="#f6f3ea" stroke="#ccc5b2" strokeWidth="1" strokeLinejoin="round" />
-        <path d="M69,29 L89,33 L93,53 L79,57 L68,46 Z" fill="#f6f3ea" stroke="#ccc5b2" strokeWidth="1" strokeLinejoin="round" />
-        <path d="M30,27 L70,27 L73,80 L71,101 L29,101 L27,80 Z" fill="#f6f3ea" stroke="#ccc5b2" strokeWidth="1" strokeLinejoin="round" />
-        <line x1="50" y1="31" x2="50" y2="68" stroke="#e4dece" strokeWidth="1" />
-        <path d="M38,27 Q50,16 62,27 L57,30 Q50,24 43,30 Z" fill="#e8e1d1" stroke="#ccc5b2" strokeWidth="0.8" strokeLinejoin="round" />
-        <text x="50" y="51" textAnchor="middle" fontFamily={FONT_DISPLAY} fontWeight="700" fontSize="16" letterSpacing="1.2" fill="#2a2a28">
-          {country}
-        </text>
-        <rect x="24" y="68" width="52" height="12" rx="2" fill="#16130f" />
-        <rect x="24" y="68" width="52" height="3" rx="1.5" fill="#2c2620" />
-        <rect x="43" y="69" width="14" height="13" rx="2.5" fill="#0d0b09" />
-        <line x1="50" y1="70" x2="50" y2="81" stroke="#322b24" strokeWidth="0.8" />
-        <rect x="44" y="80" width="4.5" height="20" rx="2" fill="#16130f" />
-        <rect x="51.5" y="80" width="4.5" height="20" rx="2" fill="#16130f" />
-      </svg>
-      {captain && (
-        <div
-          style={{
-            position: "absolute",
-            top: 6,
-            right: 6,
-            width: 22,
-            height: 22,
-            borderRadius: "50%",
-            background: GOLD,
-            color: "#1b211e",
-            fontFamily: FONT_DISPLAY,
-            fontWeight: 700,
-            fontSize: 13,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          C
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Mascote ornitorrinco judoca — cores da página inicial, faixa por nível
-function Mascot({ belt }: { belt: string }) {
-  return (
-    <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">
-      <ellipse cx="72" cy="72" rx="13" ry="7.5" fill="#39998f" transform="rotate(-18 72 72)" />
-      <line x1="65" y1="70" x2="79" y2="73" stroke="#2d7a72" strokeWidth="0.8" transform="rotate(-18 72 72)" />
-      <path d="M50,40 C40,40 33,44 32,52 L30,80 C30,85 36,86 50,86 C64,86 70,85 70,80 L68,52 C67,44 60,40 50,40 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" />
-      <path d="M33,47 L21,54 L25,63 L35,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
-      <path d="M67,47 L79,54 L75,63 L65,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
-      <circle cx="23" cy="62" r="4.2" fill="#E65100" />
-      <circle cx="77" cy="62" r="4.2" fill="#E65100" />
-      <path d="M34,30 C34,18 42,12 50,12 C58,12 66,18 66,30 C66,38 60,43 50,43 C40,43 34,38 34,30 Z" fill="#4DB6AC" stroke="#2f8a80" strokeWidth="1" />
-      <path d="M43,41 L50,53 L50,60 L41,51 Z" fill="#ece5d5" stroke="#d8d1c0" strokeWidth="0.6" />
-      <path d="M57,41 L50,53 L50,60 L59,51 Z" fill="#e3dccb" stroke="#d8d1c0" strokeWidth="0.6" />
-      <rect x="28" y="65" width="44" height="8" rx="2" fill={belt} stroke="rgba(0,0,0,0.25)" strokeWidth="0.6" />
-      <rect x="44" y="64" width="12" height="11" rx="2" fill={belt} />
-      <rect x="44" y="64" width="12" height="11" rx="2" fill="rgba(0,0,0,0.2)" />
-      <rect x="46" y="74" width="3.5" height="10" rx="1.5" fill={belt} />
-      <rect x="51" y="74" width="3.5" height="10" rx="1.5" fill={belt} />
-      <ellipse cx="43.5" cy="26" rx="3.3" ry="3.8" fill="#fff" />
-      <ellipse cx="56.5" cy="26" rx="3.3" ry="3.8" fill="#fff" />
-      <circle cx="44.3" cy="27" r="1.9" fill="#1A237E" />
-      <circle cx="55.7" cy="27" r="1.9" fill="#1A237E" />
-      <line x1="39" y1="20.5" x2="46.5" y2="22.5" stroke="#E65100" strokeWidth="1.8" strokeLinecap="round" />
-      <line x1="61" y1="20.5" x2="53.5" y2="22.5" stroke="#E65100" strokeWidth="1.8" strokeLinecap="round" />
-      <ellipse cx="50" cy="37" rx="11" ry="4.6" fill="#FF8F00" stroke="#E65100" strokeWidth="0.7" />
-      <circle cx="46" cy="35.5" r="0.9" fill="#E65100" />
-      <circle cx="54" cy="35.5" r="0.9" fill="#E65100" />
-      <path d="M37,84 L46,84 L48,93 L35,93 Z" fill="#FF8F00" />
-      <path d="M63,84 L54,84 L52,93 L65,93 Z" fill="#FF8F00" />
-    </svg>
-  );
-}
-
-function AthleteInfo({ name, category, price, variation, score }: { name: string; category: string; price: number; variation: number; score: number }) {
-  const up = variation >= 0;
-  return (
-    <div
-      style={{
-        background: "rgba(8,10,8,0.82)",
-        border: "1px solid rgba(0,0,0,0.35)",
-        borderRadius: 10,
-        padding: "6px 4px",
-        textAlign: "center",
-      }}
-    >
-      <div style={{ fontSize: 12, fontWeight: 700, color: "#ffffff", lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {name}
-      </div>
-      <div style={{ fontSize: 11, color: "#b6c0b9" }}>{category}</div>
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 3 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#f2c84b" }}>JC {price}</span>
-        <span style={{ fontSize: 11, fontWeight: 700, color: up ? "#6fd49b" : "#ef8d83" }}>
-          {up ? "▲" : "▼"} {Math.abs(variation)}%
-        </span>
-      </div>
-      <div style={{ marginTop: 4 }}>
-        <span style={{ background: "#1d3a2b", color: "#9be3bd", fontWeight: 700, fontSize: 11, padding: "2px 9px", borderRadius: 999 }}>
-          {score >= 0 ? "+" : ""}
-          {score} pts
-        </span>
-      </div>
-    </div>
-  );
+// Ações de exemplo (estáveis por atleta) — ligam aos dados reais da rodada no passo C.
+function sampleActions(a: Athlete): ActionType[] {
+  let h = 0;
+  for (let i = 0; i < a.id.length; i++) h = (h * 31 + a.id.charCodeAt(i)) >>> 0;
+  const acts: ActionType[] = [];
+  if (a.last >= 8) acts.push("ippon_feito");
+  if (a.last >= 14) acts.push("waza_ari_feito");
+  if (a.last >= 18) acts.push("waza_ari_feito");
+  if (h % 2 === 0) acts.push("shido_provocado");
+  if (h % 5 === 0) acts.push("shido_recebido");
+  if (acts.length === 0) acts.push("yuko_feito");
+  return acts;
 }
 
 export default function MeuTime() {
-  const cards = ATHLETES.map((a) => ({ ...a, score: scoreAthlete(a.actions, a.isCaptain) }));
-  const totalScore = cards.reduce((s, c) => s + c.score, 0);
-  const beltColor = BELT_HEX[TEAM.belt] ?? "#7a4fa3";
+  const [team, setTeam] = useState<TeamState>({ ids: [], captain: null });
+  const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
+  const [ready, setReady] = useState(false);
+  const [sel, setSel] = useState<Athlete | null>(null);
+
+  useEffect(() => {
+    try { setTeam(loadSaved()); setIdentity(loadIdentity()); } catch {}
+    setReady(true);
+  }, []);
+
+  if (!ready) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
+
+  const athletes = resolve(team.ids);
+  const hasTeam = athletes.length > 0;
+  const males = athletes.filter((a) => a.gender === "M");
+  const females = athletes.filter((a) => a.gender === "F");
+  const squadValue = fmt(athletes.reduce((s, a) => s + a.priceJc, 0));
+  const left = jcLeft(team);
+  const scoreOf = (a: Athlete) => scoreAthlete(sampleActions(a), a.id === team.captain);
+  const totalPts = athletes.reduce((s, a) => s + scoreOf(a), 0);
 
   return (
-    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FONT_BODY }}>
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "20px 16px 40px" }}>
-        {/* Top bar */}
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
-          <div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em" }}>
-              {TEAM.teamName}
-            </div>
-            <div style={{ fontSize: 13, color: "#93a39a", marginTop: 2 }}>
-              Faixa {TEAM.belt} · #{TEAM.rankNational} Portugal
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <Stat label="Patrimônio" value={`JC ${TEAM.patrimony}`} />
-            <Stat label="Saldo" value={`JC ${TEAM.balance}`} />
-          </div>
+    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 40px" }}>
+        <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
+          <a href="/inicio" aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          </a>
+          <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Meu Time</h1>
         </header>
 
-        {/* Tatame — área de competição */}
-        <section style={{ background: "#2f6fb3", border: "1px solid #25588f", borderRadius: 16, padding: 22 }}>
-          <div style={{ background: "#e6b422", border: "3px solid #f0cf6a", borderRadius: 4, padding: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
-              {cards.map((c) => (
-                <div key={c.name} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <KimonoAvatar country={c.country} captain={c.isCaptain} />
-                  <AthleteInfo name={c.name} category={c.category} price={c.price} variation={c.variation} score={c.score} />
-                </div>
-              ))}
-            </div>
+        {!hasTeam ? (
+          <div style={{ textAlign: "center", padding: "26px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
+            <div style={{ width: 96, height: 96, margin: "0 auto 6px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Ainda não tens equipa</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 18px" }}>Monta 8 atletas com 100 Judocoins, escolhe o teu capitão e vê-os aqui prontos a competir.</p>
+            <a href="/criar-equipa" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px 22px", borderRadius: 12, fontSize: 15, textDecoration: "none" }}>Montar a minha equipa</a>
           </div>
-        </section>
-
-        {/* Footer — pontuação + mascote */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginTop: 18,
-            padding: "12px 16px",
-            background: "#141a17",
-            border: "1px solid #243029",
-            borderRadius: 14,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 66, height: 66, flexShrink: 0 }}>
-              <Mascot belt={beltColor} />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: "#93a39a" }}>Pontuação da rodada</div>
-              <div style={{ fontSize: 13, color: "#f2c84b", fontWeight: 700, marginTop: 2 }}>
-                {roundMessage(TEAM.roundPosition)}
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
+                <div style={{ flexShrink: 0 }}><Escudo config={identity} size={40} /></div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name}</div>
+                  <div style={{ fontSize: 12, color: GOLD }}>Faixa {BELT}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Stat label="Património" value={`JC 100`} />
+                <Stat label="Saldo" value={`JC ${fmt(left)}`} />
               </div>
             </div>
+
+            <section style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
+              <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
+                <SectionLabel>Masculino</SectionLabel>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
+                  {males.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} onClick={() => setSel(a)} />)}
+                </div>
+                <SectionLabel>Feminino</SectionLabel>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                  {females.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} onClick={() => setSel(a)} />)}
+                </div>
+              </div>
+            </section>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={BELT_HEX} expression={MARKET_PHASE === "ao-vivo" ? "determinado" : "feliz"} /></div>
+                <div>
+                  <div style={{ fontSize: 12, color: "#93a39a" }}>
+                    {MARKET_PHASE === "aberto" ? "Mercado aberto" : MARKET_PHASE === "fechado" ? "Mercado fechado" : "A rodada está a decorrer!"}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#7fd1a3", fontWeight: 700, marginTop: 2 }}>
+                    {MARKET_PHASE === "fechado" ? "À espera das primeiras lutas." : `Valor da equipa: JC ${squadValue}`}
+                  </div>
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>
+                  {MARKET_PHASE === "aberto" ? `JC ${squadValue}` : MARKET_PHASE === "fechado" ? "—" : totalPts}
+                </div>
+                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{MARKET_PHASE === "aberto" ? "valor" : "pts"}</div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+              <a href="/criar-equipa" style={{ flex: 1, textAlign: "center", background: "transparent", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none" }}>Editar equipa</a>
+              <a href="/mercado" style={{ flex: 1, textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none" }}>Ver mercado</a>
+            </div>
+
+            <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
+              Toca num atleta para veres as ações e a valorização. A pontuação ao vivo liga-se em breve.
+            </p>
+          </>
+        )}
+      </div>
+
+      {sel && <AthleteDetail a={sel} captain={sel.id === team.captain} onClose={() => setSel(null)} />}
+    </main>
+  );
+}
+
+function AthleteDetail({ a, captain, onClose }: { a: Athlete; captain: boolean; onClose: () => void }) {
+  const acts = sampleActions(a);
+  const total = scoreAthlete(acts, captain);
+  const up = a.variation >= 0;
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.78)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 100 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "#10160f", borderTop: `2px solid ${captain ? "#FF8F00" : "#243029"}`, borderRadius: "18px 18px 0 0", padding: "16px 16px 24px", maxHeight: "86%", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <div style={{ width: 46, height: 50, borderRadius: 8, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 10, padding: "1px 4px", borderRadius: 3 }}>{code3(a.countryIso)}</div>
           </div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 700, color: GOLD }}>{totalScore} pts</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}>
+              {a.name}{captain && <span style={{ background: "#FF8F00", color: "#1b1208", fontFamily: FD, fontWeight: 700, fontSize: 10, padding: "1px 6px", borderRadius: 5 }}>CAP</span>}
+            </div>
+            <div style={{ fontSize: 12, color: "#93a39a" }}>{code3(a.countryIso)} · {a.category}kg</div>
+          </div>
+          <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
 
-        <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
-          Dados de exemplo · pontuação calculada pelo motor do jogo
-        </p>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "10px 12px" }}>
+            <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>Preço</div>
+            <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: GOLD }}>JC {a.priceJc.toFixed(1)}</div>
+          </div>
+          <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "10px 12px" }}>
+            <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>Valorização</div>
+            <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: up ? "#7fd1a3" : "#ef8d83" }}>{up ? "▲" : "▼"} {Math.abs(a.variation)}%</div>
+          </div>
+        </div>
+
+        <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#93a39a", marginBottom: 8 }}>Ações na rodada</div>
+        <div style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+          {acts.map((act, i) => {
+            const pts = POINTS[act];
+            const pos = pts >= 0;
+            return (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 13px", borderTop: i === 0 ? "none" : "1px solid #1a221d" }}>
+                <span style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: pos ? "#7fd1a3" : "#ef8d83" }} />
+                  {ACTION_LABEL[act]}
+                </span>
+                <span style={{ fontFamily: FD, fontWeight: 700, fontSize: 14, color: pos ? "#7fd1a3" : "#ef8d83" }}>{pos ? "+" : ""}{pts}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "12px 14px" }}>
+          <div>
+            <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase" }}>Total na rodada</div>
+            {captain && <div style={{ fontSize: 11, color: "#FF8F00", marginTop: 2 }}>Capitão — pontuação a dobrar</div>}
+          </div>
+          <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>{total >= 0 ? "+" : ""}{total} pts</div>
+        </div>
+
+        <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 12 }}>Exemplo — liga-se às ações reais da competição em breve.</p>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -257,5 +224,37 @@ function Stat({ label, value }: { label: string; value: string }) {
       <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</div>
       <div style={{ fontSize: 15, fontWeight: 700, color: GOLD }}>{value}</div>
     </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#5a4a12" }}>{children}</span>
+      <span style={{ flex: 1, height: 1, background: "rgba(90,74,18,0.35)" }} />
+    </div>
+  );
+}
+
+function Cell({ a, captain, score, onClick }: { a: Athlete; captain: boolean; score: number; onClick: () => void }) {
+  const surname = a.name.split(" ").slice(-1)[0];
+  let value: React.ReactNode;
+  if (MARKET_PHASE === "aberto") {
+    value = <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, color: "#f2c84b" }}>JC {a.priceJc.toFixed(1)}</span>;
+  } else if (MARKET_PHASE === "fechado") {
+    value = <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#7c8a82", letterSpacing: "0.16em", whiteSpace: "nowrap" }}>— —</span>;
+  } else {
+    value = <span style={{ background: "#1d3a2b", color: "#9be3bd", fontFamily: FD, fontWeight: 700, fontSize: 11, padding: "2px 9px", borderRadius: 999 }}>{score >= 0 ? "+" : ""}{score} pts</span>;
+  }
+  return (
+    <button onClick={onClick} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "8px 3px", borderRadius: 12, border: `1.5px solid ${captain ? "#FF8F00" : "#2f4a3c"}`, background: "rgba(12,14,13,0.80)", cursor: "pointer", fontFamily: FB }}>
+      {captain && <div style={{ position: "absolute", top: -8, right: -5, background: "#FF8F00", border: "1px solid #c2410c", color: "#1b1208", fontFamily: FD, fontWeight: 700, fontSize: 11, padding: "1px 6px", borderRadius: 5, lineHeight: 1.3 }}>C</div>}
+      <div style={{ width: 30, height: 34, borderRadius: 6, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 8, padding: "1px 3px", borderRadius: 2 }}>{code3(a.countryIso)}</div>
+      </div>
+      <div style={{ fontSize: 10, fontWeight: 700, width: "100%", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#fff" }}>{surname}</div>
+      <div style={{ fontSize: 9, color: "#b6c0b9" }}>{a.category}kg</div>
+      <div style={{ marginTop: 1, minHeight: 18, display: "flex", alignItems: "center" }}>{value}</div>
+    </button>
   );
 }
