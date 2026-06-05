@@ -1,135 +1,126 @@
-// Calendário Oficial contínuo: rodadas reais + Retrô (não oficial, surpresa) nos buracos.
-import { getCompetitions, type IjfCompetition } from "@/lib/ijf";
+// Mercado real (prévia) + teste da lista de inscritos de uma prova futura.
+import { getCompetitions, getCompetitionContests, getCompetitor, type IjfCompetitor } from "@/lib/ijf";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const FD = "var(--font-geist-mono), ui-monospace, monospace";
 const GOLD = "#d9a441";
-const MINT = "#7fd1a3";
-const PURPLE = "#b48ad6";
-const YEAR = 2026;
-const MON_ABBR = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const TATAME = "#1c3a2e";
 
-function parseDate(s?: string): Date | null {
-  if (!s) return null;
-  const d = new Date(String(s).replace(/\//g, "-"));
-  return isNaN(d.getTime()) ? null : d;
-}
-const fmtOne = (d: Date) => `${d.getDate()} ${MON_ABBR[d.getMonth()]}`;
-function fmtRange(a?: string, b?: string): string {
-  const da = parseDate(a), db = parseDate(b);
-  if (!da) return "";
-  if (!db || da.getTime() === db.getTime()) return fmtOne(da);
-  const d1 = da.getDate(), m1 = da.getMonth(), d2 = db.getDate(), m2 = db.getMonth();
-  return m1 === m2 ? `${d1}–${d2} ${MON_ABBR[m1]}` : `${d1} ${MON_ABBR[m1]} – ${d2} ${MON_ABBR[m2]}`;
-}
-const AGE_LABEL: Record<string, string> = { sen: "Sénior", jun: "Júnior", cad: "Cadete", vet: "Veteranos", you: "Juvenil" };
-const levels = (c: IjfCompetition) => (c.ages || []).map((x) => AGE_LABEL[x] || x).join(" · ");
-
-function isoWeekKey(d: Date): string {
-  const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayNum = (dt.getUTCDay() + 6) % 7;
-  dt.setUTCDate(dt.getUTCDate() - dayNum + 3);
-  const firstThu = new Date(Date.UTC(dt.getUTCFullYear(), 0, 4));
-  const week = 1 + Math.round((dt.getTime() - firstThu.getTime()) / (7 * 864e5));
-  return `${dt.getUTCFullYear()}-${String(week).padStart(2, "0")}`;
-}
-function mondayOf(d: Date): Date {
-  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const day = (x.getDay() + 6) % 7;
-  x.setDate(x.getDate() - day);
-  return x;
-}
-
-type Tier = "major" | "regular" | "fora";
-function classify(c: IjfCompetition): { tier: Tier; tag: string } {
-  const n = (c.name || "").toLowerCase();
-  if (/postpon|cancel|adiad/.test(n)) return { tier: "fora", tag: "Adiada" };
-  if (/training camp|\botc\b|\bitc\b| camp\b|kata|world series/.test(n)) return { tier: "fora", tag: "Camp/Kata" };
-  if (String(c.is_teams) === "1") return { tier: "fora", tag: "Equipas" };
-  if (/olympic|olimp/.test(n)) return { tier: "major", tag: "Jogos" };
-  if (/masters/.test(n)) return { tier: "major", tag: "Masters" };
-  if (/grand slam/.test(n)) return { tier: "major", tag: "Grand Slam" };
-  if (/grand prix/.test(n)) return { tier: "major", tag: "Grand Prix" };
-  if (/world championships|world champ|campeonato mundial/.test(n)) return { tier: "major", tag: "Mundial" };
-  if (/championships|championship/.test(n)) return { tier: "major", tag: "Continental" };
-  if (/world cup/.test(n)) return { tier: "regular", tag: "World Cup" };
-  if (/open|cup|copa/.test(n)) return { tier: "regular", tag: "Open/Cup" };
-  return { tier: "regular", tag: "Outro" };
-}
-const regularRank = (tag: string) => (tag === "World Cup" ? 3 : tag === "Open/Cup" ? 2 : 1);
-
-type Item =
-  | { kind: "major" | "gap"; date: Date; name: string; tag: string; c: IjfCompetition }
-  | { kind: "retro"; date: Date; name: string; tag: string };
-
-export default async function CalendarioOficial() {
-  const all = (await getCompetitions(YEAR)).filter((c) => c.name && parseDate(c.date_from));
-  all.sort((a, b) => parseDate(a.date_from)!.getTime() - parseDate(b.date_from)!.getTime());
-
-  const weeks = new Map<string, { majors: { c: IjfCompetition; tag: string }[]; regs: { c: IjfCompetition; tag: string }[] }>();
-  for (const c of all) {
-    const { tier, tag } = classify(c);
-    if (tier === "fora") continue;
-    const wk = isoWeekKey(parseDate(c.date_from)!);
-    if (!weeks.has(wk)) weeks.set(wk, { majors: [], regs: [] });
-    const w = weeks.get(wk)!;
-    if (tier === "major") w.majors.push({ c, tag }); else w.regs.push({ c, tag });
+// Chamada crua para sondar ações ainda não confirmadas (lista de inscritos).
+async function rawProbe(action: string, idc: string): Promise<{ action: string; works: boolean; info: string }> {
+  const url = `https://data.ijf.org/api/get_json?access_token=&params%5Baction%5D=${action}&params%5Bid_competition%5D=${idc}`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: ctrl.signal, headers: { "User-Agent": "Mozilla/5.0 (IpponLeague)" } });
+    const txt = await res.text();
+    clearTimeout(t);
+    if (txt.includes("unknown action")) return { action, works: false, info: "ação desconhecida" };
+    let info = `${txt.length} chars`;
+    try {
+      const j = JSON.parse(txt);
+      if (Array.isArray(j)) info = `array · ${j.length} itens`;
+      else if (j && typeof j === "object") info = `obj · chaves: ${Object.keys(j).join(",").slice(0, 80)}`;
+    } catch { /* */ }
+    return { action, works: true, info };
+  } catch (e: any) {
+    clearTimeout(t);
+    return { action, works: false, info: "erro/timeout" };
   }
+}
 
-  const official: Item[] = [];
-  for (const { majors, regs } of weeks.values()) {
-    if (majors.length) {
-      for (const m of majors) official.push({ kind: "major", date: parseDate(m.c.date_from)!, name: m.c.name, tag: m.tag, c: m.c });
-    } else if (regs.length) {
-      const best = [...regs].sort((a, b) => regularRank(b.tag) - regularRank(a.tag))[0];
-      official.push({ kind: "gap", date: parseDate(best.c.date_from)!, name: best.c.name, tag: best.tag, c: best.c });
+function provPrice(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return 6 + (h % 25) / 2; // 6..18,5
+}
+const fmt = (n: number) => (Math.round(n * 10) / 10).toString().replace(".", ",");
+
+export default async function MercadoReal() {
+  const comps2026 = await getCompetitions(2026);
+  const paris = comps2026.find((c) => /paris grand slam/i.test(c.name || ""));
+
+  // --- Mercado real (atletas do Paris Grand Slam 2026) ---
+  let athletes: { id: string; info: IjfCompetitor }[] = [];
+  let compName = "";
+  if (paris) {
+    compName = paris.name;
+    const contests = await getCompetitionContests(paris.id_competition);
+    const seen: string[] = [];
+    for (const f of contests) {
+      for (const id of [String(f.id_person_blue), String(f.id_person_white)]) {
+        if (id && id !== "0" && !seen.includes(id)) seen.push(id);
+      }
+      if (seen.length >= 16) break;
     }
+    const infos = await Promise.all(seen.map((id) => getCompetitor(id)));
+    athletes = seen.map((id, i) => ({ id, info: infos[i] })).filter((a) => a.info) as any;
   }
 
-  // Preencher semanas vazias da época com Retrô (não oficial)
-  const officialWeeks = new Set(official.map((o) => isoWeekKey(o.date)));
-  const times = official.map((o) => o.date.getTime());
-  const seasonStart = mondayOf(new Date(Math.min(...times)));
-  const seasonEnd = mondayOf(new Date(Math.max(...times)));
-  const retros: Item[] = [];
-  for (let w = new Date(seasonStart); w.getTime() <= seasonEnd.getTime(); w = new Date(w.getTime() + 7 * 864e5)) {
-    if (!officialWeeks.has(isoWeekKey(w))) retros.push({ kind: "retro", date: new Date(w), name: "Retrô — competição surpresa", tag: "Retrô" });
-  }
+  // --- Teste de inscritos de uma prova futura ---
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const upcoming = comps2026
+    .filter((c) => { const d = new Date(String(c.date_from).replace(/\//g, "-")); return !isNaN(d.getTime()) && d.getTime() >= today.getTime() && c.name; })
+    .sort((a, b) => new Date(String(a.date_from).replace(/\//g, "-")).getTime() - new Date(String(b.date_from).replace(/\//g, "-")).getTime())[0];
 
-  const timeline = [...official, ...retros].sort((a, b) => a.date.getTime() - b.date.getTime());
-  const oCount = official.length, rCount = retros.length;
+  let probeRows: { action: string; works: boolean; info: string }[] = [];
+  let upcomingContests = -1;
+  if (upcoming) {
+    const ENTRY_ACTIONS = ["competition.competitors", "competition.get_competitors", "competition.entries", "competition.participants", "competition.competitor_list", "competition.draw"];
+    probeRows = await Promise.all(ENTRY_ACTIONS.map((a) => rawProbe(a, upcoming.id_competition)));
+    upcomingContests = (await getCompetitionContests(upcoming.id_competition)).length;
+  }
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: "system-ui, sans-serif", padding: "20px 16px 60px" }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <h1 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Calendário Oficial · {YEAR}</h1>
+        <h1 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Mercado real · prévia</h1>
         <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.5 }}>
-          <b style={{ color: GOLD }}>{oCount} rodadas oficiais</b> + <b style={{ color: PURPLE }}>{rCount} Retrô</b> nos buracos. O Retrô é <b style={{ color: PURPLE }}>só diversão</b> (não conta para ranking/faixa) e a competição é <b>surpresa</b>, revelada só no dia — sem tempo para pesquisar.
+          {compName ? <>Amostra de atletas reais de <b style={{ color: "#cfd8d2" }}>{compName}</b>. Preços de exemplo (serão calculados pelo histórico).</> : "Não encontrei a competição."}
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 16 }}>
-          {timeline.map((it, i) => {
-            const color = it.kind === "retro" ? PURPLE : it.kind === "major" ? GOLD : MINT;
-            const tagText = it.kind === "retro" ? "Retrô" : it.kind === "major" ? it.tag : "Preenche";
-            const sub =
-              it.kind === "retro"
-                ? `Semana de ${fmtOne(it.date)} · surpresa · não oficial`
-                : `${fmtRange(it.c.date_from, it.c.date_to)}${it.c.country_short ? ` · ${it.c.country_short}` : ""}${levels(it.c) ? ` · ${levels(it.c)}` : ""}`;
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
+          {athletes.map((a) => {
+            const cc = (a.info.country_short || "").toUpperCase();
+            const name = `${a.info.given_name || ""} ${a.info.family_name || ""}`.trim();
+            const gender = a.info.gender === "female" ? "F" : "M";
+            const cat = (a.info.categories && a.info.categories[0]) || "";
             return (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, background: it.kind === "retro" ? "#15101c" : "#121815", border: `1px solid ${it.kind === "retro" ? "#3a2d4d" : it.kind === "major" ? "#3a2f12" : "#1a221d"}`, borderLeft: `3px solid ${color}`, borderRadius: 11, padding: "10px 12px", borderStyle: it.kind === "retro" ? "dashed" : "solid" }}>
-                <span style={{ fontFamily: FD, fontSize: 12, color: "#5f6f67", width: 22, flexShrink: 0 }}>{i + 1}</span>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, lineHeight: 1.2, color: it.kind === "retro" ? "#cdbfe0" : "#f1ede2" }}>{it.name}</div>
-                  <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{sub}</div>
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "#121815", border: "1px solid #243029", borderRadius: 12, padding: "10px 12px" }}>
+                <div style={{ width: 44, height: 44, borderRadius: 9, background: TATAME, border: "1px solid #2a4d3e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: "#aee9c9" }}>{cc || "—"}</span>
                 </div>
-                <span style={{ background: "#1b211e", color, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 8px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{tagText}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name || `#${a.id}`}</div>
+                  <div style={{ fontSize: 11.5, color: "#93a39a", marginTop: 2 }}>
+                    {cc}{cat ? ` · ${cat}` : ""} · <span style={{ color: gender === "F" ? "#e6a3d0" : "#8ab6e6" }}>{gender === "F" ? "Feminino" : "Masculino"}</span>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: GOLD }}>JC {fmt(provPrice(a.id))}</div>
+                  <div style={{ fontSize: 9.5, color: "#5f6f67" }}>preço ex.</div>
+                </div>
               </div>
             );
           })}
         </div>
-        <p style={{ fontSize: 11, color: "#5f6f67", marginTop: 24 }}>Proposta automática — ajustável. Oficiais a dourado/verde, Retrô a roxo (tracejado).</p>
+
+        {/* Teste de inscritos */}
+        <h2 style={{ fontFamily: FD, fontSize: 14, textTransform: "uppercase", color: "#cfd8d2", marginTop: 28 }}>Inscritos de prova futura?</h2>
+        <p style={{ fontSize: 12, color: "#93a39a", margin: "2px 0 10px" }}>
+          A testar com: <b style={{ color: "#cfd8d2" }}>{upcoming?.name || "—"}</b>. Combates já no sistema (draw): <b style={{ color: upcomingContests > 0 ? "#7fd1a3" : "#ef8d83" }}>{upcomingContests >= 0 ? upcomingContests : "—"}</b>.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {probeRows.map((r) => (
+            <div key={r.action} style={{ display: "flex", justifyContent: "space-between", gap: 10, background: r.works ? "#101a14" : "#0f1411", border: `1px solid ${r.works ? "#2f6f4a" : "#1a221d"}`, borderRadius: 9, padding: "8px 11px" }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: r.works ? "#7fd1a3" : "#cfd8d2" }}>{r.works ? "✓ " : "✗ "}{r.action}</span>
+              <span style={{ fontSize: 11, color: "#93a39a", whiteSpace: "nowrap" }}>{r.info}</span>
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 11, color: "#5f6f67", marginTop: 24 }}>Prévia temporária.</p>
       </div>
     </main>
   );
