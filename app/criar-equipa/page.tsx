@@ -19,6 +19,9 @@ const IOC: Record<string, string> = {
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
+// Competição desta escalação (exemplo). Liga à competição selecionada (modelo time-por-competição + JudoBase).
+const COMPETITION = { name: "Grand Slam Paris", local: "Paris", level: "Sénior" };
+
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
 type Modal = { kind: "missing" | "saved" | "trash" | "share" } | { kind: "athlete"; a: Athlete } | null;
 
@@ -118,6 +121,17 @@ export default function CriarEquipa() {
           </div>
           <button onClick={openGuide} aria-label="Como montar a equipa" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 11, background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "10px 13px", marginBottom: 14 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 8, background: GOLD, color: "#1b211e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <TrophyIcon />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>A escalar para</div>
+            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{COMPETITION.name} <span style={{ color: "#93a39a", fontWeight: 600 }}>· {COMPETITION.local}</span></div>
+          </div>
+          <span style={{ background: "#1b211e", color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{COMPETITION.level}</span>
+        </div>
 
         <div style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
           <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
