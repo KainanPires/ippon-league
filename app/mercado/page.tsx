@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { ATHLETES, CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
+import { loadDraft, saveDraft } from "@/lib/team";
 import { Mascot } from "@/components/Mascot";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const START_JC = 100;
+const FAV_KEY = "ippon_favorites";
 
 const IOC: Record<string, string> = {
   JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
@@ -24,6 +26,47 @@ const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Aposta": ["#2a1f3a", "#b79be0"],
 };
 
+// Disponibilidade (placeholder estável até ligarmos o JudoBase)
+type Availability = "inscrito" | "provavel" | "duvida" | "suspenso" | "lesionado" | "sem-status";
+const AVAIL_META: Record<Availability, { label: string; color: string }> = {
+  inscrito: { label: "Inscrito", color: "#7fb8f5" },
+  provavel: { label: "Provável", color: "#7fd1a3" },
+  duvida: { label: "Dúvida", color: "#e6c84f" },
+  suspenso: { label: "Suspenso", color: "#ef8d83" },
+  lesionado: { label: "Lesionado", color: "#e2655a" },
+  "sem-status": { label: "Sem status", color: "#7c8a82" },
+};
+const AVAIL_LIST: Availability[] = ["inscrito", "provavel", "duvida", "suspenso", "lesionado", "sem-status"];
+function availabilityOf(id: string): Availability {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  const r = h % 100;
+  if (r < 55) return "inscrito";
+  if (r < 80) return "provavel";
+  if (r < 88) return "duvida";
+  if (r < 93) return "suspenso";
+  if (r < 97) return "lesionado";
+  return "sem-status";
+}
+
+type SortId = "caros" | "baratos" | "valorizados" | "desvalorizados" | "media" | "piores" | "val-esperada" | "min-valorizar";
+const SORTS: { id: SortId; label: string; pro?: boolean }[] = [
+  { id: "caros", label: "Mais caros" },
+  { id: "baratos", label: "Mais baratos" },
+  { id: "valorizados", label: "Valorizados" },
+  { id: "desvalorizados", label: "Desvalorizados" },
+  { id: "media", label: "Maior média" },
+  { id: "piores", label: "Piores na última rodada" },
+  { id: "val-esperada", label: "Maior valorização esperada", pro: true },
+  { id: "min-valorizar", label: "Menos pontos p/ valorizar", pro: true },
+];
+const sortLabel = (id: SortId) => SORTS.find((s) => s.id === id)?.label || "Ordenar";
+
+const ALL_COUNTRIES = Array.from(new Set(ATHLETES.map((a) => a.countryIso))).sort((a, b) => code3(a).localeCompare(code3(b)));
+
+const PRICE_MIN = 2;
+const PRICE_MAX = 20;
+
 const STEPS = [
   { t: "Saldo JC", x: "Estes são os Judocoins que tens para gastar. Cada atleta tem um preço — geres os teus 100 JC para montar a melhor equipa.", target: "jc" },
   { t: "Valorização", x: "O ▲/▼ ao lado do preço mostra se o atleta está a valorizar ou a desvalorizar. Fica atento a isto: faz toda a diferença no teu património.", target: "price" },
@@ -33,28 +76,56 @@ const STEPS = [
 
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
+type SheetKind = "ord" | "sta" | "fil" | null;
+
 export default function Mercado() {
   const [gender, setGender] = useState<Gender>("M");
   const [cat, setCat] = useState<string>("Todas");
   const [query, setQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [team, setTeam] = useState<string[]>([]);
+  const [captain, setCaptain] = useState<string | null>(null);
   const [guide, setGuide] = useState<number | null>(null);
+
+  const [favs, setFavs] = useState<string[]>([]);
+  const [favOnly, setFavOnly] = useState(false);
+  const [sort, setSort] = useState<SortId>("caros");
+  const [statusSel, setStatusSel] = useState<Availability[]>([]);
+  const [priceMin, setPriceMin] = useState(PRICE_MIN);
+  const [priceMax, setPriceMax] = useState(PRICE_MAX);
+  const [countrySel, setCountrySel] = useState<string[]>([]);
+  const [sheet, setSheet] = useState<SheetKind>(null);
 
   useEffect(() => {
     try {
-      const t = localStorage.getItem("ippon_team");
-      if (t) setTeam(JSON.parse(t));
+      const d = loadDraft();
+      setTeam(d.ids);
+      setCaptain(d.captain);
+      const f = localStorage.getItem(FAV_KEY);
+      if (f) setFavs(JSON.parse(f));
       if (!localStorage.getItem("ippon_market_tutorial")) setGuide(0);
     } catch {}
   }, []);
 
   function persist(next: string[]) {
+    const cap = captain && next.includes(captain) ? captain : null;
     setTeam(next);
-    try { localStorage.setItem("ippon_team", JSON.stringify(next)); } catch {}
+    setCaptain(cap);
+    saveDraft({ ids: next, captain: cap });
+  }
+  function toggleFav(id: string) {
+    setFavs((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      try { localStorage.setItem(FAV_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
   }
   function finishTutorial() {
     try { localStorage.setItem("ippon_market_tutorial", "done"); } catch {}
     setGuide(null);
+  }
+  function clearFilters() {
+    setStatusSel([]); setPriceMin(PRICE_MIN); setPriceMax(PRICE_MAX); setCountrySel([]); setFavOnly(false);
   }
 
   const teamAthletes = team.map((id) => ATHLETES.find((a) => a.id === id)).filter(Boolean) as Athlete[];
@@ -64,11 +135,26 @@ export default function Mercado() {
   const takenM = new Set(teamAthletes.filter((a) => a.gender === "M").map((a) => a.category));
   const takenF = new Set(teamAthletes.filter((a) => a.gender === "F").map((a) => a.category));
 
-  const filtered = ATHLETES.filter((a) => {
-    const okGender = a.gender === gender;
-    const okCat = cat === "Todas" || a.category === cat;
-    const okQ = !query.trim() || a.name.toLowerCase().includes(query.trim().toLowerCase());
-    return okGender && okCat && okQ;
+  let filtered = ATHLETES.filter((a) => {
+    if (a.gender !== gender) return false;
+    if (cat !== "Todas" && a.category !== cat) return false;
+    if (query.trim() && !a.name.toLowerCase().includes(query.trim().toLowerCase())) return false;
+    if (favOnly && !favs.includes(a.id)) return false;
+    if (statusSel.length > 0 && !statusSel.includes(availabilityOf(a.id))) return false;
+    if (a.priceJc < priceMin) return false;
+    if (priceMax < PRICE_MAX && a.priceJc > priceMax) return false;
+    if (countrySel.length > 0 && !countrySel.includes(a.countryIso)) return false;
+    return true;
+  });
+  filtered = [...filtered].sort((a, b) => {
+    switch (sort) {
+      case "baratos": return a.priceJc - b.priceJc;
+      case "valorizados": return b.variation - a.variation;
+      case "desvalorizados": return a.variation - b.variation;
+      case "media": return b.avg - a.avg;
+      case "piores": return a.last - b.last;
+      default: return b.priceJc - a.priceJc; // caros (e Pro caem aqui)
+    }
   });
 
   function buttonState(a: Athlete) {
@@ -84,22 +170,21 @@ export default function Mercado() {
     if (!afford) return { label: "Sem JC", kind: "blocked" as const };
     return { label: "Contratar", kind: "buy" as const };
   }
-
   function toggle(a: Athlete) {
     if (team.includes(a.id)) { persist(team.filter((id) => id !== a.id)); return; }
     const st = buttonState(a);
     if (st.kind === "buy") persist([...team, a.id]);
   }
 
+  const filtroCount = (priceMin > PRICE_MIN ? 1 : 0) + (priceMax < PRICE_MAX ? 1 : 0) + countrySel.length;
   const jcGlow = guide === 0;
   const focus = guide === 1 ? "price" : guide === 2 ? "scout" : null;
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px}`}</style>
+      <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none}`}</style>
 
       <div style={{ maxWidth: 460, margin: "0 auto" }}>
-        {/* Cabeçalho fixo */}
         <div style={{ position: "sticky", top: 0, background: "#0c0e0d", borderBottom: "1px solid #1a221d", zIndex: 5, padding: "12px 14px 10px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -109,22 +194,41 @@ export default function Mercado() {
               <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>Mercado</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button onClick={() => setShowSearch((v) => !v)} aria-label="Procurar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", background: showSearch ? "#1c3a2e" : "transparent", color: showSearch ? "#aee9c9" : "#93a39a", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
+              </button>
               <button onClick={() => setGuide(0)} aria-label="Como funciona" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontWeight: 700, cursor: "pointer" }}>?</button>
               <span className={jcGlow ? "glow" : undefined} style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "6px 11px", fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 15 }}>JC {fmt(jcLeft)}</span>
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "8px 11px", marginBottom: 9 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93a39a" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar atleta..." style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB }} />
-          </div>
+          {showSearch && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "8px 11px", marginBottom: 9 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93a39a" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
+              <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar atleta..." style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB }} />
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 8, marginBottom: 9 }}>
             <button onClick={() => { setGender("M"); setCat("Todas"); }} style={genderBtn(gender === "M")}>Masculino {countM}/4</button>
             <button onClick={() => { setGender("F"); setCat("Todas"); }} style={genderBtn(gender === "F")}>Feminino {countF}/4</button>
           </div>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+          {/* Barra de filtros */}
+          <div className="noscroll" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 9 }}>
+            <button onClick={() => setFavOnly((v) => !v)} aria-label="Só favoritos" style={{ flexShrink: 0, width: 46, height: 42, borderRadius: 11, border: `1.5px solid ${favOnly ? GOLD : "#2a3a33"}`, background: favOnly ? "#3a2f12" : "#121815", color: favOnly ? GOLD : "#5f6f67", fontSize: 18, cursor: "pointer" }}>★</button>
+            <button onClick={() => setSheet("ord")} style={fbtn(false)}>
+              <SortIcon /> {sortLabel(sort)}
+            </button>
+            <button onClick={() => setSheet("sta")} style={fbtn(statusSel.length > 0)}>
+              <TagIcon /> Status {statusSel.length > 0 && <span style={cnt}>{statusSel.length}</span>}
+            </button>
+            <button onClick={() => setSheet("fil")} style={fbtn(filtroCount > 0)}>
+              <SlidersIcon /> Filtros {filtroCount > 0 && <span style={cnt}>{filtroCount}</span>}
+            </button>
+          </div>
+
+          <div className="noscroll" style={{ display: "flex", gap: 7, overflowX: "auto" }}>
             {["Todas", ...CATEGORIES[gender]].map((c) => (
               <button key={c} onClick={() => setCat(c)} style={chip(c === cat)}>{c}</button>
             ))}
@@ -134,13 +238,17 @@ export default function Mercado() {
         {/* Lista */}
         <div style={{ padding: "12px 14px 92px" }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "24px 0" }}>Sem atletas para este filtro (mais em breve).</div>
+            <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "30px 0" }}>
+              {favOnly ? "Ainda não tens favoritos neste género. Toca na ★ de um atleta." : "Nenhum atleta com estes filtros."}
+            </div>
           ) : (
             filtered.map((a, idx) => {
               const st = buttonState(a);
               const inTeam = st.kind === "sell";
               const dim = st.kind === "blocked" && st.label !== "Sem JC";
               const vUp = a.variation >= 0;
+              const av = AVAIL_META[availabilityOf(a.id)];
+              const isFav = favs.includes(a.id);
               return (
                 <div key={a.id} style={{ background: "#121815", border: `1px solid ${inTeam ? "#2f4a3c" : "#243029"}`, borderRadius: 14, padding: 12, marginBottom: 10, opacity: dim ? 0.7 : 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -149,9 +257,14 @@ export default function Mercado() {
                       <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {a.name}{inTeam && <span style={{ color: "#7fd1a3", fontSize: 11 }}> ✓ na equipa</span>}
                       </div>
-                      <div style={{ fontSize: 12, color: "#93a39a" }}>{code3(a.countryIso)} · {a.category}kg</div>
+                      <div style={{ fontSize: 11.5, color: "#93a39a", marginTop: 2, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden" }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 2, background: av.color, flexShrink: 0 }} />
+                        <span style={{ color: av.color }}>{av.label}</span>
+                        <span>· {code3(a.countryIso)} · {a.category}kg</span>
+                      </div>
                     </div>
                     <span style={{ background: STATUS_COLORS[a.status][0], color: STATUS_COLORS[a.status][1], fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{a.status}</span>
+                    <button onClick={() => toggleFav(a.id)} aria-label={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"} style={{ background: "transparent", border: "none", cursor: "pointer", color: isFav ? GOLD : "#3c463f", fontSize: 20, lineHeight: 1, padding: 2, flexShrink: 0 }}>★</button>
                   </div>
                   <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 10 }}>
                     <div>
@@ -185,7 +298,7 @@ export default function Mercado() {
         </div>
       </div>
 
-      {/* Barra inferior: progresso + voltar ao dojo */}
+      {/* Barra inferior */}
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 40 }}>
         <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div style={{ fontSize: 12, color: "#cfd8d2" }}>
@@ -196,17 +309,107 @@ export default function Mercado() {
         </div>
       </div>
 
+      {/* Folhas (ordenar / status / filtros) */}
+      {sheet === "ord" && (
+        <Sheet title="Ordenar" onClose={() => setSheet(null)}>
+          {SORTS.map((o) => {
+            const active = sort === o.id;
+            return (
+              <button key={o.id} onClick={() => { if (o.pro) return; setSort(o.id); setSheet(null); }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", background: active ? "#16201b" : "#121815", border: `1.5px solid ${active ? GOLD : "#2a3a33"}`, borderRadius: 11, padding: "13px 14px", marginBottom: 8, color: o.pro ? "#cfd8d2" : "#f1ede2", fontSize: 14, fontFamily: FB, cursor: o.pro ? "default" : "pointer", opacity: o.pro ? 0.75 : 1 }}>
+                <span>{o.label}</span>
+                {o.pro && <span style={{ display: "flex", alignItems: "center", gap: 5, color: GOLD, fontSize: 11, fontWeight: 700 }}><LockIcon /> Pro</span>}
+              </button>
+            );
+          })}
+          <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>🔒 As ordenações avançadas fazem parte do Ippon Pro.</div>
+        </Sheet>
+      )}
+
+      {sheet === "sta" && (
+        <Sheet title="Status" onClose={() => setSheet(null)}>
+          {AVAIL_LIST.map((id) => {
+            const m = AVAIL_META[id];
+            const on = statusSel.includes(id);
+            return (
+              <button key={id} onClick={() => setStatusSel((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "transparent", border: "none", borderBottom: "1px solid #1a221d", padding: "14px 2px", cursor: "pointer", color: "#f1ede2" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: 3, background: m.color }} />{m.label}
+                </span>
+                <span style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${on ? GOLD : "#3a463f"}`, background: on ? GOLD : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#1b211e", fontSize: 13, fontWeight: 700 }}>{on ? "✓" : ""}</span>
+              </button>
+            );
+          })}
+          <button onClick={() => setSheet(null)} style={applyBtn}>Aplicar</button>
+        </Sheet>
+      )}
+
+      {sheet === "fil" && (
+        <Sheet title="Filtros" onClose={() => setSheet(null)}>
+          <div style={sectionTitle}>Preço</div>
+          <div style={{ textAlign: "center", fontSize: 13, color: "#cfd8d2", marginBottom: 10 }}>
+            JC {priceMin} — JC {priceMax >= PRICE_MAX ? "20+" : priceMax}
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 2 }}>Mínimo</div>
+            <input type="range" min={PRICE_MIN} max={PRICE_MAX} value={priceMin} onChange={(e) => { const v = Number(e.target.value); setPriceMin(Math.min(v, priceMax)); }} style={{ width: "100%", accentColor: GOLD }} />
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 2 }}>Máximo</div>
+            <input type="range" min={PRICE_MIN} max={PRICE_MAX} value={priceMax} onChange={(e) => { const v = Number(e.target.value); setPriceMax(Math.max(v, priceMin)); }} style={{ width: "100%", accentColor: GOLD }} />
+          </div>
+
+          <div style={sectionTitle}>País</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+            {ALL_COUNTRIES.map((iso) => {
+              const on = countrySel.includes(iso);
+              return (
+                <button key={iso} onClick={() => setCountrySel((prev) => prev.includes(iso) ? prev.filter((x) => x !== iso) : [...prev, iso])} style={chip(on)}>{code3(iso)}</button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => { clearFilters(); }} style={{ flex: 1, background: "transparent", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: 12, borderRadius: 11, cursor: "pointer" }}>Limpar</button>
+            <button onClick={() => setSheet(null)} style={{ flex: 1, ...applyBtn, marginTop: 0 }}>Aplicar</button>
+          </div>
+        </Sheet>
+      )}
+
       {/* Tutorial guiado */}
       {guide !== null && <Tutorial step={guide} setStep={setGuide} onClose={finishTutorial} />}
     </main>
   );
 }
 
+const cnt: React.CSSProperties = { background: GOLD, color: "#1b211e", borderRadius: 999, fontSize: 11, fontWeight: 700, padding: "1px 7px" };
+const sectionTitle: React.CSSProperties = { fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#93a39a", marginBottom: 8 };
+const applyBtn: React.CSSProperties = { width: "100%", marginTop: 14, background: "#3f8f5a", color: "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: 13, borderRadius: 11, cursor: "pointer", fontSize: 14 };
+
+function fbtn(active: boolean): React.CSSProperties {
+  return { display: "flex", alignItems: "center", gap: 7, flexShrink: 0, whiteSpace: "nowrap", background: active ? "#16201b" : "#121815", border: `1.5px solid ${active ? GOLD : "#2a3a33"}`, color: "#f1ede2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 13, padding: "0 14px", height: 42, borderRadius: 11, cursor: "pointer" };
+}
 function genderBtn(on: boolean): React.CSSProperties {
   return { flex: 1, textAlign: "center", fontSize: 12, padding: "7px 11px", borderRadius: 999, cursor: "pointer", fontFamily: FB, fontWeight: 700, border: `1px solid ${on ? "#1c3a2e" : "#243029"}`, background: on ? "#1c3a2e" : "#141a17", color: on ? "#aee9c9" : "#93a39a" };
 }
 function chip(on: boolean): React.CSSProperties {
-  return { whiteSpace: "nowrap", fontSize: 12, padding: "6px 11px", borderRadius: 999, cursor: "pointer", fontFamily: FB, border: `1px solid ${on ? "#1c3a2e" : "#243029"}`, background: on ? "#1c3a2e" : "#141a17", color: on ? "#aee9c9" : "#93a39a" };
+  return { whiteSpace: "nowrap", fontSize: 12, padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontFamily: FB, border: `1px solid ${on ? "#1c3a2e" : "#243029"}`, background: on ? "#1c3a2e" : "#141a17", color: on ? "#aee9c9" : "#93a39a" };
+}
+
+function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 80 }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(6,8,7,0.6)" }} />
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, margin: "0 auto", maxWidth: 460, background: "#10160f", borderTop: "1px solid #243029", borderRadius: "18px 18px 0 0", padding: "16px 16px 22px", maxHeight: "82%", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <span style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase" }}>{title}</span>
+          <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 18, cursor: "pointer" }}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 function Avatar({ code }: { code: string }) {
@@ -215,6 +418,19 @@ function Avatar({ code }: { code: string }) {
       <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 10, padding: "1px 4px", borderRadius: 3 }}>{code}</div>
     </div>
   );
+}
+
+function SortIcon() {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 4v16M7 20l-3-3M7 4l3 3M17 20V4M17 4l3 3M17 20l-3-3" /></svg>;
+}
+function TagIcon() {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7v5l9 9 5-5-9-9H3z" /><circle cx="7" cy="11" r="1.4" fill="currentColor" stroke="none" /></svg>;
+}
+function SlidersIcon() {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h4M12 16h8" /><circle cx="16" cy="8" r="2.2" /><circle cx="10" cy="16" r="2.2" /></svg>;
+}
+function LockIcon() {
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>;
 }
 
 function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: number | null) => void; onClose: () => void }) {
@@ -242,7 +458,7 @@ function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: numbe
           {skip}
           <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
-              <div style={{ width: 54, height: 54, flexShrink: 0 }}><Mascot belt="#efeadd" expression="feliz" /></div>
+              <div style={{ width: 54, height: 54, flexShrink: 0 }}><Mascot belt="#141110" expression="sabio" /></div>
               <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase" }}>{s.t}</div>
             </div>
             {STATUS_LEGEND.map((l) => (
@@ -261,7 +477,7 @@ function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: numbe
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
       <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
-        <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt="#efeadd" expression="feliz" /></div>
+        <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
         <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px" }}>
           {skip}
           <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{s.t}</div>
