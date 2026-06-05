@@ -71,6 +71,7 @@ const STEPS = [
   { t: "Saldo JC", x: "Estes são os Judocoins que tens para gastar. Cada atleta tem um preço — geres os teus 100 JC para montar a melhor equipa.", target: "jc" },
   { t: "Valorização", x: "O ▲/▼ ao lado do preço mostra se o atleta está a valorizar ou a desvalorizar. Fica atento a isto: faz toda a diferença no teu património.", target: "price" },
   { t: "Médias e pontuação", x: "A média mostra o nível típico do atleta e a 'última' a pontuação mais recente. Usa-as para descobrir quem pode render mais — e ganhar JC.", target: "scout" },
+  { t: "Filtros e favoritos", x: "Lá em cima: a ★ mostra só os teus favoritos, e os botões Ordenar, Status e Filtros (preço, país) ajudam-te a encontrar atletas. A ★ em cada card guarda o atleta como favorito.", target: "filters" },
   { t: "O que significam os estados", target: "legend" },
 ];
 
