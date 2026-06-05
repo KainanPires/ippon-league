@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Mascot } from "@/components/Mascot";
+import { supabase, supabaseConfigured } from "@/lib/supabase";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -13,8 +14,10 @@ export default function Entrar() {
   const [senha, setSenha] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [erro, setErro] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  function entrar() {
+  async function entrar() {
+    if (saving) return;
     if (!email.trim() || !senha.trim()) {
       setErro("Preenche o email e a senha.");
       return;
@@ -23,8 +26,36 @@ export default function Entrar() {
       setErro("Esse email não parece válido.");
       return;
     }
-    // TODO: autenticação real com Supabase Auth (próximo passo)
+    if (!supabaseConfigured) {
+      setErro("A ligação ao servidor não está configurada. Tenta mais tarde.");
+      return;
+    }
+
+    setErro("");
+    setSaving(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: senha,
+    });
+
+    if (error) {
+      const msg = error.message || "";
+      if (/invalid login credentials/i.test(msg)) {
+        setErro("Email ou senha incorretos.");
+      } else if (/email not confirmed/i.test(msg)) {
+        setErro("Ainda não confirmaste o email. Verifica a tua caixa de entrada.");
+      } else {
+        setErro("Não foi possível entrar. Tenta novamente.");
+      }
+      setSaving(false);
+      return;
+    }
+
     window.location.href = "/inicio";
+  }
+
+  function onEnter(e: { key: string }) {
+    if (e.key === "Enter") entrar();
   }
 
   return (
@@ -46,11 +77,11 @@ export default function Entrar() {
           <h1 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", textAlign: "center", margin: "0 0 18px" }}>Entrar no dojo</h1>
 
           <Label>Email</Label>
-          <input value={email} onChange={(e) => { setEmail(e.target.value); setErro(""); }} placeholder="tu@email.com" inputMode="email" style={inp} />
+          <input value={email} onChange={(e) => { setEmail(e.target.value); setErro(""); }} onKeyDown={onEnter} placeholder="tu@email.com" inputMode="email" style={inp} />
 
           <Label>Senha</Label>
           <div style={{ position: "relative" }}>
-            <input value={senha} onChange={(e) => { setSenha(e.target.value); setErro(""); }} type={showPw ? "text" : "password"} placeholder="••••••••" style={{ ...inp, paddingRight: 44 }} />
+            <input value={senha} onChange={(e) => { setSenha(e.target.value); setErro(""); }} onKeyDown={onEnter} type={showPw ? "text" : "password"} placeholder="••••••••" style={{ ...inp, paddingRight: 44 }} />
             <button onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Esconder senha" : "Mostrar senha"} style={{ position: "absolute", right: 8, top: 8, width: 32, height: 32, background: "transparent", border: "none", color: "#93a39a", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 {showPw
@@ -66,7 +97,7 @@ export default function Entrar() {
 
           {erro && <div style={{ fontSize: 12, color: "#ef8d83", margin: "4px 0 8px" }}>{erro}</div>}
 
-          <button onClick={entrar} style={{ width: "100%", marginTop: 8, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 14, borderRadius: 12, cursor: "pointer" }}>Entrar</button>
+          <button onClick={entrar} disabled={saving} style={{ width: "100%", marginTop: 8, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 14, borderRadius: 12, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>{saving ? "A entrar..." : "Entrar"}</button>
         </div>
 
         <div style={{ textAlign: "center", fontSize: 13, color: "#93a39a", marginTop: 18 }}>
