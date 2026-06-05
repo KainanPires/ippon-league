@@ -7,6 +7,8 @@ const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
 const BENEFITS: { t: string; x: string }[] = [
+  { t: "Chave ao vivo", x: "Acompanha cada atleta na competição: adversário, fase, repescagem e resultado." },
+  { t: "Alertas ao vivo", x: "Recebe um aviso quando o teu atleta — ou o teu capitão — vai lutar. Não percas nada." },
   { t: "Scout avançado", x: "Vê o histórico completo, tendências e estatísticas de cada atleta." },
   { t: "Valorização esperada", x: "Sabe quanto um atleta pode valorizar antes de escalares." },
   { t: "Mínimo para valorizar", x: "Descobre o que o atleta precisa de fazer para ganhares JC." },
