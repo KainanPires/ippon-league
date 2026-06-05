@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
 import { loadDraft, saveDraft, loadSaved, commitSaved, resolve, jcLeft, counts, isComplete, missing, type TeamState } from "@/lib/team";
@@ -21,12 +22,19 @@ const fmt = (n: number) => String(Math.round(n * 10) / 10);
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
 type Modal = { kind: "missing" | "saved" | "trash" | "share" } | { kind: "athlete"; a: Athlete } | null;
 
+function sameTeam(a: TeamState, b: TeamState): boolean {
+  if ((a.captain || "") !== (b.captain || "")) return false;
+  if (a.ids.length !== b.ids.length) return false;
+  return [...a.ids].sort().join(",") === [...b.ids].sort().join(",");
+}
+
 export default function CriarEquipa() {
   const [guide, setGuide] = useState<Guide>(null);
   const [draft, setDraft] = useState<TeamState>({ ids: [], captain: null });
-  const [, setSaved] = useState<TeamState>({ ids: [], captain: null });
+  const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null });
   const [modal, setModal] = useState<Modal>(null);
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
+  const router = useRouter();
 
   useEffect(() => {
     try {
@@ -36,6 +44,24 @@ export default function CriarEquipa() {
       if (!localStorage.getItem("ippon_team_tutorial")) setGuide("welcome");
     } catch {}
   }, []);
+
+  const dirty = !sameTeam(draft, saved);
+  const [nudge, setNudge] = useState(false);
+
+  // Avisa ao recarregar/fechar o separador com alterações por guardar.
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (dirty) { e.preventDefault(); e.returnValue = ""; }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  // Sair do Dojo: enquanto houver alterações por guardar, prende e faz o Salvar piscar.
+  function tryLeave(href: string) {
+    if (dirty) { setNudge(true); setTimeout(() => setNudge(false), 1000); return; }
+    router.push(href);
+  }
 
   function update(next: TeamState) { setDraft(next); saveDraft(next); }
   function naoMostrarMais() { try { localStorage.setItem("ippon_team_tutorial", "skip"); } catch {} setGuide(null); }
@@ -74,12 +100,12 @@ export default function CriarEquipa() {
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.55)}50%{box-shadow:0 0 0 8px rgba(74,144,217,0.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:10px}`}</style>
+      <style>{`@keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.55)}50%{box-shadow:0 0 0 8px rgba(74,144,217,0.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:10px} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilsavebig{0%{transform:scale(1)}30%{transform:scale(1.06)}60%{transform:scale(0.98)}100%{transform:scale(1)}} .ilsavebig{animation:ilsave 1.2s ease-in-out infinite, ilsavebig 0.5s ease-in-out 2}`}</style>
 
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 150px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
-            <a href="/inicio" aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+            <a href="/inicio" onClick={(e) => { e.preventDefault(); tryLeave("/inicio"); }} aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
               <BackIcon />
             </a>
             <div style={{ display: "flex", alignItems: "center", gap: 11, color: "#f1ede2", minWidth: 0 }}>
@@ -106,7 +132,7 @@ export default function CriarEquipa() {
           Toca num lugar livre para abrir o Mercado. Toca num atleta para o tornar capitão.
         </p>
 
-        <a href="/ippon-pro" style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16, textDecoration: "none" }}>
+        <a href="/ippon-pro" onClick={(e) => { e.preventDefault(); tryLeave("/ippon-pro"); }} style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16, textDecoration: "none" }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Sê Pro e avalia a tua equipa</div>
             <div style={{ fontSize: 11.5, color: "#5c4410", marginTop: 2 }}>Scout, valorização esperada e dicas da rodada.</div>
@@ -131,14 +157,14 @@ export default function CriarEquipa() {
               <button onClick={() => setModal({ kind: "share" })} aria-label="Partilhar equipa" style={roundBtn("#243029", "#cfd8d2")}>
                 <ShareIcon />
               </button>
-              <button onClick={save} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: "pointer" }}>Salvar equipa</button>
+              <button onClick={save} className={dirty ? (nudge ? "ilsavebig" : "ilsave") : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: "pointer" }}>Salvar equipa</button>
             </div>
           </div>
         </div>
         <nav style={{ height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
-          <NavTab label="Início" href="/inicio" icon={<HomeIcon />} />
-          <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} />
-          <NavTab label="Pro" icon={<BoltIcon />} href="/ippon-pro" />
+          <NavTab label="Início" href="/inicio" icon={<HomeIcon />} onNav={tryLeave} />
+          <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} onNav={tryLeave} />
+          <NavTab label="Pro" icon={<BoltIcon />} href="/ippon-pro" onNav={tryLeave} />
           <NavTab label="Amigos" icon={<FriendsIcon />} />
         </nav>
       </div>
@@ -338,9 +364,10 @@ function roundBtn(border: string, color: string): React.CSSProperties {
   return { width: 42, height: 42, borderRadius: 10, border: `1px solid ${border}`, background: "transparent", color, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
 }
 
-function NavTab({ label, icon, href }: { label: string; icon: React.ReactNode; href?: string }) {
+function NavTab({ label, icon, href, onNav }: { label: string; icon: React.ReactNode; href?: string; onNav?: (href: string) => void }) {
   const style: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: "#6f7d76", textDecoration: "none" };
   const inner = <>{icon}<span style={{ fontSize: 11 }}>{label}</span></>;
+  if (href && onNav) return <a href={href} onClick={(e) => { e.preventDefault(); onNav(href); }} style={style}>{inner}</a>;
   return href ? <a href={href} style={style}>{inner}</a> : <div style={style}>{inner}</div>;
 }
 function HomeIcon() {
