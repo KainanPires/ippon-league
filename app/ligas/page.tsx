@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+import { loadLeagues, type MyLeague } from "@/lib/leagues";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -28,6 +29,8 @@ const PRIVADAS = [
 
 export default function Ligas() {
   const [tab, setTab] = useState<Tab>("ativas");
+  const [mine, setMine] = useState<MyLeague[]>([]);
+  useEffect(() => { try { setMine(loadLeagues()); } catch {} }, []);
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -57,10 +60,19 @@ export default function Ligas() {
             <Section>Ligas oficiais</Section>
             {OFICIAIS.map((l) => <LeagueRow key={l.id} cfg={l.cfg} name={l.name} sub={l.sub} right={<span style={{ fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 15 }}>{l.pos}</span>} />)}
             <Section style={{ marginTop: 18 }}>Ligas de amigos</Section>
-            <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "18px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 13, color: "#c7d0c9", marginBottom: 12, lineHeight: 1.5 }}>Ainda não tens ligas de amigos.<br />Cria uma e desafia o teu dojo!</div>
-              <a href="/criar-liga" style={{ display: "inline-block", background: "#3f8f5a", color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>Criar liga</a>
-            </div>
+            {mine.length > 0 ? (
+              <>
+                {mine.map((l) => (
+                  <LeagueRow key={l.id} cfg={l.cfg} name={l.name} sub={`${l.formatName} · ${l.privacy === "fechada" ? "Fechada" : "Aberta"}`} right={<ActionBtn kind="ver">Abrir</ActionBtn>} />
+                ))}
+                <a href="/criar-liga" style={{ display: "block", textAlign: "center", marginTop: 10, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 13 }}>+ Criar outra liga</a>
+              </>
+            ) : (
+              <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "18px 14px", textAlign: "center" }}>
+                <div style={{ fontSize: 13, color: "#c7d0c9", marginBottom: 12, lineHeight: 1.5 }}>Ainda não tens ligas de amigos.<br />Cria uma e desafia o teu dojo!</div>
+                <a href="/criar-liga" style={{ display: "inline-block", background: "#3f8f5a", color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>Criar liga</a>
+              </div>
+            )}
           </>
         )}
 
