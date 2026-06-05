@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
+import { supabase, supabaseConfigured } from "@/lib/supabase";
 
 const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
 const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
@@ -14,18 +15,21 @@ const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").t
 type Form = {
   name: string;
   email: string;
+  senha: string;
   contact: string;
   dialIso: string;
   belt: string;
   countryIso: string;
 };
 
-const EMPTY: Form = { name: "", email: "", contact: "", dialIso: "PT", belt: "", countryIso: "" };
+const EMPTY: Form = { name: "", email: "", senha: "", contact: "", dialIso: "PT", belt: "", countryIso: "" };
 
 export default function Comecar() {
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [saving, setSaving] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [confirmSent, setConfirmSent] = useState(false);
 
   function update(field: keyof Form, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -37,6 +41,8 @@ export default function Comecar() {
     if (!form.name.trim()) e.name = "Diz-nos o teu nome.";
     if (!form.email.trim()) e.email = "Precisamos do teu email.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Esse email não parece válido.";
+    if (!form.senha) e.senha = "Cria uma senha.";
+    else if (form.senha.length < 6) e.senha = "A senha precisa de pelo menos 6 caracteres.";
     if (!form.contact.trim()) e.contact = "Deixa um contacto.";
     if (!form.belt) e.belt = "Escolhe a tua faixa.";
     if (!form.countryIso) e.countryIso = "Escolhe o teu país.";
@@ -45,25 +51,77 @@ export default function Comecar() {
   }
 
   async function handleSubmit() {
+    if (saving) return;
     if (!validate()) return;
+    if (!supabaseConfigured) {
+      setErrors((e) => ({ ...e, email: "A ligação ao servidor não está configurada. Tenta mais tarde." }));
+      return;
+    }
+
     setSaving(true);
     const country = COUNTRIES.find((c) => c.iso2 === form.countryIso);
-    const lead = {
-      name: form.name.trim(),
+    const dial = COUNTRIES.find((c) => c.iso2 === form.dialIso)?.dial ?? "";
+    const telefone = `${dial} ${form.contact.trim()}`.trim();
+
+    const { data, error } = await supabase.auth.signUp({
       email: form.email.trim(),
-      phone: `${COUNTRIES.find((c) => c.iso2 === form.dialIso)?.dial ?? ""} ${form.contact.trim()}`.trim(),
-      belt: form.belt,
-      country: country?.name ?? "",
-      countryIso: form.countryIso,
-    };
-    // TODO: enviar `lead` para o Supabase + HubSpot (próximo passo)
-    console.log("lead", lead);
+      password: form.senha,
+      options: {
+        data: {
+          nome: form.name.trim(),
+          telefone,
+          faixa: form.belt,
+          pais: country?.name ?? "",
+          pais_iso: form.countryIso,
+        },
+        emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/inicio` : undefined,
+      },
+    });
+
+    if (error) {
+      const msg = error.message || "";
+      if (/already registered|already exists|user already/i.test(msg)) {
+        setErrors((e) => ({ ...e, email: "Já existe uma conta com este email. Tenta entrar." }));
+      } else if (/password/i.test(msg)) {
+        setErrors((e) => ({ ...e, senha: "Essa senha não é aceite. Tenta outra (mín. 6 caracteres)." }));
+      } else {
+        setErrors((e) => ({ ...e, email: "Não foi possível criar a conta. Tenta novamente." }));
+      }
+      setSaving(false);
+      return;
+    }
+
+    // Compatibilidade com telas que ainda leem o localStorage (substituído pelo Supabase a seguir).
     try {
       localStorage.setItem("ippon_onboarding", "pending");
       localStorage.setItem("ippon_name", form.name.trim().split(" ")[0] || "");
     } catch {}
-    await new Promise((r) => setTimeout(r, 400));
-    window.location.href = "/inicio";
+
+    if (data.session) {
+      // Conta criada e sessão iniciada (confirmação de email desligada) → entra direto.
+      window.location.href = "/inicio";
+    } else {
+      // Confirmação de email ligada → conta criada, falta confirmar.
+      setSaving(false);
+      setConfirmSent(true);
+    }
+  }
+
+  if (confirmSent) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FONT_BODY, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}>
+        <div style={{ width: "100%", maxWidth: 440 }}>
+          <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 18, padding: 24, textAlign: "center" }}>
+            <div style={{ fontSize: 40, marginBottom: 8 }}>📩</div>
+            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>Confirma o teu email</h1>
+            <p style={{ fontSize: 14, color: "#93a39a", margin: "0 0 18px" }}>
+              Enviámos um link para <strong style={{ color: "#f1ede2" }}>{form.email.trim()}</strong>. Abre-o para ativar a conta e depois volta para entrar.
+            </p>
+            <a href="/entrar" style={{ display: "inline-block", padding: "12px 22px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>Ir para o login</a>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -83,6 +141,19 @@ export default function Comecar() {
 
           <Field label="Email" error={errors.email}>
             <input style={inputStyle(!!errors.email)} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="email@exemplo.com" />
+          </Field>
+
+          <Field label="Senha" error={errors.senha}>
+            <div style={{ position: "relative" }}>
+              <input style={{ ...inputStyle(!!errors.senha), paddingRight: 44 }} type={showPw ? "text" : "password"} value={form.senha} onChange={(e) => update("senha", e.target.value)} placeholder="Mínimo 6 caracteres" />
+              <button type="button" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Esconder senha" : "Mostrar senha"} style={{ position: "absolute", right: 8, top: 8, width: 32, height: 32, background: "transparent", border: "none", color: "#93a39a", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  {showPw
+                    ? <><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.4 5.2A9 9 0 0 1 21 12a9.8 9.8 0 0 1-2.3 3M6.1 6.1A9.8 9.8 0 0 0 3 12a9 9 0 0 0 11.6 5.3" /></>
+                    : <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>}
+                </svg>
+              </button>
+            </div>
           </Field>
 
           <Field label="Contacto" error={errors.contact}>
@@ -106,10 +177,15 @@ export default function Comecar() {
           </Field>
 
           <button onClick={handleSubmit} disabled={saving} style={{ width: "100%", marginTop: 8, padding: "14px", borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
-            {saving ? "A entrar..." : "Começar a jogar"}
+            {saving ? "A criar conta..." : "Começar a jogar"}
           </button>
 
-          <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>Ao continuar, aceitas receber novidades da Ippon League.</p>
+          <p style={{ fontSize: 13, color: "#93a39a", textAlign: "center", marginTop: 14 }}>
+            Já tens conta?{" "}
+            <a href="/entrar" style={{ color: "#f1ede2", fontWeight: 700, textDecoration: "none", borderBottom: `2px solid ${GOLD}`, paddingBottom: 1 }}>Entrar</a>
+          </p>
+
+          <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 10 }}>Ao continuar, aceitas receber novidades da Ippon League.</p>
         </div>
       </div>
     </main>
@@ -171,7 +247,7 @@ const optionStyle = (active: boolean): CSSProperties => ({
 function CountrySelect({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement | null>(null);
   const selected = COUNTRIES.find((c) => c.iso2 === value) ?? COUNTRIES[0];
 
   useEffect(() => {
@@ -213,7 +289,7 @@ function CountrySelect({ value, onChange }: { value: string; onChange: (iso: str
 function CountryPicker({ value, hasError, onChange }: { value: string; hasError: boolean; onChange: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement | null>(null);
   const selected = COUNTRIES.find((c) => c.iso2 === value);
 
   useEffect(() => {
