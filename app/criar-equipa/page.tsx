@@ -106,14 +106,14 @@ export default function CriarEquipa() {
           Toca num lugar livre para abrir o Mercado. Toca num atleta para o tornar capitão.
         </p>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16 }}>
+        <a href="/ippon-pro" style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16, textDecoration: "none" }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Sê Pro e avalia a tua equipa</div>
             <div style={{ fontSize: 11.5, color: "#5c4410", marginTop: 2 }}>Scout, valorização esperada e dicas da rodada.</div>
             <span style={{ display: "inline-block", marginTop: 8, background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8 }}>Ver Ippon Pro</span>
           </div>
           <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt="#141110" expression="sabio" /></div>
-        </div>
+        </a>
       </div>
 
       {/* Barra inferior: ações + navegação */}
@@ -138,7 +138,7 @@ export default function CriarEquipa() {
         <nav style={{ height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
           <NavTab label="Início" href="/inicio" icon={<HomeIcon />} />
           <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} />
-          <NavTab label="Pro" icon={<BoltIcon />} />
+          <NavTab label="Pro" icon={<BoltIcon />} href="/ippon-pro" />
           <NavTab label="Amigos" icon={<FriendsIcon />} />
         </nav>
       </div>
