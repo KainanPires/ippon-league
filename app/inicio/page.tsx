@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
+import { loadSaved, resolve } from "@/lib/team";
+import { loadIdentity } from "@/components/Escudo";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
-const HAS_TEAM = false;
 const USER = { belt: "Branca" };
 
 const STEPS = [
@@ -18,12 +19,37 @@ const STEPS = [
   { title: "Sobe de faixa", text: "O teu desempenho mensal muda a tua faixa — e o visual do jogo. Boa sorte!" },
 ];
 
-const PRO_BENEFITS = ["Scout avançado dos atletas", "Valorização esperada da rodada", "Dicas e capitães recomendados", "Ligas e badges exclusivos"];
+// Passo do tutorial -> elemento do ecrã que acende e para onde o Dôdo aponta.
+type TutTarget = "team" | "ligas" | "belt" | "pro" | null;
+function targetForStep(step: number): TutTarget {
+  if (step === STEPS.length + 1) return "pro";
+  const idx = step - 1; // índice do passo de ensino
+  if (idx === 1) return "team";   // "Monta a tua equipa"
+  if (idx === 3) return "ligas";  // "Competições e ligas"
+  if (idx === 4) return "belt";   // "Sobe de faixa"
+  return null;
+}
 
 export default function Inicio() {
   const [phase, setPhase] = useState<"tutorial" | null>(null);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("campeão");
+  const [teamInfo, setTeamInfo] = useState<{ name: string; value: string; last: number } | null>(null);
+
+  const beltRef = useRef<HTMLAnchorElement | null>(null);
+  const proRef = useRef<HTMLDivElement | null>(null);
+  const teamRef = useRef<HTMLDivElement | null>(null);
+  const ligasRef = useRef<HTMLAnchorElement | null>(null);
+  const tutTarget: TutTarget = phase === "tutorial" ? targetForStep(step) : null;
+
+  useEffect(() => {
+    if (phase !== "tutorial") return;
+    const t = targetForStep(step);
+    const el = t === "team" ? teamRef.current : t === "ligas" ? ligasRef.current : t === "belt" ? beltRef.current : t === "pro" ? proRef.current : null;
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [phase, step]);
+
+  const glow = (n: TutTarget) => (tutTarget === n ? "iltut" : undefined);
 
   useEffect(() => {
     try {
@@ -32,6 +58,13 @@ export default function Inicio() {
       if (localStorage.getItem("ippon_onboarding") === "pending") {
         setStep(0);
         setPhase("tutorial");
+      }
+      const saved = loadSaved();
+      const athletes = resolve(saved.ids);
+      if (athletes.length > 0) {
+        const value = Math.round(athletes.reduce((s, a) => s + a.priceJc, 0) * 10) / 10;
+        const last = athletes.reduce((s, a) => s + a.last + (a.id === saved.captain ? a.last : 0), 0);
+        setTeamInfo({ name: loadIdentity().name, value: String(value), last });
       }
     } catch {}
   }, []);
@@ -50,11 +83,11 @@ export default function Inicio() {
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite}`}</style>
+      <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes iltut{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.75)}50%{box-shadow:0 0 0 9px rgba(74,144,217,0.18)}} .iltut{animation:iltut 1.3s ease-in-out infinite}`}</style>
 
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 14px 86px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <a href="/perfil" style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: "1px solid #243029", borderRadius: 999, padding: "5px 14px 5px 5px", textDecoration: "none", color: "#f1ede2" }}>
+          <a ref={beltRef} className={glow("belt")} href="/perfil" style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: "1px solid #243029", borderRadius: 999, padding: "5px 14px 5px 5px", textDecoration: "none", color: "#f1ede2" }}>
             <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
               <Mascot belt="#efeadd" expression="feliz" />
             </div>
@@ -72,7 +105,7 @@ export default function Inicio() {
           </div>
         </header>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "11px 14px", marginBottom: 14 }}>
+        <div ref={proRef} className={glow("pro")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "11px 14px", marginBottom: 14 }}>
           <div>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Ippon Pro · 4,90€</div>
             <div style={{ fontSize: 11, color: "#5c4410" }}>Joga com vantagem competitiva</div>
@@ -80,7 +113,9 @@ export default function Inicio() {
           <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Assinar</span>
         </div>
 
-        {HAS_TEAM ? <TeamBuilt /> : <TeamCreate />}
+        <div ref={teamRef} className={glow("team")}>
+          {teamInfo ? <TeamBuilt info={teamInfo} /> : <TeamCreate />}
+        </div>
 
         <Card>
           <CardTitle>Próxima competição</CardTitle>
@@ -105,7 +140,7 @@ export default function Inicio() {
           ))}
         </Card>
 
-        <a href="/ligas" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+        <a ref={ligasRef} className={glow("ligas")} href="/ligas" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
           <Card>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <CardTitle>As tuas ligas</CardTitle>
@@ -144,7 +179,7 @@ export default function Inicio() {
         <Tab label="Amigos" icon={<FriendsIcon />} />
       </nav>
 
-      {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={name} />}
+      {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={name} target={tutTarget} />}
     </main>
   );
 }
@@ -178,22 +213,22 @@ function TeamCreate() {
   );
 }
 
-function TeamBuilt() {
+function TeamBuilt({ info }: { info: { name: string; value: string; last: number } }) {
   return (
     <div style={{ border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
-      <div style={{ background: "#1c3a2e", padding: 9, textAlign: "center", fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aee9c9" }}>Mundial</div>
+      <div style={{ background: "#1c3a2e", padding: 9, textAlign: "center", fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aee9c9" }}>A minha equipa</div>
       <div style={{ background: "#0f1411", padding: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <div style={{ width: 48, height: 48 }}>
-            <Mascot belt="#7a4fa3" expression="determinado" />
+            <Mascot belt="#efeadd" expression="feliz" />
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>Dojo dos Sonhos</div>
-            <div style={{ fontSize: 12, color: GOLD }}>Faixa Roxa</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{info.name}</div>
+            <div style={{ fontSize: 12, color: GOLD }}>Faixa Branca</div>
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", textAlign: "center", marginBottom: 12 }}>
-          {[["JC 100", "Património"], ["86", "Última"], ["86", "Total"]].map(([v, l]) => (
+          {[["JC 100", "Património"], [String(info.last), "Última"], [`JC ${info.value}`, "Valor"]].map(([v, l]) => (
             <div key={l}>
               <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: l === "Património" ? GOLD : "#f1ede2" }}>{v}</div>
               <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{l}</div>
@@ -228,17 +263,44 @@ function Overlay({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Tutorial({ step, setStep, onClose, name }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string }) {
+function Tutorial({ step, setStep, onClose, name, target }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string; target: TutTarget }) {
   const total = STEPS.length + 2;
   const isWelcome = step === 0;
   const isPro = step === STEPS.length + 1;
   const teach = STEPS[step - 1];
+
+  // Passos que apontam para um elemento do ecrã: balão em baixo, sem tapar o ecrã.
+  if (target) {
+    const title = isPro ? "Ippon Pro" : teach.title;
+    const text = isPro
+      ? "Toca aqui para teres o Ippon Pro: scout avançado, valorização esperada e dicas da rodada. 4,90€/mês."
+      : teach.text;
+    return (
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
+        <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
+          <div style={{ width: 56, height: 56, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
+          <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px" }}>
+            <div style={{ textAlign: "right", marginBottom: 4 }}>
+              <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB }}>Pular ✕</button>
+            </div>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{title}</div>
+            <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{text}</p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+              <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>Anterior</button>
+              <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
+              <button onClick={() => (isPro ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{isPro ? "Concluir" : "Seguinte"}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Passos de texto (boas-vindas e conceitos): cartão central.
   return (
     <Overlay>
       <div style={{ textAlign: "right", marginBottom: 8 }}>
-        <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>
-          {isPro ? "Fechar ✕" : "Pular tutorial ✕"}
-        </button>
+        <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>Pular tutorial ✕</button>
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
         {Array.from({ length: total }).map((_, i) => (
@@ -254,14 +316,14 @@ function Tutorial({ step, setStep, onClose, name }: { step: number; setStep: (s:
             </div>
             <div>
               <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>Olá, {name}! Sou o Dôdo</div>
-              <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>Sou o teu sensei aqui na Ippon League e vou guiar-te. Vamos divertir-nos muito — tenho a certeza de que vais adorar. Bora começar?</p>
+              <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>Sou o teu sensei aqui na Ippon League e vou guiar-te. Vou apontar no ecrã o que importa. Bora começar?</p>
             </div>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
             <button onClick={() => setStep(1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 20px", borderRadius: 9, fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Vamos!</button>
           </div>
         </div>
-      ) : !isPro ? (
+      ) : (
         <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
             <div style={{ width: 64, height: 64, flexShrink: 0 }}>
@@ -277,29 +339,6 @@ function Tutorial({ step, setStep, onClose, name }: { step: number; setStep: (s:
             <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
             <button onClick={() => setStep(step + 1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Seguinte</button>
           </div>
-        </div>
-      ) : (
-        <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18, textAlign: "center" }}>
-          <div style={{ width: 72, height: 72, margin: "0 auto 2px" }}>
-            <Mascot belt="#141110" expression="sabio" />
-          </div>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>Oferta de lançamento</div>
-          <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0" }}>Ippon Pro</div>
-          <div style={{ margin: "6px 0 12px" }}>
-            <span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through" }}>9,90€</span>{" "}
-            <span style={{ fontFamily: FD, fontSize: 28, fontWeight: 700, color: GOLD }}>4,90€</span>
-            <span style={{ fontSize: 12, color: "#93a39a" }}>/mês</span>
-          </div>
-          <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 16 }}>
-            {PRO_BENEFITS.map((b) => (
-              <div key={b} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
-                <span style={{ color: GOLD, fontWeight: 700 }}>✓</span>
-                <span style={{ fontSize: 13, color: "#c7d0c9" }}>{b}</span>
-              </div>
-            ))}
-          </div>
-          <button onClick={onClose} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: 11, borderRadius: 10, fontSize: 14, cursor: "pointer" }}>Quero o Ippon Pro</button>
-          <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB }}>Talvez depois</button>
         </div>
       )}
     </Overlay>
