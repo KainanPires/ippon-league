@@ -38,10 +38,10 @@ function classify(c: IjfCompetition): { tier: Tier; tag: string } {
   if (/olympic|olimp/.test(n)) return { tier: "major", tag: "Jogos" };
   if (/masters/.test(n)) return { tier: "major", tag: "Masters" };
   if (/grand slam/.test(n)) return { tier: "major", tag: "Grand Slam" };
+  if (/grand prix/.test(n)) return { tier: "major", tag: "Grand Prix" };
   if (/world championships|world champ|campeonato mundial/.test(n)) return { tier: "major", tag: "Mundial" };
   if (/championships|championship/.test(n)) return { tier: "major", tag: "Continental" }; // Europeu/Pan/Asiático/Africano/Oceania
   // Regulares
-  if (/grand prix/.test(n)) return { tier: "regular", tag: "Grand Prix" };
   if (/world cup/.test(n)) return { tier: "regular", tag: "World Cup" };
   if (/open|cup|copa/.test(n)) return { tier: "regular", tag: "Open/Cup" };
   return { tier: "regular", tag: "Outro" };
