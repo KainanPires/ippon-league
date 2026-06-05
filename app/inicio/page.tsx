@@ -19,7 +19,7 @@ const STEPS = [
   { title: "Sobe de faixa", text: "O teu desempenho mensal muda a tua faixa — e o visual do jogo. Boa sorte!" },
 ];
 
-const PRO_BENEFITS = ["Scout avançado dos atletas", "Valorização esperada da rodada", "Dicas e capitães recomendados", "Ligas e badges exclusivos"];
+const PRO_BENEFITS = ["Chave ao vivo: adversário, repescagem e resultado", "Alertas ao vivo: o teu atleta vai lutar", "Scout avançado dos atletas", "Dicas e capitães recomendados"];
 
 // Passo do tutorial -> elemento do ecrã que acende e para onde o Dôdo aponta.
 type TutTarget = "team" | "ligas" | "belt" | "pro" | null;
