@@ -18,7 +18,7 @@ const IOC: Record<string, string> = {
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
-type Guide = "welcome" | "counter" | "slot" | null;
+type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
 type Modal = { kind: "missing" | "saved" | "trash" | "share" } | { kind: "athlete"; a: Athlete } | null;
 
 export default function CriarEquipa() {
@@ -165,7 +165,21 @@ export default function CriarEquipa() {
       {guide === "slot" && (
         <CoachBubble>
           <p style={coachP}>Toca no <strong style={{ color: "#7fb8f5" }}>lugar destacado</strong> para abrir o Mercado e contratar um atleta.</p>
+          <button onClick={() => setGuide("captain")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
           <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
+        </CoachBubble>
+      )}
+      {guide === "captain" && (
+        <CoachBubble>
+          <p style={coachP}>Toca num atleta já escalado para o <strong style={{ color: "#FF8F00" }}>tornares capitão</strong> (pontua a dobrar) ou para o <strong style={{ color: "#ef8d83" }}>venderes</strong>.</p>
+          <button onClick={() => setGuide("actions")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
+          <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
+        </CoachBubble>
+      )}
+      {guide === "actions" && (
+        <CoachBubble>
+          <p style={coachP}>Em baixo: <strong style={{ color: "#ef8d83" }}>🗑 limpa</strong> a equipa, <strong style={{ color: GOLD }}>partilha</strong> o teu time e <strong style={{ color: GOLD }}>Salvar equipa</strong> guarda a escalação. Boa sorte!</p>
+          <button onClick={naoMostrarMais} style={{ ...nextBtn, marginTop: 10 }}>Concluir</button>
         </CoachBubble>
       )}
 
