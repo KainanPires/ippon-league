@@ -94,7 +94,7 @@ export default function ComoJogar() {
               ))}
             </div>
 
-            <a href="/meu-time" style={{ display: "block", padding: "13px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>
+            <a href="/ippon-pro" style={{ display: "block", padding: "13px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>
               Quero o Ippon Pro
             </a>
             <a href="/meu-time" style={{ display: "inline-block", marginTop: 12, fontSize: 13, color: "#93a39a", textDecoration: "none" }}>
