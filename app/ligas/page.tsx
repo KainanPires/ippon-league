@@ -101,7 +101,7 @@ export default function Ligas() {
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around", zIndex: 50 }}>
         <NavTab label="Início" href="/inicio" icon={<HomeIcon />} />
         <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} active />
-        <NavTab label="Pro" icon={<BoltIcon />} />
+        <NavTab label="Pro" icon={<BoltIcon />} href="/ippon-pro" />
         <NavTab label="Amigos" icon={<FriendsIcon />} />
       </nav>
     </main>
