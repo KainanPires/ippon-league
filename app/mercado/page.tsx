@@ -174,7 +174,17 @@ export default function Mercado() {
   function toggle(a: Athlete) {
     if (team.includes(a.id)) { persist(team.filter((id) => id !== a.id)); return; }
     const st = buttonState(a);
-    if (st.kind === "buy") persist([...team, a.id]);
+    if (st.kind === "buy") {
+      persist([...team, a.id]);
+      // Ao completar os 4 de um género, salta para o oposto (se ainda faltar).
+      const g = a.gender;
+      const newCount = (g === "M" ? countM : countF) + 1;
+      if (newCount >= 4) {
+        const opp: Gender = g === "M" ? "F" : "M";
+        const oppCount = opp === "M" ? countM : countF;
+        if (oppCount < 4) { setGender(opp); setCat("Todas"); }
+      }
+    }
   }
 
   const filtroCount = (priceMin > PRICE_MIN ? 1 : 0) + (priceMax < PRICE_MAX ? 1 : 0) + countrySel.length;
