@@ -4,6 +4,7 @@
  */
 
 import type { ActionType } from "@/lib/engine";
+import type { Athlete, Gender, AthleteStatus } from "@/lib/athletes";
 
 const IJF = "https://data.ijf.org/api/get_json";
 const TIMEOUT_MS = 15000;
@@ -118,6 +119,108 @@ export async function getCompetitorContests(idPerson: string): Promise<IjfContes
  */
 export async function getCompetitionCompetitorsRaw(idCompetition: string): Promise<unknown> {
   return await call<unknown>("competition.competitors", { id_competition: idCompetition });
+}
+
+/* ----------------------------------------------------------------------------
+ * Mapeamento JudoBase -> Atleta do jogo (passo 3A-parte-2a)
+ * Transforma a resposta de competition.competitors no formato Athlete.
+ * Preço de PARTIDA simples (baseado no ranking + vitórias) — o preço real
+ * pelo histórico fica para o 3D. variation/avg/last ficam a 0 por agora.
+ * -------------------------------------------------------------------------- */
+
+const round1 = (n: number): number => Math.round(n * 10) / 10;
+const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
+
+function toNum(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
+// "RYUJU NAGAYAMA" / "ryuju" -> "Ryuju Nagayama"
+function titleCase(s: string): string {
+  return s.toLowerCase().replace(/(^|[\s-])([a-zà-ú])/g, (_m, sep: string, c: string) => sep + c.toUpperCase());
+}
+
+// Preço de partida (2–20 JC). Melhor ranking => mais caro. Sem ranking => usa vitórias.
+function startingPrice(rankingPlace: number | null, won: number, lost: number): number {
+  let price: number;
+  if (rankingPlace !== null && rankingPlace > 0 && rankingPlace < 9000) {
+    price = 19 - Math.log10(rankingPlace) * 5.5; // rank1≈19, rank10≈13.5, rank100≈8, rank1000≈2.5
+  } else {
+    const total = won + lost;
+    const ratio = total > 0 ? won / total : 0.4;
+    price = 3 + ratio * 4; // 3..7 para quem não tem ranking
+  }
+  price += Math.min(won, 12) * 0.1; // pequeno empurrão por vitórias
+  return clamp(round1(price), 2, 20);
+}
+
+function statusFromPrice(price: number): AthleteStatus {
+  if (price >= 15) return "Elite";
+  if (price >= 8) return "Barganha";
+  return "Aposta";
+}
+
+// Recolhe, na árvore "categories", todos os nós-folha (os que têm "persons").
+function collectLeaves(node: unknown, out: Record<string, unknown>[]): void {
+  if (!node || typeof node !== "object") return;
+  const obj = node as Record<string, unknown>;
+  if (obj.persons !== undefined && (obj.category !== undefined || obj.gender !== undefined)) {
+    out.push(obj);
+    return;
+  }
+  for (const key of Object.keys(obj)) collectLeaves(obj[key], out);
+}
+
+/** Converte a resposta crua de competition.competitors numa lista de Athlete. */
+export function mapCompetitorsToAthletes(raw: unknown): Athlete[] {
+  const data = raw as Record<string, unknown> | null;
+  const categories = data?.categories;
+  if (!categories || typeof categories !== "object") return [];
+
+  const leaves: Record<string, unknown>[] = [];
+  collectLeaves(categories, leaves);
+
+  const athletes: Athlete[] = [];
+  const seen = new Set<string>();
+
+  for (const leaf of leaves) {
+    const leafCat = String(leaf.category ?? "").trim();
+    const genderRaw = String(leaf.gender ?? "").toLowerCase();
+    const gender: Gender = genderRaw.startsWith("f") ? "F" : "M";
+
+    const personsRaw = leaf.persons;
+    const persons: unknown[] = Array.isArray(personsRaw)
+      ? personsRaw
+      : personsRaw && typeof personsRaw === "object"
+        ? Object.values(personsRaw as Record<string, unknown>)
+        : [];
+
+    for (const pu of persons) {
+      const p = pu as Record<string, unknown>;
+      const id = String(p?.id_person ?? "").trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+
+      const given = String(p?.given_name ?? "").trim();
+      const family = String(p?.family_name ?? "").trim();
+      const name = titleCase(`${given} ${family}`.trim()) || "Atleta";
+      const countryIso = (String(p?.country_short ?? "").trim().toUpperCase()) || "—";
+      const category = (String(p?.category ?? "").trim() || leafCat) || "-";
+      const ranking = toNum(p?.ranking_place);
+      const won = toNum(p?.contests_won) ?? 0;
+      const lost = toNum(p?.contests_lost) ?? 0;
+      const priceJc = startingPrice(ranking, won, lost);
+
+      athletes.push({
+        id, name, countryIso, gender, category, priceJc,
+        variation: 0, avg: 0, last: 0, status: statusFromPrice(priceJc),
+      });
+    }
+  }
+
+  return athletes;
 }
 
 const toInt = (v: any): number => {
