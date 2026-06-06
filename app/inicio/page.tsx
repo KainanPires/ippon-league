@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
 import { loadSaved, resolve } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
+import { supabase } from "@/lib/supabase";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -32,6 +33,7 @@ function targetForStep(step: number): TutTarget {
 }
 
 export default function Inicio() {
+  const [ready, setReady] = useState(false);
   const [phase, setPhase] = useState<"tutorial" | null>(null);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("campeão");
@@ -41,6 +43,22 @@ export default function Inicio() {
   const teamRef = useRef<HTMLDivElement | null>(null);
   const ligasRef = useRef<HTMLAnchorElement | null>(null);
   const tutTarget: TutTarget = phase === "tutorial" ? targetForStep(step) : null;
+
+  // Proteção de rota: sem sessão iniciada, vai para /entrar antes de mostrar o ecrã.
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (!data.session) {
+        window.location.href = "/entrar";
+        return;
+      }
+      const metaName = data.session.user?.user_metadata?.nome;
+      if (metaName) setName(String(metaName).split(" ")[0]);
+      setReady(true);
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (phase !== "tutorial") return;
@@ -79,6 +97,14 @@ export default function Inicio() {
   function openTutorial() {
     setStep(0);
     setPhase("tutorial");
+  }
+
+  if (!ready) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#7c8a82", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: FD, fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase" }}>A carregar…</div>
+      </main>
+    );
   }
 
   return (
