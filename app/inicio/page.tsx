@@ -44,7 +44,7 @@ export default function Inicio() {
   const [visitante, setVisitante] = useState(false);
   const [phase, setPhase] = useState<"tutorial" | null>(null);
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("campeão");
+  const [name, setName] = useState("Campeão");
   const [teamInfo, setTeamInfo] = useState<{ name: string; value: string; last: number } | null>(null);
 
   const beltRef = useRef<HTMLAnchorElement | null>(null);
@@ -84,16 +84,22 @@ export default function Inicio() {
   const glow = (n: TutTarget) => (tutTarget === n ? "iltut" : undefined);
 
   useEffect(() => {
-    try {
-      const savedName = localStorage.getItem("ippon_name");
-      if (savedName) setName(savedName);
-      if (localStorage.getItem("ippon_onboarding") === "pending") {
-        setStep(0);
-        setPhase("tutorial");
-      }
-      const info = computeTeamInfo(loadSaved());
-      if (info) setTeamInfo(info);
-    } catch {}
+    let active = true;
+    // A equipa/nome local só interessa a quem TEM sessão. Visitante vê sempre o convite.
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active || !data.session) return;
+      try {
+        const savedName = localStorage.getItem("ippon_name");
+        if (savedName) setName(savedName);
+        if (localStorage.getItem("ippon_onboarding") === "pending") {
+          setStep(0);
+          setPhase("tutorial");
+        }
+        const info = computeTeamInfo(loadSaved());
+        if (info) setTeamInfo(info);
+      } catch {}
+    });
+    return () => { active = false; };
   }, []);
 
   function finishOnboarding() {
@@ -128,8 +134,8 @@ export default function Inicio() {
                 <Mascot belt="#efeadd" expression="feliz" />
               </div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>Entrar</div>
-                <div style={{ fontSize: 11, color: GOLD }}>Faz o teu login</div>
+                <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>Campeão</div>
+                <div style={{ fontSize: 11, color: GOLD }}>Entrar para jogar</div>
               </div>
             </a>
           ) : (
