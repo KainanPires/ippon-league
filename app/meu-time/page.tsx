@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSaved, resolve, jcLeft, type TeamState } from "@/lib/team";
+import { loadSaved, resolve, jcLeft, loadSavedCloud, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { scoreAthlete, POINTS, type ActionType } from "@/lib/engine";
+import { supabase } from "@/lib/supabase";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -105,8 +106,23 @@ export default function MeuTime() {
   const [sel, setSel] = useState<Athlete | null>(null);
 
   useEffect(() => {
+    let active = true;
+    // Cache local primeiro (instantâneo), para não piscar.
     try { setTeam(loadSaved()); setIdentity(loadIdentity()); } catch {}
-    setReady(true);
+    // Proteção de rota + equipa da nuvem (a oficial).
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (!data.session) {
+        window.location.href = "/entrar";
+        return;
+      }
+      setReady(true);
+      loadSavedCloud().then((cloud) => {
+        if (!active || !cloud) return;
+        setTeam(cloud);
+      });
+    });
+    return () => { active = false; };
   }, []);
 
   if (!ready) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
