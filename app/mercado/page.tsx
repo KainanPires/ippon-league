@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
 import { loadDraft, saveDraft, setAthletePool } from "@/lib/team";
+import { exigirSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -204,10 +205,12 @@ export default function Mercado() {
     if (!afford) return { label: "Sem JC", kind: "blocked" as const };
     return { label: "Contratar", kind: "buy" as const };
   }
-  function toggle(a: Athlete) {
+  async function toggle(a: Athlete) {
     if (team.includes(a.id)) { persist(team.filter((id) => id !== a.id)); return; }
     const st = buttonState(a);
     if (st.kind === "buy") {
+      // Portão de login: contratar exige conta. Sem sessão, vai ao login e volta ao Mercado.
+      if (!(await exigirSessao("/mercado"))) return;
       persist([...team, a.id]);
       const g = a.gender;
       const newCount = (g === "M" ? countM : countF) + 1;
