@@ -56,16 +56,31 @@ export default function Inicio() {
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
+
       if (!data.session) {
-        // Visitante: explora à vontade, sem muro de login.
+        // VISITANTE: sem sessão. Mostra "Campeão" + convite. NUNCA lê a equipa local.
         setVisitante(true);
+        setTeamInfo(null);
         setReady(true);
         return;
       }
+
+      // LOGADO: a partir daqui podemos usar nome e equipa.
       setVisitante(false);
-      const metaName = data.session.user?.user_metadata?.nome;
-      if (metaName) setName(String(metaName).split(" ")[0]);
+      try {
+        const savedName = localStorage.getItem("ippon_name");
+        const metaName = data.session.user?.user_metadata?.nome;
+        if (metaName) setName(String(metaName).split(" ")[0]);
+        else if (savedName) setName(savedName);
+        if (localStorage.getItem("ippon_onboarding") === "pending") {
+          setStep(0);
+          setPhase("tutorial");
+        }
+        const info = computeTeamInfo(loadSaved()); // cache local (instantâneo)
+        if (info) setTeamInfo(info);
+      } catch {}
       setReady(true);
+      // Equipa oficial da conta (substitui o resumo local, se existir).
       loadSavedCloud().then((cloud) => {
         if (!active || !cloud) return;
         setTeamInfo(computeTeamInfo(cloud));
@@ -82,25 +97,6 @@ export default function Inicio() {
   }, [phase, step]);
 
   const glow = (n: TutTarget) => (tutTarget === n ? "iltut" : undefined);
-
-  useEffect(() => {
-    let active = true;
-    // A equipa/nome local só interessa a quem TEM sessão. Visitante vê sempre o convite.
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active || !data.session) return;
-      try {
-        const savedName = localStorage.getItem("ippon_name");
-        if (savedName) setName(savedName);
-        if (localStorage.getItem("ippon_onboarding") === "pending") {
-          setStep(0);
-          setPhase("tutorial");
-        }
-        const info = computeTeamInfo(loadSaved());
-        if (info) setTeamInfo(info);
-      } catch {}
-    });
-    return () => { active = false; };
-  }, []);
 
   function finishOnboarding() {
     try {
