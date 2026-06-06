@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCompetitions, getCompetitionCompetitorsRaw } from "@/lib/ijf";
+import { getCompetitions, getCompetitionCompetitorsRaw, mapCompetitorsToAthletes } from "@/lib/ijf";
 
 // Sempre fresco (sem cache de build) — é um endereço de diagnóstico.
 export const dynamic = "force-dynamic";
@@ -41,11 +41,17 @@ export async function GET(req: Request) {
   }
 
   const dados = await getCompetitionCompetitorsRaw(id);
+  const atletas = mapCompetitorsToAthletes(dados);
+  const masculinos = atletas.filter((a) => a.gender === "M").length;
+  const femininos = atletas.filter((a) => a.gender === "F").length;
   return NextResponse.json({
     modo: "atletas",
     id,
     recebido: dados !== null,
-    nota: "Dados crus do JudoBase — vamos ver a forma e depois mapear para o jogo.",
-    dados,
+    total: atletas.length,
+    masculinos,
+    femininos,
+    nota: "Atletas reais do JudoBase já no formato do jogo. Preço é de PARTIDA (afinado no 3D).",
+    atletas,
   });
 }
