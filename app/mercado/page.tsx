@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ATHLETES, CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
-import { loadDraft, saveDraft } from "@/lib/team";
+import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
+import { loadDraft, saveDraft, setAthletePool } from "@/lib/team";
 import { Mascot } from "@/components/Mascot";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -11,12 +11,8 @@ const GOLD = "#d9a441";
 const START_JC = 100;
 const FAV_KEY = "ippon_favorites";
 
-const IOC: Record<string, string> = {
-  JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
-  TR: "TUR", UZ: "UZB", RU: "AIN", DE: "GER", XK: "KOS", IT: "ITA", CA: "CAN",
-  SI: "SLO", HR: "CRO", NL: "NED",
-};
-const code3 = (iso: string) => IOC[iso] || iso;
+// Competição do mercado (Paris Grand Slam). Mais tarde muda conforme a rodada.
+const COMPETICAO = "3131";
 
 const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Elite": ["#3a2f12", "#d9a441"],
@@ -26,7 +22,7 @@ const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Aposta": ["#2a1f3a", "#b79be0"],
 };
 
-// Disponibilidade (placeholder estável até ligarmos o JudoBase)
+// Disponibilidade (placeholder estável até ligarmos aos inscritos confirmados)
 type Availability = "inscrito" | "provavel" | "duvida" | "suspenso" | "lesionado" | "sem-status";
 const AVAIL_META: Record<Availability, { label: string; color: string }> = {
   inscrito: { label: "Inscrito", color: "#7fb8f5" },
@@ -62,8 +58,6 @@ const SORTS: { id: SortId; label: string; pro?: boolean }[] = [
 ];
 const sortLabel = (id: SortId) => SORTS.find((s) => s.id === id)?.label || "Ordenar";
 
-const ALL_COUNTRIES = Array.from(new Set(ATHLETES.map((a) => a.countryIso))).sort((a, b) => code3(a).localeCompare(code3(b)));
-
 const PRICE_MIN = 2;
 const PRICE_MAX = 20;
 
@@ -76,12 +70,17 @@ const STEPS = [
 ];
 
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
+const code3 = (iso: string) => iso; // os atletas reais já vêm em 3 letras
 
 type SheetKind = "ord" | "sta" | "fil" | null;
 
 export default function Mercado() {
+  const [pool, setPool] = useState<Athlete[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState("");
+
   const [gender, setGender] = useState<Gender>("M");
-  const [cat, setCat] = useState<string>("Todas");
+  const [cat, setCat] = useState<string>(CATEGORIES.M[0]);
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [team, setTeam] = useState<string[]>([]);
@@ -98,14 +97,45 @@ export default function Mercado() {
   const [sheet, setSheet] = useState<SheetKind>(null);
 
   useEffect(() => {
+    let active = true;
+    let draft: { ids: string[]; captain: string | null } = { ids: [], captain: null };
     try {
-      const d = loadDraft();
-      setTeam(d.ids);
-      setCaptain(d.captain);
+      draft = loadDraft();
+      setTeam(draft.ids);
+      setCaptain(draft.captain);
       const f = localStorage.getItem(FAV_KEY);
       if (f) setFavs(JSON.parse(f));
       if (!localStorage.getItem("ippon_market_tutorial")) setGuide(0);
     } catch {}
+
+    // Vai buscar os atletas reais (cache no servidor) e enche a memória partilhada.
+    fetch(`/api/atletas?id=${COMPETICAO}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!active) return;
+        const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
+        setPool(list);
+        setAthletePool(list);
+        setLoading(false);
+        // Reconcilia o rascunho: mantém só ids que existem nos atletas reais.
+        if (list.length > 0) {
+          const ids = new Set(list.map((a) => a.id));
+          const cleanIds = draft.ids.filter((id) => ids.has(id));
+          if (cleanIds.length !== draft.ids.length) {
+            const cap = draft.captain && cleanIds.includes(draft.captain) ? draft.captain : null;
+            setTeam(cleanIds);
+            setCaptain(cap);
+            saveDraft({ ids: cleanIds, captain: cap });
+          }
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setLoading(false);
+        setLoadErr("Não foi possível carregar os atletas. Tenta recarregar a página.");
+      });
+
+    return () => { active = false; };
   }, []);
 
   function persist(next: string[]) {
@@ -129,16 +159,19 @@ export default function Mercado() {
     setStatusSel([]); setPriceMin(PRICE_MIN); setPriceMax(PRICE_MAX); setCountrySel([]); setFavOnly(false);
   }
 
-  const teamAthletes = team.map((id) => ATHLETES.find((a) => a.id === id)).filter(Boolean) as Athlete[];
+  const byId = new Map(pool.map((a) => [a.id, a]));
+  const teamAthletes = team.map((id) => byId.get(id)).filter(Boolean) as Athlete[];
   const jcLeft = Math.round((START_JC - teamAthletes.reduce((s, a) => s + a.priceJc, 0)) * 10) / 10;
   const countM = teamAthletes.filter((a) => a.gender === "M").length;
   const countF = teamAthletes.filter((a) => a.gender === "F").length;
   const takenM = new Set(teamAthletes.filter((a) => a.gender === "M").map((a) => a.category));
   const takenF = new Set(teamAthletes.filter((a) => a.gender === "F").map((a) => a.category));
 
-  let filtered = ATHLETES.filter((a) => {
+  const ALL_COUNTRIES = Array.from(new Set(pool.map((a) => a.countryIso))).sort((a, b) => a.localeCompare(b));
+
+  let filtered = pool.filter((a) => {
     if (a.gender !== gender) return false;
-    if (cat !== "Todas" && a.category !== cat) return false;
+    if (a.category !== cat) return false;
     if (query.trim() && !a.name.toLowerCase().includes(query.trim().toLowerCase())) return false;
     if (favOnly && !favs.includes(a.id)) return false;
     if (statusSel.length > 0 && !statusSel.includes(availabilityOf(a.id))) return false;
@@ -154,7 +187,7 @@ export default function Mercado() {
       case "desvalorizados": return a.variation - b.variation;
       case "media": return b.avg - a.avg;
       case "piores": return a.last - b.last;
-      default: return b.priceJc - a.priceJc; // caros (e Pro caem aqui)
+      default: return b.priceJc - a.priceJc;
     }
   });
 
@@ -176,13 +209,12 @@ export default function Mercado() {
     const st = buttonState(a);
     if (st.kind === "buy") {
       persist([...team, a.id]);
-      // Ao completar os 4 de um género, salta para o oposto (se ainda faltar).
       const g = a.gender;
       const newCount = (g === "M" ? countM : countF) + 1;
       if (newCount >= 4) {
         const opp: Gender = g === "M" ? "F" : "M";
         const oppCount = opp === "M" ? countM : countF;
-        if (oppCount < 4) { setGender(opp); setCat("Todas"); }
+        if (oppCount < 4) { setGender(opp); setCat(CATEGORIES[opp][0]); }
       }
     }
   }
@@ -221,11 +253,10 @@ export default function Mercado() {
           )}
 
           <div style={{ display: "flex", gap: 8, marginBottom: 9 }}>
-            <button onClick={() => { setGender("M"); setCat("Todas"); }} style={genderBtn(gender === "M")}>Masculino {countM}/4</button>
-            <button onClick={() => { setGender("F"); setCat("Todas"); }} style={genderBtn(gender === "F")}>Feminino {countF}/4</button>
+            <button onClick={() => { setGender("M"); setCat(CATEGORIES.M[0]); }} style={genderBtn(gender === "M")}>Masculino {countM}/4</button>
+            <button onClick={() => { setGender("F"); setCat(CATEGORIES.F[0]); }} style={genderBtn(gender === "F")}>Feminino {countF}/4</button>
           </div>
 
-          {/* Barra de filtros */}
           <div className="noscroll" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 9 }}>
             <button onClick={() => setFavOnly((v) => !v)} aria-label="Só favoritos" style={{ flexShrink: 0, width: 46, height: 42, borderRadius: 11, border: `1.5px solid ${favOnly ? GOLD : "#2a3a33"}`, background: favOnly ? "#3a2f12" : "#121815", color: favOnly ? GOLD : "#5f6f67", fontSize: 18, cursor: "pointer" }}>★</button>
             <button onClick={() => setSheet("ord")} style={fbtn(false)}>
@@ -240,7 +271,7 @@ export default function Mercado() {
           </div>
 
           <div className="noscroll" style={{ display: "flex", gap: 7, overflowX: "auto" }}>
-            {["Todas", ...CATEGORIES[gender]].map((c) => (
+            {CATEGORIES[gender].map((c) => (
               <button key={c} onClick={() => setCat(c)} style={chip(c === cat)}>{c}</button>
             ))}
           </div>
@@ -248,9 +279,13 @@ export default function Mercado() {
 
         {/* Lista */}
         <div style={{ padding: "12px 14px 92px" }}>
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "40px 0" }}>A carregar atletas reais…</div>
+          ) : loadErr ? (
+            <div style={{ textAlign: "center", color: "#ef8d83", fontSize: 13, padding: "40px 0" }}>{loadErr}</div>
+          ) : filtered.length === 0 ? (
             <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "30px 0" }}>
-              {favOnly ? "Ainda não tens favoritos neste género. Toca na ★ de um atleta." : "Nenhum atleta com estes filtros."}
+              {favOnly ? "Ainda não tens favoritos nesta categoria. Toca na ★ de um atleta." : "Nenhum atleta nesta categoria com estes filtros."}
             </div>
           ) : (
             filtered.map((a, idx) => {
@@ -320,7 +355,6 @@ export default function Mercado() {
         </div>
       </div>
 
-      {/* Folhas (ordenar / status / filtros) */}
       {sheet === "ord" && (
         <Sheet title="Ordenar" onClose={() => setSheet(null)}>
           {SORTS.map((o) => {
@@ -388,7 +422,6 @@ export default function Mercado() {
         </Sheet>
       )}
 
-      {/* Tutorial guiado */}
       {guide !== null && <Tutorial step={guide} setStep={setGuide} onClose={finishTutorial} />}
     </main>
   );
