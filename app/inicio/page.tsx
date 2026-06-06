@@ -22,17 +22,15 @@ const STEPS = [
 
 const PRO_BENEFITS = ["Chave ao vivo: adversário, repescagem e resultado", "Alertas ao vivo: o teu atleta vai lutar", "Scout avançado dos atletas", "Dicas e capitães recomendados"];
 
-// Passo do tutorial -> elemento do ecrã que acende e para onde o Dôdo aponta.
 type TutTarget = "team" | "ligas" | "belt" | "pro" | null;
 function targetForStep(step: number): TutTarget {
-  const idx = step - 1; // índice do passo de ensino
-  if (idx === 1) return "team";   // "Monta a tua equipa"
-  if (idx === 3) return "ligas";  // "Competições e ligas"
-  if (idx === 4) return "belt";   // "Sobe de faixa"
-  return null;                    // boas-vindas, conceitos e Ippon Pro -> cartão central
+  const idx = step - 1;
+  if (idx === 1) return "team";
+  if (idx === 3) return "ligas";
+  if (idx === 4) return "belt";
+  return null;
 }
 
-// Calcula o resumo da equipa (nome, valor, última pontuação) a partir de uma equipa.
 function computeTeamInfo(saved: TeamState): { name: string; value: string; last: number } | null {
   const athletes = resolve(saved.ids);
   if (athletes.length === 0) return null;
@@ -43,6 +41,7 @@ function computeTeamInfo(saved: TeamState): { name: string; value: string; last:
 
 export default function Inicio() {
   const [ready, setReady] = useState(false);
+  const [visitante, setVisitante] = useState(false);
   const [phase, setPhase] = useState<"tutorial" | null>(null);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("campeão");
@@ -53,19 +52,20 @@ export default function Inicio() {
   const ligasRef = useRef<HTMLAnchorElement | null>(null);
   const tutTarget: TutTarget = phase === "tutorial" ? targetForStep(step) : null;
 
-  // Proteção de rota: sem sessão iniciada, vai para /entrar antes de mostrar o ecrã.
   useEffect(() => {
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       if (!data.session) {
-        window.location.href = "/entrar";
+        // Visitante: explora à vontade, sem muro de login.
+        setVisitante(true);
+        setReady(true);
         return;
       }
+      setVisitante(false);
       const metaName = data.session.user?.user_metadata?.nome;
       if (metaName) setName(String(metaName).split(" ")[0]);
       setReady(true);
-      // Equipa oficial da conta (substitui o resumo local, se existir).
       loadSavedCloud().then((cloud) => {
         if (!active || !cloud) return;
         setTeamInfo(computeTeamInfo(cloud));
@@ -122,15 +122,27 @@ export default function Inicio() {
 
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 14px 86px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <a ref={beltRef} className={glow("belt")} href="/perfil" style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: "1px solid #243029", borderRadius: 999, padding: "5px 14px 5px 5px", textDecoration: "none", color: "#f1ede2" }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
-              <Mascot belt="#efeadd" expression="feliz" />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{name}</div>
-              <div style={{ fontSize: 11, color: GOLD }}>Faixa {USER.belt}</div>
-            </div>
-          </a>
+          {visitante ? (
+            <a href="/entrar?voltar=/inicio" style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: `1px solid ${GOLD}`, borderRadius: 999, padding: "5px 14px 5px 5px", textDecoration: "none", color: "#f1ede2" }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
+                <Mascot belt="#efeadd" expression="feliz" />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>Entrar</div>
+                <div style={{ fontSize: 11, color: GOLD }}>Faz o teu login</div>
+              </div>
+            </a>
+          ) : (
+            <a ref={beltRef} className={glow("belt")} href="/perfil" style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: "1px solid #243029", borderRadius: 999, padding: "5px 14px 5px 5px", textDecoration: "none", color: "#f1ede2" }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
+                <Mascot belt="#efeadd" expression="feliz" />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{name}</div>
+                <div style={{ fontSize: 11, color: GOLD }}>Faixa {USER.belt}</div>
+              </div>
+            </a>
+          )}
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={openTutorial} aria-label="Como se joga" style={iconBtn}>?</button>
             <div style={{ position: "relative", ...iconBtn, cursor: "default" }}>
@@ -149,7 +161,7 @@ export default function Inicio() {
         </a>
 
         <div ref={teamRef} className={glow("team")}>
-          {teamInfo ? <TeamBuilt info={teamInfo} /> : <TeamCreate />}
+          {!visitante && teamInfo ? <TeamBuilt info={teamInfo} /> : <TeamCreate />}
         </div>
 
         <Card>
@@ -304,7 +316,6 @@ function Tutorial({ step, setStep, onClose, name, target }: { step: number; setS
   const isPro = step === STEPS.length + 1;
   const teach = STEPS[step - 1];
 
-  // Passos que apontam para um elemento do ecrã: balão em baixo, sem tapar o ecrã.
   if (target) {
     const title = isPro ? "Ippon Pro" : teach.title;
     const text = isPro
@@ -331,7 +342,6 @@ function Tutorial({ step, setStep, onClose, name, target }: { step: number; setS
     );
   }
 
-  // Passos de texto (boas-vindas e conceitos): cartão central.
   return (
     <Overlay>
       <div style={{ textAlign: "right", marginBottom: 8 }}>
