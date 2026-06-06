@@ -5,6 +5,7 @@ import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
 import { loadDraft, saveDraft, loadSaved, commitSaved, resolve, jcLeft, counts, isComplete, missing, loadSavedCloud, commitSavedCloud, type TeamState } from "@/lib/team";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+import { temSessao, exigirSessao } from "@/lib/auth";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -15,10 +16,9 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
-// Competição desta escalação (exemplo). Liga à competição selecionada (modelo time-por-competição + JudoBase).
 const COMPETITION = { name: "Grand Slam Paris", local: "Paris", level: "Sénior" };
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
-type Modal = { kind: "missing" | "saved" | "trash" | "share" } | { kind: "athlete"; a: Athlete } | null;
+type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" } | { kind: "athlete"; a: Athlete } | null;
 function sameTeam(a: TeamState, b: TeamState): boolean {
   if ((a.captain || "") !== (b.captain || "")) return false;
   if (a.ids.length !== b.ids.length) return false;
@@ -34,30 +34,39 @@ export default function CriarEquipa() {
   const [cloudWarn, setCloudWarn] = useState(false);
   const router = useRouter();
   useEffect(() => {
-    // 1) Cache local (instantâneo) — mostra logo o que houver no dispositivo.
+    let active = true;
+    // O tutorial guiado pode aparecer a qualquer pessoa (é só informativo).
     try {
-      setDraft(loadDraft());
-      setSaved(loadSaved());
-      setIdentity(loadIdentity());
       if (!localStorage.getItem("ippon_team_tutorial")) setGuide("welcome");
     } catch {}
-    // 2) Nuvem (assíncrono) — a equipa da conta é a oficial. Se existir, usa-a.
-    loadSavedCloud().then((cloud) => {
-      if (!cloud) return;
-      setSaved(cloud);
-      // Só substitui o rascunho se não houver alterações locais por guardar.
-      const localDraft = loadDraft();
-      const localSaved = loadSaved();
-      if (sameTeam(localDraft, localSaved)) {
-        setDraft(cloud);
-        saveDraft(cloud);
-        commitSaved(cloud);
-      }
+    // A equipa só interessa a quem TEM sessão. Visitante: Dojo abre vazio.
+    temSessao().then((logado) => {
+      if (!active || !logado) return;
+      // 1) Cache local (instantâneo) — mostra logo o que houver no dispositivo.
+      try {
+        setDraft(loadDraft());
+        setSaved(loadSaved());
+        setIdentity(loadIdentity());
+      } catch {}
+      // 2) Nuvem (assíncrono) — a equipa da conta é a oficial. Se existir, usa-a.
+      loadSavedCloud().then((cloud) => {
+        if (!active || !cloud) return;
+        setSaved(cloud);
+        const localDraft = loadDraft();
+        const localSaved = loadSaved();
+        if (sameTeam(localDraft, localSaved)) {
+          setDraft(cloud);
+          saveDraft(cloud);
+          commitSaved(cloud);
+        }
+      });
     });
+    return () => { active = false; };
   }, []);
-  const dirty = !sameTeam(draft, saved);
+  // Só "prende" a saída se houver alterações por guardar E pelo menos um atleta escalado.
+  // Equipa vazia => sai livremente.
+  const dirty = !sameTeam(draft, saved) && draft.ids.length > 0;
   const [nudge, setNudge] = useState(false);
-  // Avisa ao recarregar/fechar o separador com alterações por guardar.
   useEffect(() => {
     function onBeforeUnload(e: BeforeUnloadEvent) {
       if (dirty) { e.preventDefault(); e.returnValue = ""; }
@@ -65,7 +74,6 @@ export default function CriarEquipa() {
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
-  // Sair do Dojo: enquanto houver alterações por guardar, prende e faz o Salvar piscar.
   function tryLeave(href: string) {
     if (dirty) { setNudge(true); setTimeout(() => setNudge(false), 1000); return; }
     router.push(href);
@@ -83,6 +91,8 @@ export default function CriarEquipa() {
     setModal(null);
   }
   async function save() {
+    // Portão de login: salvar exige conta. Sem sessão, mostra o aviso.
+    if (!(await temSessao())) { setModal({ kind: "login" }); return; }
     if (!isComplete(draft)) { setModal({ kind: "missing" }); return; }
     setSavingCloud(true);
     const res = await commitSavedCloud(draft, identity);
@@ -155,7 +165,6 @@ export default function CriarEquipa() {
           <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt="#141110" expression="sabio" /></div>
         </a>
       </div>
-      {/* Barra inferior: ações + navegação */}
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50 }}>
         <div style={{ background: "#0f1411", borderTop: "1px solid #243029", padding: "9px 14px" }}>
           <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -181,7 +190,6 @@ export default function CriarEquipa() {
           <NavTab label="Amigos" icon={<FriendsIcon />} />
         </nav>
       </div>
-      {/* Onboarding guiado */}
       {guide === "welcome" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -220,7 +228,6 @@ export default function CriarEquipa() {
           <button onClick={naoMostrarMais} style={{ ...nextBtn, marginTop: 10 }}>Concluir</button>
         </CoachBubble>
       )}
-      {/* Modais */}
       {modal?.kind === "missing" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -239,7 +246,18 @@ export default function CriarEquipa() {
           </div>
         </div>
       )}
-      {modal?.kind === "saved" && (
+      {modal?.kind === "login" && (
+        <div style={overlayBg}>
+          <div style={cardBox}>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#141110" expression="indicando" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Entra para guardar</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Para guardares a tua equipa e competires, entra na tua conta. É rápido — e ficas já a jogar!</p>
+            <button onClick={() => exigirSessao("/criar-equipa")} style={primaryBtn}>Entrar / Criar conta</button>
+            <button onClick={() => setModal(null)} style={ghostBtn}>Agora não</button>
+          </div>
+        </div>
+      )}
+            {modal?.kind === "saved" && (
         <div style={overlayBg}>
           <div style={cardBox}>
             <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="feliz" /></div>
