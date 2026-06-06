@@ -56,9 +56,11 @@ function extractFights(data: any): IjfContest[] {
 }
 
 function fightDate(f: IjfContest): number {
-  const raw = String(f.competition_date || f.date_raw || "").replace(/\//g, "-").slice(0, 10);
-  if (!raw) return 0;
-  const t = Date.parse(raw);
+  // Lê os campos de data via Record para não depender do tipo IjfContest.
+  const rec = f as unknown as Record<string, unknown>;
+  const rawStr = String(rec.competition_date || rec.date_raw || "").replace(/\//g, "-").slice(0, 10);
+  if (!rawStr) return 0;
+  const t = Date.parse(rawStr);
   return isNaN(t) ? 0 : t;
 }
 
