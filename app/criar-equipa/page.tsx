@@ -1,16 +1,13 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
-import { loadDraft, saveDraft, loadSaved, commitSaved, resolve, jcLeft, counts, isComplete, missing, type TeamState } from "@/lib/team";
+import { loadDraft, saveDraft, loadSaved, commitSaved, resolve, jcLeft, counts, isComplete, missing, loadSavedCloud, commitSavedCloud, type TeamState } from "@/lib/team";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-
 const IOC: Record<string, string> = {
   JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
   TR: "TUR", UZ: "UZB", RU: "AIN", DE: "GER", XK: "KOS", IT: "ITA", CA: "CAN",
@@ -18,39 +15,48 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
-
 // Competição desta escalação (exemplo). Liga à competição selecionada (modelo time-por-competição + JudoBase).
 const COMPETITION = { name: "Grand Slam Paris", local: "Paris", level: "Sénior" };
-
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
 type Modal = { kind: "missing" | "saved" | "trash" | "share" } | { kind: "athlete"; a: Athlete } | null;
-
 function sameTeam(a: TeamState, b: TeamState): boolean {
   if ((a.captain || "") !== (b.captain || "")) return false;
   if (a.ids.length !== b.ids.length) return false;
   return [...a.ids].sort().join(",") === [...b.ids].sort().join(",");
 }
-
 export default function CriarEquipa() {
   const [guide, setGuide] = useState<Guide>(null);
   const [draft, setDraft] = useState<TeamState>({ ids: [], captain: null });
   const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null });
   const [modal, setModal] = useState<Modal>(null);
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
+  const [savingCloud, setSavingCloud] = useState(false);
+  const [cloudWarn, setCloudWarn] = useState(false);
   const router = useRouter();
-
   useEffect(() => {
+    // 1) Cache local (instantâneo) — mostra logo o que houver no dispositivo.
     try {
       setDraft(loadDraft());
       setSaved(loadSaved());
       setIdentity(loadIdentity());
       if (!localStorage.getItem("ippon_team_tutorial")) setGuide("welcome");
     } catch {}
+    // 2) Nuvem (assíncrono) — a equipa da conta é a oficial. Se existir, usa-a.
+    loadSavedCloud().then((cloud) => {
+      if (!cloud) return;
+      setSaved(cloud);
+      // Só substitui o rascunho se não houver alterações locais por guardar.
+      const localDraft = loadDraft();
+      const localSaved = loadSaved();
+      if (sameTeam(localDraft, localSaved)) {
+        setDraft(cloud);
+        saveDraft(cloud);
+        commitSaved(cloud);
+      }
+    });
   }, []);
-
   const dirty = !sameTeam(draft, saved);
   const [nudge, setNudge] = useState(false);
-
   // Avisa ao recarregar/fechar o separador com alterações por guardar.
   useEffect(() => {
     function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -59,17 +65,14 @@ export default function CriarEquipa() {
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
-
   // Sair do Dojo: enquanto houver alterações por guardar, prende e faz o Salvar piscar.
   function tryLeave(href: string) {
     if (dirty) { setNudge(true); setTimeout(() => setNudge(false), 1000); return; }
     router.push(href);
   }
-
   function update(next: TeamState) { setDraft(next); saveDraft(next); }
   function naoMostrarMais() { try { localStorage.setItem("ippon_team_tutorial", "skip"); } catch {} setGuide(null); }
   function openGuide() { setGuide("welcome"); }
-
   function setCaptain(id: string) {
     update({ ...draft, captain: draft.captain === id ? null : id });
     setModal(null);
@@ -79,18 +82,21 @@ export default function CriarEquipa() {
     update({ ids: draft.ids.filter((x) => x !== id), captain: draft.captain === id ? null : draft.captain });
     setModal(null);
   }
-  function save() {
-    if (isComplete(draft)) { commitSaved(draft); setSaved(draft); setModal({ kind: "saved" }); }
-    else { setModal({ kind: "missing" }); }
+  async function save() {
+    if (!isComplete(draft)) { setModal({ kind: "missing" }); return; }
+    setSavingCloud(true);
+    const res = await commitSavedCloud(draft, identity);
+    setSaved(draft);
+    setSavingCloud(false);
+    setCloudWarn(!res.ok);
+    setModal({ kind: "saved" });
   }
-
   const all = resolve(draft.ids);
   const males = all.filter((a) => a.gender === "M");
   const females = all.filter((a) => a.gender === "F");
   const total = all.length;
   const left = jcLeft(draft);
   const firstEmpty = males.length < 4 ? { row: "M", i: males.length } : females.length < 4 ? { row: "F", i: females.length } : null;
-
   function renderRow(list: Athlete[], row: "M" | "F") {
     return Array.from({ length: 4 }).map((_, i) => {
       const a = list[i];
@@ -100,11 +106,9 @@ export default function CriarEquipa() {
         : <EmptySlot key={row + i} highlight={highlight} />;
     });
   }
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <style>{`@keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.55)}50%{box-shadow:0 0 0 8px rgba(74,144,217,0.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:10px} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilsavebig{0%{transform:scale(1)}30%{transform:scale(1.06)}60%{transform:scale(0.98)}100%{transform:scale(1)}} .ilsavebig{animation:ilsave 1.2s ease-in-out infinite, ilsavebig 0.5s ease-in-out 2}`}</style>
-
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 150px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
@@ -121,7 +125,6 @@ export default function CriarEquipa() {
           </div>
           <button onClick={openGuide} aria-label="Como montar a equipa" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
-
         <div style={{ display: "flex", alignItems: "center", gap: 11, background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "10px 13px", marginBottom: 14 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: GOLD, color: "#1b211e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <TrophyIcon />
@@ -132,7 +135,6 @@ export default function CriarEquipa() {
           </div>
           <span style={{ background: "#1b211e", color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{COMPETITION.level}</span>
         </div>
-
         <div style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
           <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
             <SectionLabel>Masculino</SectionLabel>
@@ -141,11 +143,9 @@ export default function CriarEquipa() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>{renderRow(females, "F")}</div>
           </div>
         </div>
-
         <p style={{ fontSize: 12, color: "#93a39a", textAlign: "center", marginTop: 14 }}>
           Toca num lugar livre para abrir o Mercado. Toca num atleta para o tornar capitão.
         </p>
-
         <a href="/ippon-pro" onClick={(e) => { e.preventDefault(); tryLeave("/ippon-pro"); }} style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16, textDecoration: "none" }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Sê Pro e avalia a tua equipa</div>
@@ -155,7 +155,6 @@ export default function CriarEquipa() {
           <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt="#141110" expression="sabio" /></div>
         </a>
       </div>
-
       {/* Barra inferior: ações + navegação */}
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50 }}>
         <div style={{ background: "#0f1411", borderTop: "1px solid #243029", padding: "9px 14px" }}>
@@ -171,7 +170,7 @@ export default function CriarEquipa() {
               <button onClick={() => setModal({ kind: "share" })} aria-label="Partilhar equipa" style={roundBtn("#243029", "#cfd8d2")}>
                 <ShareIcon />
               </button>
-              <button onClick={save} className={dirty ? (nudge ? "ilsavebig" : "ilsave") : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: "pointer" }}>Salvar equipa</button>
+              <button onClick={save} disabled={savingCloud} className={dirty && !savingCloud ? (nudge ? "ilsavebig" : "ilsave") : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar equipa"}</button>
             </div>
           </div>
         </div>
@@ -182,7 +181,6 @@ export default function CriarEquipa() {
           <NavTab label="Amigos" icon={<FriendsIcon />} />
         </nav>
       </div>
-
       {/* Onboarding guiado */}
       {guide === "welcome" && (
         <div style={overlayBg}>
@@ -222,7 +220,6 @@ export default function CriarEquipa() {
           <button onClick={naoMostrarMais} style={{ ...nextBtn, marginTop: 10 }}>Concluir</button>
         </CoachBubble>
       )}
-
       {/* Modais */}
       {modal?.kind === "missing" && (
         <div style={overlayBg}>
@@ -247,7 +244,11 @@ export default function CriarEquipa() {
           <div style={cardBox}>
             <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Equipa salva!</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>A tua equipa está pronta para competir. Boa sorte na próxima rodada!</p>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
+              {cloudWarn
+                ? "Guardámos a tua equipa neste dispositivo, mas não conseguimos sincronizar com a tua conta agora. Tenta guardar de novo quando tiveres ligação."
+                : "A tua equipa está guardada na tua conta e pronta para competir. Boa sorte na próxima rodada!"}
+            </p>
             <button onClick={() => setModal(null)} style={primaryBtn}>Fechar</button>
           </div>
         </div>
@@ -296,7 +297,6 @@ export default function CriarEquipa() {
     </main>
   );
 }
-
 const overlayBg: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 100 };
 const cardBox: React.CSSProperties = { width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" };
 const primaryBtn: React.CSSProperties = { width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" };
@@ -304,7 +304,6 @@ const ghostBtn: React.CSSProperties = { marginTop: 10, background: "transparent"
 const nextBtn: React.CSSProperties = { background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer", alignSelf: "flex-start" };
 const skipLink: React.CSSProperties = { background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB, padding: 0, alignSelf: "flex-start" };
 const coachP: React.CSSProperties = { fontSize: 13, color: "#f1ede2", margin: 0, lineHeight: 1.45 };
-
 function CoachBubble({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 134, display: "flex", justifyContent: "center", padding: "0 14px", zIndex: 90 }}>
@@ -315,7 +314,6 @@ function CoachBubble({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -324,7 +322,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
 function FilledSlot({ a, isCaptain, onClick }: { a: Athlete; isCaptain: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "8px 3px", borderRadius: 12, border: `1.5px solid ${isCaptain ? "#FF8F00" : "#2f4a3c"}`, background: "rgba(12,14,13,0.78)", color: "#f1ede2", minWidth: 0, cursor: "pointer", fontFamily: FB }}>
@@ -338,7 +335,6 @@ function FilledSlot({ a, isCaptain, onClick }: { a: Athlete; isCaptain: boolean;
     </button>
   );
 }
-
 function EmptySlot({ highlight }: { highlight: boolean }) {
   return (
     <a href="/mercado" className={highlight ? "ilglow" : undefined} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: "9px 3px 7px", borderRadius: 12, border: highlight ? "2px solid #5aa9ff" : "1.5px dashed rgba(217,164,65,0.7)", background: "rgba(12,14,13,0.62)", textDecoration: "none", color: "#f1ede2" }}>
@@ -347,7 +343,6 @@ function EmptySlot({ highlight }: { highlight: boolean }) {
     </a>
   );
 }
-
 function GiGhost() {
   return (
     <svg viewBox="0 0 60 70" width="100%" height="100%" aria-hidden="true">
@@ -357,7 +352,6 @@ function GiGhost() {
     </svg>
   );
 }
-
 function BackIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
@@ -373,11 +367,9 @@ function ShareIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M8 7l4-4 4 4" /></svg>
   );
 }
-
 function roundBtn(border: string, color: string): React.CSSProperties {
   return { width: 42, height: 42, borderRadius: 10, border: `1px solid ${border}`, background: "transparent", color, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
 }
-
 function NavTab({ label, icon, href, onNav }: { label: string; icon: React.ReactNode; href?: string; onNav?: (href: string) => void }) {
   const style: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: "#6f7d76", textDecoration: "none" };
   const inner = <>{icon}<span style={{ fontSize: 11 }}>{label}</span></>;
