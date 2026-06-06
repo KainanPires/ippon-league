@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
 import { loadDraft, saveDraft, setAthletePool } from "@/lib/team";
-import { exigirSessao } from "@/lib/auth";
+import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -96,6 +96,7 @@ export default function Mercado() {
   const [priceMax, setPriceMax] = useState(PRICE_MAX);
   const [countrySel, setCountrySel] = useState<string[]>([]);
   const [sheet, setSheet] = useState<SheetKind>(null);
+  const [pedirLogin, setPedirLogin] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -209,8 +210,8 @@ export default function Mercado() {
     if (team.includes(a.id)) { persist(team.filter((id) => id !== a.id)); return; }
     const st = buttonState(a);
     if (st.kind === "buy") {
-      // Portão de login: contratar exige conta. Sem sessão, vai ao login e volta ao Mercado.
-      if (!(await exigirSessao("/mercado"))) return;
+      // Portão de login: contratar exige conta. Sem sessão, mostra o aviso (não salta logo).
+      if (!(await temSessao())) { setPedirLogin(true); return; }
       persist([...team, a.id]);
       const g = a.gender;
       const newCount = (g === "M" ? countM : countF) + 1;
@@ -423,6 +424,18 @@ export default function Mercado() {
             <button onClick={() => setSheet(null)} style={{ flex: 1, ...applyBtn, marginTop: 0 }}>Aplicar</button>
           </div>
         </Sheet>
+      )}
+
+      {pedirLogin && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
+          <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#141110" expression="indicando" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Entra para contratar</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Para contratares atletas e montares a tua equipa, entra na tua conta. É rápido — e ficas já a jogar!</p>
+            <button onClick={() => exigirSessao("/mercado")} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Entrar / Criar conta</button>
+            <button onClick={() => setPedirLogin(false)} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Agora não</button>
+          </div>
+        </div>
       )}
 
       {guide !== null && <Tutorial step={guide} setStep={setGuide} onClose={finishTutorial} />}
