@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
-import { loadSaved, resolve } from "@/lib/team";
+import { loadSaved, resolve, loadSavedCloud, type TeamState } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
 import { supabase } from "@/lib/supabase";
 
@@ -32,6 +32,15 @@ function targetForStep(step: number): TutTarget {
   return null;                    // boas-vindas, conceitos e Ippon Pro -> cartão central
 }
 
+// Calcula o resumo da equipa (nome, valor, última pontuação) a partir de uma equipa.
+function computeTeamInfo(saved: TeamState): { name: string; value: string; last: number } | null {
+  const athletes = resolve(saved.ids);
+  if (athletes.length === 0) return null;
+  const value = Math.round(athletes.reduce((s, a) => s + a.priceJc, 0) * 10) / 10;
+  const last = athletes.reduce((s, a) => s + a.last + (a.id === saved.captain ? a.last : 0), 0);
+  return { name: loadIdentity().name, value: String(value), last };
+}
+
 export default function Inicio() {
   const [ready, setReady] = useState(false);
   const [phase, setPhase] = useState<"tutorial" | null>(null);
@@ -56,6 +65,11 @@ export default function Inicio() {
       const metaName = data.session.user?.user_metadata?.nome;
       if (metaName) setName(String(metaName).split(" ")[0]);
       setReady(true);
+      // Equipa oficial da conta (substitui o resumo local, se existir).
+      loadSavedCloud().then((cloud) => {
+        if (!active || !cloud) return;
+        setTeamInfo(computeTeamInfo(cloud));
+      });
     });
     return () => { active = false; };
   }, []);
@@ -77,13 +91,8 @@ export default function Inicio() {
         setStep(0);
         setPhase("tutorial");
       }
-      const saved = loadSaved();
-      const athletes = resolve(saved.ids);
-      if (athletes.length > 0) {
-        const value = Math.round(athletes.reduce((s, a) => s + a.priceJc, 0) * 10) / 10;
-        const last = athletes.reduce((s, a) => s + a.last + (a.id === saved.captain ? a.last : 0), 0);
-        setTeamInfo({ name: loadIdentity().name, value: String(value), last });
-      }
+      const info = computeTeamInfo(loadSaved());
+      if (info) setTeamInfo(info);
     } catch {}
   }, []);
 
