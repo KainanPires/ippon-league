@@ -9,6 +9,17 @@ const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const BLUE = "#8fbef0";
 
+// Lê o ?voltar= do endereço e garante que é um caminho interno seguro
+// (começa por "/" e não por "//"), para não redirecionar para fora do site.
+function destinoVolta(): string {
+  if (typeof window === "undefined") return "/inicio";
+  try {
+    const v = new URLSearchParams(window.location.search).get("voltar");
+    if (v && v.startsWith("/") && !v.startsWith("//")) return v;
+  } catch {}
+  return "/inicio";
+}
+
 export default function Entrar() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -51,12 +62,22 @@ export default function Entrar() {
       return;
     }
 
-    window.location.href = "/inicio";
+    // Volta ao sítio de onde a pessoa veio (ou /inicio por defeito).
+    window.location.href = destinoVolta();
   }
 
   function onEnter(e: { key: string }) {
     if (e.key === "Enter") entrar();
   }
+
+  // Mantém o ?voltar= no link para "Criar conta", para a conta nova também regressar.
+  const voltarQS = (() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const v = new URLSearchParams(window.location.search).get("voltar");
+      return v ? `?voltar=${encodeURIComponent(v)}` : "";
+    } catch { return ""; }
+  })();
 
   return (
     <main style={{ minHeight: "100vh", background: "radial-gradient(circle at 50% 0%, #143026 0%, #0c0e0d 58%)", color: "#f1ede2", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center", padding: "28px 18px" }}>
@@ -102,7 +123,7 @@ export default function Entrar() {
 
         <div style={{ textAlign: "center", fontSize: 13, color: "#93a39a", marginTop: 18 }}>
           Ainda não tens conta?{" "}
-          <a href="/comecar" style={{ color: "#f1ede2", fontWeight: 700, textDecoration: "none", borderBottom: `2px solid ${GOLD}`, paddingBottom: 1 }}>Criar conta</a>
+          <a href={`/comecar${voltarQS}`} style={{ color: "#f1ede2", fontWeight: 700, textDecoration: "none", borderBottom: `2px solid ${GOLD}`, paddingBottom: 1 }}>Criar conta</a>
         </div>
       </div>
     </main>
