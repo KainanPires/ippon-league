@@ -5,6 +5,7 @@ import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatu
 import { loadDraft, saveDraft, setAthletePool } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
+import { competicaoDaSemana, proximaDepoisDe } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -12,7 +13,17 @@ const GOLD = "#d9a441";
 const START_JC = 100;
 const FAV_KEY = "ippon_favorites";
 
-const COMPETICAO = "3131";
+// Competição-alvo do mercado: a competição para a qual se escala (igual ao Dojo).
+// Se a competição da semana já começou (mercado fechado), escala-se para a próxima.
+function competicaoAlvo(): string {
+  const hoje = new Date();
+  const atual = competicaoDaSemana(hoje);
+  const ini = new Date(atual.de.replace(/\//g, "-") + "T00:00:00");
+  const emAndamento = hoje.getTime() >= ini.getTime();
+  const alvo = emAndamento ? proximaDepoisDe(atual) : atual;
+  return alvo.idCompeticao;
+}
+const COMPETICAO = competicaoAlvo();
 
 const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Elite": ["#3a2f12", "#d9a441"],
