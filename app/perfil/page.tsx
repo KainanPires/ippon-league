@@ -1,13 +1,11 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-
+import { supabase } from "@/lib/supabase";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-
 const INFO: { label: string; href?: string; soon?: boolean }[] = [
   { label: "Como se joga", href: "/como-jogar" },
   { label: "Sobre a Ippon League", soon: true },
@@ -17,17 +15,51 @@ const INFO: { label: string; href?: string; soon?: boolean }[] = [
   { label: "Ajuda e contacto", soon: true },
 ];
 
+// Dados da conta lidos do Supabase (metadados do registo + email do Auth).
+type Conta = {
+  nome: string;
+  email: string;
+  telefone: string;
+  pais: string;
+  faixa: string;
+};
+
 export default function Perfil() {
-  const [name, setName] = useState("campeão");
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
+  const [conta, setConta] = useState<Conta | null>(null);
+  const [ready, setReady] = useState(false);
+  const [saindo, setSaindo] = useState(false);
 
   useEffect(() => {
-    try {
-      const n = localStorage.getItem("ippon_name");
-      if (n) setName(n);
-      setIdentity(loadIdentity());
-    } catch {}
+    let active = true;
+    try { setIdentity(loadIdentity()); } catch {}
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      const u = data.session?.user;
+      if (u) {
+        const m = u.user_metadata || {};
+        setConta({
+          nome: String(m.nome || "").trim() || "Campeão",
+          email: String(u.email || "").trim(),
+          telefone: String(m.telefone || "").trim(),
+          pais: String(m.pais || "").trim(),
+          faixa: String(m.faixa || "").trim() || "Branca",
+        });
+      }
+      setReady(true);
+    });
+    return () => { active = false; };
   }, []);
+
+  async function sair() {
+    if (saindo) return;
+    setSaindo(true);
+    try { await supabase.auth.signOut(); } catch {}
+    window.location.href = "/entrar";
+  }
+
+  const nomeMostrado = conta?.nome || "Campeão";
+  const faixaMostrada = conta?.faixa || "Branca";
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -45,9 +77,29 @@ export default function Perfil() {
             <Mascot belt="#efeadd" expression="feliz" />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-            <div style={{ fontSize: 13, color: GOLD, fontWeight: 700, marginTop: 2 }}>Faixa Branca</div>
+            <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeMostrado}</div>
+            <div style={{ fontSize: 13, color: GOLD, fontWeight: 700, marginTop: 2 }}>Faixa {faixaMostrada}</div>
           </div>
+        </div>
+
+        {/* Os meus dados */}
+        <SectionTitle>Os meus dados</SectionTitle>
+        <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
+          {!ready ? (
+            <div style={{ padding: 16, fontSize: 13, color: "#7c8a82" }}>A carregar os teus dados…</div>
+          ) : !conta ? (
+            <div style={{ padding: 16, fontSize: 13, color: "#93a39a" }}>
+              Não encontrámos a tua conta. <a href="/entrar" style={{ color: GOLD, fontWeight: 700, textDecoration: "none" }}>Entrar</a>
+            </div>
+          ) : (
+            <>
+              <DataRow label="Nome" value={conta.nome || "—"} first />
+              <DataRow label="Email" value={conta.email || "—"} />
+              <DataRow label="Telefone" value={conta.telefone || "—"} />
+              <DataRow label="País" value={conta.pais || "—"} />
+              <DataRow label="Faixa" value={conta.faixa || "—"} />
+            </>
+          )}
         </div>
 
         {/* A minha equipa / escudo */}
@@ -65,7 +117,7 @@ export default function Perfil() {
 
         {/* Informações e políticas */}
         <SectionTitle>Informações e políticas</SectionTitle>
-        <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
           {INFO.map((it, i) => {
             const inner = (
               <>
@@ -83,6 +135,12 @@ export default function Perfil() {
           })}
         </div>
 
+        {/* Sair (logout) — último botão, ícone de porta aberta */}
+        <button onClick={sair} disabled={saindo} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: "transparent", border: "1px solid #5a2f2c", color: "#ef8d83", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 12, cursor: saindo ? "default" : "pointer", opacity: saindo ? 0.7 : 1 }}>
+          <DoorIcon />
+          {saindo ? "A sair…" : "Sair da conta"}
+        </button>
+
         <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 22 }}>Ippon League · versão de testes</p>
       </div>
     </main>
@@ -91,4 +149,23 @@ export default function Perfil() {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 10 }}>{children}</div>;
+}
+
+function DataRow({ label, value, first }: { label: string; value: string; first?: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "13px 16px", borderTop: first ? "none" : "1px solid #1a221d" }}>
+      <span style={{ fontSize: 12, color: "#93a39a", flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 14, color: "#f1ede2", textAlign: "right", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
+    </div>
+  );
+}
+
+function DoorIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  );
 }
