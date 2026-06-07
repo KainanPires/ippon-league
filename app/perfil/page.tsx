@@ -29,6 +29,7 @@ export default function Perfil() {
   const [conta, setConta] = useState<Conta | null>(null);
   const [ready, setReady] = useState(false);
   const [saindo, setSaindo] = useState(false);
+  const [abertoDados, setAbertoDados] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -71,36 +72,41 @@ export default function Perfil() {
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Perfil</h1>
         </header>
 
-        {/* Cartão do jogador */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14, background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 22 }}>
+        {/* Cartão do jogador — toca para ver/gerir os teus dados */}
+        <button onClick={() => setAbertoDados((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: abertoDados ? 10 : 22, cursor: "pointer", color: "#f1ede2", fontFamily: FB }}>
           <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
             <Mascot belt="#efeadd" expression="feliz" />
           </div>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeMostrado}</div>
             <div style={{ fontSize: 13, color: GOLD, fontWeight: 700, marginTop: 2 }}>Faixa {faixaMostrada}</div>
+            <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>{abertoDados ? "Toca para fechar" : "Toca para ver os teus dados"}</div>
           </div>
-        </div>
+          <span style={{ flexShrink: 0, color: "#93a39a", transform: abertoDados ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+          </span>
+        </button>
 
-        {/* Os meus dados */}
-        <SectionTitle>Os meus dados</SectionTitle>
-        <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
-          {!ready ? (
-            <div style={{ padding: 16, fontSize: 13, color: "#7c8a82" }}>A carregar os teus dados…</div>
-          ) : !conta ? (
-            <div style={{ padding: 16, fontSize: 13, color: "#93a39a" }}>
-              Não encontrámos a tua conta. <a href="/entrar" style={{ color: GOLD, fontWeight: 700, textDecoration: "none" }}>Entrar</a>
-            </div>
-          ) : (
-            <>
-              <DataRow label="Nome" value={conta.nome || "—"} first />
-              <DataRow label="Email" value={conta.email || "—"} />
-              <DataRow label="Telefone" value={conta.telefone || "—"} />
-              <DataRow label="País" value={conta.pais || "—"} />
-              <DataRow label="Faixa" value={conta.faixa || "—"} />
-            </>
-          )}
-        </div>
+        {/* Os meus dados — só aparecem quando o cartão é tocado */}
+        {abertoDados && (
+          <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 22 }}>
+            {!ready ? (
+              <div style={{ padding: 16, fontSize: 13, color: "#7c8a82" }}>A carregar os teus dados…</div>
+            ) : !conta ? (
+              <div style={{ padding: 16, fontSize: 13, color: "#93a39a" }}>
+                Não encontrámos a tua conta. <a href="/entrar" style={{ color: GOLD, fontWeight: 700, textDecoration: "none" }}>Entrar</a>
+              </div>
+            ) : (
+              <>
+                <DataRow label="Nome" value={conta.nome || "—"} first />
+                <DataRow label="Email" value={conta.email || "—"} />
+                <DataRow label="Telefone" value={conta.telefone || "—"} />
+                <DataRow label="País" value={conta.pais || "—"} />
+                <DataRow label="Faixa" value={conta.faixa || "—"} />
+              </>
+            )}
+          </div>
+        )}
 
         {/* A minha equipa / escudo */}
         <SectionTitle>A minha equipa</SectionTitle>
