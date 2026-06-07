@@ -38,13 +38,15 @@ function autorizado(req: Request, key: string | null): boolean {
 }
 
 function baseUrl(req: Request): string {
-  const fromEnv = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
-  if (fromEnv) return fromEnv;
+  // Preferir o host do PRÓPRIO pedido (domínio público correto, ex.:
+  // ippon-league.vercel.app). O VERCEL_URL aponta para o URL interno do
+  // deployment, que pode devolver uma página HTML de redirecionamento em vez
+  // do JSON — foi o que causou o erro "Unexpected token '<'".
   try {
     const u = new URL(req.url);
     return `${u.protocol}//${u.host}`;
   } catch {
-    return "";
+    return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
   }
 }
 
