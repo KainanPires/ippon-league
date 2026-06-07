@@ -5,12 +5,27 @@ import { Mascot } from "@/components/Mascot";
 import { loadSaved, resolve, loadSavedCloud, type TeamState } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
 import { supabase } from "@/lib/supabase";
+import { competicaoDaSemana, type SemanaCalendario } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
 const USER = { belt: "Branca" };
+
+// Próxima competição a contar (a partir de hoje), vinda do Calendário Oficial.
+function proximaCompeticao(): { c: SemanaCalendario; dias: number } {
+  const hoje = new Date();
+  const c = competicaoDaSemana(hoje);
+  const ini = new Date(c.de.replace(/\//g, "-") + "T00:00:00");
+  const dias = Math.max(0, Math.ceil((ini.getTime() - hoje.getTime()) / 86400000));
+  return { c, dias };
+}
+function rotuloFecho(dias: number): string {
+  if (dias <= 0) return "Mercado aberto · fecha em breve";
+  if (dias === 1) return "Mercado fecha em 1 dia";
+  return `Mercado fecha em ${dias} dias`;
+}
 
 const STEPS = [
   { title: "Como funciona", text: "Vou mostrar-te o essencial em 1 minuto. Avança quando quiseres — ou pula." },
@@ -51,6 +66,11 @@ export default function Inicio() {
   const teamRef = useRef<HTMLDivElement | null>(null);
   const ligasRef = useRef<HTMLAnchorElement | null>(null);
   const tutTarget: TutTarget = phase === "tutorial" ? targetForStep(step) : null;
+
+  // Próxima competição do calendário (calculada uma vez).
+  const prox = proximaCompeticao();
+  const comp = prox.c;
+  const ehClassico = comp.classico;
 
   useEffect(() => {
     let active = true;
@@ -167,11 +187,18 @@ export default function Inicio() {
         </div>
 
         <Card>
-          <CardTitle>Próxima competição</CardTitle>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>Grand Slam Paris 2026</div>
-          <div style={{ fontSize: 12, color: "#93a39a", marginTop: 2 }}>Paris, França · Sénior</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <CardTitle>{ehClassico ? "Próximo clássico" : "Próxima competição"}</CardTitle>
+            {ehClassico && (
+              <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#3a2f12", color: GOLD, fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.03em" }}>↻ Clássico</span>
+            )}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>{comp.nome}</div>
+          <div style={{ fontSize: 12, color: "#93a39a", marginTop: 2 }}>
+            {comp.nivel}{ehClassico ? " · rodada especial" : ""} · está a valer pontos
+          </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-            <span style={{ fontSize: 12, color: "#7fd1a3" }}>Mercado fecha em 3d 14h</span>
+            <span style={{ fontSize: 12, color: "#7fd1a3" }}>{rotuloFecho(prox.dias)}</span>
             <a href="/criar-equipa" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>Escalar</a>
           </div>
         </Card>
@@ -242,7 +269,7 @@ function Card({ children }: { children: React.ReactNode }) {
   return <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 13, marginBottom: 12 }}>{children}</div>;
 }
 function CardTitle({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>{children}</div>;
+  return <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>{children}</div>;
 }
 
 function TeamCreate() {
