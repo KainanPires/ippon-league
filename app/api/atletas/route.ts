@@ -9,6 +9,9 @@ export const dynamic = "force-dynamic";
 // Quantas horas uma cópia do cache é considerada "fresca".
 const CACHE_HORAS = 6;
 
+// Linha especial no cache onde o cron guarda quem está a competir AGORA.
+const CHAVE_AO_VIVO = "_a_competir_agora";
+
 /**
  * Balcão de atletas (com cache NÃO-DESTRUTIVO).
  *
@@ -52,30 +55,15 @@ export async function GET(req: Request) {
 
   // ----- Modo: atletas de uma competição -----
 
-  // Lê o que está no cache (pode estar vazio).
-  let cacheAtual: Athlete[] = [];
-  let cacheData: string | null = null;
-  if (supabaseAdmin) {
-    try {
-      const { data } = await supabaseAdmin
-        .from("atletas_cache")
-        .select("atletas, atualizado_em")
-        .eq("id_competition", id)
-        .maybeSingle();
-      if (data) {
-        cacheAtual = Array.isArray(data.atletas) ? (data.atletas as Athlete[]) : [];
-        cacheData = data.atualizado_em ?? null;
-      }
-    } catch {
-      // segue sem cache
-    }
-  }
+  // Lê em paralelo: o cache desta competição E a lista de "a competir agora".
+  const [cacheInfo, aoVivo] = await Promise.all([lerCache(id), lerAoVivo()]);
+  const { cacheAtual, cacheData } = cacheInfo;
 
   // 1) Se o cache está fresco e não estamos a forçar, serve já.
   if (!forcar && cacheAtual.length > 0 && cacheData) {
     const idadeMs = Date.now() - new Date(cacheData).getTime();
     if (idadeMs < CACHE_HORAS * 3600 * 1000) {
-      return resposta(id, "cache", cacheAtual);
+      return resposta(id, "cache", cacheAtual, aoVivo, true);
     }
   }
 
@@ -85,25 +73,23 @@ export async function GET(req: Request) {
 
   // Se o JudoBase não respondeu, NÃO estraga o cache — serve o que temos.
   if (frescos.length === 0) {
-    if (cacheAtual.length > 0) return resposta(id, "cache", cacheAtual);
-    return resposta(id, "judobase", [], raw !== null);
+    if (cacheAtual.length > 0) return resposta(id, "cache", cacheAtual, aoVivo, true);
+    return resposta(id, "judobase", [], aoVivo, raw !== null);
   }
 
   // 3) JUNTA: mantém os valores reais já calculados; aceita novos inscritos;
   //    descarta quem já não está inscrito (só ficam os "frescos").
   const calculadosPorId = new Map<string, Athlete>();
   for (const a of cacheAtual) {
-    // "já calculado" = tem média ou última pontuação reais (deixou de ser placeholder)
     if (a && (a.avg !== 0 || a.last !== 0)) calculadosPorId.set(a.id, a);
   }
 
   const lista: Athlete[] = frescos.map((novo) => {
     const real = calculadosPorId.get(novo.id);
     if (real) {
-      // mantém preço/média/última/estado reais; atualiza só dados de identidade
       return { ...real, name: novo.name, countryIso: novo.countryIso, category: novo.category, gender: novo.gender };
     }
-    return novo; // inscrito novo (ou ainda sem cálculo): preço de partida
+    return novo;
   });
 
   // 4) Grava a lista sincronizada.
@@ -123,10 +109,57 @@ export async function GET(req: Request) {
     }
   }
 
-  return resposta(id, "judobase", lista, raw !== null);
+  return resposta(id, "judobase", lista, aoVivo, raw !== null);
 }
 
-function resposta(id: string, origem: "cache" | "judobase", atletas: Athlete[], recebido = true) {
+// Lê o cache de uma competição.
+async function lerCache(id: string): Promise<{ cacheAtual: Athlete[]; cacheData: string | null }> {
+  if (!supabaseAdmin) return { cacheAtual: [], cacheData: null };
+  try {
+    const { data } = await supabaseAdmin
+      .from("atletas_cache")
+      .select("atletas, atualizado_em")
+      .eq("id_competition", id)
+      .maybeSingle();
+    if (data) {
+      return {
+        cacheAtual: Array.isArray(data.atletas) ? (data.atletas as Athlete[]) : [],
+        cacheData: data.atualizado_em ?? null,
+      };
+    }
+  } catch {
+    // segue sem cache
+  }
+  return { cacheAtual: [], cacheData: null };
+}
+
+// Lê a lista de "a competir agora" (gravada pelo cron). Devolve os IDs e o nome.
+interface AoVivo {
+  id_competicao: string | null;
+  nome: string | null;
+  ids: string[];
+}
+async function lerAoVivo(): Promise<AoVivo> {
+  const vazio: AoVivo = { id_competicao: null, nome: null, ids: [] };
+  if (!supabaseAdmin) return vazio;
+  try {
+    const { data } = await supabaseAdmin
+      .from("atletas_cache")
+      .select("atletas, atualizado_em")
+      .eq("id_competition", CHAVE_AO_VIVO)
+      .maybeSingle();
+    const payload = data?.atletas as { id_competicao?: string; nome?: string; ids?: string[] } | unknown;
+    if (payload && typeof payload === "object" && Array.isArray((payload as { ids?: unknown }).ids)) {
+      const p = payload as { id_competicao?: string; nome?: string; ids: string[] };
+      return { id_competicao: p.id_competicao ?? null, nome: p.nome ?? null, ids: p.ids };
+    }
+  } catch {
+    // sem lista ao vivo
+  }
+  return vazio;
+}
+
+function resposta(id: string, origem: "cache" | "judobase", atletas: Athlete[], aoVivo: AoVivo, recebido = true) {
   const masculinos = atletas.filter((a) => a.gender === "M").length;
   const femininos = atletas.filter((a) => a.gender === "F").length;
   const com_preco_real = atletas.filter((a) => a.avg !== 0 || a.last !== 0).length;
@@ -139,6 +172,12 @@ function resposta(id: string, origem: "cache" | "judobase", atletas: Athlete[], 
     masculinos,
     femininos,
     com_preco_real,
+    // Quem está a competir AGORA (para o aviso no Mercado).
+    a_competir_agora: {
+      id_competicao: aoVivo.id_competicao,
+      nome: aoVivo.nome,
+      ids: aoVivo.ids,
+    },
     atletas,
   });
 }
