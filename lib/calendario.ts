@@ -111,6 +111,13 @@ export function competicaoDaSemana(hoje: Date = new Date()): SemanaCalendario {
   return atualOuProxima || ordenado[ordenado.length - 1];
 }
 
+/** A competição seguinte a uma dada (a próxima semana com competição). */
+export function proximaDepoisDe(atual: SemanaCalendario): SemanaCalendario {
+  const ordenado = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
+  const seguinte = ordenado.find((s) => s.semana > atual.semana);
+  return seguinte || ordenado[0]; // se for a última do ano, volta ao início
+}
+
 /** Lista só das competições reais (não-clássicas) — útil para o cron. */
 export function competicoesReais(): SemanaCalendario[] {
   return CALENDARIO_2026.filter((s) => !s.classico);
