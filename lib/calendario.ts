@@ -102,14 +102,13 @@ export function semanaISO(d: Date): number {
   return Math.ceil((((data.getTime() - inicioAno.getTime()) / 86400000) + 1) / 7);
 }
 
-/** A competição da semana atual (ou a próxima com competição). */
+/** A competição da semana atual; se já passou, a próxima a contar. */
 export function competicaoDaSemana(hoje: Date = new Date()): SemanaCalendario {
   const wk = semanaISO(hoje);
-  const exata = CALENDARIO_2026.find((s) => s.semana === wk);
-  if (exata) return exata;
-  // fallback: a próxima semana à frente
-  const proxima = CALENDARIO_2026.find((s) => s.semana >= wk);
-  return proxima || CALENDARIO_2026[0];
+  const ordenado = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
+  // a competição desta semana, ou a primeira semana à frente que exista
+  const atualOuProxima = ordenado.find((s) => s.semana >= wk);
+  return atualOuProxima || ordenado[ordenado.length - 1];
 }
 
 /** Lista só das competições reais (não-clássicas) — útil para o cron. */
