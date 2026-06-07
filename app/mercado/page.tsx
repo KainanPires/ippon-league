@@ -97,6 +97,7 @@ export default function Mercado() {
   const [countrySel, setCountrySel] = useState<string[]>([]);
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [pedirLogin, setPedirLogin] = useState(false);
+  const [avisoCategoria, setAvisoCategoria] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -213,6 +214,10 @@ export default function Mercado() {
       // Portão de login: contratar exige conta. Sem sessão, mostra o aviso (não salta logo).
       if (!(await temSessao())) { setPedirLogin(true); return; }
       persist([...team, a.id]);
+      // Aviso "1 por categoria" — aparece a cada contratação até a pessoa dispensar.
+      try {
+        if (localStorage.getItem("ippon_aviso_categoria") !== "skip") setAvisoCategoria(true);
+      } catch {}
       const g = a.gender;
       const newCount = (g === "M" ? countM : countF) + 1;
       if (newCount >= 4) {
@@ -434,6 +439,18 @@ export default function Mercado() {
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Para contratares atletas e montares a tua equipa, entra na tua conta. É rápido — e ficas já a jogar!</p>
             <button onClick={() => exigirSessao("/mercado")} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Entrar / Criar conta</button>
             <button onClick={() => setPedirLogin(false)} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Agora não</button>
+          </div>
+        </div>
+      )}
+
+      {avisoCategoria && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
+          <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#141110" expression="sabio" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Um por categoria</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Só podes ter <strong style={{ color: GOLD }}>1 atleta por categoria de peso</strong>. Monta 4 masculinos e 4 femininos, cada um de uma categoria diferente.</p>
+            <button onClick={() => setAvisoCategoria(false)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Entendi</button>
+            <button onClick={() => { try { localStorage.setItem("ippon_aviso_categoria", "skip"); } catch {} setAvisoCategoria(false); }} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Não mostrar mais</button>
           </div>
         </div>
       )}
