@@ -6,6 +6,7 @@ import { type Athlete } from "@/lib/athletes";
 import { loadDraft, saveDraft, loadSaved, commitSaved, resolve, jcLeft, counts, isComplete, missing, loadSavedCloud, commitSavedCloud, type TeamState } from "@/lib/team";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { temSessao, exigirSessao } from "@/lib/auth";
+import { competicaoDaSemana, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -16,7 +17,14 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
-const COMPETITION = { name: "Grand Slam Paris", local: "Paris", level: "Sénior" };
+
+// Competição vinda do Calendário Oficial. A "atual" é a da semana; se já começou,
+// escala-se para a "próxima". Dias até uma competição (a partir de hoje).
+function diasAte(c: SemanaCalendario, hoje: Date): number {
+  const ini = new Date(c.de.replace(/\//g, "-") + "T00:00:00");
+  return Math.max(0, Math.ceil((ini.getTime() - hoje.getTime()) / 86400000));
+}
+
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
 type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" } | { kind: "athlete"; a: Athlete } | null;
 function sameTeam(a: TeamState, b: TeamState): boolean {
@@ -33,22 +41,36 @@ export default function CriarEquipa() {
   const [savingCloud, setSavingCloud] = useState(false);
   const [cloudWarn, setCloudWarn] = useState(false);
   const router = useRouter();
+
+  // Competição: atual (semana) e próxima. Se a atual já começou (dias<=0),
+  // o mercado dela está fechado → escala-se para a próxima.
+  const hoje = new Date();
+  const atual = competicaoDaSemana(hoje);
+  const diasAtual = diasAte(atual, hoje);
+  const emAndamento = diasAtual <= 0;
+  const proxima = proximaDepoisDe(atual);
+  const diasProxima = diasAte(proxima, hoje);
+  // A competição para a qual se ESCALA agora:
+  const alvo = emAndamento ? proxima : atual;
+  const diasAlvo = emAndamento ? diasProxima : diasAtual;
+  function rotuloDias(d: number): string {
+    if (d <= 0) return "fecha em breve";
+    if (d === 1) return "em 1 dia";
+    return `em ${d} dias`;
+  }
+
   useEffect(() => {
     let active = true;
-    // O tutorial guiado pode aparecer a qualquer pessoa (é só informativo).
     try {
       if (!localStorage.getItem("ippon_team_tutorial")) setGuide("welcome");
     } catch {}
-    // A equipa só interessa a quem TEM sessão. Visitante: Dojo abre vazio.
     temSessao().then((logado) => {
       if (!active || !logado) return;
-      // 1) Cache local (instantâneo) — mostra logo o que houver no dispositivo.
       try {
         setDraft(loadDraft());
         setSaved(loadSaved());
         setIdentity(loadIdentity());
       } catch {}
-      // 2) Nuvem (assíncrono) — a equipa da conta é a oficial. Se existir, usa-a.
       loadSavedCloud().then((cloud) => {
         if (!active || !cloud) return;
         setSaved(cloud);
@@ -63,8 +85,6 @@ export default function CriarEquipa() {
     });
     return () => { active = false; };
   }, []);
-  // Só "prende" a saída se houver alterações por guardar E pelo menos um atleta escalado.
-  // Equipa vazia => sai livremente.
   const dirty = !sameTeam(draft, saved) && draft.ids.length > 0;
   const [nudge, setNudge] = useState(false);
   useEffect(() => {
@@ -91,7 +111,6 @@ export default function CriarEquipa() {
     setModal(null);
   }
   async function save() {
-    // Portão de login: salvar exige conta. Sem sessão, mostra o aviso.
     if (!(await temSessao())) { setModal({ kind: "login" }); return; }
     if (!isComplete(draft)) { setModal({ kind: "missing" }); return; }
     setSavingCloud(true);
@@ -118,7 +137,7 @@ export default function CriarEquipa() {
   }
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.55)}50%{box-shadow:0 0 0 8px rgba(74,144,217,0.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:10px} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilsavebig{0%{transform:scale(1)}30%{transform:scale(1.06)}60%{transform:scale(0.98)}100%{transform:scale(1)}} .ilsavebig{animation:ilsave 1.2s ease-in-out infinite, ilsavebig 0.5s ease-in-out 2}`}</style>
+      <style>{`@keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.55)}50%{box-shadow:0 0 0 8px rgba(74,144,217,0.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:10px} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilsavebig{0%{transform:scale(1)}30%{transform:scale(1.06)}60%{transform:scale(0.98)}100%{transform:scale(1)}} .ilsavebig{animation:ilsave 1.2s ease-in-out infinite, ilsavebig 0.5s ease-in-out 2} @keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite}`}</style>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 150px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
@@ -135,16 +154,34 @@ export default function CriarEquipa() {
           </div>
           <button onClick={openGuide} aria-label="Como montar a equipa" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
+
+        {/* Quando há competição a decorrer, mostra-a com aviso de que se escala para a próxima. */}
+        {emAndamento && (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a1f1c,#10160f)", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "10px 13px", marginBottom: 10 }}>
+            <span className="ilpulse" style={{ width: 9, height: 9, borderRadius: "50%", background: "#e2655a", marginTop: 4, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#e2655a" }}>A decorrer agora{atual.classico ? " · Clássico" : ""}</div>
+              <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, lineHeight: 1.1, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{atual.nome}</div>
+              <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "6px 0 0" }}>
+                O mercado desta competição já fechou — os preços podem oscilar enquanto os atletas competem. <strong style={{ color: "#f1ede2" }}>Já podes escalar para a próxima:</strong> {proxima.nome}, {rotuloDias(diasProxima)}.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Cabeçalho: a competição para a qual se está a escalar (alvo). */}
         <div style={{ display: "flex", alignItems: "center", gap: 11, background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "10px 13px", marginBottom: 14 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: GOLD, color: "#1b211e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <TrophyIcon />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>A escalar para</div>
-            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{COMPETITION.name} <span style={{ color: "#93a39a", fontWeight: 600 }}>· {COMPETITION.local}</span></div>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>A escalar para{alvo.classico ? " · Clássico" : ""}</div>
+            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{alvo.nome}</div>
+            <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>Mercado fecha {rotuloDias(diasAlvo)}</div>
           </div>
-          <span style={{ background: "#1b211e", color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{COMPETITION.level}</span>
+          <span style={{ background: "#1b211e", color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{alvo.nivel}</span>
         </div>
+
         <div style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
           <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
             <SectionLabel>Masculino</SectionLabel>
