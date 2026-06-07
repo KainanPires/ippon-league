@@ -5,6 +5,7 @@ import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
 import { loadDraft, saveDraft, loadSaved, commitSaved, resolve, jcLeft, counts, isComplete, missing, loadSavedCloud, commitSavedCloud, type TeamState } from "@/lib/team";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
 import { competicaoDaSemana, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -320,14 +321,13 @@ export default function CriarEquipa() {
         </div>
       )}
       {modal?.kind === "share" && (
-        <div style={overlayBg}>
-          <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#141110" expression="comemorando" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Partilhar a equipa</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Em breve vais poder gerar um cartão da tua equipa para mostrares aos amigos. 🥋</p>
-            <button onClick={() => setModal(null)} style={primaryBtn}>Fechar</button>
-          </div>
-        </div>
+        <CartaoEquipa
+          identity={identity}
+          faixa="Branca"
+          atletas={resolve(draft.ids)}
+          capitao={draft.captain}
+          onClose={() => setModal(null)}
+        />
       )}
       {modal?.kind === "athlete" && (
         <div style={overlayBg}>
