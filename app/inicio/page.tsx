@@ -22,7 +22,7 @@ function proximaCompeticao(): { c: SemanaCalendario; dias: number } {
   return { c, dias };
 }
 function rotuloFecho(dias: number): string {
-  if (dias <= 0) return "Mercado aberto · fecha em breve";
+  if (dias <= 0) return "Mercado fechado · em andamento";
   if (dias === 1) return "Mercado fecha em 1 dia";
   return `Mercado fecha em ${dias} dias`;
 }
