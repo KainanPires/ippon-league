@@ -12,7 +12,6 @@ const GOLD = "#d9a441";
 const START_JC = 100;
 const FAV_KEY = "ippon_favorites";
 
-// Competição do mercado (Paris Grand Slam). Mais tarde muda conforme a rodada.
 const COMPETICAO = "3131";
 
 const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
@@ -23,7 +22,6 @@ const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Aposta": ["#2a1f3a", "#b79be0"],
 };
 
-// Disponibilidade (placeholder estável até ligarmos aos inscritos confirmados)
 type Availability = "inscrito" | "provavel" | "duvida" | "suspenso" | "lesionado" | "sem-status";
 const AVAIL_META: Record<Availability, { label: string; color: string }> = {
   inscrito: { label: "Inscrito", color: "#7fb8f5" },
@@ -71,7 +69,7 @@ const STEPS = [
 ];
 
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
-const code3 = (iso: string) => iso; // os atletas reais já vêm em 3 letras
+const code3 = (iso: string) => iso;
 
 type SheetKind = "ord" | "sta" | "fil" | null;
 
@@ -79,6 +77,8 @@ export default function Mercado() {
   const [pool, setPool] = useState<Athlete[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState("");
+  const [aoVivoIds, setAoVivoIds] = useState<Set<string>>(new Set());
+  const [aoVivoNome, setAoVivoNome] = useState<string | null>(null);
 
   const [gender, setGender] = useState<Gender>("M");
   const [cat, setCat] = useState<string>(CATEGORIES.M[0]);
@@ -111,7 +111,6 @@ export default function Mercado() {
       if (!localStorage.getItem("ippon_market_tutorial")) setGuide(0);
     } catch {}
 
-    // Vai buscar os atletas reais (cache no servidor) e enche a memória partilhada.
     fetch(`/api/atletas?id=${COMPETICAO}`)
       .then((r) => r.json())
       .then((j) => {
@@ -119,8 +118,13 @@ export default function Mercado() {
         const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
         setPool(list);
         setAthletePool(list);
+        // Quem está a competir agora (vem do cron, via balcão).
+        const av = j?.a_competir_agora;
+        if (av && Array.isArray(av.ids)) {
+          setAoVivoIds(new Set(av.ids as string[]));
+          setAoVivoNome(av.nome ?? null);
+        }
         setLoading(false);
-        // Reconcilia o rascunho: mantém só ids que existem nos atletas reais.
         if (list.length > 0) {
           const ids = new Set(list.map((a) => a.id));
           const cleanIds = draft.ids.filter((id) => ids.has(id));
@@ -211,10 +215,8 @@ export default function Mercado() {
     if (team.includes(a.id)) { persist(team.filter((id) => id !== a.id)); return; }
     const st = buttonState(a);
     if (st.kind === "buy") {
-      // Portão de login: contratar exige conta. Sem sessão, mostra o aviso (não salta logo).
       if (!(await temSessao())) { setPedirLogin(true); return; }
       persist([...team, a.id]);
-      // Aviso "1 por categoria" — aparece a cada contratação até a pessoa dispensar.
       try {
         if (localStorage.getItem("ippon_aviso_categoria") !== "skip") setAvisoCategoria(true);
       } catch {}
@@ -234,7 +236,7 @@ export default function Mercado() {
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none}`}</style>
+      <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none} @keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite}`}</style>
 
       <div style={{ maxWidth: 460, margin: "0 auto" }}>
         <div style={{ position: "sticky", top: 0, background: "#0c0e0d", borderBottom: "1px solid #1a221d", zIndex: 5, padding: "12px 14px 10px" }}>
@@ -253,6 +255,15 @@ export default function Mercado() {
               <span className={jcGlow ? "glow" : undefined} style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "6px 11px", fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 15 }}>JC {fmt(jcLeft)}</span>
             </div>
           </div>
+
+          {aoVivoIds.size > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 10, padding: "7px 11px", marginBottom: 9 }}>
+              <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a", flexShrink: 0 }} />
+              <span style={{ fontSize: 11.5, color: "#f1ede2", lineHeight: 1.35 }}>
+                <strong style={{ color: "#ef8d83" }}>A decorrer agora{aoVivoNome ? `: ${aoVivoNome}` : ""}.</strong> Os atletas marcados estão a competir — o preço pode mudar quando a competição acabar.
+              </span>
+            </div>
+          )}
 
           {showSearch && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "8px 11px", marginBottom: 9 }}>
@@ -286,7 +297,6 @@ export default function Mercado() {
           </div>
         </div>
 
-        {/* Lista */}
         <div style={{ padding: "12px 14px 92px" }}>
           {loading ? (
             <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "40px 0" }}>A carregar atletas reais…</div>
@@ -304,8 +314,15 @@ export default function Mercado() {
               const vUp = a.variation >= 0;
               const av = AVAIL_META[availabilityOf(a.id)];
               const isFav = favs.includes(a.id);
+              const aVivo = aoVivoIds.has(a.id);
               return (
-                <div key={a.id} style={{ background: "#121815", border: `1px solid ${inTeam ? "#2f4a3c" : "#243029"}`, borderRadius: 14, padding: 12, marginBottom: 10, opacity: dim ? 0.7 : 1 }}>
+                <div key={a.id} style={{ background: "#121815", border: `1px solid ${aVivo ? "#5a3a36" : inTeam ? "#2f4a3c" : "#243029"}`, borderRadius: 14, padding: 12, marginBottom: 10, opacity: dim ? 0.7 : 1 }}>
+                  {aVivo && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                      <span className="ilvivo" style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", flexShrink: 0 }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83" }}>A competir agora · preço pode mudar</span>
+                    </div>
+                  )}
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <Avatar code={code3(a.countryIso)} />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -353,7 +370,6 @@ export default function Mercado() {
         </div>
       </div>
 
-      {/* Barra inferior */}
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 40 }}>
         <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div style={{ fontSize: 12, color: "#cfd8d2" }}>
