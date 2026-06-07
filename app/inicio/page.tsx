@@ -71,6 +71,7 @@ export default function Inicio() {
   const prox = proximaCompeticao();
   const comp = prox.c;
   const ehClassico = comp.classico;
+  const emAndamento = prox.dias <= 0; // já começou → mercado fechado
 
   useEffect(() => {
     let active = true;
@@ -188,7 +189,7 @@ export default function Inicio() {
 
         <Card>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-            <CardTitle>{ehClassico ? "Próximo clássico" : "Próxima competição"}</CardTitle>
+            <CardTitle>{ehClassico ? (emAndamento ? "Clássico atual" : "Próximo clássico") : (emAndamento ? "Competição atual" : "Próxima competição")}</CardTitle>
             {ehClassico && (
               <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#3a2f12", color: GOLD, fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.03em" }}>↻ Clássico</span>
             )}
@@ -198,8 +199,23 @@ export default function Inicio() {
             {comp.nivel}{ehClassico ? " · rodada especial" : ""} · está a valer pontos
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-            <span style={{ fontSize: 12, color: "#7fd1a3" }}>{rotuloFecho(prox.dias)}</span>
-            <a href="/criar-equipa" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>Escalar</a>
+            {emAndamento ? (
+              <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#e2655a", fontSize: 12, fontWeight: 700 }}>
+                <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
+                Em andamento · acompanha aqui
+              </span>
+            ) : (
+              <span style={{ fontSize: 12, color: "#7fd1a3" }}>{rotuloFecho(prox.dias)}</span>
+            )}
+            {emAndamento ? (
+              visitante ? (
+                <a href="/entrar?voltar=/inicio" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>Entrar para jogar</a>
+              ) : (
+                <a href="/meu-time" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>Ver a minha equipa</a>
+              )
+            ) : (
+              <a href="/criar-equipa" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>Escalar</a>
+            )}
           </div>
         </Card>
 
