@@ -15,9 +15,9 @@ const GOLD = "#d9a441";
 const BELT = "Branca";
 const BELT_HEX = "#efeadd";
 
-// Estado do mercado/competição. No passo C liga-se aos dados reais da rodada.
+// Fase do mercado/competição. Já NÃO é fixa: é calculada a partir do calendário.
 // "aberto" = a montar (mostra preço) · "fechado" = à espera (mostra — — —) · "ao-vivo" = a competir (mostra pontuação)
-const MARKET_PHASE: "aberto" | "fechado" | "ao-vivo" = "ao-vivo";
+type MarketPhase = "aberto" | "fechado" | "ao-vivo";
 
 const IOC: Record<string, string> = {
   JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
@@ -194,6 +194,9 @@ export default function MeuTime() {
   const totalPts = athletes.reduce((s, a) => s + scoreOf(a), 0);
   // Estamos a mostrar a equipa da competição a decorrer?
   const emCompeticao = emAndamento && idComp === atual.idCompeticao && hasTeam;
+  // Fase calculada (não fixa): se a competição que estamos a ver está a decorrer →
+  // "ao-vivo" (mostra pontos e estado da chave). Senão, mercado aberto → "aberto" (mostra preços).
+  const marketPhase: MarketPhase = emCompeticao ? "ao-vivo" : "aberto";
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -238,11 +241,11 @@ export default function MeuTime() {
               <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
                 <SectionLabel>Masculino</SectionLabel>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
-                  {males.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} onClick={() => setSel(a)} />)}
+                  {males.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setSel(a)} />)}
                 </div>
                 <SectionLabel>Feminino</SectionLabel>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-                  {females.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} onClick={() => setSel(a)} />)}
+                  {females.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setSel(a)} />)}
                 </div>
               </div>
             </section>
@@ -414,12 +417,12 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Cell({ a, captain, score, onClick }: { a: Athlete; captain: boolean; score: number; onClick: () => void }) {
+function Cell({ a, captain, score, phase, onClick }: { a: Athlete; captain: boolean; score: number; phase: MarketPhase; onClick: () => void }) {
   const surname = a.name.split(" ").slice(-1)[0];
   let value: React.ReactNode;
-  if (MARKET_PHASE === "aberto") {
+  if (phase === "aberto") {
     value = <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, color: "#f2c84b" }}>JC {a.priceJc.toFixed(1)}</span>;
-  } else if (MARKET_PHASE === "fechado") {
+  } else if (phase === "fechado") {
     value = <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#7c8a82", letterSpacing: "0.16em", whiteSpace: "nowrap" }}>— —</span>;
   } else {
     value = <span style={{ background: "#1d3a2b", color: "#9be3bd", fontFamily: FD, fontWeight: 700, fontSize: 11, padding: "2px 9px", borderRadius: 999 }}>{score >= 0 ? "+" : ""}{score} pts</span>;
@@ -433,7 +436,7 @@ function Cell({ a, captain, score, onClick }: { a: Athlete; captain: boolean; sc
       <div style={{ fontSize: 10, fontWeight: 700, width: "100%", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#fff" }}>{surname}</div>
       <div style={{ fontSize: 9, color: "#b6c0b9" }}>{a.category}kg</div>
       <div style={{ marginTop: 1, minHeight: 18, display: "flex", alignItems: "center" }}>{value}</div>
-      {MARKET_PHASE === "ao-vivo" && <CardStatusLine state={sampleRoundState(a)} />}
+      {phase === "ao-vivo" && <CardStatusLine state={sampleRoundState(a)} />}
     </button>
   );
 }
