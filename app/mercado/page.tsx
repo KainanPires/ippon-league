@@ -35,28 +35,6 @@ const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Aposta": ["#2a1f3a", "#b79be0"],
 };
 
-type Availability = "inscrito" | "provavel" | "duvida" | "suspenso" | "lesionado" | "sem-status";
-const AVAIL_META: Record<Availability, { label: string; color: string }> = {
-  inscrito: { label: "Inscrito", color: "#7fb8f5" },
-  provavel: { label: "Provável", color: "#7fd1a3" },
-  duvida: { label: "Dúvida", color: "#e6c84f" },
-  suspenso: { label: "Suspenso", color: "#ef8d83" },
-  lesionado: { label: "Lesionado", color: "#e2655a" },
-  "sem-status": { label: "Sem status", color: "#7c8a82" },
-};
-const AVAIL_LIST: Availability[] = ["inscrito", "provavel", "duvida", "suspenso", "lesionado", "sem-status"];
-function availabilityOf(id: string): Availability {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  const r = h % 100;
-  if (r < 55) return "inscrito";
-  if (r < 80) return "provavel";
-  if (r < 88) return "duvida";
-  if (r < 93) return "suspenso";
-  if (r < 97) return "lesionado";
-  return "sem-status";
-}
-
 type SortId = "caros" | "baratos" | "valorizados" | "desvalorizados" | "media" | "piores" | "val-esperada" | "min-valorizar";
 const SORTS: { id: SortId; label: string; pro?: boolean }[] = [
   { id: "caros", label: "Mais caros" },
@@ -77,14 +55,14 @@ const STEPS = [
   { t: "Saldo JC", x: "Estes são os Judocoins que tens para gastar. Cada atleta tem um preço — geres os teus 100 JC para montar a melhor equipa.", target: "jc" },
   { t: "Valorização", x: "O ▲/▼ ao lado do preço mostra se o atleta está a valorizar ou a desvalorizar. Fica atento a isto: faz toda a diferença no teu património.", target: "price" },
   { t: "Médias e pontuação", x: "A média mostra o nível típico do atleta e a 'última' a pontuação mais recente. Usa-as para descobrir quem pode render mais — e ganhar JC.", target: "scout" },
-  { t: "Filtros e favoritos", x: "Lá em cima: a ★ mostra só os teus favoritos, e os botões Ordenar, Status e Filtros (preço, país) ajudam-te a encontrar atletas. A ★ em cada card guarda o atleta como favorito.", target: "filters" },
+  { t: "Filtros e favoritos", x: "Lá em cima: a ★ mostra só os teus favoritos, e os botões Ordenar e Filtros (preço, país) ajudam-te a encontrar atletas. A ★ em cada card guarda o atleta como favorito.", target: "filters" },
   { t: "O que significam os estados", target: "legend" },
 ];
 
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 const code3 = (iso: string) => iso;
 
-type SheetKind = "ord" | "sta" | "fil" | null;
+type SheetKind = "ord" | "fil" | null;
 
 export default function Mercado() {
   const [pool, setPool] = useState<Athlete[]>([]);
@@ -104,7 +82,6 @@ export default function Mercado() {
   const [favs, setFavs] = useState<string[]>([]);
   const [favOnly, setFavOnly] = useState(false);
   const [sort, setSort] = useState<SortId>("caros");
-  const [statusSel, setStatusSel] = useState<Availability[]>([]);
   const [priceMin, setPriceMin] = useState(PRICE_MIN);
   const [priceMax, setPriceMax] = useState(PRICE_MAX);
   const [countrySel, setCountrySel] = useState<string[]>([]);
@@ -176,7 +153,7 @@ export default function Mercado() {
     setGuide(null);
   }
   function clearFilters() {
-    setStatusSel([]); setPriceMin(PRICE_MIN); setPriceMax(PRICE_MAX); setCountrySel([]); setFavOnly(false);
+    setPriceMin(PRICE_MIN); setPriceMax(PRICE_MAX); setCountrySel([]); setFavOnly(false);
   }
 
   const byId = new Map(pool.map((a) => [a.id, a]));
@@ -194,7 +171,6 @@ export default function Mercado() {
     if (a.category !== cat) return false;
     if (query.trim() && !a.name.toLowerCase().includes(query.trim().toLowerCase())) return false;
     if (favOnly && !favs.includes(a.id)) return false;
-    if (statusSel.length > 0 && !statusSel.includes(availabilityOf(a.id))) return false;
     if (a.priceJc < priceMin) return false;
     if (priceMax < PRICE_MAX && a.priceJc > priceMax) return false;
     if (countrySel.length > 0 && !countrySel.includes(a.countryIso)) return false;
@@ -295,9 +271,6 @@ export default function Mercado() {
             <button onClick={() => setSheet("ord")} style={fbtn(false)}>
               <SortIcon /> {sortLabel(sort)}
             </button>
-            <button onClick={() => setSheet("sta")} style={fbtn(statusSel.length > 0)}>
-              <TagIcon /> Status {statusSel.length > 0 && <span style={cnt}>{statusSel.length}</span>}
-            </button>
             <button onClick={() => setSheet("fil")} style={fbtn(filtroCount > 0)}>
               <SlidersIcon /> Filtros {filtroCount > 0 && <span style={cnt}>{filtroCount}</span>}
             </button>
@@ -325,7 +298,6 @@ export default function Mercado() {
               const inTeam = st.kind === "sell";
               const dim = st.kind === "blocked" && st.label !== "Sem JC";
               const vUp = a.variation >= 0;
-              const av = AVAIL_META[availabilityOf(a.id)];
               const isFav = favs.includes(a.id);
               const aVivo = aoVivoIds.has(a.id);
               return (
@@ -342,10 +314,8 @@ export default function Mercado() {
                       <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {a.name}{inTeam && <span style={{ color: "#7fd1a3", fontSize: 11 }}> ✓ na equipa</span>}
                       </div>
-                      <div style={{ fontSize: 11.5, color: "#93a39a", marginTop: 2, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden" }}>
-                        <span style={{ width: 8, height: 8, borderRadius: 2, background: av.color, flexShrink: 0 }} />
-                        <span style={{ color: av.color }}>{av.label}</span>
-                        <span>· {code3(a.countryIso)} · {a.category}kg</span>
+                      <div style={{ fontSize: 11.5, color: "#93a39a", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden" }}>
+                        {code3(a.countryIso)} · {a.category}kg
                       </div>
                     </div>
                     <span style={{ background: STATUS_COLORS[a.status][0], color: STATUS_COLORS[a.status][1], fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{a.status}</span>
@@ -406,25 +376,6 @@ export default function Mercado() {
             );
           })}
           <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>🔒 As ordenações avançadas fazem parte do Ippon Pro.</div>
-        </Sheet>
-      )}
-
-      {sheet === "sta" && (
-        <Sheet title="Status" onClose={() => setSheet(null)}>
-          {AVAIL_LIST.map((id) => {
-            const m = AVAIL_META[id];
-            const on = statusSel.includes(id);
-            return (
-              <button key={id} onClick={() => setStatusSel((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "transparent", border: "none", borderBottom: "1px solid #1a221d", padding: "14px 2px", cursor: "pointer", color: "#f1ede2" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: 3, background: m.color }} />{m.label}
-                </span>
-                <span style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${on ? GOLD : "#3a463f"}`, background: on ? GOLD : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#1b211e", fontSize: 13, fontWeight: 700 }}>{on ? "✓" : ""}</span>
-              </button>
-            );
-          })}
-          <button onClick={() => setSheet(null)} style={applyBtn}>Aplicar</button>
         </Sheet>
       )}
 
@@ -528,9 +479,6 @@ function Avatar({ code }: { code: string }) {
 
 function SortIcon() {
   return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 4v16M7 20l-3-3M7 4l3 3M17 20V4M17 4l3 3M17 20l-3-3" /></svg>;
-}
-function TagIcon() {
-  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7v5l9 9 5-5-9-9H3z" /><circle cx="7" cy="11" r="1.4" fill="currentColor" stroke="none" /></svg>;
 }
 function SlidersIcon() {
   return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h4M12 16h8" /><circle cx="16" cy="8" r="2.2" /><circle cx="10" cy="16" r="2.2" /></svg>;
