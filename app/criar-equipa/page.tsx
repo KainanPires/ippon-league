@@ -8,6 +8,7 @@ import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/compone
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
 import { competicaoDaSemana, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
+import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -66,7 +67,17 @@ export default function CriarEquipa() {
     let active = true;
     const idAlvo = alvo.idCompeticao;
     try {
-      if (!localStorage.getItem("ippon_team_tutorial")) setGuide("welcome");
+      // Guia do Dojo: só aparece se ainda não foi visto neste aparelho NEM na conta.
+      if (!tutorialVistoLocal("ippon_team_tutorial")) {
+        tutoriaisVistosConta().then((vistos) => {
+          if (!active) return;
+          if (vistos["ippon_team_tutorial"]) {
+            try { localStorage.setItem("ippon_team_tutorial", "done"); } catch {}
+          } else {
+            setGuide("welcome");
+          }
+        });
+      }
     } catch {}
     // Carrega a lista de atletas desta competição (mesma fonte do Mercado). Sem isto,
     // o resolve() não traduz os ids da equipa e o Dojo aparece "0/8" mesmo com equipa.
@@ -119,7 +130,7 @@ export default function CriarEquipa() {
     router.push(href);
   }
   function update(next: TeamState) { setDraft(next); saveDraftFor(alvo.idCompeticao, next); }
-  function naoMostrarMais() { try { localStorage.setItem("ippon_team_tutorial", "skip"); } catch {} setGuide(null); }
+  function naoMostrarMais() { marcarTutorialVisto("ippon_team_tutorial"); setGuide(null); }
   function openGuide() { setGuide("welcome"); }
   function setCaptain(id: string) {
     update({ ...draft, captain: draft.captain === id ? null : id });
