@@ -5,7 +5,7 @@ import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatu
 import { loadDraftFor, saveDraftFor, setAthletePool } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
-import { competicaoDaSemana, proximaDepoisDe } from "@/lib/calendario";
+import { focoMercado } from "@/lib/calendario";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -14,17 +14,10 @@ const GOLD = "#d9a441";
 const START_JC = 100;
 const FAV_KEY = "ippon_favorites";
 
-// Competição-alvo do mercado: a competição para a qual se escala (igual ao Dojo).
-// Se a competição da semana já começou (mercado fechado), escala-se para a próxima.
+// Competição-alvo do mercado: a de mercado aberto (mesma regra do resto da app).
+// Se a competição da semana já fechou (início - 1h), escala-se para a próxima.
 function competicaoAlvo(): string {
-  const hoje = new Date();
-  const atual = competicaoDaSemana(hoje);
-  const ini = new Date(atual.de.replace(/\//g, "-") + "T00:00:00");
-  // Mesma definição do Dojo: dias até começar; <= 0 significa que já começou.
-  const dias = Math.max(0, Math.ceil((ini.getTime() - hoje.getTime()) / 86400000));
-  const emAndamento = dias <= 0;
-  const alvo = emAndamento ? proximaDepoisDe(atual) : atual;
-  return alvo.idCompeticao;
+  return focoMercado().alvo.idCompeticao;
 }
 const COMPETICAO = competicaoAlvo();
 
