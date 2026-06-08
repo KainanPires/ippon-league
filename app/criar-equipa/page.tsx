@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
-import { loadDraft, saveDraft, loadSaved, commitSaved, resolve, jcLeft, counts, isComplete, missing, loadSavedCloud, commitSavedCloud, type TeamState } from "@/lib/team";
+import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, type TeamState } from "@/lib/team";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
@@ -27,7 +27,7 @@ function diasAte(c: SemanaCalendario, hoje: Date): number {
 }
 
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
-type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" } | { kind: "athlete"; a: Athlete } | null;
+type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" | "leave" } | { kind: "athlete"; a: Athlete } | null;
 function sameTeam(a: TeamState, b: TeamState): boolean {
   if ((a.captain || "") !== (b.captain || "")) return false;
   if (a.ids.length !== b.ids.length) return false;
@@ -40,6 +40,7 @@ export default function CriarEquipa() {
   const [modal, setModal] = useState<Modal>(null);
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [savingCloud, setSavingCloud] = useState(false);
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const [cloudWarn, setCloudWarn] = useState(false);
   const router = useRouter();
 
@@ -62,35 +63,40 @@ export default function CriarEquipa() {
 
   useEffect(() => {
     let active = true;
+    const idAlvo = alvo.idCompeticao;
     try {
       if (!localStorage.getItem("ippon_team_tutorial")) setGuide("welcome");
     } catch {}
     temSessao().then((logado) => {
       if (!active || !logado) return;
       try {
-        setDraft(loadDraft());
-        setSaved(loadSaved());
+        setDraft(loadDraftFor(idAlvo));
+        setSaved(loadSavedFor(idAlvo));
         setIdentity(loadIdentity());
       } catch {}
-      loadSavedCloud().then((cloud) => {
+      loadSavedCloudFor(idAlvo).then((cloud) => {
         if (!active || !cloud) return;
         setSaved(cloud);
-        const localDraft = loadDraft();
-        const localSaved = loadSaved();
+        const localDraft = loadDraftFor(idAlvo);
+        const localSaved = loadSavedFor(idAlvo);
         if (sameTeam(localDraft, localSaved)) {
           setDraft(cloud);
-          saveDraft(cloud);
-          commitSaved(cloud);
+          saveDraftFor(idAlvo, cloud);
+          commitSavedFor(idAlvo, cloud);
         }
       });
     });
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const dirty = !sameTeam(draft, saved) && draft.ids.length > 0;
-  // O rascunho é gravado localmente a cada alteração (saveDraft), por isso sair
-  // nunca perde a escalação — navegamos sempre, sem bloquear.
-  function tryLeave(href: string) { router.push(href); }
-  function update(next: TeamState) { setDraft(next); saveDraft(next); }
+  // O rascunho fica gravado localmente a cada alteração. Ao sair com alterações
+  // por guardar, avisamos (sem bloquear): a pessoa decide sair ou ficar.
+  function tryLeave(href: string) {
+    if (dirty) { setLeaveTo(href); setModal({ kind: "leave" }); return; }
+    router.push(href);
+  }
+  function update(next: TeamState) { setDraft(next); saveDraftFor(alvo.idCompeticao, next); }
   function naoMostrarMais() { try { localStorage.setItem("ippon_team_tutorial", "skip"); } catch {} setGuide(null); }
   function openGuide() { setGuide("welcome"); }
   function setCaptain(id: string) {
@@ -106,7 +112,7 @@ export default function CriarEquipa() {
     if (!(await temSessao())) { setModal({ kind: "login" }); return; }
     if (!isComplete(draft)) { setModal({ kind: "missing" }); return; }
     setSavingCloud(true);
-    const res = await commitSavedCloud(draft, identity);
+    const res = await commitSavedCloudFor(alvo.idCompeticao, draft, identity);
     setSaved(draft);
     setSavingCloud(false);
     setCloudWarn(!res.ok);
@@ -319,6 +325,17 @@ export default function CriarEquipa() {
           capitao={draft.captain}
           onClose={() => setModal(null)}
         />
+      )}
+      {modal?.kind === "leave" && (
+        <div style={overlayBg}>
+          <div style={cardBox}>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="indicando" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Sair sem guardar?</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Tens alterações por guardar. Se saíres agora, não ficam guardadas na tua conta.</p>
+            <button onClick={() => { const to = leaveTo; setModal(null); setLeaveTo(null); if (to) router.push(to); }} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>Sair sem guardar</button>
+            <button onClick={() => { setModal(null); setLeaveTo(null); }} style={ghostBtn}>Continuar a montar</button>
+          </div>
+        </div>
       )}
       {modal?.kind === "athlete" && (
         <div style={overlayBg}>
