@@ -5,7 +5,7 @@ import { Mascot } from "@/components/Mascot";
 import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, type TeamState } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
 import { supabase } from "@/lib/supabase";
-import { competicaoDaSemana, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
+import { focoMercado, textoFecho } from "@/lib/calendario";
 import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -13,20 +13,6 @@ const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
 const USER = { belt: "Branca" };
-
-// Próxima competição a contar (a partir de hoje), vinda do Calendário Oficial.
-function proximaCompeticao(): { c: SemanaCalendario; dias: number } {
-  const hoje = new Date();
-  const c = competicaoDaSemana(hoje);
-  const ini = new Date(c.de.replace(/\//g, "-") + "T00:00:00");
-  const dias = Math.max(0, Math.ceil((ini.getTime() - hoje.getTime()) / 86400000));
-  return { c, dias };
-}
-function rotuloFecho(dias: number): string {
-  if (dias <= 0) return "Mercado fechado · em andamento";
-  if (dias === 1) return "Mercado fecha em 1 dia";
-  return `Mercado fecha em ${dias} dias`;
-}
 
 const STEPS = [
   { title: "Como funciona", text: "Vou mostrar-te o essencial em 1 minuto. Avança quando quiseres — ou pula." },
@@ -75,16 +61,13 @@ export default function Inicio() {
   const ligasRef = useRef<HTMLAnchorElement | null>(null);
   const tutTarget: TutTarget = phase === "tutorial" ? targetForStep(step) : null;
 
-  // Próxima competição do calendário (calculada uma vez).
-  const prox = proximaCompeticao();
-  const comp = prox.c;
+  // Foco do mercado (regra única no calendário): competição-alvo, a que decorre, estado.
+  const foco = focoMercado();
+  const comp = foco.atual;
   const ehClassico = comp.classico;
-  const emAndamento = prox.dias <= 0; // já começou → mercado fechado
-  const proxComp = proximaDepoisDe(comp); // a de mercado aberto, se a atual já começou
-  // Competição-alvo (a de mercado aberto): a "comp" se ainda não começou; senão a próxima.
-  const alvo = emAndamento ? proxComp : comp;
-  // A que está a decorrer (mercado fechado), se for o caso.
-  const aDecorrer = emAndamento ? comp : null;
+  const emAndamento = foco.aDecorrer !== null; // a competição da semana já fechou/decorre
+  const alvo = foco.alvo;            // competição de mercado aberto (onde se monta)
+  const aDecorrer = foco.aDecorrer;  // competição a decorrer (mercado fechado), se houver
 
   // teamInfo calculado a cada render (re-resolve quando a lista de atletas chega).
   const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
@@ -235,7 +218,7 @@ export default function Inicio() {
         </a>
 
         <div ref={teamRef} className={glow("team")}>
-          {!visitante && teamInfo ? <TeamBuilt info={teamInfo} /> : <TeamCreate />}
+          {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo)} /> : <TeamCreate />}
         </div>
 
         <Card>
@@ -256,7 +239,7 @@ export default function Inicio() {
                 Em andamento · acompanha aqui
               </span>
             ) : (
-              <span style={{ fontSize: 12, color: "#7fd1a3" }}>{rotuloFecho(prox.dias)}</span>
+              <span style={{ fontSize: 12, color: "#7fd1a3" }}>{textoFecho(comp)}</span>
             )}
             {emAndamento ? (
               visitante ? (
@@ -356,7 +339,7 @@ function TeamCreate() {
   );
 }
 
-function TeamBuilt({ info }: { info: { name: string; value: string; last: number } }) {
+function TeamBuilt({ info, fechoTexto }: { info: { name: string; value: string; last: number }; fechoTexto: string }) {
   return (
     <div style={{ border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
       <div style={{ background: "#1c3a2e", padding: 9, textAlign: "center", fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aee9c9" }}>A minha equipa</div>
@@ -378,7 +361,7 @@ function TeamBuilt({ info }: { info: { name: string; value: string; last: number
             </div>
           ))}
         </div>
-        <div style={{ fontSize: 12, color: "#7fd1a3", marginBottom: 10 }}>Mercado fecha em 3d 14h</div>
+        <div style={{ fontSize: 12, color: "#7fd1a3", marginBottom: 10 }}>{fechoTexto}</div>
         <a href="/meu-time" style={{ display: "block", background: GOLD, color: "#1b211e", textAlign: "center", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 14, textDecoration: "none" }}>
           Ver o meu time
         </a>
