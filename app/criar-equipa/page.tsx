@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
-import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, type TeamState } from "@/lib/team";
+import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, setAthletePool, type TeamState } from "@/lib/team";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
@@ -42,6 +42,7 @@ export default function CriarEquipa() {
   const [savingCloud, setSavingCloud] = useState(false);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const [cloudWarn, setCloudWarn] = useState(false);
+  const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const router = useRouter();
 
   // Competição: atual (semana) e próxima. Se a atual já começou (dias<=0),
@@ -67,6 +68,16 @@ export default function CriarEquipa() {
     try {
       if (!localStorage.getItem("ippon_team_tutorial")) setGuide("welcome");
     } catch {}
+    // Carrega a lista de atletas desta competição (mesma fonte do Mercado). Sem isto,
+    // o resolve() não traduz os ids da equipa e o Dojo aparece "0/8" mesmo com equipa.
+    fetch(`/api/atletas?id=${idAlvo}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!active) return;
+        const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
+        if (list.length > 0) { setAthletePool(list); bumpPool((t) => t + 1); }
+      })
+      .catch(() => {});
     temSessao().then((logado) => {
       if (!active || !logado) return;
       try {
