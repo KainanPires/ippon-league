@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { Athlete } from "@/lib/athletes";
-import type { Identity, ShapeId, PatternId, SymbolId } from "@/components/Escudo";
+import { Escudo, type Identity } from "@/components/Escudo";
+import { Mascot } from "@/components/Mascot";
 
-const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
 const IOC: Record<string, string> = {
@@ -13,7 +14,7 @@ const IOC: Record<string, string> = {
   SI: "SLO", HR: "CRO", NL: "NED",
 };
 const code3 = (iso: string) => IOC[iso] || iso;
-const sobrenome = (nome: string) => (nome.split(" ").slice(-1)[0] || nome);
+const sobrenome = (nome: string) => (nome.split(" ").slice(-1)[0] || nome).toUpperCase();
 
 export interface CartaoProps {
   identity: Identity;
@@ -22,359 +23,272 @@ export interface CartaoProps {
   capitao: string | null;
 }
 
-// --- TEMA POR FAIXA ----------------------------------------------------------
-type Tema = { nome: string; accent: string; accent2: string; glow: number; moldura: number; bgTop: string; bgBot: string; textoFaixa: string; };
-const TEMAS: Record<string, Tema> = {
-  branca:  { nome: "Branca",  accent: "#d7dcd6", accent2: "#9fb0a6", glow: 0.10, moldura: 6, bgTop: "#141a17", bgBot: "#0c0e0d", textoFaixa: "#1b211e" },
-  azul:    { nome: "Azul",    accent: "#3f86d6", accent2: "#1c4f86", glow: 0.30, moldura: 7, bgTop: "#10171f", bgBot: "#0a0d11", textoFaixa: "#0c0e0d" },
-  amarela: { nome: "Amarela", accent: "#e6b422", accent2: "#a97f10", glow: 0.34, moldura: 7, bgTop: "#1a1710", bgBot: "#0c0a06", textoFaixa: "#1b211e" },
-  verde:   { nome: "Verde",   accent: "#3f9f5a", accent2: "#1c5e32", glow: 0.32, moldura: 7, bgTop: "#101a13", bgBot: "#080d09", textoFaixa: "#0c0e0d" },
-  roxa:    { nome: "Roxa",    accent: "#9b6cc9", accent2: "#5a327f", glow: 0.42, moldura: 8, bgTop: "#16101f", bgBot: "#0a070f", textoFaixa: "#0c0e0d" },
-  castanha:{ nome: "Castanha",accent: "#a06a3a", accent2: "#5e3a1c", glow: 0.40, moldura: 8, bgTop: "#1a130d", bgBot: "#0c0805", textoFaixa: "#0c0e0d" },
-  preta:   { nome: "Preta",   accent: "#d9a441", accent2: "#8a6420", glow: 0.55, moldura: 10, bgTop: "#15140f", bgBot: "#070605", textoFaixa: "#1b211e" },
+type Belt = "branca" | "azul" | "amarela" | "verde" | "roxa" | "castanha" | "preta";
+interface BeltTheme {
+  name: string; accent: string; chipText: string; frame: number; frameColor: string; double: boolean; glow: number; glowColor: string;
+}
+const BELTS: Record<Belt, BeltTheme> = {
+  branca:   { name: "FAIXA BRANCA",   accent: "#d7dcd6", chipText: "#14181a", frame: 3, frameColor: "#5a635e", double: false, glow: 0,  glowColor: "transparent" },
+  azul:     { name: "FAIXA AZUL",     accent: "#3f86d6", chipText: "#0a1622", frame: 4, frameColor: "#3f86d6", double: false, glow: 34, glowColor: "rgba(63,134,214,0.30)" },
+  amarela:  { name: "FAIXA AMARELA",  accent: "#e6b422", chipText: "#1f1804", frame: 4, frameColor: "#e6b422", double: false, glow: 44, glowColor: "rgba(230,180,34,0.32)" },
+  verde:    { name: "FAIXA VERDE",    accent: "#3f9f5a", chipText: "#08160d", frame: 5, frameColor: "#3f9f5a", double: false, glow: 48, glowColor: "rgba(63,159,90,0.34)" },
+  roxa:     { name: "FAIXA ROXA",     accent: "#9b6cc9", chipText: "#f1ede2", frame: 5, frameColor: "#9b6cc9", double: false, glow: 64, glowColor: "rgba(155,108,201,0.46)" },
+  castanha: { name: "FAIXA CASTANHA", accent: "#a06a3a", chipText: "#f1ede2", frame: 6, frameColor: "#a06a3a", double: true,  glow: 64, glowColor: "rgba(160,106,58,0.46)" },
+  preta:    { name: "FAIXA PRETA",    accent: GOLD,      chipText: "#1f1804", frame: 9, frameColor: GOLD,      double: true,  glow: 96, glowColor: "rgba(217,164,65,0.62)" },
 };
-function temaDaFaixa(faixa: string): Tema {
+function beltKey(faixa: string): Belt {
   const k = (faixa || "").trim().toLowerCase();
-  return TEMAS[k] || TEMAS.branca;
+  return (["branca","azul","amarela","verde","roxa","castanha","preta"].includes(k) ? k : "branca") as Belt;
 }
 
-// --- ESCUDO no canvas (réplica fiel, viewBox 56x64) --------------------------
-function formaPath(shape: ShapeId): Path2D {
-  const p = new Path2D();
-  switch (shape) {
-    case "circle": p.ellipse(28, 32, 26, 26, 0, 0, Math.PI * 2); return p;
-    case "round": return new Path2D("M10 6 H46 a4 4 0 0 1 4 4 V36 C50 50 40 60 28 62 C16 60 6 50 6 36 V10 a4 4 0 0 1 4 -4 Z");
-    case "hex": return new Path2D("M28 3 L51 16 V48 L28 61 L5 48 V16 Z");
-    case "diamond": return new Path2D("M28 3 L53 32 L28 61 L3 32 Z");
-    default: return new Path2D("M28 2 L52 11 V32 C52 49 41 58 28 62 C15 58 4 49 4 32 V11 Z");
+function frameShadow(b: BeltTheme, pro: boolean): string {
+  const w = pro ? 10 : b.frame;
+  const fc = pro ? GOLD : b.frameColor;
+  const dbl = pro || b.double;
+  const parts: string[] = [];
+  parts.push(`inset 0 0 0 ${w}px ${fc}`);
+  if (dbl) {
+    parts.push(`inset 0 0 0 ${w + 6}px rgba(11,13,12,0.95)`);
+    parts.push(`inset 0 0 0 ${w + 8}px ${pro ? "rgba(217,164,65,0.85)" : "rgba(217,164,65,0.45)"}`);
   }
-}
-function desenharPadrao(ctx: CanvasRenderingContext2D, pattern: PatternId, c1: string, c2: string) {
-  switch (pattern) {
-    case "listras-v": [0, 14, 28, 42].forEach((x, i) => { ctx.fillStyle = i % 2 ? c2 : c1; ctx.fillRect(x, 0, 14, 64); }); break;
-    case "listras-h": [0, 16, 32, 48].forEach((y, i) => { ctx.fillStyle = i % 2 ? c2 : c1; ctx.fillRect(0, y, 56, 16); }); break;
-    case "xadrez": for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { ctx.fillStyle = (r + c) % 2 ? c2 : c1; ctx.fillRect(c * 14, r * 16, 14, 16); } break;
-    case "cruz": ctx.fillStyle = c1; ctx.fillRect(22, 0, 12, 64); ctx.fillStyle = c2; ctx.fillRect(0, 26, 56, 12); break;
-    case "diagonal":
-      ctx.fillStyle = c1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(56, 0); ctx.lineTo(0, 64); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = c2; ctx.beginPath(); ctx.moveTo(56, 0); ctx.lineTo(56, 64); ctx.lineTo(0, 64); ctx.closePath(); ctx.fill(); break;
-    case "metade": ctx.fillStyle = c1; ctx.fillRect(0, 0, 56, 32); ctx.fillStyle = c2; ctx.fillRect(0, 32, 56, 32); break;
-    default: break;
-  }
-}
-function desenharSimbolo(ctx: CanvasRenderingContext2D, id: SymbolId, color: string) {
-  if (id === "none") return;
-  ctx.save(); ctx.fillStyle = color; ctx.strokeStyle = color;
-  const fill = (d: string) => ctx.fill(new Path2D(d));
-  switch (id) {
-    case "estrela": fill("M12 1 L15 9 L23 9 L16.5 14 L19 22 L12 17 L5 22 L7.5 14 L1 9 L9 9 Z"); break;
-    case "montanha": fill("M2 21 L9 9 L13 14 L17 6 L22 21 Z"); break;
-    case "torii": fill("M4 5 h16 v2.4 h-16 Z"); fill("M3 8.6 h18 v2.8 h-18 Z"); fill("M6 11 h2.4 v11 h-2.4 Z"); fill("M15.6 11 h2.4 v11 h-2.4 Z"); break;
-    case "chama": fill("M12 1 C16 6 18 10 18 14 A6 6 0 0 1 6 14 C6 11 8.5 9 9 6 C10.5 7.5 12 9.5 12 11.5 C13 9.5 13 4.5 12 1 Z"); break;
-    case "raio": fill("M13 1 L4 13 H10.5 L9 23 L20 9 H13 Z"); break;
-    case "punho": fill("M5 10 V8 a2 2 0 0 1 4 0 V7 a2 2 0 0 1 4 0 V7 a2 2 0 0 1 4 0 V8 a2 2 0 0 1 4 0 V15 a7 7 0 0 1 -7 7 H11 a6 6 0 0 1 -6 -6 Z"); break;
-    case "trofeu":
-      fill("M6 3 H18 V6 C18 11 15.5 14 12 14 C8.5 14 6 11 6 6 Z");
-      fill("M6 4 C2 4 2 9.5 7.5 10.2 L7.5 8.1 C4.5 7.6 4.6 6 6 6 Z");
-      fill("M18 4 C22 4 22 9.5 16.5 10.2 L16.5 8.1 C19.5 7.6 19.4 6 18 6 Z");
-      fill("M11 13.5 h2 v4.5 h-2 Z"); fill("M7.5 18 H16.5 L17.5 21.5 H6.5 Z"); break;
-    case "taca": fill("M4 4 H20 C20 9.5 16.5 13 12 13 C7.5 13 4 9.5 4 4 Z"); fill("M11 12.5 h2 v4.5 h-2 Z"); fill("M7 17 H17 L18 21 H6 Z"); break;
-    case "medalha": fill("M8 2 L11.5 9 L9 10 L5.5 3 Z"); fill("M16 2 L12.5 9 L15 10 L18.5 3 Z"); ctx.beginPath(); ctx.arc(12, 16, 6, 0, Math.PI * 2); ctx.fill(); break;
-    case "bandeirola": fill("M5 2 h2 v20 h-2 Z"); fill("M7 3 H20 L16 7.5 L20 12 H7 Z"); break;
-    case "flamula": fill("M6 2 H18 V19 L12 14.5 L6 19 Z"); break;
-    default: break;
-  }
-  ctx.restore();
-}
-function desenharEscudo(ctx: CanvasRenderingContext2D, id: Identity, x: number, y: number, w: number) {
-  const h = (w * 64) / 56;
-  ctx.save(); ctx.translate(x, y); ctx.scale(w / 56, h / 64);
-  const forma = formaPath(id.shape);
-  ctx.save(); ctx.clip(forma);
-  const g = ctx.createLinearGradient(0, 0, 0, 64);
-  g.addColorStop(0, id.bg1); g.addColorStop(1, id.bg2);
-  ctx.fillStyle = g; ctx.fillRect(0, 0, 56, 64);
-  desenharPadrao(ctx, id.pattern, id.stamp1, id.stamp2);
-  ctx.restore();
-  if (id.symbol !== "none") { ctx.save(); ctx.clip(forma); ctx.translate(16, 20); desenharSimbolo(ctx, id.symbol, id.border); ctx.restore(); }
-  ctx.lineWidth = 3; ctx.strokeStyle = id.border; ctx.lineJoin = "round"; ctx.stroke(forma);
-  ctx.restore();
+  const glow = pro ? "0 0 120px rgba(217,164,65,0.55)" : b.glow ? `0 0 ${b.glow}px ${b.glowColor}` : null;
+  if (glow) parts.push(glow);
+  parts.push("0 44px 100px rgba(0,0,0,0.55)");
+  return parts.join(", ");
 }
 
-// --- LINHA de atleta (toda a largura → texto GRANDE e legível) ---------------
-function desenharLinha(ctx: CanvasRenderingContext2D, a: Athlete, capitao: boolean, x: number, y: number, w: number, h: number, tema: Tema) {
-  ctx.save();
-  const r = 16;
-  roundRect(ctx, x, y, w, h, r);
-  ctx.fillStyle = capitao ? hexA(tema.accent, 0.16) : "rgba(255,255,255,0.035)";
-  ctx.fill();
-  ctx.lineWidth = capitao ? 2.5 : 1.5;
-  ctx.strokeStyle = capitao ? tema.accent : "#2a342d";
-  ctx.stroke();
+// CSS do cartão (do Claude Design), injetado inline para não depender de ficheiro .css externo.
+const CARD_CSS = `
+.jcard{position:relative;width:1080px;height:1350px;border-radius:34px;overflow:hidden;font-family:'Oswald',var(--font-geist-mono),sans-serif;color:#f1ede2;isolation:isolate;-webkit-font-smoothing:antialiased}
+.jcard-bg{position:absolute;inset:0;background:linear-gradient(180deg,#141a17 0%,#10130f 48%,#0c0e0d 100%);z-index:0}
+.jcard-headglow{position:absolute;top:-120px;left:0;right:0;height:620px;z-index:0;background:radial-gradient(58% 70% at 34% 24%,color-mix(in srgb,var(--glow-accent) 26%,transparent) 0%,transparent 68%),radial-gradient(80% 60% at 80% 6%,color-mix(in srgb,#d9a441 10%,transparent) 0%,transparent 70%);pointer-events:none}
+.jcard-inner{position:relative;z-index:2;height:100%;padding:64px 60px 56px;display:flex;flex-direction:column;box-sizing:border-box}
+.pro-badge{align-self:center;margin-top:-14px;margin-bottom:30px;padding:13px 40px;border-radius:999px;background:linear-gradient(180deg,#f1c969 0%,#d9a441 55%,#b9842c 100%);color:#20160a;font-weight:700;font-size:31px;letter-spacing:5px;text-transform:uppercase;border:1.5px solid #f4d489;box-shadow:0 0 44px rgba(217,164,65,0.6),inset 0 1px 0 rgba(255,255,255,0.5)}
+.jcard-head{display:flex;align-items:center;gap:36px;padding-bottom:30px;margin-bottom:8px;border-bottom:1.5px solid rgba(241,237,226,0.10)}
+.crest-wrap{flex-shrink:0;width:150px;height:172px;display:grid;place-items:center;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.45))}
+.head-text{min-width:0;flex:1}
+.team-name{margin:0;font-weight:700;font-size:70px;line-height:0.96;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2}
+.belt-pill{display:inline-block;margin-top:20px;padding:11px 32px;border-radius:9px;background:var(--accent);color:var(--chip-text);font-weight:600;font-size:30px;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap}
+.roster{flex:1;display:flex;flex-direction:column;padding:6px 0}
+.row{flex:1 1 0;min-height:0;display:flex;align-items:center;gap:28px;padding:0 6px;border-bottom:1.5px solid rgba(241,237,226,0.07)}
+.row:last-child{border-bottom:0}
+.chip{flex-shrink:0;width:108px;height:62px;display:grid;place-items:center;border-radius:7px;background:var(--accent);color:var(--chip-text);font-family:'JetBrains Mono',var(--font-geist-mono),monospace;font-weight:700;font-size:33px;letter-spacing:1px}
+.surname{flex:1;min-width:0;font-weight:700;font-size:52px;line-height:1;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.weight{flex-shrink:0;font-family:'JetBrains Mono',var(--font-geist-mono),monospace;font-weight:500;font-size:32px;letter-spacing:0.5px;color:#93a39a}
+.row.is-captain{border-bottom:0;background:linear-gradient(90deg,rgba(217,164,65,0.16) 0%,rgba(217,164,65,0.07) 100%);border:2px solid rgba(217,164,65,0.55);border-radius:14px;padding:0 18px;box-shadow:0 0 30px rgba(217,164,65,0.14)}
+.cap-badge{flex-shrink:0;width:58px;height:58px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(180deg,#f1c969 0%,#d9a441 60%,#b9842c 100%);color:#20160a;font-weight:700;font-size:36px;margin-left:6px;box-shadow:0 0 22px rgba(217,164,65,0.5),inset 0 1px 0 rgba(255,255,255,0.5)}
+.jcard-foot{margin-top:14px;padding-top:26px;border-top:1.5px solid rgba(241,237,226,0.10);text-align:center}
+.foot-main{font-weight:700;font-size:48px;letter-spacing:8px;text-transform:uppercase;color:#d9a441;text-shadow:0 0 26px rgba(217,164,65,0.35)}
+.foot-main.pro{font-size:39px;letter-spacing:2px;line-height:1.12}
+.foot-sub{margin-top:10px;font-weight:300;font-size:27px;letter-spacing:1px;color:#93a39a}
+.foot-link{margin-top:12px;font-family:'JetBrains Mono',var(--font-geist-mono),monospace;font-size:28px;letter-spacing:1px;color:#e8cf8f}
+.dodo-medal{position:absolute;right:34px;bottom:40px;width:150px;height:150px;z-index:3;border-radius:50%;background:radial-gradient(circle at 50% 38%,#245446 0%,#1c3a2e 58%,#14271f 100%);border:3px solid color-mix(in srgb,var(--accent) 85%,#1c3a2e);box-shadow:0 0 0 6px rgba(12,14,13,0.55),0 14px 30px rgba(0,0,0,0.5),0 0 34px color-mix(in srgb,var(--glow-accent) 30%,transparent),inset 0 2px 10px rgba(0,0,0,0.4);display:grid;place-items:center;overflow:hidden}
+.dodo-fig{width:80%;height:80%;margin-top:8%;filter:drop-shadow(0 3px 5px rgba(0,0,0,0.35))}
+.jcard.is-pro .dodo-medal{border-color:#d9a441;border-width:4px;box-shadow:0 0 0 6px rgba(12,14,13,0.55),0 14px 30px rgba(0,0,0,0.5),0 0 44px rgba(217,164,65,0.5),inset 0 2px 10px rgba(0,0,0,0.4)}
+.jcard.is-pro .jcard-bg{background:linear-gradient(180deg,#1c1810 0%,#15110a 50%,#0b0906 100%)}
+.jcard.is-pro .jcard-headglow{top:-160px;height:720px;background:radial-gradient(46% 60% at 50% 22%,color-mix(in srgb,#d9a441 42%,transparent) 0%,transparent 64%),conic-gradient(from 200deg at 50% 14%,transparent 0deg,color-mix(in srgb,#d9a441 16%,transparent) 30deg,transparent 70deg,transparent 290deg,color-mix(in srgb,#d9a441 16%,transparent) 330deg,transparent 360deg)}
+.pro-sheen{position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(122deg,transparent 38%,rgba(246,220,160,0.10) 49%,rgba(246,220,160,0.02) 56%,transparent 64%)}
+.pro-corner{position:absolute;width:92px;height:92px;z-index:3;pointer-events:none;filter:drop-shadow(0 0 14px rgba(217,164,65,0.6))}
+.pro-corner.tl{top:30px;left:30px;border-top:5px solid #d9a441;border-left:5px solid #d9a441;border-top-left-radius:14px}
+.pro-corner.tr{top:30px;right:30px;border-top:5px solid #d9a441;border-right:5px solid #d9a441;border-top-right-radius:14px}
+.jcard.is-pro .jcard-inner{padding:50px 64px 56px}
+.jcard.is-pro .pro-badge{margin-top:6px;margin-bottom:30px;padding:15px 50px;font-size:33px;letter-spacing:6px;background:linear-gradient(180deg,#fbe3a4 0%,#e7b75a 45%,#c79235 100%);border:2px solid #fbe7ad;box-shadow:0 0 26px rgba(217,164,65,0.5),0 0 70px rgba(217,164,65,0.6),inset 0 1px 0 rgba(255,255,255,0.65)}
+.jcard.is-pro .team-name{background:linear-gradient(176deg,#fbe7ad 0%,#e7c074 42%,#d9a441 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 1px 12px rgba(217,164,65,0.25))}
+.jcard.is-pro .foot-main.pro{background:linear-gradient(180deg,#fbe7ad,#d9a441);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 0 22px rgba(217,164,65,0.45))}
+`;
 
-  const padX = h * 0.32;
-  const cy = y + h / 2;
-
-  // etiqueta de país (grande, cor da faixa)
-  const tagW = w * 0.155, tagH = h * 0.50, tagX = x + padX, tagY = cy - tagH / 2;
-  roundRect(ctx, tagX, tagY, tagW, tagH, 7);
-  ctx.fillStyle = tema.accent; ctx.fill();
-  ctx.fillStyle = tema.textoFaixa;
-  ctx.font = `700 ${Math.round(tagH * 0.46)}px ${FD}`;
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(code3(a.countryIso), tagX + tagW / 2, cy + 1);
-
-  // nome grande
-  const nomeX = tagX + tagW + h * 0.34;
-  ctx.fillStyle = "#f1ede2";
-  ctx.textAlign = "left"; ctx.textBaseline = "middle";
-  let fs = Math.round(h * 0.40);
-  ctx.font = `700 ${fs}px ${FD}`;
-  const catTxt = `${a.category}kg`;
-  ctx.font = `400 ${Math.round(h * 0.30)}px ${FD}`;
-  const catW = ctx.measureText(catTxt).width;
-  const capW = capitao ? h * 0.9 : 0;
-  const nomeMax = x + w - padX - catW - h * 0.4 - capW - nomeX;
-  ctx.font = `700 ${fs}px ${FD}`;
-  let nome = sobrenome(a.name).toUpperCase();
-  while (fs > 18 && ctx.measureText(nome).width > nomeMax) { fs -= 1; ctx.font = `700 ${fs}px ${FD}`; }
-  ctx.fillText(cortar(ctx, nome, nomeMax), nomeX, cy + 1);
-
-  // categoria à direita (antes do selo de capitão, se houver)
-  ctx.fillStyle = "#93a39a";
-  ctx.font = `400 ${Math.round(h * 0.30)}px ${FD}`;
-  ctx.textAlign = "right"; ctx.textBaseline = "middle";
-  const catX = x + w - padX - capW;
-  ctx.fillText(catTxt, catX, cy + 1);
-
-  // selo de capitão (círculo dourado "C" à direita)
-  if (capitao) {
-    const cr = h * 0.30;
-    const ccx = x + w - padX - cr;
-    roundCircle(ctx, ccx, cy, cr);
-    ctx.fillStyle = tema.accent; ctx.fill();
-    ctx.fillStyle = tema.textoFaixa;
-    ctx.font = `700 ${Math.round(cr * 1.2)}px ${FD}`;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("C", ccx, cy + 1);
-  }
-  ctx.restore();
-}
-function roundCircle(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); }
-
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-function cortar(ctx: CanvasRenderingContext2D, txt: string, maxW: number): string {
-  if (ctx.measureText(txt).width <= maxW) return txt;
-  let s = txt;
-  while (s.length > 1 && ctx.measureText(s + "…").width > maxW) s = s.slice(0, -1);
-  return s + "…";
-}
-function hexA(hex: string, a: number): string {
-  const h = hex.replace("#", "");
-  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${a})`;
+// Carrega o html-to-image de um CDN, uma vez.
+let _h2iPromise: Promise<any> | null = null;
+function loadHtmlToImage(): Promise<any> {
+  const w = window as unknown as { htmlToImage?: any };
+  if (w.htmlToImage) return Promise.resolve(w.htmlToImage);
+  if (_h2iPromise) return _h2iPromise;
+  _h2iPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.13/html-to-image.min.js";
+    s.crossOrigin = "anonymous";
+    s.onload = () => resolve((window as unknown as { htmlToImage?: any }).htmlToImage);
+    s.onerror = () => reject(new Error("CDN html-to-image falhou"));
+    document.head.appendChild(s);
+  });
+  return _h2iPromise;
 }
 
-function desenharCartao(canvas: HTMLCanvasElement, props: CartaoProps & { pro: boolean }): string {
-  const W = 1080, H = 1350;
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return "";
-  const tema = temaDaFaixa(props.faixa);
-  const pro = props.pro;
-
-  // fundo
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, tema.bgTop); bg.addColorStop(1, tema.bgBot);
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-  const rg = ctx.createRadialGradient(W / 2, 260, 40, W / 2, 260, 660);
-  rg.addColorStop(0, hexA(tema.accent, pro ? tema.glow + 0.12 : tema.glow));
-  rg.addColorStop(1, hexA(tema.accent, 0));
-  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
-
-  // moldura (Pro: dourada, mais grossa, brilho extra + moldura dupla)
-  const molCor = pro ? GOLD : tema.accent;
-  const molEsp = pro ? tema.moldura + 4 : tema.moldura;
-  ctx.save();
-  ctx.shadowColor = hexA(molCor, pro ? 0.7 : tema.glow);
-  ctx.shadowBlur = (pro ? 60 : 40) * (tema.glow + (pro ? 0.3 : 0)) + 6;
-  ctx.strokeStyle = molCor; ctx.lineWidth = molEsp;
-  roundRect(ctx, 26, 26, W - 52, H - 52, 30); ctx.stroke();
-  ctx.restore();
-  ctx.strokeStyle = hexA(molCor, pro ? 0.6 : 0.35); ctx.lineWidth = pro ? 2.5 : 1.5;
-  roundRect(ctx, 42, 42, W - 84, H - 84, 24); ctx.stroke();
-
-  // emblema PRO (topo centro), só se pro
-  let topo = 80;
-  if (pro) {
-    const eW = 260, eH = 56, eX = W / 2 - eW / 2, eY = 56;
-    ctx.save();
-    ctx.shadowColor = hexA(GOLD, 0.8); ctx.shadowBlur = 30;
-    roundRect(ctx, eX, eY, eW, eH, eH / 2);
-    const gg = ctx.createLinearGradient(eX, eY, eX, eY + eH);
-    gg.addColorStop(0, "#f0d79a"); gg.addColorStop(1, GOLD);
-    ctx.fillStyle = gg; ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = "#1b1208";
-    ctx.font = `700 30px ${FD}`;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("★ IPPON PRO ★", W / 2, eY + eH / 2 + 1);
-    topo = 140;
-  }
-
-  // cabeçalho: escudo
-  const escW = 120;
-  desenharEscudo(ctx, props.identity, 74, topo, escW);
-
-  // nome
-  const headerX = 74 + escW + 28;
-  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#f1ede2";
-  let nf = 50; ctx.font = `700 ${nf}px ${FD}`;
-  const nome = props.identity.name.toUpperCase();
-  const maxHeader = W - 74 - headerX;
-  while (nf > 26 && ctx.measureText(nome).width > maxHeader) { nf -= 1; ctx.font = `700 ${nf}px ${FD}`; }
-  ctx.fillText(cortar(ctx, nome, maxHeader), headerX, topo + 50);
-
-  // pílula da faixa
-  const fLabel = `FAIXA ${tema.nome.toUpperCase()}`;
-  ctx.font = `700 28px ${FD}`;
-  const fw = ctx.measureText(fLabel).width;
-  const pillH = 44, pillW = fw + 62, pillX = headerX, pillY = topo + 66;
-  roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
-  ctx.save();
-  ctx.shadowColor = hexA(tema.accent, tema.glow); ctx.shadowBlur = 24 * tema.glow;
-  ctx.fillStyle = tema.accent; ctx.fill();
-  ctx.restore();
-  ctx.fillStyle = tema.textoFaixa;
-  ctx.textAlign = "left"; ctx.textBaseline = "middle";
-  // nó da faixa
-  ctx.fillRect(pillX + 18, pillY + pillH / 2 - 8, 20, 16);
-  ctx.fillText(fLabel, pillX + 48, pillY + pillH / 2 + 1);
-
-  // separador
-  const sepY = topo + 150;
-  ctx.strokeStyle = hexA(tema.accent, 0.25); ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(74, sepY); ctx.lineTo(W - 74, sepY); ctx.stroke();
-
-  // 8 linhas de atletas (toda a largura)
-  const listTop = sepY + 26;
-  const listBottom = H - (pro ? 150 : 130);
-  const gap = 16;
-  const lineH = (listBottom - listTop - gap * 7) / 8;
-  for (let i = 0; i < 8; i++) {
-    const a = props.atletas[i];
-    const y = listTop + (lineH + gap) * i;
-    if (!a) {
-      roundRect(ctx, 74, y, W - 148, lineH, 16);
-      ctx.fillStyle = "rgba(255,255,255,0.02)"; ctx.fill();
-      ctx.save(); ctx.setLineDash([8, 6]); ctx.strokeStyle = hexA(tema.accent, 0.35); ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
-      continue;
-    }
-    desenharLinha(ctx, a, props.capitao === a.id, 74, y, W - 148, lineH, tema);
-  }
-
-  // rodapé
-  ctx.textAlign = "center";
-  if (pro) {
-    ctx.fillStyle = GOLD; ctx.font = `700 36px ${FD}`;
-    ctx.fillText("JOGA COM VANTAGEM. SÊ IPPON PRO.", W / 2, H - 92);
-    ctx.fillStyle = "#93a39a"; ctx.font = `400 24px ${FD}`;
-    ctx.fillText("ippon-league.vercel.app", W / 2, H - 56);
-  } else {
-    ctx.fillStyle = tema.accent; ctx.font = `700 36px ${FD}`;
-    ctx.fillText("IPPON LEAGUE", W / 2, H - 88);
-    ctx.fillStyle = "#93a39a"; ctx.font = `400 24px ${FD}`;
-    ctx.fillText("O jogo oficial dos fãs de judô", W / 2, H - 52);
-  }
-
-  return canvas.toDataURL("image/png");
+// Carrega as fontes Oswald + JetBrains Mono (uma vez).
+function ensureFonts() {
+  if (document.getElementById("ippon-card-fonts")) return;
+  const l = document.createElement("link");
+  l.id = "ippon-card-fonts";
+  l.rel = "stylesheet";
+  l.href = "https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap";
+  document.head.appendChild(l);
 }
 
 export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, onClose }: CartaoProps & { pro?: boolean; onClose: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [img, setImg] = useState<string>("");
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(0.3);
+  const [verPro, setVerPro] = useState(pro); // interruptor de TESTE
+  const [busy, setBusy] = useState(false);
   const [podePartilhar, setPodePartilhar] = useState(false);
-  // Interruptor de TESTE: deixa ver a versão Pro mesmo sem conta Pro. Remover quando o Pro estiver ligado a sério.
-  const [verPro, setVerPro] = useState(pro);
 
   useEffect(() => {
-    const c = canvasRef.current;
-    if (!c) return;
-    try { setImg(desenharCartao(c, { identity, faixa, atletas, capitao, pro: verPro })); } catch { setImg(""); }
+    ensureFonts();
+    loadHtmlToImage().catch(() => {});
     try {
-      const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean };
+      const nav = navigator as Navigator & { share?: any };
       setPodePartilhar(typeof nav.share === "function");
     } catch { setPodePartilhar(false); }
-  }, [identity, faixa, atletas, capitao, verPro]);
+    function medir() {
+      const w = previewRef.current?.clientWidth || 324;
+      setScale(w / 1080);
+    }
+    medir();
+    window.addEventListener("resize", medir);
+    return () => window.removeEventListener("resize", medir);
+  }, []);
 
-  async function dataUrlParaFicheiro(): Promise<File | null> {
-    if (!img) return null;
+  const bk = beltKey(faixa);
+  const b = BELTS[bk];
+
+  async function gerarBlob(): Promise<Blob | null> {
+    const node = cardRef.current;
+    if (!node) return null;
     try {
-      const blob = await (await fetch(img)).blob();
-      return new File([blob], "ippon-equipa.png", { type: "image/png" });
+      const h2i = await loadHtmlToImage();
+      if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch {} }
+      const blob: Blob = await h2i.toBlob(node, { width: 1080, height: 1350, pixelRatio: 1, cacheBust: true, backgroundColor: "#0c0e0d" });
+      return blob;
     } catch { return null; }
   }
+
   async function partilhar() {
-    const file = await dataUrlParaFicheiro();
-    const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean };
+    setBusy(true);
+    const blob = await gerarBlob();
+    setBusy(false);
+    if (!blob) return;
+    const file = new File([blob], "ippon-equipa.png", { type: "image/png" });
+    const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean; share?: any };
     try {
-      if (file && nav.canShare && nav.canShare({ files: [file] })) {
+      if (nav.canShare && nav.canShare({ files: [file] })) {
         await nav.share({ files: [file], title: "A minha equipa Ippon League", text: "Vê a minha equipa na Ippon League!" });
         return;
       }
-      if (nav.share) { await nav.share({ title: "Ippon League", text: "Vê a minha equipa na Ippon League!" }); }
     } catch { /* cancelado */ }
+    // fallback: descarrega
+    baixarBlob(blob);
   }
-  function guardar() {
-    if (!img) return;
+
+  async function guardar() {
+    setBusy(true);
+    const blob = await gerarBlob();
+    setBusy(false);
+    if (blob) baixarBlob(blob);
+  }
+
+  function baixarBlob(blob: Blob) {
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = img; a.download = "ippon-equipa.png";
+    a.href = url; a.download = "ippon-equipa.png";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
+
+  // monta as 8 linhas a partir dos dados reais
+  const linhas = atletas.slice(0, 8);
+
+  const cardVars = {
+    ["--accent" as any]: b.accent,
+    ["--chip-text" as any]: b.chipText,
+    ["--glow-accent" as any]: verPro ? GOLD : b.accent,
+    boxShadow: frameShadow(b, verPro),
+  } as CSSProperties;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.86)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 120 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 120, overflowY: "auto" }}>
+      <style>{CARD_CSS}</style>
       <div style={{ width: "100%", maxWidth: 360, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18, textAlign: "center" }}>
-        <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 12px", color: GOLD }}>Partilhar a equipa</h2>
+        <h2 style={{ fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 12px", color: GOLD }}>Partilhar a equipa</h2>
 
-        {/* Interruptor de TESTE — alterna a vista Normal/Pro do cartão. Remover quando o Pro estiver ligado. */}
+        {/* Interruptor de TESTE — alterna Normal/Pro. Remover quando o Pro estiver ligado a sério. */}
         <div style={{ display: "flex", gap: 6, marginBottom: 12, background: "#0c0e0d", border: "1px solid #243029", borderRadius: 10, padding: 4 }}>
           {[{ k: false, lbl: "Normal" }, { k: true, lbl: "Pro" }].map((opt) => (
-            <button
-              key={String(opt.k)}
-              onClick={() => setVerPro(opt.k)}
-              style={{
-                flex: 1, padding: "8px 0", borderRadius: 7, border: "none", cursor: "pointer",
-                fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em",
-                background: verPro === opt.k ? GOLD : "transparent",
-                color: verPro === opt.k ? "#1b211e" : "#93a39a",
-              }}
-            >
-              {opt.lbl}
-            </button>
+            <button key={String(opt.k)} onClick={() => setVerPro(opt.k)} style={{ flex: 1, padding: "8px 0", borderRadius: 7, border: "none", cursor: "pointer", fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", background: verPro === opt.k ? GOLD : "transparent", color: verPro === opt.k ? "#1b211e" : "#93a39a" }}>{opt.lbl}</button>
           ))}
         </div>
 
-        <canvas ref={canvasRef} style={{ display: "none" }} />
-        {img ? (
-          <img src={img} alt="A minha equipa" style={{ width: "100%", borderRadius: 12, marginBottom: 14 }} />
-        ) : (
-          <div style={{ padding: "40px 0", color: "#93a39a", fontSize: 13 }}>A gerar o cartão…</div>
-        )}
+        {/* Pré-visualização: o cartão real (1080px) escalado para a largura do modal. */}
+        <div ref={previewRef} style={{ width: "100%", aspectRatio: "1080 / 1350", borderRadius: 12, overflow: "hidden", marginBottom: 14, position: "relative", background: "#0c0e0d" }}>
+          <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1350, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+            <CardNode innerRef={cardRef} vars={cardVars} pro={verPro} belt={bk} beltName={b.name} identity={identity} linhas={linhas} capitao={capitao} />
+          </div>
+        </div>
+
         {podePartilhar && (
-          <button onClick={partilhar} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer", marginBottom: 10 }}>Partilhar</button>
+          <button onClick={partilhar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1, marginBottom: 10 }}>{busy ? "A gerar…" : "Partilhar"}</button>
         )}
-        <button onClick={guardar} disabled={!img} style={{ width: "100%", padding: 13, borderRadius: 12, border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: img ? "pointer" : "default", opacity: img ? 1 : 0.5 }}>Guardar imagem</button>
+        <button onClick={guardar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "A gerar…" : "Guardar imagem"}</button>
         <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer" }}>Fechar</button>
+      </div>
+    </div>
+  );
+}
+
+// O nó do cartão a 1080×1350 — é isto que o html-to-image captura.
+function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capitao }: {
+  innerRef: { current: HTMLDivElement | null };
+  vars: CSSProperties;
+  pro: boolean;
+  belt: Belt;
+  beltName: string;
+  identity: Identity;
+  linhas: Athlete[];
+  capitao: string | null;
+}) {
+  const accent = (vars as any)["--accent"] as string;
+  return (
+    <div ref={innerRef} className={`jcard belt-${belt} ${pro ? "is-pro" : ""}`} style={vars}>
+      <div className="jcard-bg" />
+      <div className="jcard-headglow" />
+      {pro && (<><div className="pro-sheen" /><div className="pro-corner tl" /><div className="pro-corner tr" /></>)}
+      <div className="jcard-inner">
+        {pro && <div className="pro-badge">★&nbsp;&nbsp;IPPON&nbsp;PRO&nbsp;&nbsp;★</div>}
+        <header className="jcard-head">
+          <div className="crest-wrap"><Escudo config={identity} size={150} /></div>
+          <div className="head-text">
+            <h1 className="team-name">{identity.name}</h1>
+            <span className="belt-pill">{beltName}</span>
+          </div>
+        </header>
+        <div className="roster">
+          {linhas.map((a, i) => {
+            const cap = capitao != null && a.id === capitao;
+            return (
+              <div key={i} className={`row ${cap ? "is-captain" : ""}`}>
+                <span className="chip">{code3(a.countryIso)}</span>
+                <span className="surname">{sobrenome(a.name)}</span>
+                <span className="weight">{a.category}KG</span>
+                {cap && <span className="cap-badge">C</span>}
+              </div>
+            );
+          })}
+        </div>
+        <footer className="jcard-foot">
+          {pro ? (
+            <>
+              <div className="foot-main pro">JOGA COM VANTAGEM.<br />SÊ IPPON PRO.</div>
+              <div className="foot-link">ippon-league.vercel.app</div>
+            </>
+          ) : (
+            <>
+              <div className="foot-main">IPPON&nbsp;LEAGUE</div>
+              <div className="foot-sub">O jogo oficial dos fãs de judô</div>
+            </>
+          )}
+        </footer>
+        <div className="dodo-medal">
+          <div className="dodo-fig"><Mascot belt={accent} expression={pro ? "sabio" : "feliz"} /></div>
+        </div>
       </div>
     </div>
   );
