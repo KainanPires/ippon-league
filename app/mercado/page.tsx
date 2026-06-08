@@ -6,6 +6,7 @@ import { loadDraftFor, saveDraftFor, setAthletePool } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
 import { competicaoDaSemana, proximaDepoisDe } from "@/lib/calendario";
+import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -98,7 +99,17 @@ export default function Mercado() {
       setCaptain(draft.captain);
       const f = localStorage.getItem(FAV_KEY);
       if (f) setFavs(JSON.parse(f));
-      if (!localStorage.getItem("ippon_market_tutorial")) setGuide(0);
+      // Guia do Mercado: só aparece se ainda não foi visto neste aparelho NEM na conta.
+      if (!tutorialVistoLocal("ippon_market_tutorial")) {
+        tutoriaisVistosConta().then((vistos) => {
+          if (!active) return;
+          if (vistos["ippon_market_tutorial"]) {
+            try { localStorage.setItem("ippon_market_tutorial", "done"); } catch {}
+          } else {
+            setGuide(0);
+          }
+        });
+      }
     } catch {}
 
     fetch(`/api/atletas?id=${COMPETICAO}`)
@@ -149,7 +160,7 @@ export default function Mercado() {
     });
   }
   function finishTutorial() {
-    try { localStorage.setItem("ippon_market_tutorial", "done"); } catch {}
+    marcarTutorialVisto("ippon_market_tutorial"); // local (este aparelho) + conta (todos)
     setGuide(null);
   }
   function clearFilters() {
