@@ -1,13 +1,22 @@
 // Gestão da equipa: rascunho (em edição) vs guardada (oficial).
-// O rascunho só passa a "guardada" quando o jogador carrega em Salvar.
+// Agora cada equipa pertence a UMA competição (id_competicao). O rascunho e a
+// equipa guardada são por competição, por isso montar para o Tahiti não mexe na
+// equipa do Ulaanbaatar. As funções antigas (sem competição) continuam a existir
+// para compatibilidade, mas as páginas devem migrar para as versões "ParaComp".
 import { ATHLETES, type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
+
 export type TeamState = { ids: string[]; captain: string | null };
+
 const DRAFT = "ippon_team_draft";
 const SAVED = "ippon_team_saved";
 const LEGACY = "ippon_team"; // versão antiga (só ids)
-const POOL = "ippon_athletes_pool"; // memória partilhada dos atletas reais (do Mercado)
 export const START_JC = 100;
+
+// Chaves por competição: "ippon_team_draft__3295".
+function draftKey(idComp?: string) { return idComp ? `${DRAFT}__${idComp}` : DRAFT; }
+function savedKey(idComp?: string) { return idComp ? `${SAVED}__${idComp}` : SAVED; }
+
 function read(key: string): TeamState | null {
   try {
     const raw = localStorage.getItem(key);
@@ -19,6 +28,8 @@ function read(key: string): TeamState | null {
     return null;
   }
 }
+
+// ---- LOCAL (sem competição — compatibilidade) -----------------------------
 export function loadDraft(): TeamState {
   return read(DRAFT) || read(LEGACY) || { ids: [], captain: null };
 }
@@ -35,32 +46,26 @@ export function commitSaved(t: TeamState) {
   } catch {}
 }
 
-/* ----------------------------------------------------------------------------
- * Memória partilhada de atletas (POOL)
- * O Mercado vai buscar os atletas reais ao /api/atletas e guarda-os aqui.
- * Todas as telas resolvem a equipa a partir desta lista (com fallback aos
- * atletas de exemplo enquanto a pool não estiver preenchida).
- * -------------------------------------------------------------------------- */
-export function setAthletePool(list: Athlete[]) {
-  try { localStorage.setItem(POOL, JSON.stringify(list)); } catch {}
+// ---- LOCAL por competição --------------------------------------------------
+export function loadDraftFor(idComp: string): TeamState {
+  return read(draftKey(idComp)) || { ids: [], captain: null };
 }
-export function getAthletePool(): Athlete[] {
+export function saveDraftFor(idComp: string, t: TeamState) {
+  try { localStorage.setItem(draftKey(idComp), JSON.stringify(t)); } catch {}
+}
+export function loadSavedFor(idComp: string): TeamState {
+  return read(savedKey(idComp)) || { ids: [], captain: null };
+}
+export function commitSavedFor(idComp: string, t: TeamState) {
   try {
-    const raw = localStorage.getItem(POOL);
-    if (raw) {
-      const p = JSON.parse(raw);
-      if (Array.isArray(p)) return p as Athlete[];
-    }
+    localStorage.setItem(savedKey(idComp), JSON.stringify(t));
+    localStorage.setItem(draftKey(idComp), JSON.stringify(t));
   } catch {}
-  return [];
 }
 
+// ---- Cálculo (igual) -------------------------------------------------------
 export function resolve(ids: string[]): Athlete[] {
-  const pool = getAthletePool();
-  const source = pool.length > 0 ? pool : ATHLETES; // atletas reais quando existirem
-  const byId = new Map<string, Athlete>();
-  for (const a of source) byId.set(a.id, a);
-  return ids.map((id) => byId.get(id)).filter(Boolean) as Athlete[];
+  return ids.map((id) => ATHLETES.find((a) => a.id === id)).filter(Boolean) as Athlete[];
 }
 export function jcLeft(t: TeamState): number {
   const a = resolve(t.ids);
@@ -84,19 +89,78 @@ export function missing(t: TeamState): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// NUVEM (Supabase) — equipa oficial ligada à conta do jogador.
+// NUVEM (Supabase) — equipa oficial ligada à conta do jogador E à competição.
 // ---------------------------------------------------------------------------
-
 export type CloudResult = { ok: boolean; error?: string };
 type TeamIdentity = { name?: string; [k: string]: unknown };
 
+/**
+ * Grava a equipa oficial de uma competição: primeiro no dispositivo (rápido),
+ * depois na conta do jogador (tabela `equipas`, uma por user+competição).
+ */
+export async function commitSavedCloudFor(idComp: string, t: TeamState, identity?: TeamIdentity): Promise<CloudResult> {
+  commitSavedFor(idComp, t);
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id as string | undefined;
+    if (!userId) return { ok: false, error: "sem sessão" };
+
+    const payload: Record<string, unknown> = {
+      user_id: userId,
+      id_competicao: idComp,
+      atletas: t.ids,
+      capitao: t.captain,
+      atualizado_em: new Date().toISOString(),
+    };
+    if (identity) {
+      if (identity.name) payload.nome = identity.name;
+      payload.escudo = identity;
+    }
+
+    const { error } = await supabase.from("equipas").upsert(payload, { onConflict: "user_id,id_competicao" });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e) {
+    const msg = (e as { message?: string })?.message || "erro desconhecido";
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * Lê a equipa oficial de uma competição guardada na conta do jogador.
+ * Devolve null se não houver sessão, se não houver equipa, ou em erro de rede.
+ */
+export async function loadSavedCloudFor(idComp: string): Promise<TeamState | null> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id as string | undefined;
+    if (!userId) return null;
+
+    const { data, error } = await supabase
+      .from("equipas")
+      .select("atletas, capitao")
+      .eq("user_id", userId)
+      .eq("id_competicao", idComp)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    const ids = Array.isArray(data.atletas) ? (data.atletas as string[]) : [];
+    const captain = (data.capitao as string | null) ?? null;
+    return { ids, captain };
+  } catch {
+    return null;
+  }
+}
+
+// ---- Cloud antigas (compatibilidade — assumem a competição atual) ----------
+// Mantidas para as páginas ainda não migradas não partirem. Internamente já não
+// devem ser a via principal; preferir as versões "...For".
 export async function commitSavedCloud(t: TeamState, identity?: TeamIdentity): Promise<CloudResult> {
   commitSaved(t);
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user?.id as string | undefined;
     if (!userId) return { ok: false, error: "sem sessão" };
-
     const payload: Record<string, unknown> = {
       user_id: userId,
       atletas: t.ids,
@@ -107,7 +171,6 @@ export async function commitSavedCloud(t: TeamState, identity?: TeamIdentity): P
       if (identity.name) payload.nome = identity.name;
       payload.escudo = identity;
     }
-
     const { error } = await supabase.from("equipas").upsert(payload, { onConflict: "user_id" });
     if (error) return { ok: false, error: error.message };
     return { ok: true };
@@ -116,21 +179,17 @@ export async function commitSavedCloud(t: TeamState, identity?: TeamIdentity): P
     return { ok: false, error: msg };
   }
 }
-
 export async function loadSavedCloud(): Promise<TeamState | null> {
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user?.id as string | undefined;
     if (!userId) return null;
-
     const { data, error } = await supabase
       .from("equipas")
       .select("atletas, capitao")
       .eq("user_id", userId)
       .maybeSingle();
-
     if (error || !data) return null;
-
     const ids = Array.isArray(data.atletas) ? (data.atletas as string[]) : [];
     const captain = (data.capitao as string | null) ?? null;
     return { ids, captain };
