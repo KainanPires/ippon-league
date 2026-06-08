@@ -6,6 +6,7 @@ import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, type TeamStat
 import { loadIdentity } from "@/components/Escudo";
 import { supabase } from "@/lib/supabase";
 import { competicaoDaSemana, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
+import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -108,9 +109,18 @@ export default function Inicio() {
         const metaName = data.session.user?.user_metadata?.nome;
         if (metaName) setName(String(metaName).split(" ")[0]);
         else if (savedName) setName(savedName);
+        // Onboarding: só auto-aparece a quem registou agora ("pending") E cuja conta
+        // ainda não o viu. Assim não volta em logins futuros nem noutro dispositivo.
         if (localStorage.getItem("ippon_onboarding") === "pending") {
-          setStep(0);
-          setPhase("tutorial");
+          tutoriaisVistosConta().then((vistos) => {
+            if (!active) return;
+            if (vistos["ippon_onboarding"]) {
+              try { localStorage.setItem("ippon_onboarding", "done"); } catch {}
+            } else {
+              setStep(0);
+              setPhase("tutorial");
+            }
+          });
         }
         // Cache local (instantâneo): tenta a competição a decorrer; senão a de mercado aberto (alvo).
         const localDecorrer = aDecorrer ? loadSavedFor(aDecorrer.idCompeticao) : { ids: [], captain: null };
@@ -163,9 +173,7 @@ export default function Inicio() {
   const glow = (n: TutTarget) => (tutTarget === n ? "iltut" : undefined);
 
   function finishOnboarding() {
-    try {
-      localStorage.setItem("ippon_onboarding", "done");
-    } catch {}
+    marcarTutorialVisto("ippon_onboarding"); // local (este aparelho) + conta (todos)
     setPhase(null);
   }
 
