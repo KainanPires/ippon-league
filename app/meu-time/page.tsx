@@ -7,7 +7,7 @@ import { loadSavedFor, resolve, jcLeft, loadSavedCloudFor, setAthletePool, type 
 import { type Athlete } from "@/lib/athletes";
 import { scoreAthlete, POINTS, type ActionType } from "@/lib/engine";
 import { supabase } from "@/lib/supabase";
-import { competicaoDaSemana, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
+import { focoMercado } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -27,11 +27,7 @@ const IOC: Record<string, string> = {
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
-// A competição a decorrer (ou a próxima). Dias até começar (a partir de hoje).
-function diasAte(c: SemanaCalendario, hoje: Date): number {
-  const ini = new Date(c.de.replace(/\//g, "-") + "T00:00:00");
-  return Math.max(0, Math.ceil((ini.getTime() - hoje.getTime()) / 86400000));
-}
+// A competição a decorrer (ou a de mercado aberto) vem de focoMercado em lib/calendario.
 
 const ACTION_LABEL: Record<ActionType, string> = {
   ippon_feito: "Ippon",
@@ -116,12 +112,11 @@ export default function MeuTime() {
   // Qual a competição a mostrar:
   // - a que está a decorrer (mercado fechado), se o jogador tiver equipa nela → modo competição (trancado);
   // - senão, a competição de mercado aberto (alvo), onde pode editar.
-  const hoje = new Date();
-  const atual = competicaoDaSemana(hoje);
-  const emAndamento = diasAte(atual, hoje) <= 0;
-  const proxima = proximaDepoisDe(atual);
-  const alvo = emAndamento ? proxima : atual;      // mercado aberto
-  const aDecorrer = emAndamento ? atual : null;    // mercado fechado, em competição
+  const foco = focoMercado();
+  const atual = foco.atual;
+  const emAndamento = foco.aDecorrer !== null; // mercado da competição da semana já fechou
+  const alvo = foco.alvo;            // mercado aberto
+  const aDecorrer = foco.aDecorrer;  // mercado fechado, em competição
   // idComp definido depois de sabermos onde há equipa (no useEffect). Começa pela alvo.
   const [idComp, setIdComp] = useState<string>(alvo.idCompeticao);
 
