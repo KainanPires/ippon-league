@@ -87,18 +87,9 @@ export default function CriarEquipa() {
     return () => { active = false; };
   }, []);
   const dirty = !sameTeam(draft, saved) && draft.ids.length > 0;
-  const [nudge, setNudge] = useState(false);
-  useEffect(() => {
-    function onBeforeUnload(e: BeforeUnloadEvent) {
-      if (dirty) { e.preventDefault(); e.returnValue = ""; }
-    }
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [dirty]);
-  function tryLeave(href: string) {
-    if (dirty) { setNudge(true); setTimeout(() => setNudge(false), 1000); return; }
-    router.push(href);
-  }
+  // O rascunho é gravado localmente a cada alteração (saveDraft), por isso sair
+  // nunca perde a escalação — navegamos sempre, sem bloquear.
+  function tryLeave(href: string) { router.push(href); }
   function update(next: TeamState) { setDraft(next); saveDraft(next); }
   function naoMostrarMais() { try { localStorage.setItem("ippon_team_tutorial", "skip"); } catch {} setGuide(null); }
   function openGuide() { setGuide("welcome"); }
@@ -217,7 +208,7 @@ export default function CriarEquipa() {
               <button onClick={() => setModal({ kind: "share" })} aria-label="Partilhar equipa" style={roundBtn("#243029", "#cfd8d2")}>
                 <ShareIcon />
               </button>
-              <button onClick={save} disabled={savingCloud} className={dirty && !savingCloud ? (nudge ? "ilsavebig" : "ilsave") : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar equipa"}</button>
+              <button onClick={save} disabled={savingCloud} className={dirty && !savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar equipa"}</button>
             </div>
           </div>
         </div>
