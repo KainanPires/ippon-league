@@ -12,11 +12,13 @@ const DRAFT = "ippon_team_draft";
 const SAVED = "ippon_team_saved";
 const LEGACY = "ippon_team"; // versão antiga (só ids)
 const POOL = "ippon_athletes_pool"; // memória partilhada dos atletas reais (do Mercado)
+const PRECOS = "ippon_team_precos"; // preço de compra por atleta (para o património)
 export const START_JC = 100;
 
 // Chaves por competição: "ippon_team_draft__3295".
 function draftKey(idComp?: string) { return idComp ? `${DRAFT}__${idComp}` : DRAFT; }
 function savedKey(idComp?: string) { return idComp ? `${SAVED}__${idComp}` : SAVED; }
+function precosKey(idComp?: string) { return idComp ? `${PRECOS}__${idComp}` : PRECOS; }
 
 function read(key: string): TeamState | null {
   try {
@@ -61,6 +63,8 @@ export function commitSavedFor(idComp: string, t: TeamState) {
   try {
     localStorage.setItem(savedKey(idComp), JSON.stringify(t));
     localStorage.setItem(draftKey(idComp), JSON.stringify(t));
+    // Guarda o preço de compra de cada atleta neste momento (para o património).
+    localStorage.setItem(precosKey(idComp), JSON.stringify(pricesOf(t)));
   } catch {}
 }
 
@@ -109,6 +113,55 @@ export function missing(t: TeamState): string[] {
   return out;
 }
 
+// ---- Preço de compra / património -----------------------------------------
+// Mapa { id_person: preço } com o preço ATUAL de cada atleta da equipa — usado
+// como "preço de compra" no momento em que a equipa é guardada.
+export function pricesOf(t: TeamState): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const a of resolve(t.ids)) out[a.id] = a.priceJc;
+  return out;
+}
+// Lê os preços de compra guardados localmente para uma competição.
+export function loadPrecosFor(idComp: string): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(precosKey(idComp));
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && typeof p === "object") return p as Record<string, number>;
+    }
+  } catch {}
+  return {};
+}
+// Lê os preços de compra guardados na nuvem (tabela equipas) para uma competição.
+export async function loadPrecosCloudFor(idComp: string): Promise<Record<string, number>> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id as string | undefined;
+    if (!userId) return {};
+    const { data, error } = await supabase
+      .from("equipas")
+      .select("precos")
+      .eq("user_id", userId)
+      .eq("id_competicao", idComp)
+      .maybeSingle();
+    if (error || !data || !data.precos || typeof data.precos !== "object") return {};
+    return data.precos as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+// Património = 100 + Σ (preço de agora − preço de compra) dos atletas da equipa.
+// Sem atletas, ou sem preços de compra, devolve exatamente START_JC (100).
+export function patrimonio(t: TeamState, precosCompra: Record<string, number>): number {
+  const atuais = resolve(t.ids);
+  let delta = 0;
+  for (const a of atuais) {
+    const compra = precosCompra[a.id];
+    if (typeof compra === "number") delta += a.priceJc - compra;
+  }
+  return Math.round((START_JC + delta) * 10) / 10;
+}
+
 // ---------------------------------------------------------------------------
 // NUVEM (Supabase) — equipa oficial ligada à conta do jogador E à competição.
 // ---------------------------------------------------------------------------
@@ -131,6 +184,7 @@ export async function commitSavedCloudFor(idComp: string, t: TeamState, identity
       id_competicao: idComp,
       atletas: t.ids,
       capitao: t.captain,
+      precos: pricesOf(t), // preço de compra de cada atleta, para o património
       atualizado_em: new Date().toISOString(),
     };
     if (identity) {
