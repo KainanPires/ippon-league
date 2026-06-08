@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
-import { loadSavedFor, resolve, loadSavedCloudFor, type TeamState } from "@/lib/team";
+import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, type TeamState } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
 import { supabase } from "@/lib/supabase";
 import { competicaoDaSemana, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
@@ -47,10 +47,8 @@ function targetForStep(step: number): TutTarget {
 }
 
 // "Tem equipa?" depende SÓ de haver ids guardados — não de conseguirmos resolver
-// os atletas. A pool de atletas vive no localStorage (vinda do Mercado) e pode não
-// estar carregada (ex.: outro dispositivo, localStorage reposto, ou ainda não passou
-// pelo Mercado nesta sessão). Nesse caso mostramos a equipa na mesma, com os números
-// em "—", em vez de mostrar por engano o convite "Cria a tua equipa".
+// os atletas. A lista de atletas (pool) vem do Mercado/servidor e pode não estar
+// carregada ainda. Quando não está, mostramos a equipa na mesma, com o Valor em "—".
 function computeTeamInfo(saved: TeamState): { name: string; value: string; last: number } | null {
   if (saved.ids.length === 0) return null; // só sem ids é que NÃO há equipa
   const athletes = resolve(saved.ids);
@@ -66,7 +64,10 @@ export default function Inicio() {
   const [phase, setPhase] = useState<"tutorial" | null>(null);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("Campeão");
-  const [teamInfo, setTeamInfo] = useState<{ name: string; value: string; last: number } | null>(null);
+  // Guardamos a EQUIPA encontrada (ids); o teamInfo é calculado ao mostrar, para
+  // atualizar o Valor quando a lista de atletas chegar.
+  const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
+  const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
 
   const beltRef = useRef<HTMLAnchorElement | null>(null);
   const teamRef = useRef<HTMLDivElement | null>(null);
@@ -84,6 +85,9 @@ export default function Inicio() {
   // A que está a decorrer (mercado fechado), se for o caso.
   const aDecorrer = emAndamento ? comp : null;
 
+  // teamInfo calculado a cada render (re-resolve quando a lista de atletas chega).
+  const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
+
   useEffect(() => {
     let active = true;
     supabase.auth.getSession().then(({ data }: { data: { session: { user?: { user_metadata?: { nome?: string } } } | null } }) => {
@@ -92,7 +96,7 @@ export default function Inicio() {
       if (!data.session) {
         // VISITANTE: sem sessão. Mostra "Campeão" + convite. NUNCA lê a equipa local.
         setVisitante(true);
-        setTeamInfo(null);
+        setSavedTeam(null);
         setReady(true);
         return;
       }
@@ -111,23 +115,38 @@ export default function Inicio() {
         // Cache local (instantâneo): tenta a competição a decorrer; senão a de mercado aberto (alvo).
         const localDecorrer = aDecorrer ? loadSavedFor(aDecorrer.idCompeticao) : { ids: [], captain: null };
         const localBase = localDecorrer.ids.length > 0 ? localDecorrer : loadSavedFor(alvo.idCompeticao);
-        const info = computeTeamInfo(localBase);
-        if (info) setTeamInfo(info);
+        if (localBase.ids.length > 0) setSavedTeam(localBase);
       } catch {}
       setReady(true);
+      // Carrega a lista de atletas das competições relevantes (mesma fonte do Mercado),
+      // para o resolve() traduzir os ids da equipa e o Valor deixar de ser "—".
+      const compsPool = aDecorrer ? [aDecorrer.idCompeticao, alvo.idCompeticao] : [alvo.idCompeticao];
+      Promise.all(
+        compsPool.map((id) => fetch(`/api/atletas?id=${id}`).then((r) => r.json()).catch(() => null))
+      ).then((resultados) => {
+        if (!active) return;
+        const merged = new Map<string, { id: string }>();
+        for (const j of resultados) {
+          const list = Array.isArray(j?.atletas) ? j.atletas : [];
+          for (const a of list) merged.set(a.id, a);
+        }
+        if (merged.size > 0) {
+          // setAthletePool espera Athlete[]; a lista do servidor já vem nesse formato.
+          setAthletePool(Array.from(merged.values()) as never);
+          bumpPool((t) => t + 1);
+        }
+      });
       // Equipa oficial da conta: a da competição a decorrer (se existir), senão a da competição de mercado aberto.
       (async () => {
         const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
         if (!active) return;
         if (naDecorrer && naDecorrer.ids.length > 0) {
-          const infoDecorrer = computeTeamInfo(naDecorrer);
-          if (infoDecorrer) setTeamInfo(infoDecorrer); // nunca apagar um estado bom com null
+          setSavedTeam(naDecorrer);
           return;
         }
         const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
-        if (!active || !naAlvo) return;
-        const infoAlvo = computeTeamInfo(naAlvo);
-        if (infoAlvo) setTeamInfo(infoAlvo); // nunca apagar um estado bom com null
+        if (!active || !naAlvo || naAlvo.ids.length === 0) return;
+        setSavedTeam(naAlvo); // nunca apagar um estado bom (só atualiza se tiver equipa)
       })();
     });
     return () => { active = false; };
