@@ -1,8 +1,16 @@
-// Mascote ornitorrinco judoca da Ippon League.
-// Expressões: feliz, determinado, comemorando, indicando, sabio (óculos).
-// A faixa muda de cor conforme o contexto.
+"use client";
 
-export type MascotExpression = "feliz" | "determinado" | "comemorando" | "indicando" | "sabio";
+// Mascot.tsx
+// Mascote ornitorrinco judoca da Ippon League — o "Dôdo".
+// Expressões: feliz, determinado, comemorando, indicando, sabio (óculos).
+// A faixa (belt) muda de cor conforme o contexto.
+
+export type MascotExpression =
+  | "feliz"
+  | "determinado"
+  | "comemorando"
+  | "indicando"
+  | "sabio";
 
 export function Mascot({
   belt = "#141110",
