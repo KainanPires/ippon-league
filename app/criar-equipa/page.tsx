@@ -7,7 +7,7 @@ import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLe
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
-import { competicaoDaSemana, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
+import { focoMercado, textoFecho } from "@/lib/calendario";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -20,12 +20,8 @@ const IOC: Record<string, string> = {
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
-// Competição vinda do Calendário Oficial. A "atual" é a da semana; se já começou,
-// escala-se para a "próxima". Dias até uma competição (a partir de hoje).
-function diasAte(c: SemanaCalendario, hoje: Date): number {
-  const ini = new Date(c.de.replace(/\//g, "-") + "T00:00:00");
-  return Math.max(0, Math.ceil((ini.getTime() - hoje.getTime()) / 86400000));
-}
+// Competição vinda do Calendário Oficial. A "atual" é a da semana; se o mercado dela
+// já fechou (início - 1h), escala-se para a "próxima". Ver focoMercado em lib/calendario.
 
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
 type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" | "leave" } | { kind: "athlete"; a: Athlete } | null;
@@ -46,22 +42,12 @@ export default function CriarEquipa() {
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const router = useRouter();
 
-  // Competição: atual (semana) e próxima. Se a atual já começou (dias<=0),
-  // o mercado dela está fechado → escala-se para a próxima.
-  const hoje = new Date();
-  const atual = competicaoDaSemana(hoje);
-  const diasAtual = diasAte(atual, hoje);
-  const emAndamento = diasAtual <= 0;
-  const proxima = proximaDepoisDe(atual);
-  const diasProxima = diasAte(proxima, hoje);
-  // A competição para a qual se ESCALA agora:
-  const alvo = emAndamento ? proxima : atual;
-  const diasAlvo = emAndamento ? diasProxima : diasAtual;
-  function rotuloDias(d: number): string {
-    if (d <= 0) return "fecha em breve";
-    if (d === 1) return "em 1 dia";
-    return `em ${d} dias`;
-  }
+  // Foco do mercado (regra única no calendário): competição-alvo (mercado aberto),
+  // a que está a decorrer (mercado fechado) e o estado para a contagem.
+  const foco = focoMercado();
+  const atual = foco.atual;
+  const emAndamento = foco.aDecorrer !== null;
+  const alvo = foco.alvo; // a competição para a qual se ESCALA agora
 
   useEffect(() => {
     let active = true;
@@ -194,7 +180,7 @@ export default function CriarEquipa() {
               <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#e2655a" }}>A decorrer agora{atual.classico ? " · Clássico" : ""}</div>
               <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, lineHeight: 1.1, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{atual.nome}</div>
               <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "6px 0 0" }}>
-                O mercado desta competição já fechou — os preços podem oscilar enquanto os atletas competem. <strong style={{ color: "#f1ede2" }}>Já podes escalar para a próxima:</strong> {proxima.nome}, {rotuloDias(diasProxima)}.
+                O mercado desta competição já fechou — os preços podem oscilar enquanto os atletas competem. <strong style={{ color: "#f1ede2" }}>Já podes escalar para a próxima:</strong> {alvo.nome} — {textoFecho(alvo)}.
               </p>
             </div>
           </div>
@@ -208,7 +194,7 @@ export default function CriarEquipa() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>A escalar para{alvo.classico ? " · Clássico" : ""}</div>
             <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{alvo.nome}</div>
-            <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>Mercado fecha {rotuloDias(diasAlvo)}</div>
+            <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{textoFecho(alvo)}</div>
           </div>
           <span style={{ background: "#1b211e", color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{alvo.nivel}</span>
         </div>
