@@ -73,6 +73,10 @@ export default function Inicio() {
   const ehClassico = comp.classico;
   const emAndamento = prox.dias <= 0; // já começou → mercado fechado
   const proxComp = proximaDepoisDe(comp); // a de mercado aberto, se a atual já começou
+  // Competição-alvo (a de mercado aberto): a "comp" se ainda não começou; senão a próxima.
+  const alvo = emAndamento ? proxComp : comp;
+  // A que está a decorrer (mercado fechado), se for o caso.
+  const aDecorrer = emAndamento ? comp : null;
 
   useEffect(() => {
     let active = true;
@@ -98,24 +102,24 @@ export default function Inicio() {
           setStep(0);
           setPhase("tutorial");
         }
-        // Cache local (instantâneo): tenta a competição a decorrer; senão a próxima.
-        const localAtual = emAndamento ? loadSavedFor(comp.idCompeticao) : { ids: [], captain: null };
-        const localBase = localAtual.ids.length > 0 ? localAtual : loadSavedFor(proxComp.idCompeticao);
+        // Cache local (instantâneo): tenta a competição a decorrer; senão a de mercado aberto (alvo).
+        const localDecorrer = aDecorrer ? loadSavedFor(aDecorrer.idCompeticao) : { ids: [], captain: null };
+        const localBase = localDecorrer.ids.length > 0 ? localDecorrer : loadSavedFor(alvo.idCompeticao);
         const info = computeTeamInfo(localBase);
         if (info) setTeamInfo(info);
       } catch {}
       setReady(true);
-      // Equipa oficial da conta: a da competição a decorrer (se existir), senão a da próxima.
+      // Equipa oficial da conta: a da competição a decorrer (se existir), senão a da competição de mercado aberto.
       (async () => {
-        const naAtual = emAndamento ? await loadSavedCloudFor(comp.idCompeticao) : null;
+        const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
         if (!active) return;
-        if (naAtual && naAtual.ids.length > 0) {
-          setTeamInfo(computeTeamInfo(naAtual));
+        if (naDecorrer && naDecorrer.ids.length > 0) {
+          setTeamInfo(computeTeamInfo(naDecorrer));
           return;
         }
-        const naProxima = await loadSavedCloudFor(proxComp.idCompeticao);
-        if (!active || !naProxima) return;
-        setTeamInfo(computeTeamInfo(naProxima));
+        const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
+        if (!active || !naAlvo) return;
+        setTeamInfo(computeTeamInfo(naAlvo));
       })();
     });
     return () => { active = false; };
