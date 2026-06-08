@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSavedFor, resolve, jcLeft, loadSavedCloudFor, type TeamState } from "@/lib/team";
+import { loadSavedFor, resolve, jcLeft, loadSavedCloudFor, setAthletePool, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { scoreAthlete, POINTS, type ActionType } from "@/lib/engine";
 import { supabase } from "@/lib/supabase";
@@ -111,6 +111,7 @@ export default function MeuTime() {
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [ready, setReady] = useState(false);
   const [sel, setSel] = useState<Athlete | null>(null);
+  const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
 
   // Qual a competição a mostrar:
   // - a que está a decorrer (mercado fechado), se o jogador tiver equipa nela → modo competição (trancado);
@@ -138,6 +139,20 @@ export default function MeuTime() {
         setIdComp(alvo.idCompeticao);
       }
     } catch {}
+    // Carrega a lista de atletas das competições relevantes (mesma fonte do Mercado).
+    // Sem isto, o resolve() não traduz os ids e a página diz "ainda não tens equipa".
+    const compsPool = aDecorrer ? [aDecorrer.idCompeticao, alvo.idCompeticao] : [alvo.idCompeticao];
+    Promise.all(
+      compsPool.map((id) => fetch(`/api/atletas?id=${id}`).then((r) => r.json()).catch(() => null))
+    ).then((resultados) => {
+      if (!active) return;
+      const merged = new Map<string, Athlete>();
+      for (const j of resultados) {
+        const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
+        for (const a of list) merged.set(a.id, a);
+      }
+      if (merged.size > 0) { setAthletePool(Array.from(merged.values())); bumpPool((t) => t + 1); }
+    });
     // Proteção de rota + equipa da nuvem (a oficial).
     supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
       if (!active) return;
@@ -168,6 +183,8 @@ export default function MeuTime() {
   if (!ready) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
 
   const athletes = resolve(team.ids);
+  const temEquipa = team.ids.length > 0;                       // há ids guardados?
+  const aCarregarAtletas = temEquipa && athletes.length === 0;  // tem ids, mas a lista ainda não resolveu
   const hasTeam = athletes.length > 0;
   const males = athletes.filter((a) => a.gender === "M");
   const females = athletes.filter((a) => a.gender === "F");
@@ -189,12 +206,17 @@ export default function MeuTime() {
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Meu Time</h1>
         </header>
 
-        {!hasTeam ? (
+        {!temEquipa ? (
           <div style={{ textAlign: "center", padding: "26px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
             <div style={{ width: 96, height: 96, margin: "0 auto 6px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Ainda não tens equipa</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 18px" }}>Monta 8 atletas com 100 Judocoins, escolhe o teu capitão e vê-os aqui prontos a competir.</p>
             <a href="/criar-equipa" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px 22px", borderRadius: 12, fontSize: 15, textDecoration: "none" }}>Montar a minha equipa</a>
+          </div>
+        ) : aCarregarAtletas ? (
+          <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
+            <div style={{ width: 80, height: 80, margin: "0 auto 8px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
+            <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>A carregar a tua equipa…</div>
           </div>
         ) : (
           <>
