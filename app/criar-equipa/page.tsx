@@ -70,16 +70,27 @@ export default function CriarEquipa() {
     temSessao().then((logado) => {
       if (!active || !logado) return;
       try {
-        setDraft(loadDraftFor(idAlvo));
-        setSaved(loadSavedFor(idAlvo));
         setIdentity(loadIdentity());
+        const localSaved = loadSavedFor(idAlvo);
+        let localDraft = loadDraftFor(idAlvo);
+        setSaved(localSaved);
+        // BUG 2: se o rascunho desta competição está vazio mas há equipa guardada
+        // localmente, parte dessa equipa — em vez de abrir o Dojo em branco.
+        if (localDraft.ids.length === 0 && localSaved.ids.length > 0) {
+          localDraft = localSaved;
+          saveDraftFor(idAlvo, localDraft);
+        }
+        setDraft(localDraft);
       } catch {}
       loadSavedCloudFor(idAlvo).then((cloud) => {
-        if (!active || !cloud) return;
+        if (!active || !cloud || cloud.ids.length === 0) return;
         setSaved(cloud);
-        const localDraft = loadDraftFor(idAlvo);
-        const localSaved = loadSavedFor(idAlvo);
-        if (sameTeam(localDraft, localSaved)) {
+        const curDraft = loadDraftFor(idAlvo);
+        const curSaved = loadSavedFor(idAlvo);
+        // Adota a equipa da nuvem como ponto de partida da edição SÓ se o utilizador
+        // ainda não começou a editar: rascunho vazio, OU rascunho igual ao guardado
+        // local (sem alterações por guardar). Assim nunca apagamos edições em curso.
+        if (curDraft.ids.length === 0 || sameTeam(curDraft, curSaved)) {
           setDraft(cloud);
           saveDraftFor(idAlvo, cloud);
           commitSavedFor(idAlvo, cloud);
