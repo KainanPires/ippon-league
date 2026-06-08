@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
-import { loadDraft, saveDraft, setAthletePool } from "@/lib/team";
+import { loadDraftFor, saveDraftFor, setAthletePool } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
 import { competicaoDaSemana, proximaDepoisDe } from "@/lib/calendario";
@@ -19,7 +19,9 @@ function competicaoAlvo(): string {
   const hoje = new Date();
   const atual = competicaoDaSemana(hoje);
   const ini = new Date(atual.de.replace(/\//g, "-") + "T00:00:00");
-  const emAndamento = hoje.getTime() >= ini.getTime();
+  // Mesma definição do Dojo: dias até começar; <= 0 significa que já começou.
+  const dias = Math.max(0, Math.ceil((ini.getTime() - hoje.getTime()) / 86400000));
+  const emAndamento = dias <= 0;
   const alvo = emAndamento ? proximaDepoisDe(atual) : atual;
   return alvo.idCompeticao;
 }
@@ -114,7 +116,7 @@ export default function Mercado() {
     let active = true;
     let draft: { ids: string[]; captain: string | null } = { ids: [], captain: null };
     try {
-      draft = loadDraft();
+      draft = loadDraftFor(COMPETICAO);
       setTeam(draft.ids);
       setCaptain(draft.captain);
       const f = localStorage.getItem(FAV_KEY);
@@ -143,7 +145,7 @@ export default function Mercado() {
             const cap = draft.captain && cleanIds.includes(draft.captain) ? draft.captain : null;
             setTeam(cleanIds);
             setCaptain(cap);
-            saveDraft({ ids: cleanIds, captain: cap });
+            saveDraftFor(COMPETICAO, { ids: cleanIds, captain: cap });
           }
         }
       })
@@ -160,7 +162,7 @@ export default function Mercado() {
     const cap = captain && next.includes(captain) ? captain : null;
     setTeam(next);
     setCaptain(cap);
-    saveDraft({ ids: next, captain: cap });
+    saveDraftFor(COMPETICAO, { ids: next, captain: cap });
   }
   function toggleFav(id: string) {
     setFavs((prev) => {
