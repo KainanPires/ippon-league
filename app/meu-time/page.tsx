@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSaved, resolve, jcLeft, loadSavedCloud, type TeamState } from "@/lib/team";
+import { loadSavedFor, resolve, jcLeft, loadSavedCloudFor, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { scoreAthlete, POINTS, type ActionType } from "@/lib/engine";
 import { supabase } from "@/lib/supabase";
+import { competicaoDaSemana, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -25,6 +26,12 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
+
+// A competição a decorrer (ou a próxima). Dias até começar (a partir de hoje).
+function diasAte(c: SemanaCalendario, hoje: Date): number {
+  const ini = new Date(c.de.replace(/\//g, "-") + "T00:00:00");
+  return Math.max(0, Math.ceil((ini.getTime() - hoje.getTime()) / 86400000));
+}
 
 const ACTION_LABEL: Record<ActionType, string> = {
   ippon_feito: "Ippon",
@@ -105,24 +112,56 @@ export default function MeuTime() {
   const [ready, setReady] = useState(false);
   const [sel, setSel] = useState<Athlete | null>(null);
 
+  // Qual a competição a mostrar:
+  // - a que está a decorrer (atual), se o jogador tiver equipa nela → modo competição;
+  // - senão, a próxima de mercado aberto.
+  const hoje = new Date();
+  const atual = competicaoDaSemana(hoje);
+  const emAndamento = diasAte(atual, hoje) <= 0;
+  const proxima = proximaDepoisDe(atual);
+  // idComp definido depois de sabermos onde há equipa (no useEffect). Começa pela atual.
+  const [idComp, setIdComp] = useState<string>(emAndamento ? atual.idCompeticao : proxima.idCompeticao);
+
   useEffect(() => {
     let active = true;
-    // Cache local primeiro (instantâneo), para não piscar.
-    try { setTeam(loadSaved()); setIdentity(loadIdentity()); } catch {}
+    // Cache local primeiro (instantâneo). Tenta a atual; se vazia e não estamos em
+    // andamento, cai para a próxima.
+    try {
+      setIdentity(loadIdentity());
+      const localAtual = loadSavedFor(atual.idCompeticao);
+      if (localAtual.ids.length > 0 && emAndamento) {
+        setTeam(localAtual);
+        setIdComp(atual.idCompeticao);
+      } else {
+        setTeam(loadSavedFor(proxima.idCompeticao));
+        setIdComp(proxima.idCompeticao);
+      }
+    } catch {}
     // Proteção de rota + equipa da nuvem (a oficial).
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
       if (!active) return;
       if (!data.session) {
         window.location.href = "/entrar";
         return;
       }
       setReady(true);
-      loadSavedCloud().then((cloud) => {
-        if (!active || !cloud) return;
-        setTeam(cloud);
-      });
+      // Regra: se há competição a decorrer e tenho equipa nela, é essa. Senão, a próxima.
+      (async () => {
+        const naAtual = emAndamento ? await loadSavedCloudFor(atual.idCompeticao) : null;
+        if (!active) return;
+        if (naAtual && naAtual.ids.length > 0) {
+          setTeam(naAtual);
+          setIdComp(atual.idCompeticao);
+          return;
+        }
+        const naProxima = await loadSavedCloudFor(proxima.idCompeticao);
+        if (!active || !naProxima) return;
+        setTeam(naProxima);
+        setIdComp(proxima.idCompeticao);
+      })();
     });
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!ready) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
@@ -135,6 +174,8 @@ export default function MeuTime() {
   const left = jcLeft(team);
   const scoreOf = (a: Athlete) => scoreAthlete(sampleActions(a), a.id === team.captain);
   const totalPts = athletes.reduce((s, a) => s + scoreOf(a), 0);
+  // Estamos a mostrar a equipa da competição a decorrer?
+  const emCompeticao = emAndamento && idComp === atual.idCompeticao && hasTeam;
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -185,28 +226,36 @@ export default function MeuTime() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={BELT_HEX} expression={MARKET_PHASE === "ao-vivo" ? "determinado" : "feliz"} /></div>
+                <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={BELT_HEX} expression={emCompeticao ? "determinado" : "feliz"} /></div>
                 <div>
                   <div style={{ fontSize: 12, color: "#93a39a" }}>
-                    {MARKET_PHASE === "aberto" ? "Mercado aberto" : MARKET_PHASE === "fechado" ? "Mercado fechado" : "A rodada está a decorrer!"}
+                    {emCompeticao ? "A rodada está a decorrer!" : "Mercado aberto"}
                   </div>
                   <div style={{ fontSize: 12, color: "#7fd1a3", fontWeight: 700, marginTop: 2 }}>
-                    {MARKET_PHASE === "fechado" ? "À espera das primeiras lutas." : `Valor da equipa: JC ${squadValue}`}
+                    {`Valor da equipa: JC ${squadValue}`}
                   </div>
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>
-                  {MARKET_PHASE === "aberto" ? `JC ${squadValue}` : MARKET_PHASE === "fechado" ? "—" : totalPts}
+                  {emCompeticao ? totalPts : `JC ${squadValue}`}
                 </div>
-                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{MARKET_PHASE === "aberto" ? "valor" : "pts"}</div>
+                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{emCompeticao ? "pts" : "valor"}</div>
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-              <a href="/criar-equipa" style={{ flex: 1, textAlign: "center", background: "transparent", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none" }}>Editar equipa</a>
-              <a href="/mercado" style={{ flex: 1, textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none" }}>Ver mercado</a>
-            </div>
+            {/* Durante a competição a decorrer (equipa trancada): só ver/partilhar, sem editar nem mercado.
+                Fora disso (mercado aberto): pode editar e ir ao mercado. */}
+            {emCompeticao ? (
+              <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
+                A tua equipa está em competição. Podes acompanhar os pontos aqui — o mercado abre de novo para a próxima rodada.
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                <a href="/criar-equipa" style={{ flex: 1, textAlign: "center", background: "transparent", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none" }}>Editar equipa</a>
+                <a href="/mercado" style={{ flex: 1, textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none" }}>Ver mercado</a>
+              </div>
+            )}
 
             <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
               Toca num atleta para veres as ações e a valorização. A pontuação ao vivo liga-se em breve.
