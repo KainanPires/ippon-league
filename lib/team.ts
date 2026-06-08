@@ -11,6 +11,7 @@ export type TeamState = { ids: string[]; captain: string | null };
 const DRAFT = "ippon_team_draft";
 const SAVED = "ippon_team_saved";
 const LEGACY = "ippon_team"; // versão antiga (só ids)
+const POOL = "ippon_athletes_pool"; // memória partilhada dos atletas reais (do Mercado)
 export const START_JC = 100;
 
 // Chaves por competição: "ippon_team_draft__3295".
@@ -63,9 +64,29 @@ export function commitSavedFor(idComp: string, t: TeamState) {
   } catch {}
 }
 
+// ---- Pool de atletas reais (preenchida pelo Mercado a partir do JudoBase) ---
+// O resolve usa esta pool quando existir; senão cai nos atletas de exemplo.
+export function setAthletePool(list: Athlete[]) {
+  try { localStorage.setItem(POOL, JSON.stringify(list)); } catch {}
+}
+export function getAthletePool(): Athlete[] {
+  try {
+    const raw = localStorage.getItem(POOL);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (Array.isArray(p)) return p as Athlete[];
+    }
+  } catch {}
+  return [];
+}
+
 // ---- Cálculo (igual) -------------------------------------------------------
 export function resolve(ids: string[]): Athlete[] {
-  return ids.map((id) => ATHLETES.find((a) => a.id === id)).filter(Boolean) as Athlete[];
+  const pool = getAthletePool();
+  const source = pool.length > 0 ? pool : ATHLETES; // atletas reais quando existirem
+  const byId = new Map<string, Athlete>();
+  for (const a of source) byId.set(a.id, a);
+  return ids.map((id) => byId.get(id)).filter(Boolean) as Athlete[];
 }
 export function jcLeft(t: TeamState): number {
   const a = resolve(t.ids);
