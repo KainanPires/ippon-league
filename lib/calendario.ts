@@ -29,6 +29,11 @@ export interface SemanaCalendario {
   de: string;            // data de início (YYYY/MM/DD) — referência da rodada
   classico: boolean;     // true = competição antiga revivida
   anoOriginal?: number;  // se clássico, o ano real da competição
+  // Hora OFICIAL de início do 1º dia de competição, em ISO 8601 COM FUSO
+  // (ex.: Tahiti UTC-10 → "2026-06-13T10:00:00-10:00"). Opcional: quando existe,
+  // o fecho do mercado e a contagem decrescente passam a ser ao minuto. Quando
+  // não existe, a app cai no comportamento por data (ver estadoMercado).
+  inicioUTC?: string;
 }
 
 // As 52 semanas de 2026. As reais (classico:false) estão confirmadas na lista
@@ -61,7 +66,12 @@ export const CALENDARIO_2026: SemanaCalendario[] = [
   { semana: 21, idCompeticao: "3224", nome: "Algiers African Open",                    nivel: "Open",          de: "2026/05/24", classico: false },
   { semana: 22, idCompeticao: "3255", nome: "Sarajevo Senior European Cup",            nivel: "European Cup",  de: "2026/05/30", classico: false },
   { semana: 23, idCompeticao: "3161", nome: "Tallinn European Open",                   nivel: "European Open", de: "2026/06/06", classico: false },
-  { semana: 24, idCompeticao: "3295", nome: "Tahiti Oceanian Open",                    nivel: "Open",          de: "2026/06/13", classico: false },
+  // Tahiti UTC-10. Sem hora oficial confirmada, usamos um DEFAULT SEGURO: 09:00 locais
+  // de início (as competições quase nunca começam antes das 9h). Com a regra "fecho =
+  // início - 1h", o mercado fecha às 08:00 locais — fecha cedo de propósito, para nunca
+  // ficar aberto depois do início real. Confirmar com o outline da IJF e corrigir só esta
+  // string. Apagar "inicioUTC" → volta ao comportamento por data.
+  { semana: 24, idCompeticao: "3295", nome: "Tahiti Oceanian Open",                    nivel: "Open",          de: "2026/06/13", classico: false, inicioUTC: "2026-06-13T09:00:00-10:00" },
   { semana: 25, idCompeticao: "3149", nome: "Ulaanbaatar Grand Slam",                  nivel: "Grand Slam",    de: "2026/06/19", classico: false },
   { semana: 26, idCompeticao: "3204", nome: "Qingdao Grand Prix",                      nivel: "Grand Prix",    de: "2026/06/26", classico: false },
   { semana: 27, idCompeticao: "2644", nome: "Paris Grand Slam 2024 — Clássico", nivel: "Grand Slam", de: "2026/07/04", classico: true, anoOriginal: 2024 },
@@ -121,4 +131,61 @@ export function proximaDepoisDe(atual: SemanaCalendario): SemanaCalendario {
 /** Lista só das competições reais (não-clássicas) — útil para o cron. */
 export function competicoesReais(): SemanaCalendario[] {
   return CALENDARIO_2026.filter((s) => !s.classico);
+}
+
+// ---------------------------------------------------------------------------
+// FECHO DE MERCADO + CONTAGEM (Live Round, passos 1a + 1b)
+// ---------------------------------------------------------------------------
+
+// O mercado fecha 1 HORA antes do início oficial da competição.
+export const FECHO_ANTES_MS = 60 * 60 * 1000;
+
+export interface EstadoMercado {
+  estado: "aberto" | "fechado"; // aberto = pode montar/editar; fechado = trancado
+  temHora: boolean;             // true se a competição tem hora oficial (inicioUTC)
+  inicio: Date | null;          // instante de início oficial (se houver hora)
+  fecho: Date | null;           // instante de fecho do mercado = início - 1h (se houver hora)
+  msAteFecho: number | null;    // ms até ao fecho (>0 aberto); null se só houver data
+}
+
+/**
+ * Estado do mercado de uma competição num dado instante.
+ * - Com hora oficial (inicioUTC): fecho = início - 1h, ao minuto.
+ * - Sem hora oficial: cai no comportamento por data (aberto até ao dia do início).
+ */
+export function estadoMercado(s: SemanaCalendario, agora: Date = new Date()): EstadoMercado {
+  if (s.inicioUTC) {
+    const inicio = new Date(s.inicioUTC);
+    const fecho = new Date(inicio.getTime() - FECHO_ANTES_MS);
+    const msAteFecho = fecho.getTime() - agora.getTime();
+    return {
+      estado: msAteFecho > 0 ? "aberto" : "fechado",
+      temHora: true,
+      inicio,
+      fecho,
+      msAteFecho,
+    };
+  }
+  // Fallback por data (sem hora confirmada): aberto enquanto não chega o dia do início.
+  const inicioDia = new Date(s.de.replace(/\//g, "-") + "T00:00:00");
+  const aberto = agora.getTime() < inicioDia.getTime();
+  return {
+    estado: aberto ? "aberto" : "fechado",
+    temHora: false,
+    inicio: inicioDia,
+    fecho: null,
+    msAteFecho: null,
+  };
+}
+
+/** Formata uma duração em ms como "5d 3h", "3h 20min" ou "12min". */
+export function formatarContagem(ms: number): string {
+  if (ms <= 0) return "fechado";
+  const totalMin = Math.floor(ms / 60000);
+  const dias = Math.floor(totalMin / (60 * 24));
+  const horas = Math.floor((totalMin % (60 * 24)) / 60);
+  const min = totalMin % 60;
+  if (dias > 0) return `${dias}d ${horas}h`;
+  if (horas > 0) return `${horas}h ${min}min`;
+  return `${min}min`;
 }
