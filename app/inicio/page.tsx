@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
-import { loadSaved, resolve, loadSavedCloud, type TeamState } from "@/lib/team";
+import { loadSavedFor, resolve, loadSavedCloudFor, type TeamState } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
 import { supabase } from "@/lib/supabase";
-import { competicaoDaSemana, type SemanaCalendario } from "@/lib/calendario";
+import { competicaoDaSemana, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -72,10 +72,11 @@ export default function Inicio() {
   const comp = prox.c;
   const ehClassico = comp.classico;
   const emAndamento = prox.dias <= 0; // já começou → mercado fechado
+  const proxComp = proximaDepoisDe(comp); // a de mercado aberto, se a atual já começou
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }: { data: { session: { user?: { user_metadata?: { nome?: string } } } | null } }) => {
       if (!active) return;
 
       if (!data.session) {
@@ -97,17 +98,28 @@ export default function Inicio() {
           setStep(0);
           setPhase("tutorial");
         }
-        const info = computeTeamInfo(loadSaved()); // cache local (instantâneo)
+        // Cache local (instantâneo): tenta a competição a decorrer; senão a próxima.
+        const localAtual = emAndamento ? loadSavedFor(comp.idCompeticao) : { ids: [], captain: null };
+        const localBase = localAtual.ids.length > 0 ? localAtual : loadSavedFor(proxComp.idCompeticao);
+        const info = computeTeamInfo(localBase);
         if (info) setTeamInfo(info);
       } catch {}
       setReady(true);
-      // Equipa oficial da conta (substitui o resumo local, se existir).
-      loadSavedCloud().then((cloud) => {
-        if (!active || !cloud) return;
-        setTeamInfo(computeTeamInfo(cloud));
-      });
+      // Equipa oficial da conta: a da competição a decorrer (se existir), senão a da próxima.
+      (async () => {
+        const naAtual = emAndamento ? await loadSavedCloudFor(comp.idCompeticao) : null;
+        if (!active) return;
+        if (naAtual && naAtual.ids.length > 0) {
+          setTeamInfo(computeTeamInfo(naAtual));
+          return;
+        }
+        const naProxima = await loadSavedCloudFor(proxComp.idCompeticao);
+        if (!active || !naProxima) return;
+        setTeamInfo(computeTeamInfo(naProxima));
+      })();
     });
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
