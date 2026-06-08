@@ -46,12 +46,18 @@ function targetForStep(step: number): TutTarget {
   return null;
 }
 
+// "Tem equipa?" depende SÓ de haver ids guardados — não de conseguirmos resolver
+// os atletas. A pool de atletas vive no localStorage (vinda do Mercado) e pode não
+// estar carregada (ex.: outro dispositivo, localStorage reposto, ou ainda não passou
+// pelo Mercado nesta sessão). Nesse caso mostramos a equipa na mesma, com os números
+// em "—", em vez de mostrar por engano o convite "Cria a tua equipa".
 function computeTeamInfo(saved: TeamState): { name: string; value: string; last: number } | null {
+  if (saved.ids.length === 0) return null; // só sem ids é que NÃO há equipa
   const athletes = resolve(saved.ids);
-  if (athletes.length === 0) return null;
+  const resolvido = athletes.length > 0;
   const value = Math.round(athletes.reduce((s, a) => s + a.priceJc, 0) * 10) / 10;
   const last = athletes.reduce((s, a) => s + a.last + (a.id === saved.captain ? a.last : 0), 0);
-  return { name: loadIdentity().name, value: String(value), last };
+  return { name: loadIdentity().name, value: resolvido ? String(value) : "—", last: resolvido ? last : 0 };
 }
 
 export default function Inicio() {
@@ -114,12 +120,14 @@ export default function Inicio() {
         const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
         if (!active) return;
         if (naDecorrer && naDecorrer.ids.length > 0) {
-          setTeamInfo(computeTeamInfo(naDecorrer));
+          const infoDecorrer = computeTeamInfo(naDecorrer);
+          if (infoDecorrer) setTeamInfo(infoDecorrer); // nunca apagar um estado bom com null
           return;
         }
         const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
         if (!active || !naAlvo) return;
-        setTeamInfo(computeTeamInfo(naAlvo));
+        const infoAlvo = computeTeamInfo(naAlvo);
+        if (infoAlvo) setTeamInfo(infoAlvo); // nunca apagar um estado bom com null
       })();
     });
     return () => { active = false; };
