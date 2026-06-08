@@ -113,28 +113,29 @@ export default function MeuTime() {
   const [sel, setSel] = useState<Athlete | null>(null);
 
   // Qual a competição a mostrar:
-  // - a que está a decorrer (atual), se o jogador tiver equipa nela → modo competição;
-  // - senão, a próxima de mercado aberto.
+  // - a que está a decorrer (mercado fechado), se o jogador tiver equipa nela → modo competição (trancado);
+  // - senão, a competição de mercado aberto (alvo), onde pode editar.
   const hoje = new Date();
   const atual = competicaoDaSemana(hoje);
   const emAndamento = diasAte(atual, hoje) <= 0;
   const proxima = proximaDepoisDe(atual);
-  // idComp definido depois de sabermos onde há equipa (no useEffect). Começa pela atual.
-  const [idComp, setIdComp] = useState<string>(emAndamento ? atual.idCompeticao : proxima.idCompeticao);
+  const alvo = emAndamento ? proxima : atual;      // mercado aberto
+  const aDecorrer = emAndamento ? atual : null;    // mercado fechado, em competição
+  // idComp definido depois de sabermos onde há equipa (no useEffect). Começa pela alvo.
+  const [idComp, setIdComp] = useState<string>(alvo.idCompeticao);
 
   useEffect(() => {
     let active = true;
-    // Cache local primeiro (instantâneo). Tenta a atual; se vazia e não estamos em
-    // andamento, cai para a próxima.
+    // Cache local primeiro (instantâneo): equipa a decorrer (se existir), senão a da alvo.
     try {
       setIdentity(loadIdentity());
-      const localAtual = loadSavedFor(atual.idCompeticao);
-      if (localAtual.ids.length > 0 && emAndamento) {
-        setTeam(localAtual);
-        setIdComp(atual.idCompeticao);
+      const localDecorrer = aDecorrer ? loadSavedFor(aDecorrer.idCompeticao) : { ids: [], captain: null };
+      if (localDecorrer.ids.length > 0 && aDecorrer) {
+        setTeam(localDecorrer);
+        setIdComp(aDecorrer.idCompeticao);
       } else {
-        setTeam(loadSavedFor(proxima.idCompeticao));
-        setIdComp(proxima.idCompeticao);
+        setTeam(loadSavedFor(alvo.idCompeticao));
+        setIdComp(alvo.idCompeticao);
       }
     } catch {}
     // Proteção de rota + equipa da nuvem (a oficial).
@@ -145,19 +146,19 @@ export default function MeuTime() {
         return;
       }
       setReady(true);
-      // Regra: se há competição a decorrer e tenho equipa nela, é essa. Senão, a próxima.
+      // Regra: se há competição a decorrer e tenho equipa nela, é essa (trancada). Senão, a de mercado aberto.
       (async () => {
-        const naAtual = emAndamento ? await loadSavedCloudFor(atual.idCompeticao) : null;
+        const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
         if (!active) return;
-        if (naAtual && naAtual.ids.length > 0) {
-          setTeam(naAtual);
-          setIdComp(atual.idCompeticao);
+        if (naDecorrer && naDecorrer.ids.length > 0 && aDecorrer) {
+          setTeam(naDecorrer);
+          setIdComp(aDecorrer.idCompeticao);
           return;
         }
-        const naProxima = await loadSavedCloudFor(proxima.idCompeticao);
-        if (!active || !naProxima) return;
-        setTeam(naProxima);
-        setIdComp(proxima.idCompeticao);
+        const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
+        if (!active || !naAlvo) return;
+        setTeam(naAlvo);
+        setIdComp(alvo.idCompeticao);
       })();
     });
     return () => { active = false; };
