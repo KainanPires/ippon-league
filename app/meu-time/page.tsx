@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSavedFor, resolve, jcLeft, loadSavedCloudFor, setAthletePool, type TeamState } from "@/lib/team";
+import { loadSavedFor, resolve, jcLeft, loadSavedCloudFor, setAthletePool, patrimonio, loadPrecosFor, loadPrecosCloudFor, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
@@ -38,6 +38,7 @@ export default function MeuTime() {
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const [pontos, setPontos] = useState<Record<string, number>>({}); // id_person -> pontos reais
   const [temResultados, setTemResultados] = useState(false);
+  const [precos, setPrecos] = useState<Record<string, number>>({}); // id_person -> preço de compra
 
   // Qual a competição a mostrar:
   // - a que está a decorrer (mercado fechado), se o jogador tiver equipa nela → modo competição (trancado);
@@ -109,6 +110,11 @@ export default function MeuTime() {
   useEffect(() => {
     let active = true;
     if (!idComp) return;
+    // Preços de compra: local primeiro (instantâneo), depois a nuvem (oficial).
+    setPrecos(loadPrecosFor(idComp));
+    loadPrecosCloudFor(idComp).then((c) => {
+      if (active && c && Object.keys(c).length > 0) setPrecos(c);
+    });
     fetch(`/api/resultados?comp=${idComp}`)
       .then((r) => r.json())
       .then((j) => {
@@ -130,6 +136,7 @@ export default function MeuTime() {
   const females = athletes.filter((a) => a.gender === "F");
   const squadValue = fmt(athletes.reduce((s, a) => s + a.priceJc, 0));
   const left = jcLeft(team);
+  const patr = patrimonio(team, precos); // 100 + Σ(preço de agora − preço de compra)
   // Pontos reais: o id do atleta é o id_person do JudoBase, igual à chave do mapa /api/resultados.
   const scoreOf = (a: Athlete) => {
     const base = pontos[a.id] ?? 0;
@@ -176,7 +183,7 @@ export default function MeuTime() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <Stat label="Património" value={`JC 100`} />
+                <Stat label="Património" value={`JC ${fmt(patr)}`} />
                 <Stat label="Saldo" value={`JC ${fmt(left)}`} />
               </div>
             </div>
