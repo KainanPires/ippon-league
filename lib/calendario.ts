@@ -189,3 +189,44 @@ export function formatarContagem(ms: number): string {
   if (horas > 0) return `${horas}h ${min}min`;
   return `${min}min`;
 }
+
+// ---------------------------------------------------------------------------
+// FOCO DO MERCADO — a regra única usada por todas as telas.
+// ---------------------------------------------------------------------------
+
+export interface FocoMercado {
+  atual: SemanaCalendario;             // competição da semana
+  alvo: SemanaCalendario;              // competição de mercado ABERTO (onde se monta)
+  aDecorrer: SemanaCalendario | null;  // competição a decorrer (mercado fechado), se houver
+  estadoAtual: EstadoMercado;          // estado do mercado da "atual"
+  estadoAlvo: EstadoMercado;           // estado do mercado da "alvo" (p/ contagem)
+}
+
+/**
+ * Decide, num dado instante, qual a competição de mercado aberto (alvo) e qual
+ * está a decorrer (aDecorrer). Regra: se o mercado da competição da semana já
+ * fechou (início - 1h), escala-se para a próxima.
+ */
+export function focoMercado(agora: Date = new Date()): FocoMercado {
+  const atual = competicaoDaSemana(agora);
+  const estadoAtual = estadoMercado(atual, agora);
+  const fechado = estadoAtual.estado === "fechado";
+  const alvo = fechado ? proximaDepoisDe(atual) : atual;
+  const aDecorrer = fechado ? atual : null;
+  const estadoAlvo = estadoMercado(alvo, agora);
+  return { atual, alvo, aDecorrer, estadoAtual, estadoAlvo };
+}
+
+/**
+ * Texto pronto para mostrar o prazo do mercado de uma competição.
+ * Usa a hora real (ao minuto) se houver `inicioUTC`; senão, conta por dias.
+ */
+export function textoFecho(s: SemanaCalendario, agora: Date = new Date()): string {
+  const e = estadoMercado(s, agora);
+  if (e.estado === "fechado") return "Mercado fechado";
+  if (e.temHora && e.msAteFecho !== null) return `Mercado fecha em ${formatarContagem(e.msAteFecho)}`;
+  const inicioDia = new Date(s.de.replace(/\//g, "-") + "T00:00:00");
+  const dias = Math.max(0, Math.ceil((inicioDia.getTime() - agora.getTime()) / 86400000));
+  if (dias <= 1) return "Mercado fecha em 1 dia";
+  return `Mercado fecha em ${dias} dias`;
+}
