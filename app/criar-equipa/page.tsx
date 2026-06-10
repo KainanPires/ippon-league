@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
-import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, setAthletePool, type TeamState } from "@/lib/team";
+import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, setAthletePool, carryOver, loadLatestSavedCloudExcept, type TeamState } from "@/lib/team";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
@@ -25,6 +25,8 @@ const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
 type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" | "leave" } | { kind: "athlete"; a: Athlete } | null;
+// Resultado do carry-over para mostrar no banner "Reescala o teu time".
+type Carry = { dropped: string[]; captainDropped: boolean } | null;
 function sameTeam(a: TeamState, b: TeamState): boolean {
   if ((a.captain || "") !== (b.captain || "")) return false;
   if (a.ids.length !== b.ids.length) return false;
@@ -39,6 +41,7 @@ export default function CriarEquipa() {
   const [savingCloud, setSavingCloud] = useState(false);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const [cloudWarn, setCloudWarn] = useState(false);
+  const [carry, setCarry] = useState<Carry>(null); // atletas que sairam no carry-over
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const router = useRouter();
 
@@ -67,14 +70,52 @@ export default function CriarEquipa() {
     } catch {}
     // Carrega a lista de atletas desta competição (mesma fonte do Mercado). Sem isto,
     // o resolve() não traduz os ids da equipa e o Dojo aparece "0/8" mesmo com equipa.
+    // Esta lista é também a de INSCRITOS usada pelo carry-over (quem não está aqui,
+    // não está inscrito nesta competição).
     fetch(`/api/atletas?id=${idAlvo}`)
       .then((r) => r.json())
       .then((j) => {
         if (!active) return;
         const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
-        if (list.length > 0) { setAthletePool(list); bumpPool((t) => t + 1); }
+        if (list.length > 0) {
+          setAthletePool(list);
+          bumpPool((t) => t + 1);
+          // CARRY-OVER: só quando esta competição ainda está MESMO vazia (sem
+          // rascunho, sem guardado local e sem nuvem) E só depois de termos a
+          // lista de inscritos. Traz a última equipa guardada e larga os não
+          // inscritos. Só semeia o rascunho — não há commit automático.
+          tryCarryOver(idAlvo, list);
+        }
       })
       .catch(() => {});
+
+    // Corre o carry-over quando a competição-alvo está vazia. `inscritos` é a
+    // lista de atletas desta competição (a pool acabada de carregar). A guarda
+    // de segurança contra inscritos vazios vive dentro de carryOver().
+    async function tryCarryOver(idComp: string, inscritos: Athlete[]) {
+      // Não mexer se já há rascunho ou equipa guardada local nesta competição.
+      const draftLocal = loadDraftFor(idComp);
+      const savedLocal = loadSavedFor(idComp);
+      if (draftLocal.ids.length > 0 || savedLocal.ids.length > 0) return;
+      if (!(await temSessao())) return;
+      // Não mexer se já existe equipa na nuvem para esta competição.
+      const cloudAlvo = await loadSavedCloudFor(idComp);
+      if (!active) return;
+      if (cloudAlvo && cloudAlvo.ids.length > 0) return;
+      // Base = última equipa guardada noutra competição.
+      const anterior = await loadLatestSavedCloudExcept(idComp);
+      if (!active || !anterior) return;
+      const inscritosIds = inscritos.map((a) => a.id);
+      const res = carryOver(anterior.team, inscritosIds);
+      // Se, entretanto, o utilizador já começou a montar, não sobrescrever.
+      const draftAgora = loadDraftFor(idComp);
+      if (draftAgora.ids.length > 0) return;
+      setDraft(res.team);
+      saveDraftFor(idComp, res.team);
+      if (res.dropped.length > 0 || res.captainDropped) {
+        setCarry({ dropped: res.dropped, captainDropped: res.captainDropped });
+      }
+    }
     temSessao().then((logado) => {
       if (!active || !logado) return;
       try {
@@ -122,7 +163,7 @@ export default function CriarEquipa() {
     update({ ...draft, captain: draft.captain === id ? null : id });
     setModal(null);
   }
-  function clearAll() { update({ ids: [], captain: null }); setModal(null); }
+  function clearAll() { update({ ids: [], captain: null }); setCarry(null); setModal(null); }
   function sell(id: string) {
     update({ ids: draft.ids.filter((x) => x !== id), captain: draft.captain === id ? null : draft.captain });
     setModal(null);
@@ -133,6 +174,7 @@ export default function CriarEquipa() {
     setSavingCloud(true);
     const res = await commitSavedCloudFor(alvo.idCompeticao, draft, identity);
     setSaved(draft);
+    setCarry(null); // a partir daqui a equipa desta competição está confirmada
     setSavingCloud(false);
     setCloudWarn(!res.ok);
     setModal({ kind: "saved" });
@@ -171,6 +213,25 @@ export default function CriarEquipa() {
           </div>
           <button onClick={openGuide} aria-label="Como montar a equipa" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
+
+        {/* Banner do carry-over: atletas da equipa anterior que não estão inscritos
+            nesta competição sairam; o JC deles já voltou pelo preço atual. */}
+        {carry && (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a2410,#10160f)", border: "1px solid #5a4a18", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", marginBottom: 10 }}>
+            <div style={{ width: 34, height: 34, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Reescala o teu time</div>
+              <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "5px 0 0" }}>
+                {carry.dropped.length === 1
+                  ? "1 atleta da tua equipa não está inscrito nesta competição e saiu."
+                  : `${carry.dropped.length} atletas da tua equipa não estão inscritos nesta competição e sairam.`}
+                {carry.captainDropped ? " O teu capitão era um deles — escolhe um novo." : ""}
+                {" "}Os JC voltaram pelo preço atual. Escala quem falta (ou refaz tudo) e guarda.
+              </p>
+              <button onClick={() => setCarry(null)} style={{ marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB, padding: 0 }}>Percebi, dispensar</button>
+            </div>
+          </div>
+        )}
 
         {/* Quando há competição a decorrer, mostra-a com aviso de que se escala para a próxima. */}
         {emAndamento && (
