@@ -163,6 +163,89 @@ export function patrimonio(t: TeamState, precosCompra: Record<string, number>): 
 }
 
 // ---------------------------------------------------------------------------
+// CARRY-OVER ENTRE COMPETIÇÕES
+// ---------------------------------------------------------------------------
+// Quando uma nova competição abre, a equipa NÃO transita sozinha: cada equipa é
+// guardada por competição e a nova começa vazia. Estas funções trazem a última
+// equipa guardada como PONTO DE PARTIDA e largam quem não está inscrito na nova.
+// Decisão (opção A): só semeamos o rascunho — NÃO há commit automático na nuvem.
+// A pessoa revê e carrega em "Salvar equipa" ("Reescala o teu time", liberdade
+// total para trocar só os que cairam ou refazer tudo). Assim nunca se grava uma
+// equipa furada (sem capitão / com menos de 8): o isComplete trata disso.
+
+export type CarryResult = {
+  team: TeamState;          // equipa já podada (só inscritos); capitão limpo se caiu
+  dropped: string[];        // ids dos atletas que sairam por não estarem inscritos
+  captainDropped: boolean;  // o capitão estava entre os que sairam
+};
+
+// Poda uma equipa-base contra os atletas INSCRITOS na competição-alvo.
+// `inscritosIds` = ids (id_person) presentes na pool da competição-alvo.
+// GUARDA DE SEGURANÇA: se a lista de inscritos vier vazia, NÃO larga ninguém
+// (evita apagar a equipa por uma falha de rede ou pool ainda não carregada).
+export function carryOver(base: TeamState, inscritosIds: string[]): CarryResult {
+  if (base.ids.length === 0 || inscritosIds.length === 0) {
+    return { team: base, dropped: [], captainDropped: false };
+  }
+  const inscritos = new Set(inscritosIds);
+  const ficam = base.ids.filter((id) => inscritos.has(id));
+  const dropped = base.ids.filter((id) => !inscritos.has(id));
+  const captainDropped = base.captain != null && !inscritos.has(base.captain);
+  return {
+    team: { ids: ficam, captain: captainDropped ? null : base.captain },
+    dropped,
+    captainDropped,
+  };
+}
+
+// A última equipa guardada na nuvem que NÃO seja a da competição-alvo (a mais
+// recente). Serve de base ao carry-over. Ordena por `atualizado_em`; se essa
+// coluna não existir no schema, tenta de novo sem ordenação (não parte nada).
+export async function loadLatestSavedCloudExcept(
+  idCompAlvo: string
+): Promise<{ team: TeamState; idComp: string } | null> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id as string | undefined;
+    if (!userId) return null;
+
+    const base = supabase
+      .from("equipas")
+      .select("atletas, capitao, id_competicao, atualizado_em")
+      .eq("user_id", userId)
+      .neq("id_competicao", idCompAlvo);
+
+    // 1ª tentativa: a mais recente por atualizado_em.
+    let resp = await base
+      .order("atualizado_em", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Se a coluna de ordenação não existir (ou outro erro), tenta sem order.
+    if (resp.error) {
+      resp = await supabase
+        .from("equipas")
+        .select("atletas, capitao, id_competicao")
+        .eq("user_id", userId)
+        .neq("id_competicao", idCompAlvo)
+        .limit(1)
+        .maybeSingle();
+    }
+
+    const data = resp.data as
+      | { atletas?: unknown; capitao?: unknown; id_competicao?: unknown }
+      | null;
+    if (resp.error || !data) return null;
+    const ids = Array.isArray(data.atletas) ? (data.atletas as string[]) : [];
+    if (ids.length === 0) return null;
+    const captain = (data.capitao as string | null) ?? null;
+    return { team: { ids, captain }, idComp: String(data.id_competicao) };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // NUVEM (Supabase) — equipa oficial ligada à conta do jogador E à competição.
 // ---------------------------------------------------------------------------
 export type CloudResult = { ok: boolean; error?: string };
