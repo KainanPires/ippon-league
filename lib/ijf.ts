@@ -4,6 +4,7 @@
  */
 
 import type { ActionType } from "@/lib/engine";
+import { scoreActions, scoreShidosSofridos, POINTS } from "@/lib/engine";
 import type { Athlete, Gender, AthleteStatus } from "@/lib/athletes";
 
 const IJF = "https://data.ijf.org/api/get_json";
@@ -232,25 +233,93 @@ export function personOnSide(f: IjfContest, side: "b" | "w"): string {
   return String(side === "b" ? f.id_person_blue : f.id_person_white || "");
 }
 
+// Lê um campo cru "ippon_b", "penalty_w", etc.
+function campo(f: IjfContest, nome: string): number {
+  return toInt((f as any)[nome]);
+}
+
+/**
+ * Ações de pontuação de um lado da luta — SEM os shidos.
+ * Os shidos (provocados e sofridos) saíram daqui porque deixaram de ter valor
+ * fixo: ver scoreContestSide(). Aqui ficam só as ações de valor fixo, que ainda
+ * passam pela tabela POINTS. O ippon sofrido/feito é incluído na mesma — quem
+ * decide ignorá-lo (caso de hansoku-make) é o scoreContestSide.
+ */
 export function contestActions(f: IjfContest, side: "b" | "w"): ActionType[] {
   const opp = side === "b" ? "w" : "b";
   const out: ActionType[] = [];
   const push = (a: ActionType, times: number) => { for (let i = 0; i < times; i++) out.push(a); };
-  push("ippon_feito", toInt((f as any)[`ippon_${side}`]));
-  push("waza_ari_feito", toInt((f as any)[`waza_${side}`]));
-  push("yuko_feito", toInt((f as any)[`yuko_${side}`]));
-  push("shido_provocado", toInt((f as any)[`penalty_${opp}`]));
-  push("ippon_sofrido", toInt((f as any)[`ippon_${opp}`]));
-  push("waza_ari_sofrido", toInt((f as any)[`waza_${opp}`]));
-  push("yuko_sofrido", toInt((f as any)[`yuko_${opp}`]));
-  push("shido_recebido", toInt((f as any)[`penalty_${side}`]));
+  push("ippon_feito", campo(f, `ippon_${side}`));
+  push("waza_ari_feito", campo(f, `waza_${side}`));
+  push("yuko_feito", campo(f, `yuko_${side}`));
+  push("ippon_sofrido", campo(f, `ippon_${opp}`));
+  push("waza_ari_sofrido", campo(f, `waza_${opp}`));
+  push("yuko_sofrido", campo(f, `yuko_${opp}`));
   return out;
+}
+
+/**
+ * Uma luta foi decidida por HANSOKU-MAKE se algum lado acumulou 3+ shidos.
+ * (Padrão observado no JudoBase: penalty>=3 + ippon ao adversário.)
+ */
+export function isHansokuMake(f: IjfContest): boolean {
+  return campo(f, "penalty_b") >= 3 || campo(f, "penalty_w") >= 3;
+}
+
+/**
+ * PONTUAÇÃO REAL de um lado da luta, com as regras de shido fechadas com o Kainan:
+ *
+ *  - Ações de valor fixo (ippon/waza/yuko, feitos e sofridos): tabela POINTS.
+ *  - SOFRER shido: custo CRESCENTE (1.º -2, 2.º -3, 3.º -4). 3 shidos = -9.
+ *  - PROVOCAR shido: +1 cada; só DOBRA (x2) se a vitória foi por hansoku-make.
+ *  - HANSOKU-MAKE: o ippon que o JudoBase regista é FANTASMA (existe só para
+ *    marcar o vencedor). Ignora-se dos DOIS lados — nem o vencedor leva +10,
+ *    nem o perdedor leva -5. Conta só os shidos.
+ *
+ * Exemplos validados:
+ *   Vitória por hansoku (3 shidos provocados): vencedor +6 (3x1 x2), perdedor -9.
+ *   Ippon a sério com 2 shidos provocados:     vencedor +12, perdedor -10.
+ *   Ippon limpo sem shidos:                    vencedor +10, perdedor -5.
+ */
+export function scoreContestSide(f: IjfContest, side: "b" | "w"): number {
+  const opp = side === "b" ? "w" : "b";
+  const hansoku = isHansokuMake(f);
+
+  // Base de valor fixo. Em hansoku-make, removemos o ippon fantasma (feito e sofrido).
+  let actions = contestActions(f, side);
+  if (hansoku) {
+    actions = actions.filter((a) => a !== "ippon_feito" && a !== "ippon_sofrido");
+  }
+  let total = scoreActions(actions);
+
+  // Shidos SOFRIDOS por este lado (penalty do próprio lado): custo crescente.
+  const shidosSofridos = campo(f, `penalty_${side}`);
+  total += scoreShidosSofridos(shidosSofridos);
+
+  // Shidos PROVOCADOS por este lado (penalty do adversário): +1 cada.
+  const shidosProvocados = campo(f, `penalty_${opp}`);
+  let provocados = shidosProvocados * POINTS["shido_provocado"];
+
+  // Dobra os provocados SÓ se este lado venceu POR hansoku-make:
+  // é hansoku na luta E quem levou os 3+ shidos foi o adversário (não este lado).
+  const esteLadoVenceuPorHansoku = hansoku && shidosSofridos < 3 && shidosProvocados >= 3;
+  if (esteLadoVenceuPorHansoku) provocados *= 2;
+  total += provocados;
+
+  return total;
 }
 
 export function contestActionsForPerson(f: IjfContest, idPerson: string): ActionType[] {
   if (String(f.id_person_blue) === idPerson) return contestActions(f, "b");
   if (String(f.id_person_white) === idPerson) return contestActions(f, "w");
   return [];
+}
+
+/** Pontuação real de um atleta numa luta, pelo seu id_person. */
+export function scoreContestForPerson(f: IjfContest, idPerson: string): number {
+  if (String(f.id_person_blue) === idPerson) return scoreContestSide(f, "b");
+  if (String(f.id_person_white) === idPerson) return scoreContestSide(f, "w");
+  return 0;
 }
 
 export function isRepechage(f: IjfContest): boolean {
