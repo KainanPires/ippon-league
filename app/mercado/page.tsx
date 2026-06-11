@@ -569,20 +569,17 @@ function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: numbe
     );
   }
 
-  const dir = (s.dir === "up" || s.dir === "down") ? s.dir : "down";
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
       <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
         <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
         <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
-          {/* Seta para CIMA: aparece ANTES do conteúdo (aponta ao topo do ecrã). */}
-          {dir === "up" && <SetaTutorial dir="up" />}
+          {/* No mercado, tudo o que se destaca está acima do balão: seta sempre para cima. */}
+          <SetaTutorial dir="up" />
           {skip}
           <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{s.t}</div>
           <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{s.x}</p>
           {controls}
-          {/* Seta para BAIXO: aparece DEPOIS do conteúdo (aponta aos cards abaixo). */}
-          {dir === "down" && <SetaTutorial dir="down" />}
         </div>
       </div>
     </div>
