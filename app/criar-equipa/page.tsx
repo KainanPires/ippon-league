@@ -204,7 +204,7 @@ export default function CriarEquipa() {
   }
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.55)}50%{box-shadow:0 0 0 8px rgba(74,144,217,0.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:10px} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilsavebig{0%{transform:scale(1)}30%{transform:scale(1.06)}60%{transform:scale(0.98)}100%{transform:scale(1)}} .ilsavebig{animation:ilsave 1.2s ease-in-out infinite, ilsavebig 0.5s ease-in-out 2} @keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite}`}</style>
+      <style>{`@keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.55)}50%{box-shadow:0 0 0 8px rgba(74,144,217,0.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:10px} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilsavebig{0%{transform:scale(1)}30%{transform:scale(1.06)}60%{transform:scale(0.98)}100%{transform:scale(1)}} .ilsavebig{animation:ilsave 1.2s ease-in-out infinite, ilsavebig 0.5s ease-in-out 2} @keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 150px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
@@ -325,28 +325,28 @@ export default function CriarEquipa() {
         </div>
       )}
       {guide === "counter" && (
-        <CoachBubble>
+        <CoachBubble dir="down">
           <p style={coachP}>Aqui em baixo, o <strong style={{ color: GOLD }}>{total}/8</strong> mostra quantos atletas já tens. Vais preenchendo até teres 8.</p>
           <button onClick={() => setGuide("slot")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
           <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
         </CoachBubble>
       )}
       {guide === "slot" && (
-        <CoachBubble>
+        <CoachBubble dir="up">
           <p style={coachP}>Toca no <strong style={{ color: "#7fb8f5" }}>lugar destacado</strong> para abrir o Mercado e contratar um atleta.</p>
           <button onClick={() => setGuide("captain")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
           <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
         </CoachBubble>
       )}
       {guide === "captain" && (
-        <CoachBubble>
+        <CoachBubble dir="up">
           <p style={coachP}>Toca num atleta já escalado para o <strong style={{ color: "#FF8F00" }}>tornares capitão</strong> (pontua a dobrar) ou para o <strong style={{ color: "#ef8d83" }}>venderes</strong>.</p>
           <button onClick={() => setGuide("actions")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
           <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
         </CoachBubble>
       )}
       {guide === "actions" && (
-        <CoachBubble>
+        <CoachBubble dir="down">
           <p style={coachP}>Em baixo: <strong style={{ color: "#ef8d83" }}>🗑 limpa</strong> a equipa, <strong style={{ color: GOLD }}>partilha</strong> o teu time e <strong style={{ color: GOLD }}>Salvar equipa</strong> guarda a escalação. Boa sorte!</p>
           <button onClick={naoMostrarMais} style={{ ...nextBtn, marginTop: 10 }}>Concluir</button>
         </CoachBubble>
@@ -468,12 +468,25 @@ const ghostBtn: React.CSSProperties = { marginTop: 10, background: "transparent"
 const nextBtn: React.CSSProperties = { background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer", alignSelf: "flex-start" };
 const skipLink: React.CSSProperties = { background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB, padding: 0, alignSelf: "flex-start" };
 const coachP: React.CSSProperties = { fontSize: 13, color: "#f1ede2", margin: 0, lineHeight: 1.45 };
-function CoachBubble({ children }: { children: React.ReactNode }) {
+function SetaCoach({ dir }: { dir: "up" | "down" }) {
+  return (
+    <div className="ilseta" style={{ display: "flex", justifyContent: "center", color: GOLD, margin: dir === "up" ? "0 0 6px" : "6px 0 0" }}>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {dir === "up" ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M5 12l7 7 7-7" />}
+      </svg>
+    </div>
+  );
+}
+function CoachBubble({ children, dir = "down" }: { children: React.ReactNode; dir?: "up" | "down" }) {
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 134, display: "flex", justifyContent: "center", padding: "0 14px", zIndex: 90 }}>
       <div style={{ width: "100%", maxWidth: 432, display: "flex", alignItems: "flex-end", gap: 10 }}>
         <div style={{ width: 64, height: 64, flexShrink: 0 }}><Mascot belt="#efeadd" expression="feliz" /></div>
-        <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", display: "flex", flexDirection: "column" }}>{children}</div>
+        <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", display: "flex", flexDirection: "column", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
+          {dir === "up" && <SetaCoach dir="up" />}
+          {children}
+          {dir === "down" && <SetaCoach dir="down" />}
+        </div>
       </div>
     </div>
   );
