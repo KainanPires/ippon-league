@@ -301,8 +301,8 @@ export default function Inicio() {
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 62, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
         <Tab label="Início" active icon={<HomeIcon />} href="/inicio" />
         <Tab label="Competições" icon={<TrophyIcon />} href="/ligas" />
+        <Tab label="Atletas" icon={<AthletesIcon />} href="/atletas" />
         <Tab label="Pro" icon={<BoltIcon />} href="/ippon-pro" />
-        <Tab label="Amigos" icon={<FriendsIcon />} />
       </nav>
 
       {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={name} target={tutTarget} />}
