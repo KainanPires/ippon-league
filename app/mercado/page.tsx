@@ -49,8 +49,8 @@ const PRICE_MAX = 20;
 // "down" = alvo abaixo (cards). A legenda não aponta para nada (central).
 const STEPS = [
   { t: "Saldo JC", x: "Estes são os Judocoins que tens para gastar. Cada atleta tem um preço — geres os teus 100 JC para montar a melhor equipa.", target: "jc", dir: "up" as const },
-  { t: "Valorização", x: "O ▲/▼ ao lado do preço mostra se o atleta está a valorizar ou a desvalorizar. Fica atento a isto: faz toda a diferença no teu património.", target: "price", dir: "down" as const },
-  { t: "Médias e pontuação", x: "A média mostra o nível típico do atleta e a 'última' a pontuação mais recente. Usa-as para descobrir quem pode render mais — e ganhar JC.", target: "scout", dir: "down" as const },
+  { t: "Valorização", x: "O ▲/▼ ao lado do preço mostra se o atleta está a valorizar ou a desvalorizar. Fica atento a isto: faz toda a diferença no teu património.", target: "price", dir: "up" as const },
+  { t: "Médias e pontuação", x: "A média mostra o nível típico do atleta e a 'última' a pontuação mais recente. Usa-as para descobrir quem pode render mais — e ganhar JC.", target: "scout", dir: "up" as const },
   { t: "Filtros e favoritos", x: "Lá em cima: a ★ mostra só os teus favoritos, e os botões Ordenar e Filtros (preço, país) ajudam-te a encontrar atletas. A ★ em cada card guarda o atleta como favorito.", target: "filters", dir: "up" as const },
   { t: "O que significam os estados", target: "legend", dir: "none" as const },
 ];
@@ -282,7 +282,7 @@ export default function Mercado() {
           </div>
 
           <div className="noscroll" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 9 }}>
-            <button onClick={() => setFavOnly((v) => !v)} aria-label="Só favoritos" style={{ flexShrink: 0, width: 46, height: 42, borderRadius: 11, border: `1.5px solid ${favOnly ? GOLD : "#2a3a33"}`, background: favOnly ? "#3a2f12" : "#121815", color: favOnly ? GOLD : "#5f6f67", fontSize: 18, cursor: "pointer" }}>★</button>
+            <button onClick={() => setFavOnly((v) => !v)} aria-label="Só favoritos" className={guide === 3 ? "glow" : undefined} style={{ flexShrink: 0, width: 46, height: 42, borderRadius: 11, border: `1.5px solid ${guide === 3 ? GOLD : favOnly ? GOLD : "#2a3a33"}`, background: favOnly ? "#3a2f12" : "#121815", color: guide === 3 || favOnly ? GOLD : "#5f6f67", fontSize: 18, cursor: "pointer" }}>★</button>
             <button onClick={() => setSheet("ord")} style={fbtn(false)}>
               <SortIcon /> {sortLabel(sort)}
             </button>
