@@ -26,6 +26,43 @@ function novoCodigo(): string {
   return s;
 }
 
+
+// Conta em quantas ligas de AMIGOS (type "amigos") o utilizador já está.
+async function contarLigasAmigos(user_id: string): Promise<number> {
+  if (!supabaseAdmin) return 0;
+  try {
+    const { data: filiacoes } = await supabaseAdmin
+      .from("league_members")
+      .select("league_id")
+      .eq("user_id", user_id);
+    const ids = (filiacoes || []).map((f) => f.league_id);
+    if (ids.length === 0) return 0;
+    const { count } = await supabaseAdmin
+      .from("leagues")
+      .select("id", { count: "exact", head: true })
+      .in("id", ids)
+      .eq("type", "amigos");
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+// É Pro? (lê do user_metadata do Auth)
+async function ehPro(user_id: string): Promise<boolean> {
+  if (!supabaseAdmin) return false;
+  try {
+    const { data } = await supabaseAdmin.auth.admin.getUserById(user_id);
+    const meta = data?.user?.user_metadata as { is_pro?: boolean } | undefined;
+    return !!meta?.is_pro;
+  } catch {
+    return false;
+  }
+}
+
+// Limite de ligas de amigos para quem não é Pro.
+const LIMITE_AMIGOS_FREE = 2;
+
 export async function POST(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação à base de dados." }, { status: 500 });
@@ -55,6 +92,19 @@ export async function POST(req: Request) {
   // Validações mínimas.
   if (!user_id) return NextResponse.json({ ok: false, erro: "Sessão em falta. Entra para criar uma liga." }, { status: 401 });
   if (nome.length < 2) return NextResponse.json({ ok: false, erro: "Dá um nome à tua liga (mínimo 2 letras)." }, { status: 400 });
+
+  // Limite: quem não é Pro só pode estar em 2 ligas de amigos.
+  const pro = await ehPro(user_id);
+  if (!pro) {
+    const quantas = await contarLigasAmigos(user_id);
+    if (quantas >= LIMITE_AMIGOS_FREE) {
+      return NextResponse.json({
+        ok: false,
+        limite: true,
+        erro: "Já estás em 2 ligas de amigos. Passa a Ippon Pro para criares e entrares em ligas ilimitadas.",
+      }, { status: 403 });
+    }
+  }
 
   // Gera um código único (tenta algumas vezes para evitar colisão rara).
   let invite_code = novoCodigo();
