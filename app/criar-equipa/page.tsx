@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
-import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, setAthletePool, carryOver, loadLatestSavedCloudExcept, type TeamState } from "@/lib/team";
+import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, setAthletePool, carryOver, loadLatestSavedCloudExcept, temNomeProprio, type TeamState } from "@/lib/team";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
@@ -24,7 +24,7 @@ const fmt = (n: number) => String(Math.round(n * 10) / 10);
 // já fechou (início - 1h), escala-se para a "próxima". Ver focoMercado em lib/calendario.
 
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
-type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" | "leave" } | { kind: "athlete"; a: Athlete } | null;
+type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" | "leave" | "precisaNome" } | { kind: "athlete"; a: Athlete } | null;
 // Resultado do carry-over para mostrar no banner "Reescala o teu time".
 type Carry = { dropped: string[]; captainDropped: boolean } | null;
 function sameTeam(a: TeamState, b: TeamState): boolean {
@@ -177,7 +177,15 @@ export default function CriarEquipa() {
     setCarry(null); // a partir daqui a equipa desta competição está confirmada
     setSavingCloud(false);
     setCloudWarn(!res.ok);
-    setModal({ kind: "saved" });
+    // FUNIL DO NOME: a equipa está guardada. Mas se o time ainda não tem nome
+    // próprio (é "A minha equipa" ou vazio), a pessoa TEM de o definir — é a sua
+    // identidade na liga. Mostramos uma notificação de saída única que a leva
+    // obrigatoriamente ao /escudo. Se já tem nome, segue o fluxo normal.
+    if (!temNomeProprio(identity)) {
+      setModal({ kind: "precisaNome" });
+    } else {
+      setModal({ kind: "saved" });
+    }
   }
   const all = resolve(draft.ids);
   const males = all.filter((a) => a.gender === "M");
@@ -372,7 +380,7 @@ export default function CriarEquipa() {
           </div>
         </div>
       )}
-            {modal?.kind === "saved" && (
+      {modal?.kind === "saved" && (
         <div style={overlayBg}>
           <div style={cardBox}>
             <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="feliz" /></div>
@@ -383,6 +391,19 @@ export default function CriarEquipa() {
                 : "A tua equipa está guardada na tua conta e pronta para competir. Boa sorte na próxima rodada!"}
             </p>
             <button onClick={() => setModal(null)} style={primaryBtn}>Fechar</button>
+          </div>
+        </div>
+      )}
+      {modal?.kind === "precisaNome" && (
+        <div style={overlayBg}>
+          <div style={cardBox}>
+            <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="feliz" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Equipa salva!</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 8px" }}>
+              Falta só um passo: <strong style={{ color: "#f1ede2" }}>dá um nome ao teu time</strong>. É a tua identidade na liga — sem ele, apareces como “A minha equipa” e ninguém te distingue.
+            </p>
+            <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5, margin: "0 0 20px" }}>Escolhe o nome e, se quiseres, o escudo. Demora 10 segundos.</p>
+            <button onClick={() => { window.location.href = "/escudo?voltar=/inicio&obrigatorio=1"; }} style={primaryBtn}>Dar nome ao meu time</button>
           </div>
         </div>
       )}
