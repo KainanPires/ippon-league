@@ -14,6 +14,12 @@ const GOLD = "#d9a441";
 const BELT = "Branca";
 const BELT_HEX = "#efeadd";
 
+// TICK AO VIVO: de quantos em quantos ms a página vai buscar os pontos novos
+// enquanto a competição decorre. 15s — numa luta de ~4min, apanha as ações sem
+// atraso percetível. Mudar aqui (15000 -> 30000 -> 60000) ajusta tudo.
+// Nota: o tick SÓ corre quando há competição a decorrer e a aba está visível.
+const TICK_AO_VIVO_MS = 15000;
+
 // Fase do mercado/competição. Já NÃO é fixa: é calculada a partir do calendário.
 // "aberto" = a montar (mostra preço) · "fechado" = à espera (mostra — — —) · "ao-vivo" = a competir (mostra pontuação)
 type MarketPhase = "aberto" | "fechado" | "ao-vivo";
@@ -39,6 +45,7 @@ export default function MeuTime() {
   const [pontos, setPontos] = useState<Record<string, number>>({}); // id_person -> pontos reais
   const [temResultados, setTemResultados] = useState(false);
   const [precos, setPrecos] = useState<Record<string, number>>({}); // id_person -> preço de compra
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null); // hora do último tick
 
   // Qual a competição a mostrar:
   // - a que está a decorrer (mercado fechado), se o jogador tiver equipa nela → modo competição (trancado);
@@ -107,23 +114,67 @@ export default function MeuTime() {
   }, []);
 
   // Pontos reais da competição que estamos a ver (atualiza quando idComp muda).
+  // TICK AO VIVO: além de buscar uma vez, repete a cada TICK_AO_VIVO_MS ENQUANTO
+  // a competição estiver a decorrer (emAndamento) e a aba estiver visível.
   useEffect(() => {
     let active = true;
     if (!idComp) return;
+
     // Preços de compra: local primeiro (instantâneo), depois a nuvem (oficial).
     setPrecos(loadPrecosFor(idComp));
     loadPrecosCloudFor(idComp).then((c) => {
       if (active && c && Object.keys(c).length > 0) setPrecos(c);
     });
-    fetch(`/api/resultados?comp=${idComp}`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (!active) return;
-        setPontos(j && j.pontos ? j.pontos : {});
-        setTemResultados(!!(j && j.tem_resultados));
-      })
-      .catch(() => {});
-    return () => { active = false; };
+
+    // Busca os pontos uma vez. Reutilizada pelo tick.
+    const buscarPontos = () => {
+      fetch(`/api/resultados?comp=${idComp}`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (!active) return;
+          setPontos(j && j.pontos ? j.pontos : {});
+          setTemResultados(!!(j && j.tem_resultados));
+          setUltimaAtualizacao(Date.now());
+        })
+        .catch(() => {});
+    };
+
+    buscarPontos(); // primeira carga, imediata
+
+    // Só liga o tick se a competição que estamos a ver está MESMO a decorrer.
+    // (Mercado aberto ou prova terminada não têm pontos novos a chegar.)
+    const aDecorrerAgora = emAndamento && idComp === atual.idCompeticao;
+    if (!aDecorrerAgora) {
+      return () => { active = false; };
+    }
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const arranca = () => {
+      if (timer) return;
+      timer = setInterval(() => {
+        // Não desperdiça chamadas se a aba estiver escondida.
+        if (typeof document !== "undefined" && document.hidden) return;
+        buscarPontos();
+      }, TICK_AO_VIVO_MS);
+    };
+    const para = () => {
+      if (timer) { clearInterval(timer); timer = null; }
+    };
+
+    arranca();
+
+    // Quando a aba volta a ficar visível, busca já (sem esperar o próximo tick).
+    const aoMudarVisibilidade = () => {
+      if (typeof document !== "undefined" && !document.hidden) buscarPontos();
+    };
+    document.addEventListener("visibilitychange", aoMudarVisibilidade);
+
+    return () => {
+      active = false;
+      para();
+      document.removeEventListener("visibilitychange", aoMudarVisibilidade);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idComp]);
 
   if (!ready) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
@@ -148,6 +199,11 @@ export default function MeuTime() {
   // Fase calculada (não fixa): se a competição que estamos a ver está a decorrer →
   // "ao-vivo" (mostra pontos e estado da chave). Senão, mercado aberto → "aberto" (mostra preços).
   const marketPhase: MarketPhase = emCompeticao ? "ao-vivo" : "aberto";
+
+  // Texto curto da hora da última atualização (só no modo ao-vivo).
+  const horaTick = ultimaAtualizacao
+    ? new Date(ultimaAtualizacao).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : null;
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -226,6 +282,12 @@ export default function MeuTime() {
             {emCompeticao ? (
               <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
                 A tua equipa está em competição. Podes acompanhar os pontos aqui — o mercado abre de novo para a próxima rodada.
+                {horaTick && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 6, fontSize: 11, color: "#7fd1a3" }}>
+                    <span className="ilp" style={{ width: 7, height: 7, borderRadius: "50%", background: "#7fd1a3" }} />
+                    Ao vivo · atualizado às {horaTick}
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
@@ -235,7 +297,7 @@ export default function MeuTime() {
             )}
 
             <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
-              Toca num atleta para veres as ações e a valorização. A pontuação ao vivo liga-se em breve.
+              Toca num atleta para veres as ações e a valorização.{emCompeticao ? " Os pontos atualizam-se sozinhos durante a rodada." : " A pontuação ao vivo liga-se na próxima competição."}
             </p>
           </>
         )}
