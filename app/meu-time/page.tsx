@@ -9,6 +9,7 @@ import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
+import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -27,6 +28,25 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
+
+// Tutorial de EDIÇÃO (mercado aberto). Todas as setas apontam para cima (os
+// elementos destacados estão acima do balão, que fica em baixo). `target` indica
+// o que pulsa em cada passo.
+const STEPS_EDICAO = [
+  { t: "Património e saldo", x: "No topo vês o teu património total e o saldo em Judocoins que ainda tens para gastar.", target: "topo" },
+  { t: "Lugares vazios", x: "Um lugar vazio leva-te ao Mercado para contratares um atleta. Preenche os 8 (4 masculinos + 4 femininas).", target: "vazio" },
+  { t: "Os teus atletas", x: "Toca num atleta para o tornares capitão (pontua a dobrar) ou para o venderes.", target: "atletas" },
+  { t: "Guardar", x: "Sempre que mudas algo, aparece o botão Salvar em baixo. Guarda para a tua equipa ficar pronta para a rodada.", target: "guardar" },
+];
+// Tutorial de COMPETIÇÃO (a decorrer). Explica o que se vê ao vivo.
+const STEPS_COMPETICAO = [
+  { t: "Pontos ao vivo", x: "Os pontos de cada atleta aparecem aqui e atualizam-se sozinhos durante a rodada.", target: "atletas" },
+  { t: "Capitão a dobrar", x: "O teu capitão tem o (C) e pontua a dobrar — repara no destaque dele.", target: "atletas" },
+  { t: "Total da equipa", x: "A pontuação total da tua equipa está aqui em baixo, e sobe à medida que os teus atletas pontuam.", target: "total" },
+  { t: "Acompanha a rodada", x: "A equipa está trancada durante a competição. Volta aqui para ver os pontos a subir!", target: "total" },
+];
+const TUT_EDICAO_KEY = "ippon_meutime_tut_edicao";
+const TUT_COMP_KEY = "ippon_meutime_tut_competicao";
 
 function sameTeam(a: TeamState, b: TeamState): boolean {
   if ((a.captain || "") !== (b.captain || "")) return false;
@@ -53,6 +73,9 @@ export default function MeuTime() {
   const [cloudWarn, setCloudWarn] = useState(false);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const [, bumpPool] = useState(0);
+  // Tutorial: passo atual (null = fechado). O conjunto de passos muda conforme o
+  // momento (edição quando mercado aberto; competição quando a decorrer).
+  const [guide, setGuide] = useState<number | null>(null);
   const router = useRouter();
 
   const foco = focoMercado();
@@ -171,6 +194,30 @@ export default function MeuTime() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idComp]);
 
+  // Modo atual (edição vs competição) para decidir qual tutorial. Calculado também
+  // aqui (antes do return) para o efeito de "primeira vez" poder usá-lo.
+  const emCompeticaoNow = emAndamento && idComp === atual.idCompeticao && team.ids.length > 0;
+
+  // TUTORIAL — primeira vez: abre automaticamente uma vez por modo. Se a pessoa
+  // pula ou escolhe "não ver mais", fica marcado e só reabre pelo "?".
+  useEffect(() => {
+    if (!ready) return;
+    const chave = emCompeticaoNow ? TUT_COMP_KEY : TUT_EDICAO_KEY;
+    let active = true;
+    if (!tutorialVistoLocal(chave)) {
+      tutoriaisVistosConta().then((vistos) => {
+        if (!active) return;
+        if (vistos[chave]) {
+          try { localStorage.setItem(chave, "done"); } catch {}
+        } else {
+          setGuide(0);
+        }
+      });
+    }
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, emCompeticaoNow]);
+
   if (!ready) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
 
   const athletes = resolve(team.ids);
@@ -192,6 +239,11 @@ export default function MeuTime() {
   // EDITÁVEL só quando NÃO está em competição (mercado aberto).
   const editavel = !emCompeticao;
   const dirty = editavel && !sameTeam(team, saved);
+
+  // Tutorial ativo conforme o momento + qual elemento destacar agora.
+  const passos = emCompeticao ? STEPS_COMPETICAO : STEPS_EDICAO;
+  const passoAtual = guide !== null ? passos[guide] : null;
+  const destaque = passoAtual?.target ?? null; // "topo" | "vazio" | "atletas" | "total" | "guardar"
 
   const horaTick = ultimaAtualizacao
     ? new Date(ultimaAtualizacao).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -242,13 +294,14 @@ export default function MeuTime() {
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes ilp{0%,100%{opacity:1}50%{opacity:.25}} .ilp{animation:ilp 1.1s ease-in-out infinite} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite}`}</style>
+      <style>{`@keyframes ilp{0%,100%{opacity:1}50%{opacity:.25}} .ilp{animation:ilp 1.1s ease-in-out infinite} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:14px} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: dirty ? "14px 14px 96px" : "14px 14px 40px" }}>
         <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
           <a href="/inicio" onClick={(e) => { e.preventDefault(); tryLeave("/inicio"); }} aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           </a>
-          <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Meu Time</h1>
+          <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>Meu Time</h1>
+          <button onClick={() => setGuide(0)} aria-label="Como funciona" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
 
         {!temEquipa ? (
@@ -273,13 +326,13 @@ export default function MeuTime() {
                   <div style={{ fontSize: 12, color: GOLD }}>Faixa {BELT}</div>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div className={destaque === "topo" ? "ilglow" : undefined} style={{ display: "flex", gap: 8, padding: 2 }}>
                 <Stat label="Património" value={`JC ${fmt(patr)}`} />
                 <Stat label="Saldo" value={`JC ${fmt(left)}`} />
               </div>
             </div>
 
-            <section style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
+            <section className={destaque === "atletas" || destaque === "vazio" ? "ilglow" : undefined} style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
               <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
                 <SectionLabel>Masculino</SectionLabel>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
@@ -294,7 +347,7 @@ export default function MeuTime() {
               </div>
             </section>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
+            <div className={destaque === "total" ? "ilglow" : undefined} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={BELT_HEX} expression={emCompeticao ? "determinado" : "feliz"} /></div>
                 <div>
@@ -434,6 +487,18 @@ export default function MeuTime() {
           onClose={() => setModal(null)}
         />
       )}
+
+      {guide !== null && passoAtual && (
+        <TutorialMeuTime
+          passos={passos}
+          step={guide}
+          setStep={setGuide}
+          onClose={() => {
+            marcarTutorialVisto(emCompeticao ? TUT_COMP_KEY : TUT_EDICAO_KEY);
+            setGuide(null);
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -558,3 +623,33 @@ const overlayBg: React.CSSProperties = { position: "fixed", inset: 0, background
 const cardBox: React.CSSProperties = { width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" };
 const primaryBtn: React.CSSProperties = { width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" };
 const ghostBtn: React.CSSProperties = { marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB };
+
+// Tutorial do Meu Time (edição ou competição). Balão em baixo, seta SEMPRE para
+// cima (os elementos destacados estão acima do balão). O elemento citado pulsa
+// via a classe ilglow aplicada no corpo da página (controlada por `destaque`).
+function TutorialMeuTime({ passos, step, setStep, onClose }: { passos: { t: string; x: string; target: string }[]; step: number; setStep: (s: number | null) => void; onClose: () => void }) {
+  const s = passos[step];
+  const total = passos.length;
+  return (
+    <div style={{ position: "fixed", left: 0, right: 0, bottom: 20, padding: "0 12px", zIndex: 100 }}>
+      <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
+        <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
+        <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
+          <div className="ilseta" style={{ display: "flex", justifyContent: "center", color: GOLD, margin: "0 0 6px" }}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+          </div>
+          <div style={{ textAlign: "right", marginBottom: 6 }}>
+            <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>Pular ✕</button>
+          </div>
+          <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{s.t}</div>
+          <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{s.x}</p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+            <button onClick={() => step > 0 && setStep(step - 1)} style={{ background: "transparent", border: "none", color: step === 0 ? "#3c463f" : "#93a39a", fontSize: 13, fontWeight: 700, cursor: step === 0 ? "default" : "pointer", fontFamily: FB }}>Anterior</button>
+            <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
+            <button onClick={() => (step === total - 1 ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{step === total - 1 ? "Concluir" : "Seguinte"}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
