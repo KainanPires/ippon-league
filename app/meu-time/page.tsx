@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, isComplete, missing, loadSavedCloudFor, setAthletePool, patrimonio, loadPrecosFor, loadPrecosCloudFor, type TeamState } from "@/lib/team";
+import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, jcLeft, isComplete, missing, loadSavedCloudFor, setAthletePool, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
@@ -66,7 +66,6 @@ export default function MeuTime() {
   const [ready, setReady] = useState(false);
   const [pontos, setPontos] = useState<Record<string, number>>({});
   const [temResultados, setTemResultados] = useState(false);
-  const [precos, setPrecos] = useState<Record<string, number>>({});
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null);
   const [modal, setModal] = useState<Modal>(null);
   const [savingCloud, setSavingCloud] = useState(false);
@@ -152,10 +151,6 @@ export default function MeuTime() {
   useEffect(() => {
     let active = true;
     if (!idComp) return;
-    setPrecos(loadPrecosFor(idComp));
-    loadPrecosCloudFor(idComp).then((c) => {
-      if (active && c && Object.keys(c).length > 0) setPrecos(c);
-    });
     const buscarPontos = () => {
       fetch(`/api/resultados?comp=${idComp}`)
         .then((r) => r.json())
@@ -227,7 +222,7 @@ export default function MeuTime() {
   const males = athletes.filter((a) => a.gender === "M");
   const females = athletes.filter((a) => a.gender === "F");
   const squadValue = fmt(athletes.reduce((s, a) => s + a.priceJc, 0));
-  const patr = patrimonio(team, precos);
+  const saldo = jcLeft(team); // o que sobra para gastar (mostrado como 'Património')
   const scoreOf = (a: Athlete) => {
     const base = pontos[a.id] ?? 0;
     return a.id === team.captain ? base * 2 : base;
@@ -328,7 +323,7 @@ export default function MeuTime() {
               <div className={destaque === "topo" ? "ilglow" : undefined} style={{ display: "flex", gap: 8, padding: 2 }}>
                 <div style={{ background: "#141a17", border: `1px solid #2a4d3e`, borderRadius: 12, padding: "8px 16px", textAlign: "right" }}>
                   <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em" }}>Património</div>
-                  <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: GOLD }}>JC {fmt(patr)}</div>
+                  <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: GOLD }}>JC {fmt(saldo)}</div>
                 </div>
               </div>
             </div>
