@@ -1,397 +1,215 @@
-// Gestão da equipa: rascunho (em edição) vs guardada (oficial).
-// Agora cada equipa pertence a UMA competição (id_competicao). O rascunho e a
-// equipa guardada são por competição, por isso montar para o Tahiti não mexe na
-// equipa do Ulaanbaatar. As funções antigas (sem competição) continuam a existir
-// para compatibilidade, mas as páginas devem migrar para as versões "ParaComp".
-import { ATHLETES, type Athlete } from "@/lib/athletes";
-import { supabase } from "@/lib/supabase";
+"use client";
 
-export type TeamState = { ids: string[]; captain: string | null };
+import { useState, useEffect, useRef } from "react";
+import { Escudo, SymbolGlyph, loadIdentity, saveIdentity, SHAPES, PATTERNS, SYMBOLS, COLORS, type Identity, type ShapeId, type PatternId, type SymbolId } from "@/components/Escudo";
+import { atualizarIdentidadeCloud } from "@/lib/team";
 
-const DRAFT = "ippon_team_draft";
-const SAVED = "ippon_team_saved";
-const LEGACY = "ippon_team"; // versão antiga (só ids)
-const POOL = "ippon_athletes_pool"; // memória partilhada dos atletas reais (do Mercado)
-const PRECOS = "ippon_team_precos"; // preço de compra por atleta (para o património)
-export const START_JC = 100;
+const FD = "var(--font-geist-mono), system-ui, sans-serif";
+const FB = "var(--font-geist-sans), system-ui, sans-serif";
+const GOLD = "#d9a441";
+const ORANGE = "#e67e22";
 
-// Chaves por competição: "ippon_team_draft__3295".
-function draftKey(idComp?: string) { return idComp ? `${DRAFT}__${idComp}` : DRAFT; }
-function savedKey(idComp?: string) { return idComp ? `${SAVED}__${idComp}` : SAVED; }
-function precosKey(idComp?: string) { return idComp ? `${PRECOS}__${idComp}` : PRECOS; }
+type Slot = "bg1" | "bg2" | "stamp1" | "stamp2" | "border";
+const SLOTS: { id: Slot; label: string }[] = [
+  { id: "bg1", label: "Fundo 1" },
+  { id: "bg2", label: "Fundo 2" },
+  { id: "stamp1", label: "Estampa 1" },
+  { id: "stamp2", label: "Estampa 2" },
+  { id: "border", label: "Borda" },
+];
 
-function read(key: string): TeamState | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
-    if (Array.isArray(p)) return { ids: p, captain: null };
-    return { ids: Array.isArray(p.ids) ? p.ids : [], captain: p.captain ?? null };
-  } catch {
-    return null;
-  }
-}
+export default function EscudoEditorPage() {
+  const [id, setId] = useState<Identity | null>(null);
+  // Lê os parâmetros do URL no cliente (sem useSearchParams, evita Suspense).
+  const [voltar, setVoltar] = useState("/inicio");
+  const [obrigatorio, setObrigatorio] = useState(false);
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      setVoltar(sp.get("voltar") || "/inicio");
+      setObrigatorio(sp.get("obrigatorio") === "1");
+    } catch {}
+  }, []);
 
-// ---- LOCAL (sem competição — compatibilidade) -----------------------------
-export function loadDraft(): TeamState {
-  return read(DRAFT) || read(LEGACY) || { ids: [], captain: null };
-}
-export function saveDraft(t: TeamState) {
-  try { localStorage.setItem(DRAFT, JSON.stringify(t)); } catch {}
-}
-export function loadSaved(): TeamState {
-  return read(SAVED) || { ids: [], captain: null };
-}
-export function commitSaved(t: TeamState) {
-  try {
-    localStorage.setItem(SAVED, JSON.stringify(t));
-    localStorage.setItem(DRAFT, JSON.stringify(t));
-  } catch {}
-}
+  const [slot, setSlot] = useState<Slot>("bg1");
+  const [erro, setErro] = useState("");
+  const [aGuardar, setAGuardar] = useState(false);
 
-// ---- LOCAL por competição --------------------------------------------------
-export function loadDraftFor(idComp: string): TeamState {
-  return read(draftKey(idComp)) || { ids: [], captain: null };
-}
-export function saveDraftFor(idComp: string, t: TeamState) {
-  try { localStorage.setItem(draftKey(idComp), JSON.stringify(t)); } catch {}
-}
-export function loadSavedFor(idComp: string): TeamState {
-  return read(savedKey(idComp)) || { ids: [], captain: null };
-}
-export function commitSavedFor(idComp: string, t: TeamState) {
-  try {
-    localStorage.setItem(savedKey(idComp), JSON.stringify(t));
-    localStorage.setItem(draftKey(idComp), JSON.stringify(t));
-    // Guarda o preço de compra de cada atleta neste momento (para o património).
-    localStorage.setItem(precosKey(idComp), JSON.stringify(pricesOf(t)));
-  } catch {}
-}
-
-// ---- Pool de atletas reais (preenchida pelo Mercado a partir do JudoBase) ---
-// O resolve usa esta pool quando existir; senão cai nos atletas de exemplo.
-export function setAthletePool(list: Athlete[]) {
-  try { localStorage.setItem(POOL, JSON.stringify(list)); } catch {}
-}
-export function getAthletePool(): Athlete[] {
-  try {
-    const raw = localStorage.getItem(POOL);
-    if (raw) {
-      const p = JSON.parse(raw);
-      if (Array.isArray(p)) return p as Athlete[];
+  useEffect(() => {
+    const carregado = loadIdentity();
+    // Se o nome ainda é o por defeito, começamos com o campo VAZIO para obrigar a escolher.
+    if ((carregado.name || "").trim().toLowerCase() === "a minha equipa") {
+      setId({ ...carregado, name: "" });
+    } else {
+      setId(carregado);
     }
-  } catch {}
-  return [];
-}
+  }, []);
 
-// ---- Cálculo (igual) -------------------------------------------------------
-export function resolve(ids: string[]): Athlete[] {
-  const pool = getAthletePool();
-  const source = pool.length > 0 ? pool : ATHLETES; // atletas reais quando existirem
-  const byId = new Map<string, Athlete>();
-  for (const a of source) byId.set(a.id, a);
-  return ids.map((id) => byId.get(id)).filter(Boolean) as Athlete[];
-}
-export function jcLeft(t: TeamState): number {
-  const a = resolve(t.ids);
-  return Math.round((START_JC - a.reduce((s, x) => s + x.priceJc, 0)) * 10) / 10;
-}
-export function counts(t: TeamState) {
-  const a = resolve(t.ids);
-  return { m: a.filter((x) => x.gender === "M").length, f: a.filter((x) => x.gender === "F").length, total: a.length };
-}
-export function isComplete(t: TeamState): boolean {
-  const c = counts(t);
-  return c.m === 4 && c.f === 4 && !!t.captain;
-}
-export function missing(t: TeamState): string[] {
-  const c = counts(t);
-  const out: string[] = [];
-  if (c.m < 4) out.push(`${4 - c.m} atleta${4 - c.m > 1 ? "s" : ""} masculino${4 - c.m > 1 ? "s" : ""}`);
-  if (c.f < 4) out.push(`${4 - c.f} atleta${4 - c.f > 1 ? "s" : ""} feminino${4 - c.f > 1 ? "s" : ""}`);
-  if (!t.captain) out.push("escolher o capitão");
-  return out;
-}
+  if (!id) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
 
-// ---- Preço de compra / património -----------------------------------------
-// Mapa { id_person: preço } com o preço ATUAL de cada atleta da equipa — usado
-// como "preço de compra" no momento em que a equipa é guardada.
-export function pricesOf(t: TeamState): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const a of resolve(t.ids)) out[a.id] = a.priceJc;
-  return out;
-}
-// Lê os preços de compra guardados localmente para uma competição.
-export function loadPrecosFor(idComp: string): Record<string, number> {
-  try {
-    const raw = localStorage.getItem(precosKey(idComp));
-    if (raw) {
-      const p = JSON.parse(raw);
-      if (p && typeof p === "object") return p as Record<string, number>;
+  function set<K extends keyof Identity>(key: K, value: Identity[K]) {
+    setId((prev) => (prev ? { ...prev, [key]: value } : prev));
+    if (key === "name") setErro("");
+  }
+  function rnd<T>(a: T[]): T { return a[Math.floor(Math.random() * a.length)]; }
+  function sortear() {
+    setId((p) => p ? { ...p, shape: rnd(SHAPES), pattern: rnd(PATTERNS).id, symbol: rnd(SYMBOLS).id, bg1: rnd(COLORS), bg2: rnd(COLORS), stamp1: rnd(COLORS), stamp2: rnd(COLORS), border: rnd(COLORS) } : p);
+  }
+
+  async function guardar() {
+    const nome = (id!.name || "").trim();
+    // NOME OBRIGATÓRIO: sem nome, não avança.
+    if (nome.length < 2) {
+      setErro("Dá um nome ao teu time para continuar.");
+      // leva o foco/scroll ao topo onde está o campo
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
     }
-  } catch {}
-  return {};
-}
-// Lê os preços de compra guardados na nuvem (tabela equipas) para uma competição.
-export async function loadPrecosCloudFor(idComp: string): Promise<Record<string, number>> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return {};
-    const { data, error } = await supabase
-      .from("equipas")
-      .select("precos")
-      .eq("user_id", userId)
-      .eq("id_competicao", idComp)
-      .maybeSingle();
-    if (error || !data || !data.precos || typeof data.precos !== "object") return {};
-    return data.precos as Record<string, number>;
-  } catch {
-    return {};
-  }
-}
-// Património = 100 + Σ (preço de agora − preço de compra) dos atletas da equipa.
-// Sem atletas, ou sem preços de compra, devolve exatamente START_JC (100).
-export function patrimonio(t: TeamState, precosCompra: Record<string, number>): number {
-  const atuais = resolve(t.ids);
-  let delta = 0;
-  for (const a of atuais) {
-    const compra = precosCompra[a.id];
-    if (typeof compra === "number") delta += a.priceJc - compra;
-  }
-  return Math.round((START_JC + delta) * 10) / 10;
-}
-
-// ---------------------------------------------------------------------------
-// CARRY-OVER ENTRE COMPETIÇÕES
-// ---------------------------------------------------------------------------
-// Quando uma nova competição abre, a equipa NÃO transita sozinha: cada equipa é
-// guardada por competição e a nova começa vazia. Estas funções trazem a última
-// equipa guardada como PONTO DE PARTIDA e largam quem não está inscrito na nova.
-// Decisão (opção A): só semeamos o rascunho — NÃO há commit automático na nuvem.
-// A pessoa revê e carrega em "Salvar equipa" ("Reescala o teu time", liberdade
-// total para trocar só os que cairam ou refazer tudo). Assim nunca se grava uma
-// equipa furada (sem capitão / com menos de 8): o isComplete trata disso.
-
-export type CarryResult = {
-  team: TeamState;          // equipa já podada (só inscritos); capitão limpo se caiu
-  dropped: string[];        // ids dos atletas que sairam por não estarem inscritos
-  captainDropped: boolean;  // o capitão estava entre os que sairam
-};
-
-// Poda uma equipa-base contra os atletas INSCRITOS na competição-alvo.
-// `inscritosIds` = ids (id_person) presentes na pool da competição-alvo.
-// GUARDA DE SEGURANÇA: se a lista de inscritos vier vazia, NÃO larga ninguém
-// (evita apagar a equipa por uma falha de rede ou pool ainda não carregada).
-export function carryOver(base: TeamState, inscritosIds: string[]): CarryResult {
-  if (base.ids.length === 0 || inscritosIds.length === 0) {
-    return { team: base, dropped: [], captainDropped: false };
-  }
-  const inscritos = new Set(inscritosIds);
-  const ficam = base.ids.filter((id) => inscritos.has(id));
-  const dropped = base.ids.filter((id) => !inscritos.has(id));
-  const captainDropped = base.captain != null && !inscritos.has(base.captain);
-  return {
-    team: { ids: ficam, captain: captainDropped ? null : base.captain },
-    dropped,
-    captainDropped,
-  };
-}
-
-// A última equipa guardada na nuvem que NÃO seja a da competição-alvo (a mais
-// recente). Serve de base ao carry-over. Ordena por `atualizado_em`; se essa
-// coluna não existir no schema, tenta de novo sem ordenação (não parte nada).
-export async function loadLatestSavedCloudExcept(
-  idCompAlvo: string
-): Promise<{ team: TeamState; idComp: string } | null> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return null;
-
-    const base = supabase
-      .from("equipas")
-      .select("atletas, capitao, id_competicao, atualizado_em")
-      .eq("user_id", userId)
-      .neq("id_competicao", idCompAlvo);
-
-    // 1ª tentativa: a mais recente por atualizado_em.
-    let resp = await base
-      .order("atualizado_em", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    // Se a coluna de ordenação não existir (ou outro erro), tenta sem order.
-    if (resp.error) {
-      resp = await supabase
-        .from("equipas")
-        .select("atletas, capitao, id_competicao")
-        .eq("user_id", userId)
-        .neq("id_competicao", idCompAlvo)
-        .limit(1)
-        .maybeSingle();
+    setAGuardar(true);
+    const identidade = { ...id!, name: nome };
+    // 1) Local (rápido, para o resto da app ver já).
+    saveIdentity(identidade);
+    // 2) Nuvem: propaga o nome/escudo para todas as equipas (para a liga ver).
+    try {
+      await atualizarIdentidadeCloud(identidade);
+    } catch {
+      // mesmo que a nuvem falhe, o local foi guardado; seguimos.
     }
-
-    const data = resp.data as
-      | { atletas?: unknown; capitao?: unknown; id_competicao?: unknown }
-      | null;
-    if (resp.error || !data) return null;
-    const ids = Array.isArray(data.atletas) ? (data.atletas as string[]) : [];
-    if (ids.length === 0) return null;
-    const captain = (data.capitao as string | null) ?? null;
-    return { team: { ids, captain }, idComp: String(data.id_competicao) };
-  } catch {
-    return null;
+    // 3) Regresso inteligente: de onde a pessoa veio.
+    window.location.href = voltar;
   }
+
+  const nomeVazio = (id.name || "").trim().length < 2;
+
+  return (
+    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "0 0 110px" }}>
+        <header style={{ display: "flex", alignItems: "center", gap: 11, padding: "14px 16px" }}>
+          {/* Se for obrigatório (veio do funil), não há seta de fuga — só se conclui dando o nome. */}
+          {obrigatorio ? (
+            <span style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#3a463f", flexShrink: 0 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+            </span>
+          ) : (
+            <a href={voltar} aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+            </a>
+          )}
+          <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Personalizar escudo</h1>
+        </header>
+
+        {obrigatorio && (
+          <div style={{ margin: "0 16px 8px", background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 18 }}>🥋</span>
+            <div style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45 }}>Falta só um passo: <span style={{ color: GOLD, fontWeight: 700 }}>dá um nome ao teu time</span> para concluíres.</div>
+          </div>
+        )}
+
+        <div style={{ background: "radial-gradient(circle at 50% 28%, #173029, #0c0e0d 72%)", borderTop: "1px solid #1a221d", borderBottom: "1px solid #1a221d", padding: "18px 16px 14px", textAlign: "center" }}>
+          <div style={{ filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.5))", display: "inline-block" }}>
+            <Escudo config={{ ...id, name: id.name || "A minha equipa" }} size={128} />
+          </div>
+          <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", marginTop: 8, wordBreak: "break-word", color: nomeVazio ? "#5f6f67" : "#f1ede2" }}>{id.name.trim() || "Sem nome"}</div>
+          <button onClick={sortear} style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 7, background: "transparent", border: "none", color: "#7fd1a3", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", cursor: "pointer" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
+            Sortear
+          </button>
+        </div>
+
+        <div style={{ padding: "18px 16px 0" }}>
+          <Label>Nome do time <span style={{ color: GOLD }}>*</span></Label>
+          <input value={id.name} onChange={(e) => set("name", e.target.value.slice(0, 24))} placeholder="Escreve o nome da tua equipa"
+            style={{ width: "100%", boxSizing: "border-box", background: "#141a17", border: `1px solid ${erro ? "#c0392b" : "#243029"}`, borderRadius: 12, padding: "12px 14px", color: "#f1ede2", fontSize: 15, fontFamily: FB, outline: "none", marginBottom: erro ? 8 : 24 }} />
+          {erro && <div style={{ fontSize: 12.5, color: "#ef8d83", marginBottom: 20, fontWeight: 700 }}>{erro}</div>}
+
+          <CenterLabel>Escolher forma</CenterLabel>
+          <ScrollRow>
+            {SHAPES.map((s) => (
+              <Thumb key={s} on={id.shape === s} onClick={() => set("shape", s as ShapeId)}>
+                <Escudo config={{ ...id, shape: s as ShapeId }} size={40} />
+              </Thumb>
+            ))}
+          </ScrollRow>
+
+          <CenterLabel>Escolher estampa</CenterLabel>
+          <ScrollRow>
+            {PATTERNS.map((p) => (
+              <Thumb key={p.id} on={id.pattern === p.id} onClick={() => set("pattern", p.id as PatternId)}>
+                <Escudo config={{ ...id, shape: "circle", pattern: p.id as PatternId }} size={40} />
+              </Thumb>
+            ))}
+          </ScrollRow>
+
+          <CenterLabel>Escolher cores</CenterLabel>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 14, marginBottom: 14 }}>
+            {SLOTS.map((s) => (
+              <div key={s.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                <div style={{ fontSize: 10.5, color: slot === s.id ? GOLD : "#93a39a", fontWeight: 700 }}>{s.label}</div>
+                <button onClick={() => setSlot(s.id)} aria-label={s.label} style={{ width: 42, height: 42, borderRadius: "50%", background: id[s.id], border: `2px solid ${slot === s.id ? GOLD : "rgba(255,255,255,0.25)"}`, boxShadow: slot === s.id ? `0 0 0 3px rgba(217,164,65,0.35)` : "none", cursor: "pointer" }} />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10, marginBottom: 24 }}>
+            {COLORS.map((c) => {
+              const on = id[slot].toLowerCase() === c.toLowerCase();
+              return <button key={c} onClick={() => set(slot, c)} aria-label={c} style={{ width: 34, height: 34, borderRadius: "50%", background: c, border: `2px solid ${on ? "#f1ede2" : "rgba(255,255,255,0.18)"}`, boxShadow: on ? `0 0 0 2px ${GOLD}` : "none", cursor: "pointer" }} />;
+            })}
+          </div>
+
+          <CenterLabel>Escolher adorno</CenterLabel>
+          <ScrollRow>
+            {SYMBOLS.map((s) => (
+              <Thumb key={s.id} on={id.symbol === s.id} onClick={() => set("symbol", s.id as SymbolId)}>
+                {s.id === "none" ? <span style={{ color: "#7c8a82", fontSize: 13 }}>—</span> : <svg viewBox="0 0 24 24" width={22} height={22}><SymbolGlyph id={s.id as SymbolId} color="#f1ede2" /></svg>}
+              </Thumb>
+            ))}
+          </ScrollRow>
+        </div>
+      </div>
+
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "12px 16px", zIndex: 50 }}>
+        <div style={{ maxWidth: 460, margin: "0 auto" }}>
+          <button onClick={guardar} disabled={aGuardar} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: nomeVazio ? "#3a2f12" : ORANGE, color: nomeVazio ? GOLD : "#1b0f06", fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", cursor: aGuardar ? "default" : "pointer" }}>
+            {aGuardar ? "A guardar…" : nomeVazio ? "Dá um nome para salvar" : "Salvar escudo"}
+          </button>
+        </div>
+      </div>
+    </main>
+  );
 }
 
-// ---------------------------------------------------------------------------
-// NUVEM (Supabase) — equipa oficial ligada à conta do jogador E à competição.
-// ---------------------------------------------------------------------------
-export type CloudResult = { ok: boolean; error?: string };
-type TeamIdentity = { name?: string; [k: string]: unknown };
-
-/**
- * Grava a equipa oficial de uma competição: primeiro no dispositivo (rápido),
- * depois na conta do jogador (tabela `equipas`, uma por user+competição).
- */
-export async function commitSavedCloudFor(idComp: string, t: TeamState, identity?: TeamIdentity): Promise<CloudResult> {
-  commitSavedFor(idComp, t);
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return { ok: false, error: "sem sessão" };
-
-    const payload: Record<string, unknown> = {
-      user_id: userId,
-      id_competicao: idComp,
-      atletas: t.ids,
-      capitao: t.captain,
-      precos: pricesOf(t), // preço de compra de cada atleta, para o património
-      atualizado_em: new Date().toISOString(),
-    };
-    if (identity) {
-      if (identity.name) payload.nome = identity.name;
-      payload.escudo = identity;
-    }
-
-    const { error } = await supabase.from("equipas").upsert(payload, { onConflict: "user_id,id_competicao" });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
-  } catch (e) {
-    const msg = (e as { message?: string })?.message || "erro desconhecido";
-    return { ok: false, error: msg };
-  }
+function Label({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 9 }}>{children}</div>;
 }
-
-/**
- * Lê a equipa oficial de uma competição guardada na conta do jogador.
- * Devolve null se não houver sessão, se não houver equipa, ou em erro de rede.
- */
-export async function loadSavedCloudFor(idComp: string): Promise<TeamState | null> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return null;
-
-    const { data, error } = await supabase
-      .from("equipas")
-      .select("atletas, capitao")
-      .eq("user_id", userId)
-      .eq("id_competicao", idComp)
-      .maybeSingle();
-
-    if (error || !data) return null;
-    const ids = Array.isArray(data.atletas) ? (data.atletas as string[]) : [];
-    const captain = (data.capitao as string | null) ?? null;
-    return { ids, captain };
-  } catch {
-    return null;
-  }
+function CenterLabel({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cfd8d2", textAlign: "center", marginBottom: 12 }}>{children}</div>;
 }
-
-// ---- Cloud antigas (compatibilidade — assumem a competição atual) ----------
-// Mantidas para as páginas ainda não migradas não partirem. Internamente já não
-// devem ser a via principal; preferir as versões "...For".
-export async function commitSavedCloud(t: TeamState, identity?: TeamIdentity): Promise<CloudResult> {
-  commitSaved(t);
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return { ok: false, error: "sem sessão" };
-    const payload: Record<string, unknown> = {
-      user_id: userId,
-      atletas: t.ids,
-      capitao: t.captain,
-      atualizado_em: new Date().toISOString(),
-    };
-    if (identity) {
-      if (identity.name) payload.nome = identity.name;
-      payload.escudo = identity;
-    }
-    const { error } = await supabase.from("equipas").upsert(payload, { onConflict: "user_id" });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
-  } catch (e) {
-    const msg = (e as { message?: string })?.message || "erro desconhecido";
-    return { ok: false, error: msg };
-  }
+function Thumb({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} style={{ flex: "0 0 auto", width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", background: on ? "#16201b" : "#121815", border: `2px solid ${on ? GOLD : "#243029"}`, borderRadius: "50%", cursor: "pointer" }}>
+      {children}
+    </button>
+  );
 }
-export async function loadSavedCloud(): Promise<TeamState | null> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return null;
-    const { data, error } = await supabase
-      .from("equipas")
-      .select("atletas, capitao")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (error || !data) return null;
-    const ids = Array.isArray(data.atletas) ? (data.atletas as string[]) : [];
-    const captain = (data.capitao as string | null) ?? null;
-    return { ids, captain };
-  } catch {
-    return null;
-  }
+function ScrollRow({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const go = (dir: number) => { if (ref.current) ref.current.scrollBy({ left: dir * 150, behavior: "smooth" }); };
+  return (
+    <div style={{ position: "relative", marginBottom: 22 }}>
+      <Arrow side="left" onClick={() => go(-1)} />
+      <div ref={ref} style={{ display: "flex", gap: 9, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", padding: "2px 34px" }}>
+        {children}
+      </div>
+      <Arrow side="right" onClick={() => go(1)} />
+    </div>
+  );
 }
-
-// ---------------------------------------------------------------------------
-// IDENTIDADE (nome + escudo) — propagar para a tabela `equipas`.
-// ---------------------------------------------------------------------------
-// O ecrã /escudo guardava o nome só no localStorage; a liga lê o nome da
-// tabela `equipas`. Esta função actualiza o `nome` e o `escudo` em TODAS as
-// linhas de equipa da conta, para que qualquer competição (e a liga) mostrem
-// o nome certo. Se a conta ainda não tem nenhuma equipa, não há nada a
-// actualizar — o nome chega à `equipas` quando a 1ª equipa for guardada (o
-// commitSavedCloudFor já leva a identidade).
-export async function atualizarIdentidadeCloud(identity: TeamIdentity): Promise<CloudResult> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return { ok: false, error: "sem sessão" };
-
-    const nome = (identity.name || "").toString().trim();
-    const campos: Record<string, unknown> = { escudo: identity };
-    if (nome) campos.nome = nome;
-
-    // Actualiza todas as linhas de equipa desta conta.
-    const { error } = await supabase
-      .from("equipas")
-      .update(campos)
-      .eq("user_id", userId);
-
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
-  } catch (e) {
-    const msg = (e as { message?: string })?.message || "erro desconhecido";
-    return { ok: false, error: msg };
-  }
-}
-
-// Esta conta já tem alguma equipa com nome próprio (≠ "A minha equipa")?
-// Usado pelo Dojo para decidir se obriga a pessoa a dar nome ao time.
-export function temNomeProprio(identity: TeamIdentity): boolean {
-  const nome = (identity.name || "").toString().trim();
-  return nome.length > 0 && nome.toLowerCase() !== "a minha equipa";
+function Arrow({ side, onClick }: { side: "left" | "right"; onClick: () => void }) {
+  return (
+    <button onClick={onClick} aria-label={side === "left" ? "Anterior" : "Seguinte"} style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", [side]: 0, width: 30, height: 30, borderRadius: "50%", background: "rgba(15,20,17,0.92)", border: "1px solid #2a3a33", color: "#f1ede2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 2 } as React.CSSProperties}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d={side === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
+      </svg>
+    </button>
+  );
 }
