@@ -49,9 +49,29 @@ function round1(n: number): number {
 /**
  * Soma os pontos de uma lista de ações.
  * As ações são acumulativas: yuko + waza-ari + ippon = 2 + 4 + 10 = 16.
+ *
+ * NOTA: os SHIDOS já não passam por aqui. O custo de quem sofre shido é
+ * CRESCENTE (1.º -2, 2.º -3, 3.º -4) e o de quem provoca pode DOBRAR numa
+ * vitória por hansoku-make — regras que um valor fixo por ação não exprime.
+ * Esse cálculo vive em scoreShidosSofridos() e na camada do JudoBase
+ * (lib/ijf.ts -> scoreContestSide), não na lista de ações.
  */
 export function scoreActions(actions: ActionType[]): number {
   return actions.reduce((total, a) => total + (POINTS[a] ?? 0), 0);
+}
+
+/**
+ * Custo (negativo) de SOFRER `n` shidos, de forma CRESCENTE.
+ *   1.º shido = -2, 2.º = -3, 3.º = -4, ...  (o k-ésimo custa -(k+1))
+ * Total de 3 shidos (hansoku-make) = -(2+3+4) = -9.
+ *
+ * Devolve 0 para n <= 0. É puro e não sabe nada de vitória/derrota — quem
+ * decide o resto (ignorar ippon fantasma, dobrar provocados) é o ijf.ts.
+ */
+export function scoreShidosSofridos(n: number): number {
+  let total = 0;
+  for (let k = 1; k <= n; k++) total += -(k + 1);
+  return total;
 }
 
 /**
