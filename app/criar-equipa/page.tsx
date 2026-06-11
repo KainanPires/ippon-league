@@ -306,12 +306,6 @@ export default function CriarEquipa() {
             </div>
           </div>
         </div>
-        <nav style={{ height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
-          <NavTab label="Início" href="/inicio" icon={<HomeIcon />} onNav={tryLeave} />
-          <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} onNav={tryLeave} />
-          <NavTab label="Atletas" icon={<AthletesIcon />} href="/atletas" onNav={tryLeave} />
-          <NavTab label="Pro" icon={<BoltIcon />} href="/ippon-pro" onNav={tryLeave} />
-        </nav>
       </div>
       {guide === "welcome" && (
         <div style={overlayBg}>
@@ -547,21 +541,6 @@ function ShareIcon() {
 function roundBtn(border: string, color: string): React.CSSProperties {
   return { width: 42, height: 42, borderRadius: 10, border: `1px solid ${border}`, background: "transparent", color, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
 }
-function NavTab({ label, icon, href, onNav }: { label: string; icon: React.ReactNode; href?: string; onNav?: (href: string) => void }) {
-  const style: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: "#6f7d76", textDecoration: "none" };
-  const inner = <>{icon}<span style={{ fontSize: 11 }}>{label}</span></>;
-  if (href && onNav) return <a href={href} onClick={(e) => { e.preventDefault(); onNav(href); }} style={style}>{inner}</a>;
-  return href ? <a href={href} style={style}>{inner}</a> : <div style={style}>{inner}</div>;
-}
-function HomeIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></svg>;
-}
 function TrophyIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 6H5v2a3 3 0 0 0 3 3M16 6h3v2a3 3 0 0 1-3 3M10 17h4M9 21h6M12 13v4" /></svg>;
-}
-function BoltIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" /></svg>;
-}
-function AthletesIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="6" r="3" /><circle cx="17" cy="7" r="2.5" /><path d="M3 20v-1a5 5 0 0 1 10 0v1M14 20v-1a4 4 0 0 1 7-2.6" /></svg>;
 }
