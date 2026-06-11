@@ -91,6 +91,16 @@ export default function CriarLiga() {
   function copy() {
     try { navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch {}
   }
+  function partilhar() {
+    if (!created) return;
+    const texto = `Entra na minha liga "${created.name}" na Ippon League! Código: ${created.invite_code}`;
+    const navAny = navigator as unknown as { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
+    if (navAny.share) {
+      navAny.share({ title: "Ippon League", text: texto, url: inviteLink }).catch(() => {});
+    } else {
+      try { navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch {}
+    }
+  }
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -206,8 +216,12 @@ export default function CriarLiga() {
 
               <Label>Convidar por link</Label>
               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 12px", fontSize: 12.5, color: "#cfd8d2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{inviteLink}</div>
-                <button onClick={copy} style={{ background: copied ? "#3f8f5a" : GOLD, color: copied ? "#06140d" : "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 16px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{copied ? "Copiado!" : "Copiar"}</button>
+                <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 12px", fontSize: 12.5, color: "#cfd8d2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center" }}>{inviteLink}</div>
+                <button onClick={copy} aria-label="Copiar link" style={{ background: copied ? "#3f8f5a" : "#141a17", color: copied ? "#06140d" : "#cfd8d2", border: "1px solid #243029", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 14px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{copied ? "✓" : "Copiar"}</button>
+                <button onClick={partilhar} aria-label="Partilhar link" style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 14px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+                  Partilhar
+                </button>
               </div>
               <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 12, padding: "12px 14px", marginBottom: 26, textAlign: "center" }}>
                 <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Código de convite</div>
