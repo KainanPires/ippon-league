@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSavedFor, resolve, jcLeft, loadSavedCloudFor, setAthletePool, patrimonio, loadPrecosFor, loadPrecosCloudFor, type TeamState } from "@/lib/team";
+import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, jcLeft, isComplete, missing, loadSavedCloudFor, setAthletePool, patrimonio, loadPrecosFor, loadPrecosCloudFor, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
+import { CartaoEquipa } from "@/components/CartaoEquipa";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -14,14 +16,8 @@ const GOLD = "#d9a441";
 const BELT = "Branca";
 const BELT_HEX = "#efeadd";
 
-// TICK AO VIVO: de quantos em quantos ms a página vai buscar os pontos novos
-// enquanto a competição decorre. 15s — numa luta de ~4min, apanha as ações sem
-// atraso percetível. Mudar aqui (15000 -> 30000 -> 60000) ajusta tudo.
-// Nota: o tick SÓ corre quando há competição a decorrer e a aba está visível.
 const TICK_AO_VIVO_MS = 15000;
 
-// Fase do mercado/competição. Já NÃO é fixa: é calculada a partir do calendário.
-// "aberto" = a montar (mostra preço) · "fechado" = à espera (mostra — — —) · "ao-vivo" = a competir (mostra pontuação)
 type MarketPhase = "aberto" | "fechado" | "ao-vivo";
 
 const IOC: Record<string, string> = {
@@ -32,48 +28,59 @@ const IOC: Record<string, string> = {
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
-// A competição a decorrer (ou a de mercado aberto) vem de focoMercado em lib/calendario.
-// Os pontos por atleta vêm de /api/resultados (reais, do JudoBase). Sem dados de exemplo.
+function sameTeam(a: TeamState, b: TeamState): boolean {
+  if ((a.captain || "") !== (b.captain || "")) return false;
+  if (a.ids.length !== b.ids.length) return false;
+  return [...a.ids].sort().join(",") === [...b.ids].sort().join(",");
+}
 
+type Modal =
+  | { kind: "saved" | "trash" | "share" | "leave" | "missing" }
+  | { kind: "athlete"; a: Athlete }
+  | null;
 
 export default function MeuTime() {
-  const [team, setTeam] = useState<TeamState>({ ids: [], captain: null });
+  const [team, setTeam] = useState<TeamState>({ ids: [], captain: null }); // rascunho (editável)
+  const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null }); // guardado (referência p/ dirty)
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [ready, setReady] = useState(false);
-  const [sel, setSel] = useState<Athlete | null>(null);
-  const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
-  const [pontos, setPontos] = useState<Record<string, number>>({}); // id_person -> pontos reais
+  const [pontos, setPontos] = useState<Record<string, number>>({});
   const [temResultados, setTemResultados] = useState(false);
-  const [precos, setPrecos] = useState<Record<string, number>>({}); // id_person -> preço de compra
-  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null); // hora do último tick
+  const [precos, setPrecos] = useState<Record<string, number>>({});
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null);
+  const [modal, setModal] = useState<Modal>(null);
+  const [savingCloud, setSavingCloud] = useState(false);
+  const [cloudWarn, setCloudWarn] = useState(false);
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
+  const [, bumpPool] = useState(0);
+  const router = useRouter();
 
-  // Qual a competição a mostrar:
-  // - a que está a decorrer (mercado fechado), se o jogador tiver equipa nela → modo competição (trancado);
-  // - senão, a competição de mercado aberto (alvo), onde pode editar.
   const foco = focoMercado();
   const atual = foco.atual;
-  const emAndamento = foco.aDecorrer !== null; // mercado da competição da semana já fechou
-  const alvo = foco.alvo;            // mercado aberto
-  const aDecorrer = foco.aDecorrer;  // mercado fechado, em competição
-  // idComp definido depois de sabermos onde há equipa (no useEffect). Começa pela alvo.
+  const emAndamento = foco.aDecorrer !== null;
+  const alvo = foco.alvo;
+  const aDecorrer = foco.aDecorrer;
   const [idComp, setIdComp] = useState<string>(alvo.idCompeticao);
 
   useEffect(() => {
     let active = true;
-    // Cache local primeiro (instantâneo): equipa a decorrer (se existir), senão a da alvo.
     try {
       setIdentity(loadIdentity());
       const localDecorrer = aDecorrer ? loadSavedFor(aDecorrer.idCompeticao) : { ids: [], captain: null };
       if (localDecorrer.ids.length > 0 && aDecorrer) {
         setTeam(localDecorrer);
+        setSaved(localDecorrer);
         setIdComp(aDecorrer.idCompeticao);
       } else {
-        setTeam(loadSavedFor(alvo.idCompeticao));
+        // Mercado aberto: o rascunho é o ponto de edição; arranca do guardado.
+        const s = loadSavedFor(alvo.idCompeticao);
+        const d = loadDraftFor(alvo.idCompeticao);
+        const base = d.ids.length > 0 ? d : s;
+        setTeam(base);
+        setSaved(s);
         setIdComp(alvo.idCompeticao);
       }
     } catch {}
-    // Carrega a lista de atletas das competições relevantes (mesma fonte do Mercado).
-    // Sem isto, o resolve() não traduz os ids e a página diz "ainda não tens equipa".
     const compsPool = aDecorrer ? [aDecorrer.idCompeticao, alvo.idCompeticao] : [alvo.idCompeticao];
     Promise.all(
       compsPool.map((id) => fetch(`/api/atletas?id=${id}`).then((r) => r.json()).catch(() => null))
@@ -86,7 +93,6 @@ export default function MeuTime() {
       }
       if (merged.size > 0) { setAthletePool(Array.from(merged.values())); bumpPool((t) => t + 1); }
     });
-    // Proteção de rota + equipa da nuvem (a oficial).
     supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
       if (!active) return;
       if (!data.session) {
@@ -94,39 +100,39 @@ export default function MeuTime() {
         return;
       }
       setReady(true);
-      // Regra: se há competição a decorrer e tenho equipa nela, é essa (trancada). Senão, a de mercado aberto.
       (async () => {
         const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
         if (!active) return;
         if (naDecorrer && naDecorrer.ids.length > 0 && aDecorrer) {
           setTeam(naDecorrer);
+          setSaved(naDecorrer);
           setIdComp(aDecorrer.idCompeticao);
           return;
         }
         const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
         if (!active || !naAlvo) return;
-        setTeam(naAlvo);
-        setIdComp(alvo.idCompeticao);
+        setSaved(naAlvo);
+        // Só adota a equipa da nuvem como base de edição se não há edição em curso.
+        const curDraft = loadDraftFor(alvo.idCompeticao);
+        if (curDraft.ids.length === 0 || sameTeam(curDraft, loadSavedFor(alvo.idCompeticao))) {
+          setTeam(naAlvo);
+          saveDraftFor(alvo.idCompeticao, naAlvo);
+          commitSavedFor(alvo.idCompeticao, naAlvo);
+        }
       })();
     });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pontos reais da competição que estamos a ver (atualiza quando idComp muda).
-  // TICK AO VIVO: além de buscar uma vez, repete a cada TICK_AO_VIVO_MS ENQUANTO
-  // a competição estiver a decorrer (emAndamento) e a aba estiver visível.
+  // Pontos reais + tick ao vivo (igual ao original).
   useEffect(() => {
     let active = true;
     if (!idComp) return;
-
-    // Preços de compra: local primeiro (instantâneo), depois a nuvem (oficial).
     setPrecos(loadPrecosFor(idComp));
     loadPrecosCloudFor(idComp).then((c) => {
       if (active && c && Object.keys(c).length > 0) setPrecos(c);
     });
-
-    // Busca os pontos uma vez. Reutilizada pelo tick.
     const buscarPontos = () => {
       fetch(`/api/resultados?comp=${idComp}`)
         .then((r) => r.json())
@@ -138,37 +144,25 @@ export default function MeuTime() {
         })
         .catch(() => {});
     };
-
-    buscarPontos(); // primeira carga, imediata
-
-    // Só liga o tick se a competição que estamos a ver está MESMO a decorrer.
-    // (Mercado aberto ou prova terminada não têm pontos novos a chegar.)
+    buscarPontos();
     const aDecorrerAgora = emAndamento && idComp === atual.idCompeticao;
     if (!aDecorrerAgora) {
       return () => { active = false; };
     }
-
     let timer: ReturnType<typeof setInterval> | null = null;
     const arranca = () => {
       if (timer) return;
       timer = setInterval(() => {
-        // Não desperdiça chamadas se a aba estiver escondida.
         if (typeof document !== "undefined" && document.hidden) return;
         buscarPontos();
       }, TICK_AO_VIVO_MS);
     };
-    const para = () => {
-      if (timer) { clearInterval(timer); timer = null; }
-    };
-
+    const para = () => { if (timer) { clearInterval(timer); timer = null; } };
     arranca();
-
-    // Quando a aba volta a ficar visível, busca já (sem esperar o próximo tick).
     const aoMudarVisibilidade = () => {
       if (typeof document !== "undefined" && !document.hidden) buscarPontos();
     };
     document.addEventListener("visibilitychange", aoMudarVisibilidade);
-
     return () => {
       active = false;
       para();
@@ -180,37 +174,71 @@ export default function MeuTime() {
   if (!ready) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
 
   const athletes = resolve(team.ids);
-  const temEquipa = team.ids.length > 0;                       // há ids guardados?
-  const aCarregarAtletas = temEquipa && athletes.length === 0;  // tem ids, mas a lista ainda não resolveu
+  const temEquipa = team.ids.length > 0;
+  const aCarregarAtletas = temEquipa && athletes.length === 0;
   const hasTeam = athletes.length > 0;
   const males = athletes.filter((a) => a.gender === "M");
   const females = athletes.filter((a) => a.gender === "F");
   const squadValue = fmt(athletes.reduce((s, a) => s + a.priceJc, 0));
   const left = jcLeft(team);
-  const patr = patrimonio(team, precos); // 100 + Σ(preço de agora − preço de compra)
-  // Pontos reais: o id do atleta é o id_person do JudoBase, igual à chave do mapa /api/resultados.
+  const patr = patrimonio(team, precos);
   const scoreOf = (a: Athlete) => {
     const base = pontos[a.id] ?? 0;
     return a.id === team.captain ? base * 2 : base;
   };
   const totalPts = Math.round(athletes.reduce((s, a) => s + scoreOf(a), 0) * 10) / 10;
-  // Estamos a mostrar a equipa da competição a decorrer?
   const emCompeticao = emAndamento && idComp === atual.idCompeticao && hasTeam;
-  // Fase calculada (não fixa): se a competição que estamos a ver está a decorrer →
-  // "ao-vivo" (mostra pontos e estado da chave). Senão, mercado aberto → "aberto" (mostra preços).
   const marketPhase: MarketPhase = emCompeticao ? "ao-vivo" : "aberto";
+  // EDITÁVEL só quando NÃO está em competição (mercado aberto).
+  const editavel = !emCompeticao;
+  const dirty = editavel && !sameTeam(team, saved);
 
-  // Texto curto da hora da última atualização (só no modo ao-vivo).
   const horaTick = ultimaAtualizacao
     ? new Date(ultimaAtualizacao).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
 
+  // ---- Edição (só quando editável) ----
+  function update(next: TeamState) {
+    setTeam(next);
+    saveDraftFor(alvo.idCompeticao, next);
+  }
+  function tornarCapitao(id: string) {
+    update({ ...team, captain: team.captain === id ? null : id });
+    setModal(null);
+  }
+  function vender(id: string) {
+    update({ ids: team.ids.filter((x) => x !== id), captain: team.captain === id ? null : team.captain });
+    setModal(null);
+  }
+  function limparTudo() {
+    update({ ids: [], captain: null });
+    setModal(null);
+  }
+  async function salvar() {
+    if (!isComplete(team)) { setModal({ kind: "missing" }); return; }
+    setSavingCloud(true);
+    const res = await commitSavedCloudFor(alvo.idCompeticao, team, identity);
+    setSaved(team);
+    setSavingCloud(false);
+    setCloudWarn(!res.ok);
+    setModal({ kind: "saved" });
+  }
+  // PRENDER: ao tentar sair com alterações por guardar, avisa.
+  function tryLeave(href: string) {
+    if (dirty) { setLeaveTo(href); setModal({ kind: "leave" }); return; }
+    router.push(href);
+  }
+
+  // Lugares vazios para completar a equipa (4 masc + 4 fem).
+  const vagasM = Math.max(0, 4 - males.length);
+  const vagasF = Math.max(0, 4 - females.length);
+
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes ilp{0%,100%{opacity:1}50%{opacity:.25}} .ilp{animation:ilp 1.1s ease-in-out infinite}`}</style>
-      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 40px" }}>
+      <style>{`@keyframes ilp{0%,100%{opacity:1}50%{opacity:.25}} .ilp{animation:ilp 1.1s ease-in-out infinite} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite}`}</style>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: dirty ? "14px 14px 96px" : "14px 14px 40px" }}>
         <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
-          <a href="/inicio" aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+          <a href="/inicio" onClick={(e) => { e.preventDefault(); tryLeave("/inicio"); }} aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           </a>
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Meu Time</h1>
@@ -248,11 +276,13 @@ export default function MeuTime() {
               <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
                 <SectionLabel>Masculino</SectionLabel>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
-                  {males.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setSel(a)} />)}
+                  {males.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
+                  {editavel && Array.from({ length: vagasM }).map((_, i) => <EmptyCell key={"vm" + i} />)}
                 </div>
                 <SectionLabel>Feminino</SectionLabel>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-                  {females.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setSel(a)} />)}
+                  {females.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
+                  {editavel && Array.from({ length: vagasF }).map((_, i) => <EmptyCell key={"vf" + i} />)}
                 </div>
               </div>
             </section>
@@ -277,8 +307,6 @@ export default function MeuTime() {
               </div>
             </div>
 
-            {/* Durante a competição a decorrer (equipa trancada): só ver/partilhar, sem editar nem mercado.
-                Fora disso (mercado aberto): pode editar e ir ao mercado. */}
             {emCompeticao ? (
               <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
                 A tua equipa está em competição. Podes acompanhar os pontos aqui — o mercado abre de novo para a próxima rodada.
@@ -290,25 +318,120 @@ export default function MeuTime() {
                 )}
               </div>
             ) : (
-              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                <a href="/criar-equipa" style={{ flex: 1, textAlign: "center", background: "transparent", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none" }}>Editar equipa</a>
-                <a href="/mercado" style={{ flex: 1, textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none" }}>Ver mercado</a>
-              </div>
+              <>
+                <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                  <button onClick={() => setModal({ kind: "trash" })} aria-label="Limpar equipa" style={{ width: 46, borderRadius: 11, border: "1px solid #3a2422", background: "transparent", color: "#ef8d83", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                    <TrashIcon />
+                  </button>
+                  <button onClick={() => setModal({ kind: "share" })} aria-label="Partilhar equipa" style={{ width: 46, borderRadius: 11, border: "1px solid #243029", background: "transparent", color: "#cfd8d2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                    <ShareIcon />
+                  </button>
+                  <a href="/mercado" onClick={(e) => { e.preventDefault(); tryLeave("/mercado"); }} style={{ flex: 1, textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>Ver mercado</a>
+                </div>
+                <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
+                  Toca num atleta para o tornares capitão ou venderes. Toca num lugar vazio para ir ao Mercado.
+                </p>
+              </>
             )}
-
-            <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
-              Toca num atleta para veres as ações e a valorização.{emCompeticao ? " Os pontos atualizam-se sozinhos durante a rodada." : " A pontuação ao vivo liga-se na próxima competição."}
-            </p>
           </>
         )}
       </div>
 
-      {sel && <AthleteDetail a={sel} captain={sel.id === team.captain} score={scoreOf(sel)} temResultados={temResultados} onClose={() => setSel(null)} />}
+      {/* Barra fixa de guardar — só quando há alterações por guardar (prende para salvar). */}
+      {dirty && (
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 60 }}>
+          <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1, fontSize: 12, color: "#cfd8d2" }}>Tens alterações por guardar.</div>
+            <button onClick={salvar} disabled={savingCloud} className={!savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar equipa"}</button>
+          </div>
+        </div>
+      )}
+
+      {modal?.kind === "athlete" && (
+        <AthleteDetail
+          a={modal.a}
+          captain={modal.a.id === team.captain}
+          score={scoreOf(modal.a)}
+          temResultados={temResultados}
+          editavel={editavel}
+          onCaptain={() => tornarCapitao(modal.a.id)}
+          onSell={() => vender(modal.a.id)}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal?.kind === "missing" && (
+        <div style={overlayBg}>
+          <div style={cardBox}>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Falta pouco!</h2>
+            <p style={{ fontSize: 13, color: "#c7d0c9", margin: "0 0 12px" }}>Para guardares a equipa ainda precisas de:</p>
+            <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
+              {missing(team).map((m) => (
+                <div key={m} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+                  <span style={{ color: "#ef8d83", fontWeight: 700 }}>•</span>
+                  <span style={{ fontSize: 13, color: "#f1ede2" }}>{m}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setModal(null)} style={primaryBtn}>Continuar a montar</button>
+          </div>
+        </div>
+      )}
+
+      {modal?.kind === "saved" && (
+        <div style={overlayBg}>
+          <div style={cardBox}>
+            <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Equipa salva!</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
+              {cloudWarn
+                ? "Guardámos a tua equipa neste dispositivo, mas não conseguimos sincronizar com a tua conta agora. Tenta guardar de novo quando tiveres ligação."
+                : "A tua equipa está guardada na tua conta e pronta para competir. Boa sorte na próxima rodada!"}
+            </p>
+            <button onClick={() => setModal(null)} style={primaryBtn}>Fechar</button>
+          </div>
+        </div>
+      )}
+
+      {modal?.kind === "trash" && (
+        <div style={overlayBg}>
+          <div style={cardBox}>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="determinado" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Limpar a equipa?</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Isto remove todos os atletas e vais ter de escalar de novo.</p>
+            <button onClick={limparTudo} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>Sim, limpar tudo</button>
+            <button onClick={() => setModal(null)} style={ghostBtn}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {modal?.kind === "leave" && (
+        <div style={overlayBg}>
+          <div style={cardBox}>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="indicando" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Sair sem guardar?</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Tens alterações por guardar. Se saíres agora, não ficam guardadas na tua conta.</p>
+            <button onClick={() => { const to = leaveTo; setModal(null); setLeaveTo(null); if (to) router.push(to); }} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>Sair sem guardar</button>
+            <button onClick={() => { setModal(null); setLeaveTo(null); }} style={ghostBtn}>Continuar aqui</button>
+          </div>
+        </div>
+      )}
+
+      {modal?.kind === "share" && (
+        <CartaoEquipa
+          identity={identity}
+          faixa="Branca"
+          atletas={resolve(team.ids)}
+          capitao={team.captain}
+          onClose={() => setModal(null)}
+        />
+      )}
     </main>
   );
 }
 
-function AthleteDetail({ a, captain, score, temResultados, onClose }: { a: Athlete; captain: boolean; score: number; temResultados: boolean; onClose: () => void }) {
+function AthleteDetail({ a, captain, score, temResultados, editavel, onCaptain, onSell, onClose }: { a: Athlete; captain: boolean; score: number; temResultados: boolean; editavel: boolean; onCaptain: () => void; onSell: () => void; onClose: () => void }) {
   const up = a.variation >= 0;
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.78)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 100 }}>
@@ -338,7 +461,7 @@ function AthleteDetail({ a, captain, score, temResultados, onClose }: { a: Athle
         </div>
 
         {temResultados ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "12px 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "12px 14px", marginBottom: editavel ? 16 : 0 }}>
             <div>
               <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase" }}>Pontos na rodada</div>
               {captain && <div style={{ fontSize: 11, color: "#FF8F00", marginTop: 2 }}>Capitão — pontuação a dobrar</div>}
@@ -346,17 +469,26 @@ function AthleteDetail({ a, captain, score, temResultados, onClose }: { a: Athle
             <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>{score >= 0 ? "+" : ""}{score} pts</div>
           </div>
         ) : (
-          <div style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "14px", textAlign: "center", fontSize: 12.5, color: "#93a39a" }}>
+          <div style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "14px", textAlign: "center", fontSize: 12.5, color: "#93a39a", marginBottom: editavel ? 16 : 0 }}>
             A competição ainda não começou. Os pontos deste atleta aparecem aqui durante a rodada.
           </div>
         )}
 
-        <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 12 }}>O detalhe luta a luta liga-se em breve.</p>
+        {/* AÇÕES: só quando editável (mercado aberto). Em competição, não se mexe. */}
+        {editavel ? (
+          <>
+            <button onClick={onCaptain} style={{ ...primaryBtn, background: captain ? "#1c3a2e" : GOLD, color: captain ? "#aee9c9" : "#1b211e" }}>
+              {captain ? "Remover capitão" : "Tornar capitão (pontua x2)"}
+            </button>
+            <button onClick={onSell} style={{ display: "block", width: "100%", marginTop: 10, textAlign: "center", border: "1px solid #5a2f2c", background: "transparent", color: "#ef8d83", padding: "11px", borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer" }}>Vender</button>
+          </>
+        ) : (
+          <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 12 }}>O detalhe luta a luta liga-se em breve.</p>
+        )}
       </div>
     </div>
   );
 }
-
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -398,3 +530,24 @@ function Cell({ a, captain, score, phase, onClick }: { a: Athlete; captain: bool
     </button>
   );
 }
+
+function EmptyCell() {
+  return (
+    <a href="/mercado" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 3px", borderRadius: 12, border: "1.5px dashed rgba(217,164,65,0.7)", background: "rgba(12,14,13,0.62)", textDecoration: "none", minHeight: 92 }}>
+      <div style={{ width: 26, height: 26, borderRadius: "50%", border: `2px solid ${GOLD}`, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, lineHeight: 1 }}>+</div>
+      <div style={{ fontSize: 9, color: GOLD, fontWeight: 700, textTransform: "uppercase" }}>Mercado</div>
+    </a>
+  );
+}
+
+function TrashIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>;
+}
+function ShareIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M8 7l4-4 4 4" /></svg>;
+}
+
+const overlayBg: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 };
+const cardBox: React.CSSProperties = { width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" };
+const primaryBtn: React.CSSProperties = { width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" };
+const ghostBtn: React.CSSProperties = { marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB };
