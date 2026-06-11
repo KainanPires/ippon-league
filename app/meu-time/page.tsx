@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, jcLeft, isComplete, missing, loadSavedCloudFor, setAthletePool, patrimonio, loadPrecosFor, loadPrecosCloudFor, type TeamState } from "@/lib/team";
+import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, isComplete, missing, loadSavedCloudFor, setAthletePool, patrimonio, loadPrecosFor, loadPrecosCloudFor, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
@@ -33,7 +33,7 @@ const fmt = (n: number) => String(Math.round(n * 10) / 10);
 // elementos destacados estão acima do balão, que fica em baixo). `target` indica
 // o que pulsa em cada passo.
 const STEPS_EDICAO = [
-  { t: "Património e saldo", x: "No topo vês o teu património total e o saldo em Judocoins que ainda tens para gastar.", target: "topo" },
+  { t: "Património", x: "No topo vês o teu património: o valor total que tens, que sobe quando os teus atletas valorizam.", target: "topo" },
   { t: "Lugares vazios", x: "Um lugar vazio leva-te ao Mercado para contratares um atleta. Preenche os 8 (4 masculinos + 4 femininas).", target: "vazio" },
   { t: "Os teus atletas", x: "Toca num atleta para o tornares capitão (pontua a dobrar) ou para o venderes.", target: "atletas" },
   { t: "Guardar", x: "Sempre que mudas algo, aparece o botão Salvar em baixo. Guarda para a tua equipa ficar pronta para a rodada.", target: "guardar" },
@@ -227,7 +227,6 @@ export default function MeuTime() {
   const males = athletes.filter((a) => a.gender === "M");
   const females = athletes.filter((a) => a.gender === "F");
   const squadValue = fmt(athletes.reduce((s, a) => s + a.priceJc, 0));
-  const left = jcLeft(team);
   const patr = patrimonio(team, precos);
   const scoreOf = (a: Athlete) => {
     const base = pontos[a.id] ?? 0;
@@ -327,8 +326,10 @@ export default function MeuTime() {
                 </div>
               </div>
               <div className={destaque === "topo" ? "ilglow" : undefined} style={{ display: "flex", gap: 8, padding: 2 }}>
-                <Stat label="Património" value={`JC ${fmt(patr)}`} />
-                <Stat label="Saldo" value={`JC ${fmt(left)}`} />
+                <div style={{ background: "#141a17", border: `1px solid #2a4d3e`, borderRadius: 12, padding: "8px 16px", textAlign: "right" }}>
+                  <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em" }}>Património</div>
+                  <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: GOLD }}>JC {fmt(patr)}</div>
+                </div>
               </div>
             </div>
 
@@ -558,15 +559,6 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, onCaptain, 
           <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 12 }}>O detalhe luta a luta liga-se em breve.</p>
         )}
       </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "8px 12px", textAlign: "right" }}>
-      <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: GOLD }}>{value}</div>
     </div>
   );
 }
