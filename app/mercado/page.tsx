@@ -45,12 +45,14 @@ const sortLabel = (id: SortId) => SORTS.find((s) => s.id === id)?.label || "Orde
 const PRICE_MIN = 2;
 const PRICE_MAX = 20;
 
+// dir: para onde a seta do tutorial aponta. "up" = alvo acima do balão (topo);
+// "down" = alvo abaixo (cards). A legenda não aponta para nada (central).
 const STEPS = [
-  { t: "Saldo JC", x: "Estes são os Judocoins que tens para gastar. Cada atleta tem um preço — geres os teus 100 JC para montar a melhor equipa.", target: "jc" },
-  { t: "Valorização", x: "O ▲/▼ ao lado do preço mostra se o atleta está a valorizar ou a desvalorizar. Fica atento a isto: faz toda a diferença no teu património.", target: "price" },
-  { t: "Médias e pontuação", x: "A média mostra o nível típico do atleta e a 'última' a pontuação mais recente. Usa-as para descobrir quem pode render mais — e ganhar JC.", target: "scout" },
-  { t: "Filtros e favoritos", x: "Lá em cima: a ★ mostra só os teus favoritos, e os botões Ordenar e Filtros (preço, país) ajudam-te a encontrar atletas. A ★ em cada card guarda o atleta como favorito.", target: "filters" },
-  { t: "O que significam os estados", target: "legend" },
+  { t: "Saldo JC", x: "Estes são os Judocoins que tens para gastar. Cada atleta tem um preço — geres os teus 100 JC para montar a melhor equipa.", target: "jc", dir: "up" as const },
+  { t: "Valorização", x: "O ▲/▼ ao lado do preço mostra se o atleta está a valorizar ou a desvalorizar. Fica atento a isto: faz toda a diferença no teu património.", target: "price", dir: "down" as const },
+  { t: "Médias e pontuação", x: "A média mostra o nível típico do atleta e a 'última' a pontuação mais recente. Usa-as para descobrir quem pode render mais — e ganhar JC.", target: "scout", dir: "down" as const },
+  { t: "Filtros e favoritos", x: "Lá em cima: a ★ mostra só os teus favoritos, e os botões Ordenar e Filtros (preço, país) ajudam-te a encontrar atletas. A ★ em cada card guarda o atleta como favorito.", target: "filters", dir: "up" as const },
+  { t: "O que significam os estados", target: "legend", dir: "none" as const },
 ];
 
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
@@ -82,6 +84,8 @@ export default function Mercado() {
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [pedirLogin, setPedirLogin] = useState(false);
   const [avisoCategoria, setAvisoCategoria] = useState(false);
+  // Mensagem explícita ao completar um género: "Já tens os 4 X, agora os 4 Y".
+  const [avisoGenero, setAvisoGenero] = useState<null | { feito: Gender; falta: Gender }>(null);
 
   useEffect(() => {
     let active = true;
@@ -210,15 +214,22 @@ export default function Mercado() {
     if (st.kind === "buy") {
       if (!(await temSessao())) { setPedirLogin(true); return; }
       persist([...team, a.id]);
-      try {
-        if (localStorage.getItem("ippon_aviso_categoria") !== "skip") setAvisoCategoria(true);
-      } catch {}
       const g = a.gender;
       const newCount = (g === "M" ? countM : countF) + 1;
       if (newCount >= 4) {
         const opp: Gender = g === "M" ? "F" : "M";
         const oppCount = opp === "M" ? countM : countF;
-        if (oppCount < 4) { setGender(opp); setCat(CATEGORIES[opp][0]); }
+        if (oppCount < 4) {
+          // Completou este género e ainda falta o outro: mensagem clara + troca de filtro.
+          setGender(opp);
+          setCat(CATEGORIES[opp][0]);
+          setAvisoGenero({ feito: g, falta: opp });
+        }
+      } else {
+        // Aviso "um por categoria" só nas primeiras contratações (não quando troca de género).
+        try {
+          if (localStorage.getItem("ippon_aviso_categoria") !== "skip") setAvisoCategoria(true);
+        } catch {}
       }
     }
   }
@@ -229,7 +240,7 @@ export default function Mercado() {
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none} @keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite}`}</style>
+      <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none} @keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
 
       <div style={{ maxWidth: 460, margin: "0 auto" }}>
         <div style={{ position: "sticky", top: 0, background: "#0c0e0d", borderBottom: "1px solid #1a221d", zIndex: 5, padding: "12px 14px 10px" }}>
@@ -427,6 +438,21 @@ export default function Mercado() {
         </div>
       )}
 
+      {avisoGenero && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
+          <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#141110" expression="feliz" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>
+              {avisoGenero.feito === "M" ? "4 masculinos prontos!" : "4 femininas prontas!"}
+            </h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
+              Já completaste os <strong style={{ color: "#f1ede2" }}>{avisoGenero.feito === "M" ? "4 atletas masculinos" : "4 atletas femininas"}</strong>. Agora escolhe os <strong style={{ color: GOLD }}>{avisoGenero.falta === "M" ? "4 masculinos" : "4 femininas"}</strong> — já te mudei o filtro. Se faltarem atletas numa categoria, há noutra.
+            </p>
+            <button onClick={() => setAvisoGenero(null)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Vamos lá</button>
+          </div>
+        </div>
+      )}
+
       {avisoCategoria && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
           <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
@@ -491,6 +517,17 @@ function LockIcon() {
   return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>;
 }
 
+// Seta a apontar para o elemento destacado (cima = alvo no topo; baixo = alvo nos cards).
+function SetaTutorial({ dir }: { dir: "up" | "down" }) {
+  return (
+    <div className="ilseta" style={{ display: "flex", justifyContent: "center", color: GOLD, margin: dir === "up" ? "0 0 6px" : "6px 0 0" }}>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {dir === "up" ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M5 12l7 7 7-7" />}
+      </svg>
+    </div>
+  );
+}
+
 function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: number | null) => void; onClose: () => void }) {
   const s = STEPS[step];
   const total = STEPS.length;
@@ -532,15 +569,20 @@ function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: numbe
     );
   }
 
+  const dir = (s.dir === "up" || s.dir === "down") ? s.dir : "down";
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
       <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
         <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
-        <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px" }}>
+        <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
+          {/* Seta para CIMA: aparece ANTES do conteúdo (aponta ao topo do ecrã). */}
+          {dir === "up" && <SetaTutorial dir="up" />}
           {skip}
           <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{s.t}</div>
           <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{s.x}</p>
           {controls}
+          {/* Seta para BAIXO: aparece DEPOIS do conteúdo (aponta aos cards abaixo). */}
+          {dir === "down" && <SetaTutorial dir="down" />}
         </div>
       </div>
     </div>
