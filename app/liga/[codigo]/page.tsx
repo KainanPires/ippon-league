@@ -130,6 +130,19 @@ export default function PaginaLiga() {
     };
   }, [estado, liga, idComp, emAndamento]);
 
+
+  function partilhar() {
+    if (!liga) return;
+    const link = `https://ippon-league.vercel.app/liga/${liga.invite_code}`;
+    const texto = `Entra na minha liga "${liga.name}" na Ippon League! Código: ${liga.invite_code}`;
+    const navAny = navigator as unknown as { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
+    if (navAny.share) {
+      navAny.share({ title: "Ippon League", text: texto, url: link }).catch(() => {});
+    } else {
+      try { navigator.clipboard.writeText(link); alert("Link copiado! Cola no WhatsApp e chama o teu dojo. 🥋"); } catch {}
+    }
+  }
+
   function verDojo(m: Membro) {
     if (!mercadoFechado) {
       alert("Podes ver a equipa dos teus rivais quando o mercado fechar. 🔒");
@@ -161,9 +174,13 @@ export default function PaginaLiga() {
 
         {estado === "erro" && (
           <div style={{ textAlign: "center", padding: "30px 16px", background: "#1a1110", border: "1px solid #3a2420", borderRadius: 16 }}>
-            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#ef8d83", marginBottom: 8 }}>Ups</div>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: erroMsg.includes("Pro") ? GOLD : "#ef8d83", marginBottom: 8 }}>{erroMsg.includes("Pro") ? "Limite atingido" : "Ups"}</div>
             <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{erroMsg}</p>
-            <a href="/ligas" style={{ display: "inline-block", marginTop: 12, color: GOLD, fontSize: 13, textDecoration: "none", fontFamily: FD, fontWeight: 700 }}>Ver as minhas ligas</a>
+            {erroMsg.includes("Pro") ? (
+              <a href="/ippon-pro" style={{ display: "inline-block", marginTop: 12, background: GOLD, color: "#1b211e", fontSize: 13, fontWeight: 700, textDecoration: "none", fontFamily: FD, textTransform: "uppercase", padding: "10px 18px", borderRadius: 10 }}>Conhecer o Ippon Pro</a>
+            ) : (
+              <a href="/ligas" style={{ display: "inline-block", marginTop: 12, color: GOLD, fontSize: 13, textDecoration: "none", fontFamily: FD, fontWeight: 700 }}>Ver as minhas ligas</a>
+            )}
           </div>
         )}
 
@@ -175,10 +192,14 @@ export default function PaginaLiga() {
                 <div style={{ fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{liga.name}</div>
                 <div style={{ fontSize: 11, color: "#93a39a" }}>{liga.privacidade === "fechada" ? "Fechada" : "Aberta"} · {membros.length} {membros.length === 1 ? "membro" : "membros"}</div>
               </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ textAlign: "right", flexShrink: 0, marginRight: 4 }}>
                 <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>Código</div>
-                <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: GOLD, letterSpacing: "0.08em" }}>{liga.invite_code}</div>
+                <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, color: GOLD, letterSpacing: "0.06em" }}>{liga.invite_code}</div>
               </div>
+              <button onClick={partilhar} aria-label="Partilhar liga" style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "transparent", border: "1px solid #243029", borderRadius: 10, padding: "7px 10px", cursor: "pointer", color: GOLD }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+                <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Convidar</span>
+              </button>
             </div>
 
             {liga.descricao && (
