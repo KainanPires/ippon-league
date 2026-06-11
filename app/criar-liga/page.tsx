@@ -183,7 +183,13 @@ export default function CriarLiga() {
               <FormatCard on={privacy === "aberta"} onClick={() => setPrivacy("aberta")} title="Aberta" desc="Aparece no mercado de ligas. Qualquer um pode pedir para entrar." icon="🌍" />
             </div>
 
-            {erro && <div style={{ background: "#2a1a18", border: "1px solid #5a2a24", color: "#ef8d83", fontSize: 12.5, padding: "10px 12px", borderRadius: 10, marginBottom: 12 }}>{erro}</div>}
+            {erro && (
+              erro.includes("Pro") ? (
+                <a href="/ippon-pro" style={{ display: "block", background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontSize: 12.5, padding: "10px 12px", borderRadius: 10, marginBottom: 12, textDecoration: "none", lineHeight: 1.4 }}>{erro} →</a>
+              ) : (
+                <div style={{ background: "#2a1a18", border: "1px solid #5a2a24", color: "#ef8d83", fontSize: 12.5, padding: "10px 12px", borderRadius: 10, marginBottom: 12 }}>{erro}</div>
+              )
+            )}
 
             <button onClick={criar} disabled={!canCreate} style={{ width: "100%", background: canCreate ? GOLD : "#23291f", color: canCreate ? "#1b211e" : "#5f6f67", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 15, borderRadius: 12, fontSize: 16, cursor: canCreate ? "pointer" : "default" }}>{a_criar ? "A criar…" : "Criar liga"}</button>
             {!canCreate && !a_criar && <div style={{ textAlign: "center", fontSize: 11, color: "#7c8a82", marginTop: 8 }}>Dá um nome à tua liga para continuar.</div>}
