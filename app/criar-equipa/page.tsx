@@ -301,8 +301,8 @@ export default function CriarEquipa() {
         <nav style={{ height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
           <NavTab label="Início" href="/inicio" icon={<HomeIcon />} onNav={tryLeave} />
           <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} onNav={tryLeave} />
+          <NavTab label="Atletas" icon={<AthletesIcon />} href="/atletas" onNav={tryLeave} />
           <NavTab label="Pro" icon={<BoltIcon />} href="/ippon-pro" onNav={tryLeave} />
-          <NavTab label="Amigos" icon={<FriendsIcon />} />
         </nav>
       </div>
       {guide === "welcome" && (
@@ -528,6 +528,6 @@ function TrophyIcon() {
 function BoltIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" /></svg>;
 }
-function FriendsIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>;
+function AthletesIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="6" r="3" /><circle cx="17" cy="7" r="2.5" /><path d="M3 20v-1a5 5 0 0 1 10 0v1M14 20v-1a4 4 0 0 1 7-2.6" /></svg>;
 }
