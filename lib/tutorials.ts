@@ -1,11 +1,13 @@
 import { supabase } from "@/lib/supabase";
-
 // Preferências de tutorial guardadas na CONTA (user_metadata), para sobreviverem
 // a logins e a troca de dispositivo. O localStorage é só uma cache rápida (este
 // aparelho), para decidir logo no primeiro render sem esperar pela rede.
-
-export type TutKey = "ippon_onboarding" | "ippon_team_tutorial" | "ippon_market_tutorial";
-
+export type TutKey =
+  | "ippon_onboarding"
+  | "ippon_team_tutorial"
+  | "ippon_market_tutorial"
+  | "ippon_meutime_tut_edicao"
+  | "ippon_meutime_tut_competicao";
 // Já foi visto NESTE aparelho? (instantâneo, sem rede)
 export function tutorialVistoLocal(key: TutKey): boolean {
   try {
@@ -14,7 +16,6 @@ export function tutorialVistoLocal(key: TutKey): boolean {
     return false;
   }
 }
-
 // Conjunto de tutoriais já vistos GUARDADOS NA CONTA. Devolve {} se não houver
 // sessão ou em caso de erro de rede.
 export async function tutoriaisVistosConta(): Promise<Record<string, boolean>> {
@@ -26,7 +27,6 @@ export async function tutoriaisVistosConta(): Promise<Record<string, boolean>> {
     return {};
   }
 }
-
 // Marca um tutorial como visto: cache local (este aparelho) + conta (todos os
 // aparelhos). Para visitantes (sem sessão) fica só o local.
 export async function marcarTutorialVisto(key: TutKey): Promise<void> {
