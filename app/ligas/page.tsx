@@ -13,9 +13,8 @@ type Tab = "ativas" | "mercado" | "resultados";
 function esc(p: Partial<Identity>): Identity { return { ...DEFAULT_IDENTITY, ...p }; }
 
 const OFICIAIS = [
-  { id: "mundial", name: "Liga Mundial", sub: "Todos os jogadores", pos: "#1.243", cfg: esc({ bg1: "#1c3a2e", bg2: "#102a20", border: GOLD, symbol: "mundo" }) },
-  { id: "europa", name: "Continental · Europa", sub: "Jogadores da Europa", pos: "#312", cfg: esc({ bg1: "#2f6fb3", bg2: "#25588f", border: "#eaf2fd", symbol: "mapa-europa" }) },
-  { id: "portugal", name: "Nacional · Portugal", sub: "Jogadores de Portugal", pos: "#14", cfg: esc({ bg1: "#c0392b", bg2: "#7a1f17", border: "#efeadd", symbol: "estrela" }) },
+  { id: "mundial", name: "Liga Mundial", sub: "Concorre aos prémios mundiais", cfg: esc({ bg1: "#1c3a2e", bg2: "#102a20", border: GOLD, symbol: "mundo" }) },
+  { id: "continental", name: "Continental", sub: "Concorre aos prémios do teu continente", cfg: esc({ bg1: "#2f6fb3", bg2: "#25588f", border: "#eaf2fd", symbol: "mapa-europa" }) },
 ];
 
 interface MinhaLiga {
@@ -36,12 +35,15 @@ export default function Ligas() {
   const [codigo, setCodigo] = useState("");
   const [aEntrar, setAEntrar] = useState(false);
   const [erroEntrar, setErroEntrar] = useState("");
+  const [souPro, setSouPro] = useState(false);
 
   useEffect(() => {
     let vivo = true;
     (async () => {
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess.session?.user?.id;
+      const meta = sess.session?.user?.user_metadata as { is_pro?: boolean } | undefined;
+      if (vivo) setSouPro(!!meta?.is_pro);
       if (!uid) { if (vivo) { setMine([]); setACarregar(false); } return; }
       try {
         const res = await fetch(`/api/liga/minhas?user_id=${uid}`);
@@ -68,7 +70,11 @@ export default function Ligas() {
         body: JSON.stringify({ user_id: uid, codigo: c }),
       });
       const j = await res.json();
-      if (!j.ok) { setErroEntrar(j.erro || "Não encontrámos essa liga."); setAEntrar(false); return; }
+      if (!j.ok) {
+        setErroEntrar(j.erro || "Não encontrámos essa liga.");
+        setAEntrar(false);
+        return;
+      }
       // Entrou: vai direto para a liga.
       window.location.href = `/liga/${j.liga.invite_code}`;
     } catch {
@@ -102,8 +108,15 @@ export default function Ligas() {
 
         {tab === "ativas" && (
           <>
-            <Section>Ligas oficiais</Section>
-            {OFICIAIS.map((l) => <LeagueRow key={l.id} cfg={l.cfg} name={l.name} sub={l.sub} right={<span style={{ fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 15 }}>{l.pos}</span>} />)}
+            <Section>Ligas oficiais · prémios</Section>
+            {OFICIAIS.map((l) => (
+              <OficialRow key={l.id} cfg={l.cfg} name={l.name} sub={l.sub} pro={souPro} />
+            ))}
+            {!souPro && (
+              <a href="/ippon-pro" style={{ display: "block", textAlign: "center", marginTop: 2, marginBottom: 4, background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "11px 14px", borderRadius: 10, textDecoration: "none", fontSize: 12.5, lineHeight: 1.4 }}>
+                🔒 Só membros Pro concorrem aos prémios · passa a Pro
+              </a>
+            )}
 
             <Section style={{ marginTop: 18 }}>Ligas de amigos</Section>
             {aCarregar ? (
@@ -129,7 +142,13 @@ export default function Ligas() {
               <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} placeholder="Código de convite" maxLength={8} style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 13px", color: "#f1ede2", fontSize: 15, fontFamily: FD, letterSpacing: "0.1em", outline: "none", textTransform: "uppercase" }} />
               <button onClick={entrarPorCodigo} disabled={aEntrar} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{aEntrar ? "…" : "Entrar"}</button>
             </div>
-            {erroEntrar && <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 8 }}>{erroEntrar}</div>}
+            {erroEntrar && (
+              erroEntrar.includes("Pro") ? (
+                <a href="/ippon-pro" style={{ display: "block", fontSize: 12.5, color: GOLD, marginTop: 8, textDecoration: "none", background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 10, padding: "10px 12px", lineHeight: 1.4 }}>{erroEntrar} →</a>
+              ) : (
+                <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 8 }}>{erroEntrar}</div>
+              )
+            )}
           </>
         )}
 
@@ -185,6 +204,28 @@ function LeagueRow({ cfg, name, sub, right }: { cfg: Identity; name: string; sub
     </div>
   );
 }
+
+function OficialRow({ cfg, name, sub, pro }: { cfg: Identity; name: string; sub: string; pro: boolean }) {
+  const conteudo = (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#121815", border: `1px solid ${pro ? "#243029" : "#2a2410"}`, borderRadius: 14, padding: "11px 13px", marginBottom: 9, opacity: pro ? 1 : 0.92 }}>
+      <div style={{ flexShrink: 0, display: "flex", position: "relative" }}>
+        <Escudo config={cfg} size={34} />
+        {!pro && <span style={{ position: "absolute", right: -4, bottom: -4, width: 18, height: 18, borderRadius: "50%", background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>🔒</span>}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6 }}>{name}</div>
+        <div style={{ fontSize: 11, color: "#93a39a" }}>{sub}</div>
+      </div>
+      {pro ? (
+        <span style={{ fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 12 }}>Ativa</span>
+      ) : (
+        <span style={{ background: "#3a2f12", color: GOLD, fontSize: 10, fontWeight: 700, padding: "5px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>PRO</span>
+      )}
+    </div>
+  );
+  return pro ? conteudo : <a href="/ippon-pro" style={{ textDecoration: "none", display: "block" }}>{conteudo}</a>;
+}
+
 function ActionBtn({ kind, children }: { kind: "ver" | "solicitar"; children: React.ReactNode }) {
   const ver = kind === "ver";
   return <span style={{ background: ver ? "#e67e22" : "#3f8f5a", color: ver ? "#1b0f06" : "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 12px", borderRadius: 8, whiteSpace: "nowrap", display: "inline-block" }}>{children}</span>;
