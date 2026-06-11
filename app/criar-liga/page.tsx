@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Escudo, SymbolGlyph, SHAPES, PATTERNS, LEAGUE_SYMBOLS, COLORS, DEFAULT_IDENTITY, type Identity, type ShapeId, type PatternId, type SymbolId } from "@/components/Escudo";
-import { addLeague, newId, newInviteCode, DEFAULT_LEAGUE_SHIELD, type LeagueFormat, type LeaguePrivacy, type MyLeague } from "@/lib/leagues";
+import { Escudo, SymbolGlyph, SHAPES, PATTERNS, LEAGUE_SYMBOLS, COLORS, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+import { DEFAULT_LEAGUE_SHIELD, type LeagueFormat, type LeaguePrivacy } from "@/lib/leagues";
+import { supabase } from "@/lib/supabase";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -18,16 +19,26 @@ const COLOR_SLOTS: { key: keyof Identity; label: string }[] = [
 
 const rnd = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
+interface LigaCriada {
+  id: string;
+  name: string;
+  invite_code: string;
+  formato: string;
+  privacidade: string;
+}
+
 export default function CriarLiga() {
   const [step, setStep] = useState<"criar" | "convites">("criar");
   const [cfg, setCfg] = useState<Identity>(DEFAULT_LEAGUE_SHIELD);
   const [name, setName] = useState("");
+  const [descricao, setDescricao] = useState("");
   const [format, setFormat] = useState<LeagueFormat>("pontos");
-  const [formatName, setFormatName] = useState("");
   const [privacy, setPrivacy] = useState<LeaguePrivacy>("fechada");
   const [activeColor, setActiveColor] = useState<keyof Identity>("bg1");
-  const [created, setCreated] = useState<MyLeague | null>(null);
+  const [created, setCreated] = useState<LigaCriada | null>(null);
   const [copied, setCopied] = useState(false);
+  const [a_criar, setACriar] = useState(false);
+  const [erro, setErro] = useState("");
 
   function set<K extends keyof Identity>(key: K, value: Identity[K]) {
     setCfg((prev) => ({ ...prev, [key]: value }));
@@ -36,26 +47,47 @@ export default function CriarLiga() {
     setCfg((p) => ({ ...p, shape: rnd(SHAPES), pattern: rnd(PATTERNS).id, symbol: rnd(LEAGUE_SYMBOLS).id, bg1: rnd(COLORS), bg2: rnd(COLORS), stamp1: rnd(COLORS), stamp2: rnd(COLORS), border: rnd(COLORS) }));
   }
 
-  const canCreate = name.trim().length >= 2;
+  const canCreate = name.trim().length >= 2 && !a_criar;
 
-  function criar() {
+  async function criar() {
     if (!canCreate) return;
-    const lg: MyLeague = {
-      id: newId(),
-      name: name.trim(),
-      format,
-      formatName: formatName.trim() || (format === "copa" ? "Copa Ippon" : "Pontos Corridos"),
-      privacy,
-      cfg: { ...cfg, name: name.trim() },
-      inviteCode: newInviteCode(),
-      createdAt: Date.now(),
-    };
-    addLeague(lg);
-    setCreated(lg);
-    setStep("convites");
+    setErro("");
+    setACriar(true);
+    try {
+      // Quem está a criar? Precisa de sessão.
+      const { data: sess } = await supabase.auth.getSession();
+      const user_id = sess.session?.user?.id;
+      if (!user_id) {
+        window.location.href = "/entrar?voltar=/criar-liga";
+        return;
+      }
+      const res = await fetch("/api/liga/criar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id,
+          nome: name.trim(),
+          descricao: descricao.trim(),
+          formato: format,
+          privacidade: privacy,
+          escudo: { ...cfg, name: name.trim() },
+        }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        setErro(j.erro || "Não foi possível criar a liga.");
+        setACriar(false);
+        return;
+      }
+      setCreated(j.liga);
+      setStep("convites");
+    } catch {
+      setErro("Falha de ligação. Tenta de novo.");
+      setACriar(false);
+    }
   }
 
-  const inviteLink = created ? `https://ippon-league.vercel.app/liga/${created.inviteCode}` : "";
+  const inviteLink = created ? `https://ippon-league.vercel.app/liga/${created.invite_code}` : "";
   function copy() {
     try { navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch {}
   }
@@ -74,7 +106,6 @@ export default function CriarLiga() {
 
         {step === "criar" ? (
           <>
-            {/* Escudo da liga */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 8 }}>
               <Escudo config={cfg} size={96} />
               <button onClick={sortear} style={{ marginTop: 10, background: "#141a17", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "8px 16px", borderRadius: 10, cursor: "pointer" }}>↻ Sortear</button>
@@ -130,11 +161,21 @@ export default function CriarLiga() {
             </div>
 
             <Label>Formato</Label>
-            <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+            <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
               <FormatCard on={format === "pontos"} onClick={() => setFormat("pontos")} title="Pontos Corridos" desc="Soma de pontos rodada após rodada. Vence quem tiver mais no fim." icon="🏅" />
               <FormatCard on={format === "copa"} onClick={() => setFormat("copa")} title="Copa Ippon" desc="Mata-mata: quem pontuar mais na rodada avança. Ideal para amigos." icon="🏆" />
             </div>
-            <input value={formatName} onChange={(e) => setFormatName(e.target.value)} placeholder={format === "copa" ? "Nome do troféu (ex.: Copa do Dojo)" : "Nome do campeonato (opcional)"} maxLength={28} style={{ ...inputStyle, marginBottom: 22 }} />
+
+            <Label>Descrição da liga</Label>
+            <textarea
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              placeholder="Regras, premiação e informações da liga — opcional. Ex.: O campeão do mês ganha o jantar. Vale tudo menos escalar lesionado! 🥋"
+              maxLength={400}
+              rows={4}
+              style={{ ...inputStyle, marginBottom: 6, resize: "vertical", lineHeight: 1.5, fontFamily: FB }}
+            />
+            <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 22, textAlign: "right" }}>{descricao.length}/400</div>
 
             <Label>Privacidade</Label>
             <div style={{ display: "flex", gap: 10, marginBottom: 26 }}>
@@ -142,25 +183,20 @@ export default function CriarLiga() {
               <FormatCard on={privacy === "aberta"} onClick={() => setPrivacy("aberta")} title="Aberta" desc="Aparece no mercado de ligas. Qualquer um pode pedir para entrar." icon="🌍" />
             </div>
 
-            <button onClick={criar} disabled={!canCreate} style={{ width: "100%", background: canCreate ? GOLD : "#23291f", color: canCreate ? "#1b211e" : "#5f6f67", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 15, borderRadius: 12, fontSize: 16, cursor: canCreate ? "pointer" : "default" }}>Criar liga</button>
-            {!canCreate && <div style={{ textAlign: "center", fontSize: 11, color: "#7c8a82", marginTop: 8 }}>Dá um nome à tua liga para continuar.</div>}
+            {erro && <div style={{ background: "#2a1a18", border: "1px solid #5a2a24", color: "#ef8d83", fontSize: 12.5, padding: "10px 12px", borderRadius: 10, marginBottom: 12 }}>{erro}</div>}
+
+            <button onClick={criar} disabled={!canCreate} style={{ width: "100%", background: canCreate ? GOLD : "#23291f", color: canCreate ? "#1b211e" : "#5f6f67", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 15, borderRadius: 12, fontSize: 16, cursor: canCreate ? "pointer" : "default" }}>{a_criar ? "A criar…" : "Criar liga"}</button>
+            {!canCreate && !a_criar && <div style={{ textAlign: "center", fontSize: 11, color: "#7c8a82", marginTop: 8 }}>Dá um nome à tua liga para continuar.</div>}
           </>
         ) : (
           created && (
             <>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", marginBottom: 18 }}>
-                <Escudo config={created.cfg} size={84} />
+                <Escudo config={{ ...cfg, name: created.name }} size={84} />
                 <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", marginTop: 10 }}>{created.name}</div>
                 <div style={{ fontSize: 12, color: "#7fd1a3", marginTop: 3 }}>Liga criada! Agora chama o teu dojo. 🥋</div>
-                <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{created.formatName} · {created.privacy === "fechada" ? "Fechada" : "Aberta"}</div>
+                <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{created.privacidade === "fechada" ? "Fechada" : "Aberta"}</div>
               </div>
-
-              <Label>Convidar por nick</Label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "10px 12px", marginBottom: 6, opacity: 0.7 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93a39a" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-                <input disabled placeholder="Procurar jogador pelo nick..." style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#cfd8d2", fontSize: 14, fontFamily: FB }} />
-              </div>
-              <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 22 }}>Disponível quando as contas estiverem ligadas. Por agora, partilha o link. 👇</div>
 
               <Label>Convidar por link</Label>
               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
@@ -169,7 +205,7 @@ export default function CriarLiga() {
               </div>
               <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 12, padding: "12px 14px", marginBottom: 26, textAlign: "center" }}>
                 <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Código de convite</div>
-                <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD, letterSpacing: "0.12em" }}>{created.inviteCode}</div>
+                <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD, letterSpacing: "0.12em" }}>{created.invite_code}</div>
               </div>
 
               <a href="/ligas" style={{ display: "block", textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 15, borderRadius: 12, fontSize: 16, textDecoration: "none" }}>Concluir</a>
