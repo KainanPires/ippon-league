@@ -355,3 +355,43 @@ export async function loadSavedCloud(): Promise<TeamState | null> {
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// IDENTIDADE (nome + escudo) — propagar para a tabela `equipas`.
+// ---------------------------------------------------------------------------
+// O ecrã /escudo guardava o nome só no localStorage; a liga lê o nome da
+// tabela `equipas`. Esta função actualiza o `nome` e o `escudo` em TODAS as
+// linhas de equipa da conta, para que qualquer competição (e a liga) mostrem
+// o nome certo. Se a conta ainda não tem nenhuma equipa, não há nada a
+// actualizar — o nome chega à `equipas` quando a 1ª equipa for guardada (o
+// commitSavedCloudFor já leva a identidade).
+export async function atualizarIdentidadeCloud(identity: TeamIdentity): Promise<CloudResult> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id as string | undefined;
+    if (!userId) return { ok: false, error: "sem sessão" };
+
+    const nome = (identity.name || "").toString().trim();
+    const campos: Record<string, unknown> = { escudo: identity };
+    if (nome) campos.nome = nome;
+
+    // Actualiza todas as linhas de equipa desta conta.
+    const { error } = await supabase
+      .from("equipas")
+      .update(campos)
+      .eq("user_id", userId);
+
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e) {
+    const msg = (e as { message?: string })?.message || "erro desconhecido";
+    return { ok: false, error: msg };
+  }
+}
+
+// Esta conta já tem alguma equipa com nome próprio (≠ "A minha equipa")?
+// Usado pelo Dojo para decidir se obriga a pessoa a dar nome ao time.
+export function temNomeProprio(identity: TeamIdentity): boolean {
+  const nome = (identity.name || "").toString().trim();
+  return nome.length > 0 && nome.toLowerCase() !== "a minha equipa";
+}
