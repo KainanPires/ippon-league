@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadLeagues, type MyLeague } from "@/lib/leagues";
+import { supabase } from "@/lib/supabase";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -18,19 +18,64 @@ const OFICIAIS = [
   { id: "portugal", name: "Nacional · Portugal", sub: "Jogadores de Portugal", pos: "#14", cfg: esc({ bg1: "#c0392b", bg2: "#7a1f17", border: "#efeadd", symbol: "estrela" }) },
 ];
 
-const DESTAQUES = [
-  { id: "pretas", name: "Liga dos Faixas-Pretas", sub: "12.340 jogadores", cfg: esc({ bg1: "#141110", bg2: "#000000", border: GOLD, symbol: "estrela" }), action: "Ver" },
-  { id: "brasil", name: "Tatame Brasil", sub: "8.901 jogadores", cfg: esc({ bg1: "#2a4d3e", bg2: "#16302a", border: "#7fd1a3", symbol: "montanha" }), action: "Ver" },
-  { id: "ippt", name: "Ippon Portugal", sub: "3.221 jogadores", cfg: esc({ bg1: "#7a4fa3", bg2: "#4a2f66", border: "#efeadd", symbol: "raio" }), action: "Ver" },
-];
-const PRIVADAS = [
-  { id: "sensei", name: "Sensei Masters", sub: "Privada · moderada", cfg: esc({ bg1: "#2f6fb3", bg2: "#25588f", border: "#7fb8f5", symbol: "torii" }), action: "Solicitar" },
-];
+interface MinhaLiga {
+  id: string;
+  name: string;
+  formato: string;
+  privacidade: string;
+  escudo: Identity | null;
+  invite_code: string;
+  membros: number;
+  sou_dono: boolean;
+}
 
 export default function Ligas() {
   const [tab, setTab] = useState<Tab>("ativas");
-  const [mine, setMine] = useState<MyLeague[]>([]);
-  useEffect(() => { try { setMine(loadLeagues()); } catch {} }, []);
+  const [mine, setMine] = useState<MinhaLiga[]>([]);
+  const [aCarregar, setACarregar] = useState(true);
+  const [codigo, setCodigo] = useState("");
+  const [aEntrar, setAEntrar] = useState(false);
+  const [erroEntrar, setErroEntrar] = useState("");
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) { if (vivo) { setMine([]); setACarregar(false); } return; }
+      try {
+        const res = await fetch(`/api/liga/minhas?user_id=${uid}`);
+        const j = await res.json();
+        if (vivo && Array.isArray(j.ligas)) setMine(j.ligas);
+      } catch {}
+      if (vivo) setACarregar(false);
+    })();
+    return () => { vivo = false; };
+  }, []);
+
+  async function entrarPorCodigo() {
+    const c = codigo.trim().toUpperCase();
+    if (c.length < 4) { setErroEntrar("Código demasiado curto."); return; }
+    setErroEntrar("");
+    setAEntrar(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) { window.location.href = `/entrar?voltar=/ligas`; return; }
+      const res = await fetch("/api/liga/entrar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: uid, codigo: c }),
+      });
+      const j = await res.json();
+      if (!j.ok) { setErroEntrar(j.erro || "Não encontrámos essa liga."); setAEntrar(false); return; }
+      // Entrou: vai direto para a liga.
+      window.location.href = `/liga/${j.liga.invite_code}`;
+    } catch {
+      setErroEntrar("Falha de ligação.");
+      setAEntrar(false);
+    }
+  }
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -59,11 +104,16 @@ export default function Ligas() {
           <>
             <Section>Ligas oficiais</Section>
             {OFICIAIS.map((l) => <LeagueRow key={l.id} cfg={l.cfg} name={l.name} sub={l.sub} right={<span style={{ fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 15 }}>{l.pos}</span>} />)}
+
             <Section style={{ marginTop: 18 }}>Ligas de amigos</Section>
-            {mine.length > 0 ? (
+            {aCarregar ? (
+              <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
+            ) : mine.length > 0 ? (
               <>
                 {mine.map((l) => (
-                  <LeagueRow key={l.id} cfg={l.cfg} name={l.name} sub={`${l.formatName} · ${l.privacy === "fechada" ? "Fechada" : "Aberta"}`} right={<ActionBtn kind="ver">Abrir</ActionBtn>} />
+                  <a key={l.id} href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}>
+                    <LeagueRow cfg={l.escudo || DEFAULT_IDENTITY} name={l.name} sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`} right={<ActionBtn kind="ver">Abrir</ActionBtn>} />
+                  </a>
                 ))}
                 <a href="/criar-liga" style={{ display: "block", textAlign: "center", marginTop: 10, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 13 }}>+ Criar outra liga</a>
               </>
@@ -73,20 +123,22 @@ export default function Ligas() {
                 <a href="/criar-liga" style={{ display: "inline-block", background: "#3f8f5a", color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>Criar liga</a>
               </div>
             )}
+
+            <Section style={{ marginTop: 18 }}>Entrar com código</Section>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} placeholder="Código de convite" maxLength={8} style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 13px", color: "#f1ede2", fontSize: 15, fontFamily: FD, letterSpacing: "0.1em", outline: "none", textTransform: "uppercase" }} />
+              <button onClick={entrarPorCodigo} disabled={aEntrar} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{aEntrar ? "…" : "Entrar"}</button>
+            </div>
+            {erroEntrar && <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 8 }}>{erroEntrar}</div>}
           </>
         )}
 
         {tab === "mercado" && (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "9px 12px", marginBottom: 16 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93a39a" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-              <input placeholder="Procurar liga pelo nome" style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB }} />
-            </div>
-            <Section>Destaques</Section>
-            {DESTAQUES.map((l) => <LeagueRow key={l.id} cfg={l.cfg} name={l.name} sub={l.sub} right={<ActionBtn kind="ver">{l.action}</ActionBtn>} />)}
-            <Section style={{ marginTop: 18 }}>Últimas ligas</Section>
-            {PRIVADAS.map((l) => <LeagueRow key={l.id} cfg={l.cfg} name={l.name} sub={l.sub} right={<ActionBtn kind="solicitar">{l.action}</ActionBtn>} />)}
-          </>
+          <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82" }}>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#cfd8d2", marginBottom: 6 }}>Mercado de ligas</div>
+            <div style={{ fontSize: 13, lineHeight: 1.5 }}>As ligas públicas abertas vão aparecer aqui para qualquer um entrar.</div>
+            <div style={{ marginTop: 12, fontSize: 11, color: "#5f6f67", border: "1px solid #2a3a33", borderRadius: 999, padding: "4px 12px", display: "inline-block" }}>Em breve</div>
+          </div>
         )}
 
         {tab === "resultados" && (
@@ -113,18 +165,10 @@ function NavTab({ label, icon, href, active }: { label: string; icon: React.Reac
   const inner = <>{icon}<span style={{ fontSize: 11, fontWeight: active ? 700 : 400 }}>{label}</span></>;
   return href ? <a href={href} style={style}>{inner}</a> : <div style={style}>{inner}</div>;
 }
-function HomeIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></svg>;
-}
-function TrophyIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 6H5v2a3 3 0 0 0 3 3M16 6h3v2a3 3 0 0 1-3 3M10 17h4M9 21h6M12 13v4" /></svg>;
-}
-function AthletesIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="6" r="3" /><circle cx="17" cy="7" r="2.5" /><path d="M3 20v-1a5 5 0 0 1 10 0v1M14 20v-1a4 4 0 0 1 7-2.6" /></svg>;
-}
-function BoltIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" /></svg>;
-}
+function HomeIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></svg>; }
+function TrophyIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 6H5v2a3 3 0 0 0 3 3M16 6h3v2a3 3 0 0 1-3 3M10 17h4M9 21h6M12 13v4" /></svg>; }
+function AthletesIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="6" r="3" /><circle cx="17" cy="7" r="2.5" /><path d="M3 20v-1a5 5 0 0 1 10 0v1M14 20v-1a4 4 0 0 1 7-2.6" /></svg>; }
+function BoltIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" /></svg>; }
 
 function Section({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", margin: "4px 0 10px", ...style }}>{children}</div>;
@@ -134,7 +178,7 @@ function LeagueRow({ cfg, name, sub, right }: { cfg: Identity; name: string; sub
     <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px", marginBottom: 9 }}>
       <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={cfg} size={34} /></div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#f1ede2" }}>{name}</div>
         <div style={{ fontSize: 11, color: "#93a39a" }}>{sub}</div>
       </div>
       {right}
@@ -143,5 +187,5 @@ function LeagueRow({ cfg, name, sub, right }: { cfg: Identity; name: string; sub
 }
 function ActionBtn({ kind, children }: { kind: "ver" | "solicitar"; children: React.ReactNode }) {
   const ver = kind === "ver";
-  return <button style={{ background: ver ? "#e67e22" : "#3f8f5a", color: ver ? "#1b0f06" : "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 12px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>{children}</button>;
+  return <span style={{ background: ver ? "#e67e22" : "#3f8f5a", color: ver ? "#1b0f06" : "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 12px", borderRadius: 8, whiteSpace: "nowrap", display: "inline-block" }}>{children}</span>;
 }
