@@ -9,7 +9,7 @@ import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
-import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
+import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, type TutKey } from "@/lib/tutorials";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -45,8 +45,8 @@ const STEPS_COMPETICAO = [
   { t: "Total da equipa", x: "A pontuação total da tua equipa está aqui em baixo, e sobe à medida que os teus atletas pontuam.", target: "total" },
   { t: "Acompanha a rodada", x: "A equipa está trancada durante a competição. Volta aqui para ver os pontos a subir!", target: "total" },
 ];
-const TUT_EDICAO_KEY = "ippon_meutime_tut_edicao";
-const TUT_COMP_KEY = "ippon_meutime_tut_competicao";
+const TUT_EDICAO_KEY: TutKey = "ippon_meutime_tut_edicao";
+const TUT_COMP_KEY: TutKey = "ippon_meutime_tut_competicao";
 
 function sameTeam(a: TeamState, b: TeamState): boolean {
   if ((a.captain || "") !== (b.captain || "")) return false;
