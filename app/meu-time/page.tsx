@@ -214,13 +214,20 @@ export default function MeuTime() {
     update({ ids: [], captain: null });
     setModal(null);
   }
-  async function salvar() {
+  async function salvar(destino?: string | null) {
     if (!isComplete(team)) { setModal({ kind: "missing" }); return; }
     setSavingCloud(true);
     const res = await commitSavedCloudFor(alvo.idCompeticao, team, identity);
     setSaved(team);
     setSavingCloud(false);
     setCloudWarn(!res.ok);
+    // Se o salvar veio do aviso de saída, continua para o destino depois de guardar.
+    if (destino) {
+      setModal(null);
+      setLeaveTo(null);
+      router.push(destino);
+      return;
+    }
     setModal({ kind: "saved" });
   }
   // PRENDER: ao tentar sair com alterações por guardar, avisa.
@@ -342,7 +349,7 @@ export default function MeuTime() {
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 60 }}>
           <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1, fontSize: 12, color: "#cfd8d2" }}>Tens alterações por guardar.</div>
-            <button onClick={salvar} disabled={savingCloud} className={!savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar equipa"}</button>
+            <button onClick={() => salvar()} disabled={savingCloud} className={!savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar equipa"}</button>
           </div>
         </div>
       )}
@@ -410,10 +417,10 @@ export default function MeuTime() {
         <div style={overlayBg}>
           <div style={cardBox}>
             <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="indicando" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Sair sem guardar?</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Tens alterações por guardar. Se saíres agora, não ficam guardadas na tua conta.</p>
-            <button onClick={() => { const to = leaveTo; setModal(null); setLeaveTo(null); if (to) router.push(to); }} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>Sair sem guardar</button>
-            <button onClick={() => { setModal(null); setLeaveTo(null); }} style={ghostBtn}>Continuar aqui</button>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Cuidado — não percas as alterações</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Tens alterações por guardar. Salva agora para não perderes o teu time.</p>
+            <button onClick={() => salvar(leaveTo)} disabled={savingCloud} style={{ ...primaryBtn, opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar alterações"}</button>
+            <button onClick={() => { setModal(null); setLeaveTo(null); }} style={ghostBtn}>Fechar</button>
           </div>
         </div>
       )}
