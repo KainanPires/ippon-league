@@ -31,15 +31,22 @@ const toInt = (v: unknown): number => {
   return isNaN(x) ? 0 : x;
 };
 
+// Lê um campo dinâmico (ex.: "ippon_b") de uma luta. Passa por `unknown` antes
+// de Record<string, unknown> porque IjfContest tem campos fixos (sem index
+// signature) e o TS estrito não deixa converter diretamente.
+function campo(f: IjfContest, nome: string): number {
+  return toInt((f as unknown as Record<string, unknown>)[nome]);
+}
+
 // Campos crus + pontos calculados de um lado da luta.
 function lado(f: IjfContest, side: "b" | "w") {
   const id = String(side === "b" ? f.id_person_blue : f.id_person_white || "");
   return {
     id_person: id,
-    ippon: toInt((f as Record<string, unknown>)[`ippon_${side}`]),
-    waza: toInt((f as Record<string, unknown>)[`waza_${side}`]),
-    yuko: toInt((f as Record<string, unknown>)[`yuko_${side}`]),
-    penalty: toInt((f as Record<string, unknown>)[`penalty_${side}`]),
+    ippon: campo(f, `ippon_${side}`),
+    waza: campo(f, `waza_${side}`),
+    yuko: campo(f, `yuko_${side}`),
+    penalty: campo(f, `penalty_${side}`),
     pontos_motor: scoreActions(contestActions(f, side)),
   };
 }
@@ -107,10 +114,10 @@ export async function GET(req: Request) {
       destas_com_ippon_no_mesmo_lado: waza2ComIpponMesmoLado,
       leitura:
         casosWaza2.length === 0
-          ? "Sem lutas com waza>=2 nesta competição (ou ainda sem dados)."
+          ? "Sem lutas com waza>=2 nesta competicao (ou ainda sem dados)."
           : waza2ComIpponMesmoLado === 0
-            ? "Dois waza-aris ficam como waza=2 (ippon=0). O motor dá 8 (4+4) — É O QUE QUERES."
-            : "Há lutas com waza>=2 E ippon>=1 no mesmo lado. O JudoBase pode estar a converter — VERIFICAR os campos crus em casos_waza2.",
+            ? "Dois waza-aris ficam como waza=2 (ippon=0). O motor da 8 (4+4) — E O QUE QUERES."
+            : "Ha lutas com waza>=2 E ippon>=1 no mesmo lado. O JudoBase pode estar a converter — VERIFICAR os campos crus em casos_waza2.",
     },
 
     // ---- TESTE 2: HANSOKU-MAKE (3 shidos) ----
@@ -119,10 +126,10 @@ export async function GET(req: Request) {
       destas_com_ippon_no_vencedor: penalty3ComIpponNoVencedor,
       leitura:
         casosPenalty3.length === 0
-          ? "Sem lutas com penalty>=3 nesta competição (ou ainda sem dados)."
+          ? "Sem lutas com penalty>=3 nesta competicao (ou ainda sem dados)."
           : penalty3ComIpponNoVencedor === 0
-            ? "Hansoku-make aparece só como penalty=3, sem ippon ao vencedor. Quem leva: -6 (3 shidos). Quem ganha: +3."
-            : "Atenção: em hansoku-make o vencedor TAMBÉM tem ippon. Isso soma +10 ao vencedor e -5 ao perdedor — DECIDIR se é o pretendido.",
+            ? "Hansoku-make aparece so como penalty=3, sem ippon ao vencedor. Quem leva: -6 (3 shidos). Quem ganha: +3."
+            : "Atencao: em hansoku-make o vencedor TAMBEM tem ippon. Isso soma +10 ao vencedor e -5 ao perdedor — DECIDIR se e o pretendido.",
     },
 
     casos_waza2: casosWaza2,
