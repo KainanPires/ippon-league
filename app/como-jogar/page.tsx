@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Mascot } from "@/components/Mascot";
+import { PRECO } from "@/lib/precos";
 
 const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
 const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
@@ -23,6 +24,7 @@ const PRO_BENEFITS = [
   "Dicas e capitães recomendados da rodada",
   "Barganhas da rodada",
   "Ligas e badges exclusivos",
+  PRECO.premios,
 ];
 
 export default function ComoJogar() {
@@ -76,13 +78,13 @@ export default function ComoJogar() {
             <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}>
               <Mascot belt="#141110" expression="feliz" />
             </div>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: GOLD }}>Oferta de lançamento</div>
+            {PRECO.emPromocao && <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: GOLD }}>Oferta de lançamento</div>}
             <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 700, textTransform: "uppercase", margin: "6px 0 4px" }}>Joga com vantagem: Ippon Pro</h2>
 
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 10, margin: "10px 0 16px" }}>
-              <span style={{ fontSize: 16, color: "#7c8a82", textDecoration: "line-through" }}>9,90€</span>
-              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 700, color: GOLD }}>4,90€</span>
-              <span style={{ fontSize: 13, color: "#93a39a" }}>/mês</span>
+              {PRECO.emPromocao && <span style={{ fontSize: 16, color: "#7c8a82", textDecoration: "line-through" }}>{PRECO.normal}</span>}
+              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
+              <span style={{ fontSize: 13, color: "#93a39a" }}>{PRECO.periodo}</span>
             </div>
 
             <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
