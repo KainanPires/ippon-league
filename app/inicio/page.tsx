@@ -75,7 +75,7 @@ export default function Inicio() {
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getSession().then(({ data }: { data: { session: { user?: { user_metadata?: { nome?: string } } } | null } }) => {
+    supabase.auth.getSession().then(({ data }: { data: { session: { user?: { id?: string; user_metadata?: { nome?: string } } } | null } }) => {
       if (!active) return;
 
       if (!data.session) {
