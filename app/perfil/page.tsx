@@ -51,8 +51,13 @@ export default function Perfil() {
       const u = data.session?.user;
       if (u) {
         const m = u.user_metadata || {};
+        // Nome em cascata: 1º os metadados; se vazios (contas antigas), cai para
+        // o localStorage (onde o /inicio guardou o primeiro nome); só depois "Campeão".
+        let nomeLocal = "";
+        try { nomeLocal = String(localStorage.getItem("ippon_name") || "").trim(); } catch {}
+        const nomeFinal = (String(m.nome || "").trim() || nomeLocal || "Campeão");
         setConta({
-          nome: String(m.nome || "").trim() || "Campeão",
+          nome: nomeFinal,
           email: String(u.email || "").trim(),
           telefone: String(m.telefone || "").trim(),
           pais: String(m.pais || "").trim(),
