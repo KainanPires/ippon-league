@@ -28,6 +28,18 @@ interface MinhaLiga {
   sou_dono: boolean;
 }
 
+interface LigaMercado {
+  id: string;
+  name: string;
+  formato: string;
+  privacidade: string;
+  escudo: Identity | null;
+  invite_code: string;
+  membros: number;
+  sou_membro: boolean;
+  sou_dono: boolean;
+}
+
 export default function Ligas() {
   const [tab, setTab] = useState<Tab>("ativas");
   const [mine, setMine] = useState<MinhaLiga[]>([]);
@@ -36,6 +48,12 @@ export default function Ligas() {
   const [aEntrar, setAEntrar] = useState(false);
   const [erroEntrar, setErroEntrar] = useState("");
   const [souPro, setSouPro] = useState(false);
+
+  // Mercado de ligas (carrega só quando se abre a aba).
+  const [mercado, setMercado] = useState<LigaMercado[] | null>(null);
+  const [aCarregarMercado, setACarregarMercado] = useState(false);
+  const [aEntrarId, setAEntrarId] = useState<string | null>(null);
+  const [erroMercado, setErroMercado] = useState("");
 
   useEffect(() => {
     let vivo = true;
@@ -54,6 +72,27 @@ export default function Ligas() {
     })();
     return () => { vivo = false; };
   }, []);
+
+  // Carrega o mercado (uma vez). Chamado ao abrir a aba "mercado".
+  async function carregarMercado() {
+    if (mercado !== null || aCarregarMercado) return;
+    setACarregarMercado(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id || "";
+      const res = await fetch(`/api/liga/mercado?user_id=${uid}`);
+      const j = await res.json();
+      setMercado(Array.isArray(j.ligas) ? j.ligas : []);
+    } catch {
+      setMercado([]);
+    }
+    setACarregarMercado(false);
+  }
+
+  function mudarTab(t: Tab) {
+    setTab(t);
+    if (t === "mercado") carregarMercado();
+  }
 
   async function entrarPorCodigo() {
     const c = codigo.trim().toUpperCase();
@@ -75,11 +114,36 @@ export default function Ligas() {
         setAEntrar(false);
         return;
       }
-      // Entrou: vai direto para a liga.
       window.location.href = `/liga/${j.liga.invite_code}`;
     } catch {
       setErroEntrar("Falha de ligação.");
       setAEntrar(false);
+    }
+  }
+
+  // Entrar numa liga ABERTA a partir do mercado (entra direto, sem aprovação).
+  async function entrarNaLigaAberta(liga: LigaMercado) {
+    setErroMercado("");
+    setAEntrarId(liga.id);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) { window.location.href = `/entrar?voltar=/ligas`; return; }
+      const res = await fetch("/api/liga/entrar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: uid, codigo: liga.invite_code }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        setErroMercado(j.erro || "Não foi possível entrar nesta liga.");
+        setAEntrarId(null);
+        return;
+      }
+      window.location.href = `/liga/${liga.invite_code}`;
+    } catch {
+      setErroMercado("Falha de ligação.");
+      setAEntrarId(null);
     }
   }
 
@@ -100,7 +164,7 @@ export default function Ligas() {
 
         <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: "1px solid #1a221d" }}>
           {(["ativas", "mercado", "resultados"] as Tab[]).map((t) => (
-            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${tab === t ? GOLD : "transparent"}`, color: tab === t ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>
+            <button key={t} onClick={() => mudarTab(t)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${tab === t ? GOLD : "transparent"}`, color: tab === t ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>
               {t === "ativas" ? "Ativas" : t === "mercado" ? "Mercado" : "Resultados"}
             </button>
           ))}
@@ -153,11 +217,44 @@ export default function Ligas() {
         )}
 
         {tab === "mercado" && (
-          <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82" }}>
-            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#cfd8d2", marginBottom: 6 }}>Mercado de ligas</div>
-            <div style={{ fontSize: 13, lineHeight: 1.5 }}>As ligas públicas abertas vão aparecer aqui para qualquer um entrar.</div>
-            <div style={{ marginTop: 12, fontSize: 11, color: "#5f6f67", border: "1px solid #2a3a33", borderRadius: 999, padding: "4px 12px", display: "inline-block" }}>Em breve</div>
-          </div>
+          <>
+            <Section>Ligas abertas</Section>
+            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>Ligas públicas onde qualquer jogador pode entrar. As ligas fechadas não aparecem aqui — só se entra por código.</p>
+
+            {mercado === null || aCarregarMercado ? (
+              <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
+            ) : mercado.length === 0 ? (
+              <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
+                <div style={{ fontSize: 13, color: "#c7d0c9", marginBottom: 12, lineHeight: 1.5 }}>Ainda não há ligas abertas.<br />Cria a tua e deixa-a <strong>aberta</strong> para todos entrarem!</div>
+                <a href="/criar-liga" style={{ display: "inline-block", background: "#3f8f5a", color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>Criar liga</a>
+              </div>
+            ) : (
+              <>
+                {mercado.map((l) => (
+                  <LeagueRow
+                    key={l.id}
+                    cfg={l.escudo || DEFAULT_IDENTITY}
+                    name={l.name}
+                    sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`}
+                    right={
+                      l.sou_membro ? (
+                        <a href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}><ActionBtn kind="ver">Abrir</ActionBtn></a>
+                      ) : (
+                        <button onClick={() => entrarNaLigaAberta(l)} disabled={aEntrarId === l.id} style={{ background: "#3f8f5a", color: "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 14px", borderRadius: 8, whiteSpace: "nowrap", cursor: aEntrarId === l.id ? "default" : "pointer", opacity: aEntrarId === l.id ? 0.7 : 1 }}>{aEntrarId === l.id ? "…" : "Entrar"}</button>
+                      )
+                    }
+                  />
+                ))}
+                {erroMercado && (
+                  erroMercado.includes("Pro") ? (
+                    <a href="/ippon-pro" style={{ display: "block", fontSize: 12.5, color: GOLD, marginTop: 8, textDecoration: "none", background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 10, padding: "10px 12px", lineHeight: 1.4 }}>{erroMercado} →</a>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 8 }}>{erroMercado}</div>
+                  )
+                )}
+              </>
+            )}
+          </>
         )}
 
         {tab === "resultados" && (
