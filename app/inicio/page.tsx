@@ -224,8 +224,16 @@ export default function Inicio() {
 
         <a href="/ippon-pro" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "11px 14px", marginBottom: 14, textDecoration: "none" }}>
           <div>
-            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Ippon Pro · 4,90€</div>
-            <div style={{ fontSize: 11, color: "#5c4410" }}>Joga com vantagem competitiva</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Ippon Pro</span>
+              <span style={{ background: "#1b211e", color: GOLD, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>Promoção</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
+              <span style={{ fontSize: 12, color: "#7a5e12", textDecoration: "line-through" }}>9,90€</span>
+              <span style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: "#3a2a08" }}>4,90€</span>
+              <span style={{ fontSize: 11, color: "#5c4410" }}>/mês</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#5c4410", marginTop: 2 }}>Joga com vantagem competitiva</div>
           </div>
           <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Assinar</span>
         </a>
