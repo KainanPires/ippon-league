@@ -119,3 +119,144 @@ export function idCompeticaoSeguinte(idAtual: string): string | null {
   if (!atual) return null;
   return proximaDepoisDe(atual).idCompeticao;
 }
+
+// ===========================================================================
+// FASE C — apuramento por ronda (lógica pura, testável)
+// ===========================================================================
+
+// Os pontos de um jogador num confronto: o total da equipa e o do capitão (base),
+// para o desempate em cascata. Quem não escalou vem com escalou=false.
+export interface PontosJogador {
+  total: number;       // pontos da equipa (capitão já dobrado), como no ranking
+  capitao: number;     // pontos BASE do capitão (sem dobrar), para desempate
+  escalou: boolean;    // tinha equipa nesta competição?
+}
+
+export type DecididoPor = "pontos" | "capitao" | "sorteio" | "bye";
+
+export interface ResultadoConfronto {
+  vencedor: string;
+  decidido_por: DecididoPor;
+  pontos_a: number;
+  pontos_b: number;
+}
+
+/**
+ * Decide um confronto 1v1 com o desempate EM CASCATA:
+ *   1º mais pontos da rodada → 2º mais pontos do capitão → 3º sorteio.
+ * Quem não escalou conta como 0 e perde para quem escalou; se ambos não
+ * escalaram (0=0 e capitão 0=0), vai a sorteio. Nunca empata de verdade.
+ *
+ * @param rnd  função aleatória (default Math.random; injetável para testes)
+ */
+export function decidirConfronto(
+  jogadorA: string,
+  jogadorB: string,
+  pa: PontosJogador,
+  pb: PontosJogador,
+  rnd: () => number = Math.random
+): ResultadoConfronto {
+  const base = { pontos_a: pa.total, pontos_b: pb.total };
+
+  // 1) Pontos da rodada.
+  if (pa.total !== pb.total) {
+    return { ...base, vencedor: pa.total > pb.total ? jogadorA : jogadorB, decidido_por: "pontos" };
+  }
+  // 2) Pontos do capitão (base).
+  if (pa.capitao !== pb.capitao) {
+    return { ...base, vencedor: pa.capitao > pb.capitao ? jogadorA : jogadorB, decidido_por: "capitao" };
+  }
+  // 3) Sorteio (moeda ao ar).
+  return { ...base, vencedor: rnd() < 0.5 ? jogadorA : jogadorB, decidido_por: "sorteio" };
+}
+
+// Um confronto vindo da base de dados (o que precisamos para apurar/gerar).
+export interface ConfrontoDB {
+  ronda: number;
+  ordem: number;
+  fase: "normal" | "final" | "bronze";
+  jogador_a: string;
+  jogador_b: string | null;
+  vencedor: string | null;
+  estado: "pendente" | "decidido";
+}
+
+// Uma linha pronta a gravar para a ronda seguinte.
+export interface ConfrontoNovo {
+  ronda: number;
+  ordem: number;
+  fase: "normal" | "final" | "bronze";
+  jogador_a: string;
+  jogador_b: string | null;
+  id_competicao: string;
+  estado: "pendente";
+}
+
+/**
+ * Gera a ronda SEGUINTE a partir dos confrontos JÁ DECIDIDOS de uma ronda.
+ *
+ * Regras:
+ * - Emparelha os vencedores 2 a 2, pela ordem (0&1, 2&3, ...).
+ * - Quando a ronda decidida tem exatamente 2 confrontos (= semifinais), a ronda
+ *   seguinte gera DOIS jogos na MESMA competição: a FINAL (os 2 vencedores) e o
+ *   BRONZE (os 2 perdedores).
+ * - Caso normal: todos os jogos são "normal".
+ *
+ * @param confrontosDecididos  confrontos da ronda terminada (todos com vencedor)
+ * @param idCompeticaoSeguinte  competição da próxima ronda
+ * @returns confrontos da ronda seguinte (vazio se já era a final → copa acabou)
+ */
+export function gerarRondaSeguinte(
+  confrontosDecididos: ConfrontoDB[],
+  idCompeticaoProxima: string
+): ConfrontoNovo[] {
+  // Se a ronda já era a final, não há ronda seguinte (a copa termina).
+  if (confrontosDecididos.some((c) => c.fase === "final")) return [];
+
+  // Ordena por ordem para emparelhar de forma estável.
+  const ordenados = [...confrontosDecididos].sort((a, b) => a.ordem - b.ordem);
+  const rondaAtual = ordenados[0]?.ronda ?? 1;
+  const proximaRonda = rondaAtual + 1;
+
+  const vencedores = ordenados.map((c) => c.vencedor!).filter(Boolean);
+
+  // CASO SEMIFINAIS: exatamente 2 confrontos → final + bronze na mesma competição.
+  if (ordenados.length === 2) {
+    const perdedores = ordenados.map((c) =>
+      c.vencedor === c.jogador_a ? c.jogador_b : c.jogador_a
+    ).filter((x): x is string => !!x);
+
+    const novos: ConfrontoNovo[] = [
+      {
+        ronda: proximaRonda, ordem: 0, fase: "final",
+        jogador_a: vencedores[0], jogador_b: vencedores[1] ?? null,
+        id_competicao: idCompeticaoProxima, estado: "pendente",
+      },
+    ];
+    // Bronze só se houver mesmo 2 perdedores (não houve bye nas semis).
+    if (perdedores.length === 2) {
+      novos.push({
+        ronda: proximaRonda, ordem: 1, fase: "bronze",
+        jogador_a: perdedores[0], jogador_b: perdedores[1],
+        id_competicao: idCompeticaoProxima, estado: "pendente",
+      });
+    }
+    return novos;
+  }
+
+  // CASO NORMAL: emparelha vencedores 2 a 2.
+  const novos: ConfrontoNovo[] = [];
+  let ordem = 0;
+  for (let i = 0; i < vencedores.length; i += 2) {
+    novos.push({
+      ronda: proximaRonda,
+      ordem: ordem++,
+      fase: "normal",
+      jogador_a: vencedores[i],
+      jogador_b: vencedores[i + 1] ?? null, // ímpar → bye (raro, mas seguro)
+      id_competicao: idCompeticaoProxima,
+      estado: "pendente",
+    });
+  }
+  return novos;
+}
