@@ -9,6 +9,7 @@ import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
 import { focoMercado, textoFecho } from "@/lib/calendario";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
+import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -37,6 +38,7 @@ export default function CriarEquipa() {
   const [draft, setDraft] = useState<TeamState>({ ids: [], captain: null });
   const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null });
   const [modal, setModal] = useState<Modal>(null);
+  const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [savingCloud, setSavingCloud] = useState(false);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
@@ -183,6 +185,9 @@ export default function CriarEquipa() {
     // obrigatoriamente ao /escudo. Se já tem nome, segue o fluxo normal.
     if (!temNomeProprio(identity)) {
       setModal({ kind: "precisaNome" });
+    } else if (res.ok && devePedirAvaliacao()) {
+      // Fim da jornada (conta + equipa + nome): pede avaliação se for altura.
+      setMostrarAvaliacao(true);
     } else {
       setModal({ kind: "saved" });
     }
@@ -373,6 +378,9 @@ export default function CriarEquipa() {
             <button onClick={() => setModal(null)} style={ghostBtn}>Agora não</button>
           </div>
         </div>
+      )}
+      {mostrarAvaliacao && (
+        <Avaliacao nomeTime={identity.name} onClose={() => setMostrarAvaliacao(false)} />
       )}
       {modal?.kind === "saved" && (
         <div style={overlayBg}>
