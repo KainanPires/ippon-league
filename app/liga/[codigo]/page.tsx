@@ -31,17 +31,35 @@ interface LigaInfo {
   escudo: Identity | null;
   invite_code: string;
 }
+interface Pedido {
+  request_id: string;
+  user_id: string;
+  nome: string;
+  created_at: string;
+}
+
+// Nome amigável do estado de privacidade.
+function nomePrivacidade(p: string): string {
+  if (p === "aberta") return "Aberta";
+  if (p === "mediante_pedido") return "Por aprovação";
+  return "Fechada";
+}
 
 export default function PaginaLiga() {
   const params = useParams();
   const codigo = String(params?.codigo || "").toUpperCase();
 
-  const [estado, setEstado] = useState<"a_entrar" | "pronto" | "erro" | "sem_sessao">("a_entrar");
+  const [estado, setEstado] = useState<"a_entrar" | "pronto" | "erro" | "sem_sessao" | "pedido_enviado">("a_entrar");
   const [erroMsg, setErroMsg] = useState("");
   const [liga, setLiga] = useState<LigaInfo | null>(null);
   const [membros, setMembros] = useState<Membro[]>([]);
   const [meuId, setMeuId] = useState<string | null>(null);
   const [horaTick, setHoraTick] = useState<string>("");
+
+  // Painel do dono: pedidos pendentes.
+  const [souDono, setSouDono] = useState(false);
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [aDecidir, setADecidir] = useState<string | null>(null);
 
   // Foco do mercado: a competição que decorre (mercado fechado) ou a de mercado aberto.
   const foco = focoMercado();
@@ -79,6 +97,12 @@ export default function PaginaLiga() {
         if (!j.ok) {
           setErroMsg(j.erro || "Não foi possível abrir a liga.");
           setEstado("erro");
+          return;
+        }
+        // Liga "por aprovação": a entrada gerou um pedido pendente, não membro.
+        if (j.pedido) {
+          if (j.liga) setLiga(j.liga);
+          setEstado("pedido_enviado");
           return;
         }
         setLiga(j.liga);
@@ -130,6 +154,48 @@ export default function PaginaLiga() {
     };
   }, [estado, liga, idComp, emAndamento]);
 
+  // 3) Quando a liga está pronta: descobre se sou o dono e carrega os pedidos.
+  //    A rota /api/liga/pedidos só devolve ok:true a quem é o dono (valida lá).
+  useEffect(() => {
+    if (estado !== "pronto" || !liga || !meuId) return;
+    let vivo = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/liga/pedidos?league_id=${liga.id}&user_id=${meuId}`);
+        const j = await res.json();
+        if (!vivo) return;
+        if (j.ok && Array.isArray(j.pedidos)) {
+          setSouDono(true);
+          setPedidos(j.pedidos);
+        } else {
+          setSouDono(false);
+        }
+      } catch {
+        if (vivo) setSouDono(false);
+      }
+    })();
+    return () => { vivo = false; };
+  }, [estado, liga, meuId]);
+
+  async function decidirPedido(p: Pedido, acao: "aprovar" | "recusar") {
+    if (aDecidir || !meuId) return;
+    setADecidir(p.request_id);
+    try {
+      const res = await fetch("/api/liga/decidir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: meuId, request_id: p.request_id, acao }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        // Tira o pedido da lista (foi decidido).
+        setPedidos((lista) => lista.filter((x) => x.request_id !== p.request_id));
+      }
+    } catch {
+      // Mantém o pedido na lista para tentar de novo.
+    }
+    setADecidir(null);
+  }
 
   function partilhar() {
     if (!liga) return;
@@ -172,6 +238,18 @@ export default function PaginaLiga() {
           </div>
         )}
 
+        {estado === "pedido_enviado" && (
+          <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16 }}>
+            <div style={{ fontSize: 34, marginBottom: 6 }}>✋</div>
+            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 8, color: GOLD }}>Pedido enviado</div>
+            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, marginBottom: 4 }}>
+              {liga ? <>A liga <strong>{liga.name}</strong> é por aprovação.</> : "Esta liga é por aprovação."}
+            </p>
+            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, marginBottom: 16 }}>O dono vai rever o teu pedido. Voltamos a avisar-te assim que decidir.</p>
+            <a href="/ligas" style={{ display: "inline-block", color: GOLD, fontSize: 13, textDecoration: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", border: `1px solid ${GOLD}`, padding: "10px 18px", borderRadius: 10 }}>Ver as minhas ligas</a>
+          </div>
+        )}
+
         {estado === "erro" && (
           <div style={{ textAlign: "center", padding: "30px 16px", background: "#1a1110", border: "1px solid #3a2420", borderRadius: 16 }}>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: erroMsg.includes("Pro") ? GOLD : "#ef8d83", marginBottom: 8 }}>{erroMsg.includes("Pro") ? "Limite atingido" : "Ups"}</div>
@@ -190,7 +268,7 @@ export default function PaginaLiga() {
               <div style={{ flexShrink: 0 }}><Escudo config={liga.escudo || DEFAULT_IDENTITY} size={46} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{liga.name}</div>
-                <div style={{ fontSize: 11, color: "#93a39a" }}>{liga.privacidade === "fechada" ? "Fechada" : "Aberta"} · {membros.length} {membros.length === 1 ? "membro" : "membros"}</div>
+                <div style={{ fontSize: 11, color: "#93a39a" }}>{nomePrivacidade(liga.privacidade)} · {membros.length} {membros.length === 1 ? "membro" : "membros"}</div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0, marginRight: 4 }}>
                 <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>Código</div>
@@ -201,6 +279,28 @@ export default function PaginaLiga() {
                 <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Convidar</span>
               </button>
             </div>
+
+            {/* Painel do dono: pedidos de entrada pendentes (só liga "por aprovação"). */}
+            {souDono && pedidos.length > 0 && (
+              <div style={{ background: "#15110a", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 13px", marginBottom: 14 }}>
+                <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: GOLD, marginBottom: 10, display: "flex", alignItems: "center", gap: 7 }}>
+                  <span>✋ Pedidos para entrar</span>
+                  <span style={{ background: GOLD, color: "#1b211e", borderRadius: 999, fontSize: 11, padding: "1px 8px" }}>{pedidos.length}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {pedidos.map((p) => (
+                    <div key={p.request_id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#0f1411", border: "1px solid #243029", borderRadius: 11, padding: "9px 11px" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.nome}</div>
+                        <div style={{ fontSize: 10.5, color: "#7c8a82" }}>quer juntar-se</div>
+                      </div>
+                      <button onClick={() => decidirPedido(p, "recusar")} disabled={aDecidir === p.request_id} style={{ flexShrink: 0, background: "transparent", border: "1px solid #5a2f2c", color: "#ef8d83", fontFamily: FD, fontWeight: 700, fontSize: 11, textTransform: "uppercase", padding: "7px 11px", borderRadius: 8, cursor: aDecidir === p.request_id ? "default" : "pointer", opacity: aDecidir === p.request_id ? 0.6 : 1 }}>Recusar</button>
+                      <button onClick={() => decidirPedido(p, "aprovar")} disabled={aDecidir === p.request_id} style={{ flexShrink: 0, background: "#3f8f5a", border: "none", color: "#06140d", fontFamily: FD, fontWeight: 700, fontSize: 11, textTransform: "uppercase", padding: "7px 13px", borderRadius: 8, cursor: aDecidir === p.request_id ? "default" : "pointer", opacity: aDecidir === p.request_id ? 0.6 : 1 }}>{aDecidir === p.request_id ? "…" : "Aprovar"}</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {liga.descricao && (
               <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 12, padding: "11px 13px", marginBottom: 14, fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{liga.descricao}</div>
