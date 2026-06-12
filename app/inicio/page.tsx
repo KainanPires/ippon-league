@@ -7,6 +7,7 @@ import { loadIdentity } from "@/components/Escudo";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, textoFecho } from "@/lib/calendario";
 import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
+import { PRECO } from "@/lib/precos";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -226,12 +227,12 @@ export default function Inicio() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Ippon Pro</span>
-              <span style={{ background: "#1b211e", color: GOLD, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>Promoção</span>
+              {PRECO.emPromocao && <span style={{ background: "#1b211e", color: GOLD, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>{PRECO.etiqueta}</span>}
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
-              <span style={{ fontSize: 12, color: "#7a5e12", textDecoration: "line-through" }}>9,90€</span>
-              <span style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: "#3a2a08" }}>4,90€</span>
-              <span style={{ fontSize: 11, color: "#5c4410" }}>/mês</span>
+              {PRECO.emPromocao && <span style={{ fontSize: 12, color: "#7a5e12", textDecoration: "line-through" }}>{PRECO.normal}</span>}
+              <span style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: "#3a2a08" }}>{PRECO.atual}</span>
+              <span style={{ fontSize: 11, color: "#5c4410" }}>{PRECO.periodo}</span>
             </div>
             <div style={{ fontSize: 11, color: "#5c4410", marginTop: 2 }}>Joga com vantagem competitiva</div>
           </div>
@@ -428,7 +429,7 @@ function Tutorial({ step, setStep, onClose, name, target }: { step: number; setS
   if (target) {
     const title = isPro ? "Ippon Pro" : teach.title;
     const text = isPro
-      ? "Toca aqui para teres o Ippon Pro: scout avançado, valorização esperada e dicas da rodada. 4,90€/mês."
+      ? `Toca aqui para teres o Ippon Pro: scout avançado, valorização esperada e dicas da rodada. ${PRECO.atualComPeriodo}.`
       : teach.text;
     return (
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
@@ -485,8 +486,8 @@ function Tutorial({ step, setStep, onClose, name, target }: { step: number; setS
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>Oferta de lançamento</div>
           <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0" }}>Ippon Pro</div>
           <div style={{ margin: "6px 0 14px" }}>
-            <span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through" }}>9,90€</span>{" "}
-            <span style={{ fontFamily: FD, fontSize: 30, fontWeight: 700, color: GOLD }}>4,90€</span>
+            {PRECO.emPromocao && <><span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through" }}>{PRECO.normal}</span>{" "}</>}
+            <span style={{ fontFamily: FD, fontSize: 30, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
             <span style={{ fontSize: 12, color: "#93a39a" }}>/mês</span>
           </div>
           <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
