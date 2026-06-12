@@ -138,6 +138,7 @@ export default function DashboardPro() {
           </section>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 22 }}>
+            <DicaCapitao atletas={atletas} dossies={dossies} capitaoAtual={capitao} onAbrir={(id) => setAberto(id)} />
             {atletas.map((a) => (
               <CartaoResumo
                 key={a.id}
@@ -182,6 +183,115 @@ export default function DashboardPro() {
       )}
     </main>
   );
+}
+
+/* =========================================================================
+ * DICA DE CAPITÃO (sempre UM atleta, escolhido entre os 8 do time)
+ * ========================================================================= */
+
+// Escolhe o melhor candidato a capitão por HISTÓRICO: maior média no nível desta
+// competição (forma recente como desempate/fallback). Só decide quando todos os
+// dossiês estiverem resolvidos, para não piscar uma escolha errada a meio.
+//
+// [FASE 2 — depois da chave de sábado]: aqui entrará a camada do chaveamento —
+// ponderar o caminho de cada atleta na chave (adversários fáceis/difíceis) por
+// cima desta média de histórico. Por agora é só histórico.
+function escolherCapitao(
+  atletas: Athlete[],
+  dossies: Record<string, EstadoDossie>
+): { pronto: boolean; atleta: Athlete | null; pts: number | null; rotulo: string } {
+  const todosResolvidos = atletas.every((a) => {
+    const d = dossies[a.id];
+    return d !== undefined && d !== "carregando";
+  });
+  if (!todosResolvidos) return { pronto: false, atleta: null, pts: null, rotulo: "" };
+
+  let melhor: Athlete | null = null;
+  let melhorPts = -Infinity;
+  let melhorRot = "";
+  for (const a of atletas) {
+    const d = dossies[a.id];
+    if (!d || d === "carregando" || d === "erro") continue;
+    const s = sinalDoNivel(d);
+    if (s.estado !== "ok" || s.pts === null) continue;
+    if (s.pts > melhorPts) {
+      melhorPts = s.pts;
+      melhor = a;
+      melhorRot = s.rotulo;
+    }
+  }
+  if (!melhor) return { pronto: true, atleta: null, pts: null, rotulo: "" };
+  return { pronto: true, atleta: melhor, pts: melhorPts, rotulo: melhorRot };
+}
+
+function DicaCapitao({ atletas, dossies, capitaoAtual, onAbrir }: { atletas: Athlete[]; dossies: Record<string, EstadoDossie>; capitaoAtual: string | null; onAbrir: (id: string) => void }) {
+  const r = escolherCapitao(atletas, dossies);
+
+  // Ainda a carregar dossiês.
+  if (!r.pronto) {
+    return (
+      <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px", display: "flex", alignItems: "center", gap: 11 }}>
+        <CrownIcon cor="#5f6f67" />
+        <span style={{ fontSize: 12.5, color: "#7c8a82" }}>A analisar o teu time para a dica de capitão…</span>
+      </div>
+    );
+  }
+
+  // Sem dados suficientes em nenhum atleta.
+  if (!r.atleta || r.pts === null) {
+    return (
+      <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px", display: "flex", alignItems: "center", gap: 11 }}>
+        <CrownIcon cor="#7c8a82" />
+        <span style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.5 }}>Ainda não há histórico suficiente para uma dica de capitão nesta rodada.</span>
+      </div>
+    );
+  }
+
+  const positivo = r.pts >= 0;
+  const jaECapitao = r.atleta.id === capitaoAtual;
+  const onde = r.rotulo === "neste nível" ? "no nível desta competição" : "na forma recente";
+
+  // Tom honesto: confiante se positivo; alerta se ninguém tem histórico forte.
+  let texto: string;
+  if (positivo) {
+    texto = jaECapitao
+      ? `Por histórico, ${sobrenome(r.atleta.name)} é o teu melhor candidato a capitão — média de ${fmtPts(r.pts)} ${onde}. E é precisamente o que já tens como capitão. Boa escolha.`
+      : `Por histórico, o teu melhor candidato a capitão é ${sobrenome(r.atleta.name)} — média de ${fmtPts(r.pts)} ${onde}.`;
+  } else {
+    texto = `Nenhum do teu time tem histórico forte ${onde}. O menos arriscado seria ${sobrenome(r.atleta.name)} (${fmtPts(r.pts)}), mas é uma rodada difícil para a tua equipa — escolhe com cuidado.`;
+  }
+
+  return (
+    <button
+      onClick={() => onAbrir(r.atleta!.id)}
+      style={{
+        width: "100%", textAlign: "left", cursor: "pointer", color: "#f1ede2",
+        background: positivo ? "linear-gradient(160deg,#2a2410,#15110a)" : "#121815",
+        border: `1px solid ${positivo ? GOLD : "#5a4a2c"}`, borderRadius: 14, padding: "13px 14px",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
+        <CrownIcon cor={positivo ? GOLD : "#c0a050"} />
+        <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: positivo ? GOLD : "#c0a050" }}>Dica de capitão</span>
+      </div>
+      <p style={{ fontSize: 13, color: "#dfe6e0", lineHeight: 1.55, margin: 0 }}>{texto}</p>
+      <div style={{ fontSize: 10.5, color: "#7c8a82", marginTop: 8, lineHeight: 1.45 }}>
+        Por histórico, ainda sem os confrontos da chave. Possibilidade, não garantia. Toca para ver o dossiê.
+      </div>
+    </button>
+  );
+}
+
+function CrownIcon({ cor }: { cor: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path d="M3 8l4 4 5-7 5 7 4-4v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8z" />
+    </svg>
+  );
+}
+
+function sobrenome(nome: string): string {
+  return nome.split(" ").slice(-1)[0] || nome;
 }
 
 /* =========================================================================
