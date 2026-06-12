@@ -4,6 +4,7 @@ import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { supabase } from "@/lib/supabase";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
+import { PRECO } from "@/lib/precos";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -211,7 +212,7 @@ export default function Perfil() {
                 </span>
               </div>
               <DataRow label="Plano" value={conta.isPro ? "Ippon Pro" : "Gratuito"} />
-              <DataRow label="Preço" value={conta.isPro ? "4,90€/mês" : "—"} />
+              <DataRow label="Preço" value={conta.isPro ? PRECO.atualComPeriodo : "—"} />
               {conta.isPro ? (
                 <div style={{ padding: 12 }}>
                   <a href="/ippon-pro" style={{ display: "block", textAlign: "center", background: "transparent", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, textDecoration: "none" }}>Gerir assinatura</a>
