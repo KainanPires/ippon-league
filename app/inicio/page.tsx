@@ -54,6 +54,7 @@ export default function Inicio() {
   // Guardamos a EQUIPA encontrada (ids); o teamInfo é calculado ao mostrar, para
   // atualizar o Valor quando a lista de atletas chegar.
   const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
+  const [minhasLigas, setMinhasLigas] = useState<{ id: string; name: string; membros: number }[] | null>(null);
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
 
   const beltRef = useRef<HTMLAnchorElement | null>(null);
@@ -87,6 +88,18 @@ export default function Inicio() {
 
       // LOGADO: a partir daqui podemos usar nome e equipa.
       setVisitante(false);
+      // As tuas ligas (reais): busca as ligas onde este utilizador é membro.
+      const uid = data.session.user?.id;
+      if (uid) {
+        fetch(`/api/liga/minhas?user_id=${uid}`)
+          .then((r) => r.json())
+          .then((j) => {
+            if (!active) return;
+            const ligas = Array.isArray(j?.ligas) ? j.ligas : [];
+            setMinhasLigas(ligas.map((l: { id: string; name: string; membros?: number }) => ({ id: l.id, name: l.name, membros: l.membros ?? 1 })));
+          })
+          .catch(() => { if (active) setMinhasLigas([]); });
+      }
       try {
         const savedName = localStorage.getItem("ippon_name");
         const metaName = data.session.user?.user_metadata?.nome;
@@ -253,49 +266,52 @@ export default function Inicio() {
           </div>
         </Card>
 
-        <Card>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}>
-            <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
-            <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#e2655a" }}>Ao vivo agora</span>
-          </div>
-          {[["Abe", "Maruyama", "-66kg"], ["Agbegnenou", "Trstenjak", "-63kg"], ["Riner", "Saito", "+100kg"]].map(([a, b, cat]) => (
-            <div key={cat} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "3px 0" }}>
-              <span>{a} <span style={{ color: "#93a39a" }}>vs</span> {b}</span>
-              <span style={{ color: "#93a39a", fontSize: 11 }}>{cat}</span>
+        {emAndamento ? (
+          <Card>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}>
+              <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
+              <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#e2655a" }}>Ao vivo agora</span>
             </div>
-          ))}
-        </Card>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{aDecorrer?.nome ?? comp.nome}</div>
+            <div style={{ fontSize: 12, color: "#93a39a", marginTop: 3, lineHeight: 1.4 }}>
+              A competição está a decorrer. Acompanha as pontuações dos teus atletas no teu time, ao vivo.
+            </div>
+          </Card>
+        ) : (
+          <Card>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3a463f" }} />
+              <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#6f7d76" }}>Ao vivo</span>
+            </div>
+            <div style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.4 }}>
+              Sem competição a decorrer agora. Quando houver, acompanhas aqui as lutas e as pontuações ao vivo.
+            </div>
+          </Card>
+        )}
 
         <a ref={ligasRef} className={glow("ligas")} href="/ligas" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
           <Card>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: minhasLigas && minhasLigas.length > 0 ? 6 : 0 }}>
               <CardTitle>As tuas ligas</CardTitle>
               <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: GOLD }}>Ver todas ›</span>
             </div>
-            {[["Mundial", "#1.243"], ["Continental · Europa", "#312"], ["Nacional · Portugal", "#14"]].map(([l, p]) => (
-              <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
-                <span style={{ fontSize: 13 }}>{l}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: GOLD }}>{p}</span>
+            {minhasLigas === null ? (
+              <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6 }}>A carregar as tuas ligas…</div>
+            ) : minhasLigas.length === 0 ? (
+              <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6, lineHeight: 1.4 }}>
+                Ainda não estás em nenhuma liga. Entra numa liga oficial ou cria uma com os teus amigos.
               </div>
-            ))}
+            ) : (
+              minhasLigas.slice(0, 4).map((l) => (
+                <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                  <span style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "70%" }}>{l.name}</span>
+                  <span style={{ fontSize: 12, color: "#93a39a" }}>{l.membros} {l.membros === 1 ? "membro" : "membros"}</span>
+                </div>
+              ))
+            )}
           </Card>
         </a>
 
-        <div style={{ marginTop: 4 }}>
-          <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 9 }}>Notícias e novidades</div>
-          <div style={{ display: "flex", gap: 7, marginBottom: 10, flexWrap: "wrap" }}>
-            <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, padding: "5px 11px", borderRadius: 999 }}>Judô</span>
-            <span style={{ background: "#141a17", border: "1px solid #243029", color: "#93a39a", fontSize: 11, padding: "5px 11px", borderRadius: 999 }}>IJF</span>
-            <span style={{ background: "#141a17", border: "1px solid #243029", color: "#93a39a", fontSize: 11, padding: "5px 11px", borderRadius: 999 }}>Grand Slam</span>
-          </div>
-          <div style={{ border: "1px solid #243029", borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ height: 96, background: "linear-gradient(135deg,#1c3a2e,#2a4d3e)" }} />
-            <div style={{ padding: 11 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.25 }}>Quem pode valorizar no Grand Slam de Paris</div>
-              <div style={{ fontSize: 11, color: "#93a39a", marginTop: 3 }}>Scout da rodada · há 2h</div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 62, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
@@ -354,12 +370,18 @@ function TeamBuilt({ info, fechoTexto }: { info: { name: string; value: string; 
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", textAlign: "center", marginBottom: 12 }}>
-          {[["JC 100", "Património"], [String(info.last), "Última"], [`JC ${info.value}`, "Valor"]].map(([v, l]) => (
-            <div key={l}>
-              <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: l === "Património" ? GOLD : "#f1ede2" }}>{v}</div>
-              <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{l}</div>
-            </div>
-          ))}
+          {(() => {
+            // Património = o que sobra (100 − valor da equipa). Só real quando temos o valor.
+            const temValor = info.value !== "—";
+            const valorNum = temValor ? Number(info.value) : 0;
+            const patrimonio = temValor ? `JC ${Math.round((100 - valorNum) * 10) / 10}` : "—";
+            return [[patrimonio, "Património"], [String(info.last), "Última"], [`JC ${info.value}`, "Valor"]].map(([v, l]) => (
+              <div key={l}>
+                <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: l === "Património" ? GOLD : "#f1ede2" }}>{v}</div>
+                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{l}</div>
+              </div>
+            ));
+          })()}
         </div>
         <div style={{ fontSize: 12, color: "#7fd1a3", marginBottom: 10 }}>{fechoTexto}</div>
         <a href="/meu-time" style={{ display: "block", background: GOLD, color: "#1b211e", textAlign: "center", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 14, textDecoration: "none" }}>
