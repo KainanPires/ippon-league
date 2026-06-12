@@ -27,17 +27,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ erro: "Servidor sem ligação." }, { status: 500 });
   }
   const { searchParams } = new URL(req.url);
-  const league_id = (searchParams.get("id") || "").trim();
-  if (!league_id) return NextResponse.json({ erro: "Falta ?id=<league_id>." }, { status: 400 });
+  const league_id_param = (searchParams.get("id") || "").trim();
+  const codigo = (searchParams.get("codigo") || "").trim().toUpperCase();
+  if (!league_id_param && !codigo) {
+    return NextResponse.json({ erro: "Falta ?id=<league_id> ou ?codigo=<invite_code>." }, { status: 400 });
+  }
 
-  // Liga + estado da copa.
-  const { data: liga } = await supabaseAdmin
+  // Liga + estado da copa (por id ou por código de convite).
+  const consulta = supabaseAdmin
     .from("leagues")
-    .select("id, name, formato, copa_estado, copa_competicao_inicial, escudo")
-    .eq("id", league_id)
-    .maybeSingle();
+    .select("id, name, formato, copa_estado, copa_competicao_inicial, escudo");
+  const { data: liga } = league_id_param
+    ? await consulta.eq("id", league_id_param).maybeSingle()
+    : await consulta.eq("invite_code", codigo).maybeSingle();
   if (!liga) return NextResponse.json({ erro: "Liga não encontrada." }, { status: 404 });
   if (liga.formato !== "copa") return NextResponse.json({ erro: "Não é uma copa." }, { status: 400 });
+
+  const league_id = liga.id;
 
   // Confrontos (toda a chave), por ronda e ordem.
   const { data: confrontos } = await supabaseAdmin
