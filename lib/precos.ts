@@ -37,4 +37,7 @@ export const PRECO = {
   get atualComPeriodo(): string {
     return this.emPromocao ? this.promoComPeriodo : this.normalComPeriodo;
   },
+
+  // Mensagem de valor a mostrar junto do Pro, em todo o lado.
+  premios: "Sendo PRO concorra a prémios todas as rodadas",
 } as const;
