@@ -30,6 +30,9 @@ interface LigaInfo {
   descricao: string | null;
   escudo: Identity | null;
   invite_code: string;
+  copa_estado?: string | null;
+  copa_fecho_inscricao?: string | null;
+  copa_competicao_inicial?: string | null;
 }
 interface Pedido {
   request_id: string;
@@ -58,6 +61,7 @@ export default function PaginaLiga() {
 
   // Painel do dono: pedidos pendentes.
   const [souDono, setSouDono] = useState(false);
+  const [copaEstado, setCopaEstado] = useState<string | null>(null); // estado da copa, atualizável
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [aDecidir, setADecidir] = useState<string | null>(null);
 
@@ -176,6 +180,33 @@ export default function PaginaLiga() {
     })();
     return () => { vivo = false; };
   }, [estado, liga, meuId]);
+
+  // Gatilho "preguiçoso" do sorteio da copa: se a liga é copa, está em inscrição
+  // e o prazo de fecho já passou, pedimos o sorteio ao servidor (idempotente).
+  useEffect(() => {
+    if (estado !== "pronto" || !liga || liga.formato !== "copa") return;
+    const est = liga.copa_estado || "inscricao";
+    setCopaEstado(est);
+    if (est !== "inscricao") return;
+    const fecho = liga.copa_fecho_inscricao ? new Date(liga.copa_fecho_inscricao).getTime() : null;
+    if (!fecho || Date.now() < fecho) return; // ainda dentro do prazo
+    let vivo = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/copa/sortear", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ league_id: liga.id }),
+        });
+        const j = await res.json();
+        if (!vivo) return;
+        if (j.ok && (j.sorteada || j.jaEstava)) {
+          setCopaEstado(j.estado || "sorteada");
+        }
+      } catch { /* tenta de novo na próxima abertura */ }
+    })();
+    return () => { vivo = false; };
+  }, [estado, liga]);
 
   async function decidirPedido(p: Pedido, acao: "aprovar" | "recusar") {
     if (aDecidir || !meuId) return;
@@ -302,10 +333,16 @@ export default function PaginaLiga() {
               </div>
             )}
 
+            {liga.formato === "copa" && (
+              <CartaoCopa estado={copaEstado || liga.copa_estado || "inscricao"} fecho={liga.copa_fecho_inscricao || null} />
+            )}
+
             {liga.descricao && (
               <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 12, padding: "11px 13px", marginBottom: 14, fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{liga.descricao}</div>
             )}
 
+            {liga.formato !== "copa" && (
+            <>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>Ranking · {compAtual.nome}</span>
               {emAndamento ? (
@@ -349,6 +386,8 @@ export default function PaginaLiga() {
             <div style={{ marginTop: 12, fontSize: 11, color: "#5f6f67", textAlign: "center" }}>
               {mercadoFechado ? "Toca num membro para ver o dojo dele." : "Os dojos dos rivais abrem quando o mercado fechar. 🔒"}
             </div>
+            </>
+            )}
           </>
         )}
       </div>
@@ -360,6 +399,46 @@ function Aviso({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ textAlign: "center", padding: "40px 16px", color: "#7c8a82" }}>
       <div style={{ fontFamily: FD, fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase" }}>{children}</div>
+    </div>
+  );
+}
+
+// Cartão de estado da Copa Ippon (mata-mata). A chave visual chega na Fase D.
+function CartaoCopa({ estado, fecho }: { estado: string; fecho: string | null }) {
+  const fechoData = fecho ? new Date(fecho) : null;
+  const aindaAberta = estado === "inscricao" && fechoData ? Date.now() < fechoData.getTime() : false;
+
+  let icone = "🏆", titulo = "Copa Ippon", texto = "";
+  if (estado === "inscricao" && aindaAberta) {
+    icone = "📝";
+    titulo = "Inscrições abertas";
+    const quando = fechoData ? fechoData.toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+    texto = `Esta é uma Copa Ippon (mata-mata). Quem entrar até ao fecho das inscrições${quando ? ` (${quando})` : ""} entra na chave. O sorteio é automático.`;
+  } else if (estado === "inscricao") {
+    icone = "⏳";
+    titulo = "Inscrições fechadas";
+    texto = "As inscrições fecharam. A chave vai ser sorteada — abre daqui a pouco para veres o teu primeiro confronto.";
+  } else if (estado === "sorteada") {
+    icone = "🥋";
+    titulo = "Copa sorteada!";
+    texto = "A chave está formada. A tela com os confrontos chega em breve — prepara-te para a tua primeira eliminatória.";
+  } else if (estado === "a_decorrer") {
+    icone = "⚔️";
+    titulo = "Copa a decorrer";
+    texto = "A chave está em jogo. Cada competição elimina metade — sobrevive e avança!";
+  } else if (estado === "terminada") {
+    icone = "🏆";
+    titulo = "Copa terminada";
+    texto = "Esta edição da Copa Ippon já terminou. Vê o pódio na chave.";
+  }
+
+  return (
+    <div style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "14px 15px", marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 5 }}>
+        <span style={{ fontSize: 18 }}>{icone}</span>
+        <span style={{ fontFamily: FD, fontSize: 13.5, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{titulo}</span>
+      </div>
+      <p style={{ fontSize: 12.5, color: "#dfe6e0", lineHeight: 1.55, margin: 0 }}>{texto}</p>
     </div>
   );
 }
