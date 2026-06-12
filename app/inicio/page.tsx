@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
 import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, type TeamState } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
+import { Desempenho } from "@/components/Desempenho";
+import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, type DesempenhoRodada } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, textoFecho } from "@/lib/calendario";
 import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
@@ -56,6 +58,7 @@ export default function Inicio() {
   // atualizar o Valor quando a lista de atletas chegar.
   const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
   const [minhasLigas, setMinhasLigas] = useState<{ id: string; name: string; membros: number }[] | null>(null);
+  const [desempenho, setDesempenho] = useState<{ dados: DesempenhoRodada; team: TeamState } | null>(null);
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
 
   const beltRef = useRef<HTMLAnchorElement | null>(null);
@@ -154,6 +157,33 @@ export default function Inicio() {
         const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
         if (!active || !naAlvo || naAlvo.ids.length === 0) return;
         setSavedTeam(naAlvo); // nunca apagar um estado bom (só atualiza se tiver equipa)
+      })();
+
+      // "O TEU DESEMPENHO NA RODADA": se a competição em que escalei já terminou
+      // (tem resultados) e ainda não a vi, prepara o popup. Espera o pool de atletas.
+      (async () => {
+        // Candidata: a competição a decorrer/que decorreu esta semana (ex.: Tahiti).
+        // É a rodada mais recente em que a pessoa pode ter escalado.
+        const candidata = aDecorrer;
+        if (!active || !candidata) return;
+        // Já viu?
+        const vistos = await desempenhosVistosConta();
+        if (!active || vistos[candidata.idCompeticao]) return;
+        // A equipa dessa competição.
+        const teamComp = await loadSavedCloudFor(candidata.idCompeticao);
+        if (!active || !teamComp || teamComp.ids.length === 0) return;
+        // Há resultados? (só dispara quando a competição terminou e o JudoBase publicou)
+        const pontos = await buscarResultados(candidata.idCompeticao);
+        if (!active || !pontos) return;
+        // Garante o pool de atletas dessa competição para o resolve() funcionar.
+        try {
+          const j = await fetch(`/api/atletas?id=${candidata.idCompeticao}`).then((r) => r.json());
+          const list = Array.isArray(j?.atletas) ? j.atletas : [];
+          if (list.length > 0) setAthletePool(list as never);
+        } catch {}
+        if (!active) return;
+        const dados = construirDesempenho(candidata.idCompeticao, candidata.nome, teamComp, pontos);
+        if (dados) setDesempenho({ dados, team: teamComp });
       })();
     });
     return () => { active = false; };
@@ -332,6 +362,19 @@ export default function Inicio() {
       </nav>
 
       {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={name} target={tutTarget} />}
+
+      {desempenho && (
+        <Desempenho
+          dados={desempenho.dados}
+          identity={loadIdentity()}
+          team={desempenho.team}
+          nome={name}
+          onClose={() => {
+            marcarDesempenhoVisto(desempenho.dados.idCompeticao);
+            setDesempenho(null);
+          }}
+        />
+      )}
     </main>
   );
 }
