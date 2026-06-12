@@ -10,6 +10,7 @@ import { temSessao, exigirSessao } from "@/lib/auth";
 import { focoMercado, textoFecho } from "@/lib/calendario";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
+import { PRECO } from "@/lib/precos";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -288,6 +289,7 @@ export default function CriarEquipa() {
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Sê Pro e avalia a tua equipa</div>
             <div style={{ fontSize: 11.5, color: "#5c4410", marginTop: 2 }}>Scout, valorização esperada e dicas da rodada.</div>
+            <div style={{ fontSize: 11.5, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
             <span style={{ display: "inline-block", marginTop: 8, background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8 }}>Ver Ippon Pro</span>
           </div>
           <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt="#141110" expression="sabio" /></div>
