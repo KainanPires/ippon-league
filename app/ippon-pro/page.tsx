@@ -7,16 +7,19 @@ const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
+// Apenas benefícios REAIS ou fundamentados na análise. Nada que entregue a
+// decisão do jogador (quem montar / quem é o melhor da rodada) — isso mataria o
+// jogo. A valorização é vendida como POSSIBILIDADE segundo a análise, não promessa.
 const BENEFITS: { t: string; x: string }[] = [
-  { t: "Chave ao vivo", x: "Acompanha cada atleta na competição: adversário, fase, repescagem e resultado." },
-  { t: "Alertas ao vivo", x: "Recebe um aviso quando o teu atleta — ou o teu capitão — vai lutar. Não percas nada." },
-  { t: "Scout avançado", x: "Vê o histórico completo, tendências e estatísticas de cada atleta." },
-  { t: "Valorização esperada", x: "Sabe quanto um atleta pode valorizar antes de escalares." },
-  { t: "Mínimo para valorizar", x: "Descobre o que o atleta precisa de fazer para ganhares JC." },
-  { t: "Dicas e capitães da rodada", x: "Sugestões de quem escalar e em quem apostar a braçadeira." },
-  { t: "Barganhas da rodada", x: "Atletas subvalorizados com boa probabilidade de render." },
+  { t: "Scout avançado dos atletas", x: "O histórico real de cada atleta: títulos, forma recente e como costuma pontuar em cada nível de competição." },
+  { t: "Análise do teu time", x: "Uma leitura honesta da tua escalação — o que parece forte e onde está o risco. Sem te dizer o que fazer; a decisão é tua." },
+  { t: "Dica de capitão", x: "Entre os atletas que TU escolheste, qual tem o histórico mais forte para esta competição. Continuas a montar o teu time à tua maneira." },
+  { t: "Maior possibilidade de valorização", x: "Pela análise do histórico, vê quais dos teus atletas têm mais hipótese de valorizar e render JC. É uma tendência, não uma garantia." },
+  { t: "Chaveamento das competições", x: "Vê o quadro de lutas e acompanha o caminho dos teus atletas na chave." },
+  { t: "Acompanhamento ao vivo", x: "No dia da competição, segue as pontuações dos teus atletas em tempo real." },
+  { t: "Até 5 ligas ativas", x: "Cria até 5 ligas em simultâneo, entre mata-mata e pontos corridos." },
   { t: "Prémios e experiências", x: "Sendo PRO concorres a prémios todas as rodadas — e a experiências no mundo do judô." },
-  { t: "Ligas e badges exclusivos", x: "Distinções e ligas só para membros Ippon Pro." },
+  { t: "Ligas e badges exclusivos", x: "Distinções e ligas só para membros Ippon Pro, com um visual próprio." },
 ];
 
 export default function IpponPro() {
@@ -34,7 +37,7 @@ export default function IpponPro() {
         <div style={{ textAlign: "center", background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "22px 18px", marginBottom: 16 }}>
           <div style={{ width: 92, height: 92, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="sabio" /></div>
           <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.1 }}>Joga com vantagem</div>
-          <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "8px 0 6px" }}>Descobre atletas subvalorizados, vê a valorização esperada e recebe as dicas da rodada antes de escalares.</p>
+          <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "8px 0 6px" }}>Conhece o histórico de cada atleta, vê quem tem mais hipótese de render e monta o teu time com mais informação. A estratégia é sempre tua.</p>
           <p style={{ fontSize: 13, color: GOLD, fontWeight: 700, lineHeight: 1.4, margin: "0 0 14px" }}>{PRECO.premios}.</p>
           <div>
             {PRECO.emPromocao && <><span style={{ fontSize: 15, color: "#7c8a82", textDecoration: "line-through" }}>{PRECO.normal}</span>{" "}</>}
@@ -55,6 +58,13 @@ export default function IpponPro() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Nota honesta: o que o Pro NÃO faz (protege o jogo e a confiança) */}
+        <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px", marginBottom: 16 }}>
+          <div style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.6 }}>
+            O Pro <strong style={{ color: "#cfd8d2" }}>não monta o teu time por ti</strong> nem te diz quem vai ganhar. Dá-te informação e leituras do histórico — a graça de acertar continua a ser tua.
+          </div>
         </div>
 
         <div style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", marginBottom: 14, lineHeight: 1.5 }}>
