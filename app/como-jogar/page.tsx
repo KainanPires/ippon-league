@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { PRECO } from "@/lib/precos";
 import { temSessao } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -30,10 +31,16 @@ const PONTOS: { acao: string; aplica: string; sofre: string }[] = [
 
 export default function ComoJogar() {
   const [logado, setLogado] = useState(false);
+  const [isPro, setIsPro] = useState(false);
   const [podePartilhar, setPodePartilhar] = useState(false);
 
   useEffect(() => {
     temSessao().then(setLogado).catch(() => setLogado(false));
+    // Lê o estado Pro: quem já é Pro NÃO vê ofertas de Pro.
+    supabase.auth.getSession().then(({ data }) => {
+      const m = data.session?.user?.user_metadata || {};
+      setIsPro(Boolean(m.is_pro));
+    }).catch(() => setIsPro(false));
     try {
       const nav = navigator as Navigator & { share?: unknown };
       setPodePartilhar(typeof nav.share === "function");
@@ -166,15 +173,17 @@ export default function ComoJogar() {
           Disputa ligas mundial, nacional e de amigos. E na <strong>Copa Ippon</strong> (mata-mata), cada rodada é uma eliminatória — basta uma boa escalação para avançar.
         </Secao>
 
-        <section style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", textAlign: "center", marginBottom: 14 }}>
-          <div style={{ width: 64, height: 64, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="sabio" /></div>
-          <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Joga com vantagem: Ippon Pro</div>
-          <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: "6px 0 4px" }}>Scout avançado, valorização esperada, dicas e capitães da rodada.</p>
-          <p style={{ fontSize: 13, color: GOLD, fontWeight: 700, margin: "0 0 14px" }}>{PRECO.premios}.</p>
-          <a href="/ippon-pro" style={{ display: "block", padding: 13, borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>
-            Conhecer o Ippon Pro
-          </a>
-        </section>
+        {!isPro && (
+          <section style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", textAlign: "center", marginBottom: 14 }}>
+            <div style={{ width: 64, height: 64, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="sabio" /></div>
+            <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Joga com vantagem: Ippon Pro</div>
+            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: "6px 0 4px" }}>Scout avançado, valorização esperada, dicas e capitães da rodada.</p>
+            <p style={{ fontSize: 13, color: GOLD, fontWeight: 700, margin: "0 0 14px" }}>{PRECO.premios}.</p>
+            <a href="/ippon-pro" style={{ display: "block", padding: 13, borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>
+              Conhecer o Ippon Pro
+            </a>
+          </section>
+        )}
 
         <section style={{ background: "#121815", border: `2px solid ${GOLD}`, borderRadius: 18, padding: "22px 18px", textAlign: "center" }}>
           <div style={{ width: 72, height: 72, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="comemorando" /></div>
