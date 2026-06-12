@@ -8,6 +8,10 @@ const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
+// Limites por plano (espelho do servidor; a regra real está nas rotas).
+const LIM_CRIAR_FREE = 1, LIM_CRIAR_PRO = 5;
+const LIM_PART_FREE = 2, LIM_PART_PRO = 5;
+
 type Tab = "ativas" | "mercado" | "resultados";
 
 function esc(p: Partial<Identity>): Identity { return { ...DEFAULT_IDENTITY, ...p }; }
@@ -161,6 +165,14 @@ export default function Ligas() {
     }
   }
 
+  // Contagens para os avisos de limite (só ligas de amigos; mine já é só amigos).
+  const nCriadas = mine.filter((l) => l.sou_dono).length;
+  const nParticipa = mine.length;
+  const limCriar = souPro ? LIM_CRIAR_PRO : LIM_CRIAR_FREE;
+  const limPart = souPro ? LIM_PART_PRO : LIM_PART_FREE;
+  const noLimiteCriar = nCriadas >= limCriar;
+  const noLimitePart = nParticipa >= limPart;
+
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 84px" }}>
@@ -196,7 +208,10 @@ export default function Ligas() {
               </a>
             )}
 
-            <Section style={{ marginTop: 18 }}>Ligas de amigos</Section>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, marginBottom: 10 }}>
+              <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>Ligas de amigos</span>
+              {!aCarregar && <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, color: noLimitePart ? "#e0894f" : "#7c8a82" }}>{nParticipa}/{limPart}</span>}
+            </div>
             {aCarregar ? (
               <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
             ) : mine.length > 0 ? (
@@ -206,7 +221,17 @@ export default function Ligas() {
                     <LeagueRow cfg={l.escudo || DEFAULT_IDENTITY} name={l.name} sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`} right={<ActionBtn kind="ver">Abrir</ActionBtn>} />
                   </a>
                 ))}
-                <a href="/criar-liga" style={{ display: "block", textAlign: "center", marginTop: 10, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 13 }}>+ Criar outra liga</a>
+                {noLimiteCriar ? (
+                  <LimiteCard
+                    souPro={souPro}
+                    titulo={souPro ? "Atingiste o máximo de ligas criadas" : "Já criaste a tua liga"}
+                    texto={souPro
+                      ? "Com o Ippon Pro podes criar até 5 ligas — e já lá estás."
+                      : "Com a conta gratuita podes criar 1 liga. Passa a Ippon Pro para criares até 5."}
+                  />
+                ) : (
+                  <a href="/criar-liga" style={{ display: "block", textAlign: "center", marginTop: 10, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 13 }}>+ Criar outra liga</a>
+                )}
               </>
             ) : (
               <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "18px 14px", textAlign: "center" }}>
@@ -216,16 +241,28 @@ export default function Ligas() {
             )}
 
             <Section style={{ marginTop: 18 }}>Entrar com código</Section>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} placeholder="Código de convite" maxLength={8} style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 13px", color: "#f1ede2", fontSize: 15, fontFamily: FD, letterSpacing: "0.1em", outline: "none", textTransform: "uppercase" }} />
-              <button onClick={entrarPorCodigo} disabled={aEntrar} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{aEntrar ? "…" : "Entrar"}</button>
-            </div>
-            {erroEntrar && (
-              erroEntrar.includes("Pro") ? (
-                <a href="/ippon-pro" style={{ display: "block", fontSize: 12.5, color: GOLD, marginTop: 8, textDecoration: "none", background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 10, padding: "10px 12px", lineHeight: 1.4 }}>{erroEntrar} →</a>
-              ) : (
-                <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 8 }}>{erroEntrar}</div>
-              )
+            {noLimitePart ? (
+              <LimiteCard
+                souPro={souPro}
+                titulo={souPro ? "Estás no máximo de ligas" : "Estás em 2 ligas de amigos"}
+                texto={souPro
+                  ? "Com o Ippon Pro participas em até 5 ligas de amigos — e já lá estás."
+                  : "Com a conta gratuita participas em 2 ligas de amigos. Passa a Ippon Pro para entrares em até 5."}
+              />
+            ) : (
+              <>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} placeholder="Código de convite" maxLength={8} style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 13px", color: "#f1ede2", fontSize: 15, fontFamily: FD, letterSpacing: "0.1em", outline: "none", textTransform: "uppercase" }} />
+                  <button onClick={entrarPorCodigo} disabled={aEntrar} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{aEntrar ? "…" : "Entrar"}</button>
+                </div>
+                {erroEntrar && (
+                  erroEntrar.includes("Pro") ? (
+                    <a href="/ippon-pro" style={{ display: "block", fontSize: 12.5, color: GOLD, marginTop: 8, textDecoration: "none", background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 10, padding: "10px 12px", lineHeight: 1.4 }}>{erroEntrar} →</a>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 8 }}>{erroEntrar}</div>
+                  )
+                )}
+              </>
             )}
           </>
         )}
@@ -342,4 +379,20 @@ function OficialRow({ cfg, name, sub, pro }: { cfg: Identity; name: string; sub:
 function ActionBtn({ kind, children }: { kind: "ver" | "solicitar"; children: React.ReactNode }) {
   const ver = kind === "ver";
   return <span style={{ background: ver ? "#e67e22" : "#3f8f5a", color: ver ? "#1b0f06" : "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 12px", borderRadius: 8, whiteSpace: "nowrap", display: "inline-block" }}>{children}</span>;
+}
+
+// Cartão de limite atingido. Para free, convida ao Pro; para Pro, só informa.
+function LimiteCard({ souPro, titulo, texto }: { souPro: boolean; titulo: string; texto: string }) {
+  return (
+    <div style={{ background: souPro ? "#121815" : "#2a2410", border: `1px solid ${souPro ? "#243029" : "#5a4a18"}`, borderRadius: 14, padding: "13px 15px", marginTop: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+        <span style={{ fontSize: 14 }}>{souPro ? "✓" : "🔒"}</span>
+        <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, color: souPro ? "#cfd8d2" : GOLD }}>{titulo}</span>
+      </div>
+      <p style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.5, margin: souPro ? 0 : "0 0 10px" }}>{texto}</p>
+      {!souPro && (
+        <a href="/ippon-pro" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 12, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>Conhecer o Ippon Pro</a>
+      )}
+    </div>
+  );
 }
