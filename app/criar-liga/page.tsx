@@ -190,7 +190,7 @@ export default function CriarLiga() {
             <Label>Privacidade</Label>
             <div style={{ display: "flex", gap: 10, marginBottom: 26 }}>
               <FormatCard on={privacy === "fechada"} onClick={() => setPrivacy("fechada")} title="Fechada" desc="Só entra quem tiver convite ou código." icon="🔒" />
-              <FormatCard on={privacy === "aberta"} onClick={() => setPrivacy("aberta")} title="Aberta" desc="Aparece no mercado de ligas. Qualquer um pode pedir para entrar." icon="🌍" />
+              <FormatCard on={privacy === "aberta"} onClick={() => setPrivacy("aberta")} title="Aberta" desc="Aparece no mercado de ligas. Qualquer um pode entrar." icon="🌍" />
             </div>
 
             {erro && (
