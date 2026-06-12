@@ -122,7 +122,12 @@ export default function ChaveCopa() {
           <>
             {/* Pódio (quando terminada) */}
             {data.liga.copa_estado === "terminada" && (
-              <Podio data={data} idn={idn} />
+              <>
+                <Podio data={data} idn={idn} />
+                <a href={`/liga/${codigo}/certificado`} style={{ display: "block", textAlign: "center", marginBottom: 22, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 11, textDecoration: "none" }}>
+                  Ver certificados do pódio
+                </a>
+              </>
             )}
 
             {/* Rondas empilhadas (com dados) */}
