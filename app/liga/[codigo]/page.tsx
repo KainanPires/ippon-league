@@ -334,7 +334,7 @@ export default function PaginaLiga() {
             )}
 
             {liga.formato === "copa" && (
-              <CartaoCopa estado={copaEstado || liga.copa_estado || "inscricao"} fecho={liga.copa_fecho_inscricao || null} />
+              <CartaoCopa estado={copaEstado || liga.copa_estado || "inscricao"} fecho={liga.copa_fecho_inscricao || null} inscritos={membros} meuId={meuId} />
             )}
 
             {liga.descricao && (
@@ -404,16 +404,23 @@ function Aviso({ children }: { children: React.ReactNode }) {
 }
 
 // Cartão de estado da Copa Ippon (mata-mata). A chave visual chega na Fase D.
-function CartaoCopa({ estado, fecho }: { estado: string; fecho: string | null }) {
+// Em inscrição, mostra a "sala de espera": a lista de equipas inscritas (escudo
+// + nome) e a data de fecho.
+function CartaoCopa({ estado, fecho, inscritos, meuId }: { estado: string; fecho: string | null; inscritos: Membro[]; meuId: string | null }) {
   const fechoData = fecho ? new Date(fecho) : null;
-  const aindaAberta = estado === "inscricao" && fechoData ? Date.now() < fechoData.getTime() : false;
+  const prazoPassou = fechoData ? Date.now() >= fechoData.getTime() : false;
+  const quandoFecha = fechoData
+    ? fechoData.toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    : "";
+  const n = inscritos.length;
 
-  let icone = "🏆", titulo = "Copa Ippon", texto = "";
-  if (estado === "inscricao" && aindaAberta) {
+  let icone = "🏆", titulo = "Copa Ippon", texto = "", rodape = "";
+
+  if (estado === "inscricao" && !prazoPassou) {
     icone = "📝";
     titulo = "Inscrições abertas";
-    const quando = fechoData ? fechoData.toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
-    texto = `Esta é uma Copa Ippon (mata-mata). Quem entrar até ao fecho das inscrições${quando ? ` (${quando})` : ""} entra na chave. O sorteio é automático.`;
+    texto = "Esta é uma Copa Ippon (mata-mata). Quem entrar antes do fecho entra na chave. O sorteio é automático e aleatório.";
+    rodape = quandoFecha ? `Fecham a ${quandoFecha}` : "";
   } else if (estado === "inscricao") {
     icone = "⏳";
     titulo = "Inscrições fechadas";
@@ -439,6 +446,31 @@ function CartaoCopa({ estado, fecho }: { estado: string; fecho: string | null })
         <span style={{ fontFamily: FD, fontSize: 13.5, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{titulo}</span>
       </div>
       <p style={{ fontSize: 12.5, color: "#dfe6e0", lineHeight: 1.55, margin: 0 }}>{texto}</p>
+
+      {/* Sala de espera: lista das equipas inscritas (escudo + nome). */}
+      {estado === "inscricao" && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(217,164,65,0.25)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 9 }}>
+            <span style={{ fontFamily: FD, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cdb86a" }}>
+              {n} {n === 1 ? "equipa inscrita" : "equipas inscritas"}
+            </span>
+            {rodape && <span style={{ fontSize: 11, color: "#a9b4ac", fontFamily: FD }}>{rodape}</span>}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {inscritos.map((m) => {
+              const euMesmo = m.user_id === meuId;
+              return (
+                <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 10, background: euMesmo ? "#1b2018" : "rgba(12,14,13,0.5)", border: `1px solid ${euMesmo ? GOLD : "#2f2a18"}`, borderRadius: 10, padding: "8px 10px" }}>
+                  <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={28} /></div>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
+                  {m.is_pro && <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>}
+                  {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
