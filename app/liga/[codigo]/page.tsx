@@ -358,7 +358,7 @@ export default function PaginaLiga() {
             )}
 
             {liga.formato === "copa" && (
-              <CartaoCopa estado={copaEstado || liga.copa_estado || "inscricao"} fecho={liga.copa_fecho_inscricao || null} inscritos={membros} meuId={meuId} />
+              <CartaoCopa estado={copaEstado || liga.copa_estado || "inscricao"} fecho={liga.copa_fecho_inscricao || null} inscritos={membros} meuId={meuId} codigo={codigo} />
             )}
 
             {liga.descricao && (
@@ -430,7 +430,7 @@ function Aviso({ children }: { children: React.ReactNode }) {
 // Cartão de estado da Copa Ippon (mata-mata). A chave visual chega na Fase D.
 // Em inscrição, mostra a "sala de espera": a lista de equipas inscritas (escudo
 // + nome) e a data de fecho.
-function CartaoCopa({ estado, fecho, inscritos, meuId }: { estado: string; fecho: string | null; inscritos: Membro[]; meuId: string | null }) {
+function CartaoCopa({ estado, fecho, inscritos, meuId, codigo }: { estado: string; fecho: string | null; inscritos: Membro[]; meuId: string | null; codigo: string }) {
   const fechoData = fecho ? new Date(fecho) : null;
   const prazoPassou = fechoData ? Date.now() >= fechoData.getTime() : false;
   const quandoFecha = fechoData
@@ -494,6 +494,13 @@ function CartaoCopa({ estado, fecho, inscritos, meuId }: { estado: string; fecho
             })}
           </div>
         </div>
+      )}
+
+      {/* Botão para ver a chave — quando já há chave (sorteada/a decorrer/terminada). */}
+      {estado !== "inscricao" && (
+        <a href={`/liga/${codigo}/chave`} style={{ display: "block", textAlign: "center", marginTop: 12, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 11, textDecoration: "none" }}>
+          {estado === "terminada" ? "Ver pódio e chave" : "Ver a chave"}
+        </a>
       )}
     </div>
   );
