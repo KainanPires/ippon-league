@@ -13,7 +13,7 @@ const INFO: { label: string; href?: string; soon?: boolean }[] = [
   { label: "Sobre a Ippon League", href: "/sobre" },
   { label: "Ippon Pro", href: "/sobre-pro" },
   { label: "Termos de utilização", soon: true },
-  { label: "Política de privacidade", soon: true },
+  { label: "Política de privacidade", href: "/privacidade" },
   { label: "Ajuda e contacto", href: "/ajuda" },
 ];
 
