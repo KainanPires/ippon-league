@@ -208,6 +208,30 @@ export default function PaginaLiga() {
     return () => { vivo = false; };
   }, [estado, liga]);
 
+  // Gatilho "preguiçoso" do apuramento: se a copa está sorteada ou a decorrer,
+  // pedimos o apuramento da ronda atual (idempotente). A rota só apura se a
+  // competição da ronda já terminou; caso contrário não faz nada.
+  useEffect(() => {
+    if (estado !== "pronto" || !liga || liga.formato !== "copa") return;
+    const est = liga.copa_estado || "inscricao";
+    if (est !== "sorteada" && est !== "a_decorrer") return;
+    let vivo = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/copa/apurar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ league_id: liga.id }),
+        });
+        const j = await res.json();
+        if (!vivo) return;
+        // Se apurou algo ou terminou, reflete o novo estado no ecrã.
+        if (j.ok && j.terminada) setCopaEstado("terminada");
+        else if (j.ok && j.apurou) setCopaEstado("a_decorrer");
+      } catch { /* tenta de novo na próxima abertura */ }
+    })();
+    return () => { vivo = false; };
+  }, [estado, liga]);
   async function decidirPedido(p: Pedido, acao: "aprovar" | "recusar") {
     if (aDecidir || !meuId) return;
     setADecidir(p.request_id);
