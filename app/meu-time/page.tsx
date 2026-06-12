@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, jcLeft, isComplete, missing, loadSavedCloudFor, setAthletePool, type TeamState } from "@/lib/team";
+import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, jcLeft, isComplete, missing, loadSavedCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, type TutKey } from "@/lib/tutorials";
+import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -75,6 +76,7 @@ export default function MeuTime() {
   // Tutorial: passo atual (null = fechado). O conjunto de passos muda conforme o
   // momento (edição quando mercado aberto; competição quando a decorrer).
   const [guide, setGuide] = useState<number | null>(null);
+  const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
   const router = useRouter();
 
   const foco = focoMercado();
@@ -272,6 +274,12 @@ export default function MeuTime() {
       setModal(null);
       setLeaveTo(null);
       router.push(destino);
+      return;
+    }
+    // Fim da jornada: conta + equipa escalada + nome próprio. Se for altura (1x/semana
+    // para quem não votou, 4 meses para quem votou), pede a avaliação em vez do "saved".
+    if (res.ok && temNomeProprio(identity) && devePedirAvaliacao()) {
+      setMostrarAvaliacao(true);
       return;
     }
     setModal({ kind: "saved" });
@@ -482,6 +490,10 @@ export default function MeuTime() {
           capitao={team.captain}
           onClose={() => setModal(null)}
         />
+      )}
+
+      {mostrarAvaliacao && (
+        <Avaliacao nomeTime={identity.name} onClose={() => setMostrarAvaliacao(false)} />
       )}
 
       {guide !== null && passoAtual && (
