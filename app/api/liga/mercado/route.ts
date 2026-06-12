@@ -26,11 +26,12 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const user_id = (searchParams.get("user_id") || "").trim();
 
-  // 1) Todas as ligas abertas (as mais recentes primeiro).
+  // 1) Ligas visíveis no mercado: "aberta" (entra direto) e "mediante_pedido"
+  //    (pede aprovação). As "fechada" NUNCA aparecem aqui.
   const { data: ligas, error } = await supabaseAdmin
     .from("leagues")
     .select("id, name, formato, privacidade, descricao, escudo, invite_code, created_by, created_at")
-    .eq("privacidade", "aberta")
+    .in("privacidade", ["aberta", "mediante_pedido"])
     .order("created_at", { ascending: false });
 
   if (error) {
