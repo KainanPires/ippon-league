@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Escudo, SymbolGlyph, SHAPES, PATTERNS, LEAGUE_SYMBOLS, COLORS, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { DEFAULT_LEAGUE_SHIELD, type LeagueFormat, type LeaguePrivacy } from "@/lib/leagues";
 import { supabase } from "@/lib/supabase";
+import { focoMercado, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -36,6 +37,16 @@ export default function CriarLiga() {
   const [name, setName] = useState("");
   const [descricao, setDescricao] = useState("");
   const [format, setFormat] = useState<LeagueFormat>("pontos");
+  // Copa: o admin escolhe a competição inicial (1ª ronda). O fecho da inscrição
+  // é automático (1h antes dessa competição começar). As próximas competições do
+  // calendário, a partir da de mercado aberto, para o admin escolher.
+  const proximasComps: SemanaCalendario[] = (() => {
+    const lista: SemanaCalendario[] = [];
+    let c = focoMercado().alvo;
+    for (let i = 0; i < 10; i++) { lista.push(c); c = proximaDepoisDe(c); }
+    return lista;
+  })();
+  const [copaCompInicial, setCopaCompInicial] = useState<string>(proximasComps[0]?.idCompeticao || "");
   const [privacy, setPrivacy] = useState<LeaguePrivacy>("fechada");
   const [activeColor, setActiveColor] = useState<keyof Identity>("bg1");
   const [created, setCreated] = useState<LigaCriada | null>(null);
@@ -106,6 +117,7 @@ export default function CriarLiga() {
           formato: format,
           privacidade: privacy,
           escudo: { ...cfg, name: name.trim() },
+          copa_competicao_inicial: format === "copa" ? copaCompInicial : null,
         }),
       });
       const j = await res.json();
@@ -230,6 +242,28 @@ export default function CriarLiga() {
               <FormatCard on={format === "pontos"} onClick={() => setFormat("pontos")} title="Pontos Corridos" desc="Soma de pontos rodada após rodada. Vence quem tiver mais no fim." icon="🏅" />
               <FormatCard on={format === "copa"} onClick={() => setFormat("copa")} title="Copa Ippon" desc="Mata-mata: quem pontuar mais na rodada avança. Ideal para amigos." icon="🏆" />
             </div>
+
+            {format === "copa" && (
+              <>
+                <Label>Competição de arranque</Label>
+                <p style={{ fontSize: 11.5, color: "#7c8a82", margin: "-2px 0 9px", lineHeight: 1.5 }}>
+                  A 1ª ronda da chave joga-se nesta competição. As inscrições fecham 1h antes de ela começar, e o sorteio é automático. As rondas seguintes usam as competições seguintes do calendário.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 22 }}>
+                  {proximasComps.map((c) => (
+                    <button key={c.idCompeticao} type="button" onClick={() => setCopaCompInicial(c.idCompeticao)} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", background: copaCompInicial === c.idCompeticao ? "#16201b" : "#121815", border: `1.5px solid ${copaCompInicial === c.idCompeticao ? GOLD : "#243029"}`, borderRadius: 12, padding: "11px 13px", cursor: "pointer", color: "#f1ede2" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.nome}</div>
+                        <div style={{ fontSize: 11, color: "#93a39a", marginTop: 1 }}>{c.nivel} · {c.de.replace(/\//g, "-")}</div>
+                      </div>
+                      <div style={{ flexShrink: 0, width: 18, height: 18, borderRadius: "50%", border: `2px solid ${copaCompInicial === c.idCompeticao ? GOLD : "#3a4a42"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {copaCompInicial === c.idCompeticao && <div style={{ width: 8, height: 8, borderRadius: "50%", background: GOLD }} />}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             <Label>Descrição da liga</Label>
             <textarea
