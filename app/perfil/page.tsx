@@ -14,7 +14,7 @@ const INFO: { label: string; href?: string; soon?: boolean }[] = [
   { label: "Ippon Pro", href: "/sobre-pro" },
   { label: "Termos de utilização", soon: true },
   { label: "Política de privacidade", soon: true },
-  { label: "Ajuda e contacto", soon: true },
+  { label: "Ajuda e contacto", href: "/ajuda" },
 ];
 
 // Dados da conta lidos do Supabase (metadados do registo + email do Auth).
