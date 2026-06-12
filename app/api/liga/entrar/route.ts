@@ -47,7 +47,8 @@ async function ehPro(user_id: string): Promise<boolean> {
     return false;
   }
 }
-const LIMITE_AMIGOS_FREE = 2;
+const LIMITE_PARTICIPAR_FREE = 2;
+const LIMITE_PARTICIPAR_PRO = 5;
 
 export async function POST(req: Request) {
   if (!supabaseAdmin) {
@@ -116,18 +117,19 @@ export async function POST(req: Request) {
   }
 
   // 4) Liga "aberta" ou "fechada": o código é o convite, entra direto.
-  //    Limite: quem não é Pro só pode estar em 2 ligas de amigos (oficiais não contam).
+  //    Limite de participação (só ligas de amigos): 2 (free) / 5 (pro).
   if (liga.type === "amigos") {
     const pro = await ehPro(user_id);
-    if (!pro) {
-      const quantas = await contarLigasAmigos(user_id);
-      if (quantas >= LIMITE_AMIGOS_FREE) {
-        return NextResponse.json({
-          ok: false,
-          limite: true,
-          erro: "Já estás em 2 ligas de amigos. Passa a Ippon Pro para entrares em ligas ilimitadas.",
-        }, { status: 403 });
-      }
+    const limite = pro ? LIMITE_PARTICIPAR_PRO : LIMITE_PARTICIPAR_FREE;
+    const quantas = await contarLigasAmigos(user_id);
+    if (quantas >= limite) {
+      return NextResponse.json({
+        ok: false,
+        limite: true,
+        erro: pro
+          ? "Já estás em 5 ligas de amigos — é o máximo, mesmo com Ippon Pro."
+          : "Já estás em 2 ligas de amigos. Passa a Ippon Pro para entrares em até 5.",
+      }, { status: 403 });
     }
   }
 
