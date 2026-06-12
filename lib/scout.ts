@@ -133,9 +133,17 @@ export interface ConfrontoDireto {
   detalhe: { competicao: string; ano: number | null; venceu: boolean }[];
 }
 
-export interface NestaCompeticao {
-  jaParticipou: boolean;
-  edicoes: ResultadoCompeticao[]; // edições anteriores do MESMO evento
+export interface NivelDesempenho {
+  nivel: string; // rank_group
+  nivelLabel: string;
+  participacoes: number; // nº de competições passadas deste nível
+  podios: number;
+  ouro: number;
+  prata: number;
+  bronze: number;
+  melhorColocacao: string; // legível ("Campeão", "5.º lugar", "—")
+  pontosMedios: number | null; // média no NOSSO sistema neste nível
+  ehNivelDestaCompeticao: boolean; // é o nível da competição-alvo?
 }
 
 export interface Dossie {
@@ -145,7 +153,7 @@ export interface Dossie {
   conquistas: Conquista[]; // só pódios, ordenadas por prestígio desc
   melhorResultado: Conquista | null; // a de maior prestígio (calculada por nós)
   formaRecente: FormaRecente;
-  nestaCompeticao: NestaCompeticao | null; // só se passarmos o nome do evento-alvo
+  desempenhoPorNivel: NivelDesempenho[]; // track-record por nível de evento (Grand Slam, Open, ...)
   confrontoDireto: ConfrontoDireto | null; // só se passarmos o id do adversário
   avisos: string[]; // notas de qualidade de dados
 }
@@ -284,20 +292,32 @@ function colocacaoLegivel(placeName: string, medalha: Medalha | null): string {
   return mapa[placeName] ?? "Participação";
 }
 
+// Colocação legível a partir de um lugar numérico (1..N). Usada no resumo por nível.
+function colocacaoDePlace(place: number | null): string {
+  if (place === null) return "—";
+  if (place === 1) return "Campeão";
+  if (place === 2) return "Vice-campeão";
+  if (place === 3) return "3.º lugar";
+  return `${place}.º lugar`;
+}
+
 function ehPequenosEstados(nome: string): boolean {
   return /small states|pequenos estados/i.test(nome || "");
 }
 
-// "stem" de um evento: minúsculas, sem ano, sem "Seniors/Individuals", para
-// comparar edições do mesmo evento entre anos. É HEURÍSTICO (cidades mudam).
-function stemEvento(nome: string): string {
-  return (nome || "")
-    .toLowerCase()
-    .replace(/\b(19|20)\d{2}\b/g, " ")
-    .replace(/\b(seniors?|juniors?|cadets?|individuals?|teams?)\b/gi, " ")
-    .replace(/[,.\-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+// Infere o NÍVEL (rank_group) de uma competição a partir do nome. Heurística
+// segura: se errar, o resumo por nível continua todo lá — só não destaca a linha.
+function inferirNivel(nome: string): string | null {
+  const n = (nome || "").toLowerCase();
+  if (/olympic|olímpic/.test(n)) return "olympic";
+  if (/world championship|campeonato do mundo/.test(n)) return "wc";
+  if (/masters/.test(n)) return "masters";
+  if (/grand slam/.test(n)) return "gs";
+  if (/grand prix/.test(n)) return "gp";
+  if (/(continental|european|pan.?american|african|asian|oceania[n]?) championship/.test(n)) return "cont_champ";
+  if (/\bcup\b|taça/.test(n)) return "cont_cup";
+  if (/\bopen\b/.test(n)) return "cont_open";
+  return null;
 }
 
 // Convertemos cada ResultRow num ResultadoCompeticao (já legível).
@@ -457,23 +477,53 @@ export async function montarDossie(
     comPontos.length > 0 ? round1(comPontos.reduce((s, p) => s + (p.pontosNossos ?? 0), 0) / comPontos.length) : null;
   const formaRecente: FormaRecente = { competicoes: passadas, pontosMedios };
 
-  /* ---- Nesta competição (edições anteriores do mesmo evento) --------- */
-  let nestaCompeticao: NestaCompeticao | null = null;
-  if (opts.nomeCompeticaoAlvo) {
-    const alvo = stemEvento(opts.nomeCompeticaoAlvo);
-    const ultimas2 = alvo.split(" ").slice(-2).join(" "); // ex.: "oceania open"
-    const edicoes = rows
-      .filter((r) => {
-        const s = stemEvento(r.competition_name || "");
-        return s === alvo || (ultimas2.length > 3 && s.includes(ultimas2));
-      })
-      .sort((a, b) => (b.date_raw || "").localeCompare(a.date_raw || ""))
-      .map((r) => rowParaResultado(r, pontosPorComp));
-    nestaCompeticao = { jaParticipou: edicoes.length > 0, edicoes };
-    if (edicoes.length > 0) {
-      avisos.push("'Nesta competição' usa correspondência aproximada pelo nome do evento — confirmar.");
-    }
+  /* ---- Desempenho por NÍVEL de evento (robusto, sem casar nomes) ----- */
+  // Em vez de "já jogou nesta competição exata?" (frágil — cada Open muda de
+  // cidade e de nome), mostramos como o atleta se sai em cada NÍVEL: Grand Slam,
+  // Open, Campeonato Continental, etc. Se conseguirmos inferir o nível da
+  // competição-alvo, assinalamos a linha relevante (ehNivelDestaCompeticao).
+  const nivelAlvo = opts.nomeCompeticaoAlvo ? inferirNivel(opts.nomeCompeticaoAlvo) : null;
+  const porNivel = new Map<string, ResultRow[]>();
+  for (const r of rows) {
+    if ((r.date_raw || "") > hoje) continue; // só competições passadas
+    const g = r.rank_group || "oth";
+    if (!porNivel.has(g)) porNivel.set(g, []);
+    porNivel.get(g)!.push(r);
   }
+  const desempenhoPorNivel: NivelDesempenho[] = [];
+  for (const [g, lista] of porNivel) {
+    let ouroN = 0;
+    let prataN = 0;
+    let bronzeN = 0;
+    let podios = 0;
+    let melhorPlace: number | null = null;
+    const pts: number[] = [];
+    for (const r of lista) {
+      const place = parseInt(String(r.place), 10);
+      const med = medalhaDePlace(isNaN(place) ? null : place);
+      if (med === "ouro") ouroN++;
+      else if (med === "prata") prataN++;
+      else if (med === "bronze") bronzeN++;
+      if (med) podios++;
+      if (!isNaN(place) && (melhorPlace === null || place < melhorPlace)) melhorPlace = place;
+      const p = pontosPorComp.get(String(r.id_competition));
+      if (typeof p === "number") pts.push(p);
+    }
+    desempenhoPorNivel.push({
+      nivel: g,
+      nivelLabel: nivelLabel(g),
+      participacoes: lista.length,
+      podios,
+      ouro: ouroN,
+      prata: prataN,
+      bronze: bronzeN,
+      melhorColocacao: colocacaoDePlace(melhorPlace),
+      pontosMedios: pts.length > 0 ? round1(pts.reduce((s, x) => s + x, 0) / pts.length) : null,
+      ehNivelDestaCompeticao: nivelAlvo !== null && g === nivelAlvo,
+    });
+  }
+  // Ordena pelo prestígio do nível (mais alto primeiro).
+  desempenhoPorNivel.sort((a, b) => (NIVEL_PRESTIGIO[b.nivel] ?? 0) - (NIVEL_PRESTIGIO[a.nivel] ?? 0));
 
   /* ---- Confronto direto (head-to-head) ------------------------------- */
   let confrontoDireto: ConfrontoDireto | null = null;
@@ -531,7 +581,7 @@ export async function montarDossie(
     conquistas,
     melhorResultado,
     formaRecente,
-    nestaCompeticao,
+    desempenhoPorNivel,
     confrontoDireto,
     avisos,
   };
