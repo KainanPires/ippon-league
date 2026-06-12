@@ -65,6 +65,7 @@ export default function MeuTime() {
   const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null }); // guardado (referência p/ dirty)
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [ready, setReady] = useState(false);
+  const [poolPronto, setPoolPronto] = useState(false); // já tentámos carregar a lista de atletas?
   const [pontos, setPontos] = useState<Record<string, number>>({});
   const [temResultados, setTemResultados] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null);
@@ -116,6 +117,10 @@ export default function MeuTime() {
         for (const a of list) merged.set(a.id, a);
       }
       if (merged.size > 0) { setAthletePool(Array.from(merged.values())); bumpPool((t) => t + 1); }
+    }).finally(() => {
+      // Quer tenha vindo lista ou não, a tentativa terminou. Isto destranca o
+      // ecrã: se mesmo assim não houver atletas resolvidos, mostramos "sem equipa".
+      if (active) setPoolPronto(true);
     });
     supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
       if (!active) return;
@@ -219,7 +224,11 @@ export default function MeuTime() {
 
   const athletes = resolve(team.ids);
   const temEquipa = team.ids.length > 0;
-  const aCarregarAtletas = temEquipa && athletes.length === 0;
+  // "A carregar" só ENQUANTO ainda estamos a tentar buscar a lista de atletas.
+  // Depois de a tentativa terminar (poolPronto), se os atletas não resolverem,
+  // deixamos de carregar e a página trata como "sem equipa" (com botão montar).
+  const aCarregarAtletas = temEquipa && athletes.length === 0 && !poolPronto;
+  const equipaIrresoluvel = temEquipa && athletes.length === 0 && poolPronto;
   const hasTeam = athletes.length > 0;
   const males = athletes.filter((a) => a.gender === "M");
   const females = athletes.filter((a) => a.gender === "F");
@@ -306,7 +315,7 @@ export default function MeuTime() {
           <button onClick={() => setGuide(0)} aria-label="Como funciona" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
 
-        {!temEquipa ? (
+        {(!temEquipa || equipaIrresoluvel) ? (
           <div style={{ textAlign: "center", padding: "26px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
             <div style={{ width: 96, height: 96, margin: "0 auto 6px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Ainda não tens equipa</h2>
