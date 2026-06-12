@@ -25,7 +25,7 @@ const STEPS = [
   { title: "Sobe de faixa", text: "O teu desempenho mensal muda a tua faixa — e o visual do jogo. Boa sorte!" },
 ];
 
-const PRO_BENEFITS = ["Chave ao vivo: adversário, repescagem e resultado", "Alertas ao vivo: o teu atleta vai lutar", "Scout avançado dos atletas", "Dicas e capitães recomendados"];
+const PRO_BENEFITS = ["Scout avançado: histórico de cada atleta", "Análise do teu time e dica de capitão", "Maior possibilidade de valorização, pela análise", "Acompanhamento ao vivo no dia da competição"];
 
 type TutTarget = "team" | "ligas" | "belt" | "pro" | null;
 function targetForStep(step: number): TutTarget {
@@ -490,7 +490,7 @@ function Tutorial({ step, setStep, onClose, name, target }: { step: number; setS
   if (target) {
     const title = isPro ? "Ippon Pro" : teach.title;
     const text = isPro
-      ? `Toca aqui para teres o Ippon Pro: scout avançado, valorização esperada e dicas da rodada. ${PRECO.atualComPeriodo}.`
+      ? `Toca aqui para teres o Ippon Pro: scout avançado, análise do teu time e dica de capitão. ${PRECO.atualComPeriodo}.`
       : teach.text;
     return (
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
