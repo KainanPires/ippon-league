@@ -235,6 +235,7 @@ export default function Inicio() {
               <span style={{ fontSize: 11, color: "#5c4410" }}>{PRECO.periodo}</span>
             </div>
             <div style={{ fontSize: 11, color: "#5c4410", marginTop: 2 }}>Joga com vantagem competitiva</div>
+            <div style={{ fontSize: 11, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
           </div>
           <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Assinar</span>
         </a>
