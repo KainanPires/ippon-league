@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Escudo, SymbolGlyph, SHAPES, PATTERNS, LEAGUE_SYMBOLS, COLORS, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { DEFAULT_LEAGUE_SHIELD, type LeagueFormat, type LeaguePrivacy } from "@/lib/leagues";
 import { supabase } from "@/lib/supabase";
@@ -8,6 +8,9 @@ import { supabase } from "@/lib/supabase";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
+
+// Limites de criação por plano (espelho do servidor; a regra real está na rota).
+const LIM_CRIAR_FREE = 1, LIM_CRIAR_PRO = 5;
 
 const COLOR_SLOTS: { key: keyof Identity; label: string }[] = [
   { key: "bg1", label: "Fundo 1" },
@@ -39,6 +42,38 @@ export default function CriarLiga() {
   const [copied, setCopied] = useState(false);
   const [a_criar, setACriar] = useState(false);
   const [erro, setErro] = useState("");
+
+  // Verificação de limite à entrada: quantas ligas de amigos já criou?
+  // "a_verificar" enquanto carrega; "noLimite" se já atingiu o máximo do plano.
+  const [aVerificar, setAVerificar] = useState(true);
+  const [noLimite, setNoLimite] = useState(false);
+  const [ehPro, setEhPro] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        const uid = sess.session?.user?.id;
+        const meta = sess.session?.user?.user_metadata as { is_pro?: boolean } | undefined;
+        const pro = !!meta?.is_pro;
+        if (!uid) { if (vivo) setAVerificar(false); return; } // sem sessão: deixa seguir (a rota trata)
+        const res = await fetch(`/api/liga/minhas?user_id=${uid}`);
+        const j = await res.json();
+        const minhas = Array.isArray(j.ligas) ? j.ligas : [];
+        const criadas = minhas.filter((l: { sou_dono?: boolean }) => l.sou_dono).length;
+        const limite = pro ? LIM_CRIAR_PRO : LIM_CRIAR_FREE;
+        if (vivo) {
+          setEhPro(pro);
+          setNoLimite(criadas >= limite);
+          setAVerificar(false);
+        }
+      } catch {
+        if (vivo) setAVerificar(false); // em erro, deixa seguir (a rota é a barreira real)
+      }
+    })();
+    return () => { vivo = false; };
+  }, []);
 
   function set<K extends keyof Identity>(key: K, value: Identity[K]) {
     setCfg((prev) => ({ ...prev, [key]: value }));
@@ -114,7 +149,27 @@ export default function CriarLiga() {
           <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>{step === "criar" ? "Criar liga" : "Convidar"}</span>
         </header>
 
-        {step === "criar" ? (
+        {step === "criar" && aVerificar ? (
+          <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
+        ) : step === "criar" && noLimite ? (
+          <div style={{ background: ehPro ? "#121815" : "#2a2410", border: `1px solid ${ehPro ? "#243029" : "#5a4a18"}`, borderRadius: 16, padding: "22px 18px", textAlign: "center" }}>
+            <div style={{ fontSize: 34, marginBottom: 8 }}>{ehPro ? "✓" : "🔒"}</div>
+            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", color: ehPro ? "#cfd8d2" : GOLD, marginBottom: 8 }}>
+              {ehPro ? "Atingiste o máximo de ligas" : "Já criaste a tua liga"}
+            </div>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 18px" }}>
+              {ehPro
+                ? "Com o Ippon Pro podes criar até 5 ligas — e já lá estás. Para criar outra, terias de apagar uma das atuais."
+                : "Com a conta gratuita podes criar 1 liga de amigos. Passa a Ippon Pro para criares até 5 e participares em mais ligas."}
+            </p>
+            {!ehPro && (
+              <a href="/ippon-pro" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "12px 22px", borderRadius: 11, textDecoration: "none", marginBottom: 12 }}>Conhecer o Ippon Pro</a>
+            )}
+            <div>
+              <a href="/ligas" style={{ display: "inline-block", color: "#93a39a", fontSize: 13, fontFamily: FD, fontWeight: 700, textDecoration: "none" }}>← Voltar às ligas</a>
+            </div>
+          </div>
+        ) : step === "criar" ? (
           <>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 8 }}>
               <Escudo config={cfg} size={96} />
