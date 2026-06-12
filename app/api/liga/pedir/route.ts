@@ -20,7 +20,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const LIMITE_AMIGOS_FREE = 2;
+const LIMITE_PARTICIPAR_FREE = 2;
+const LIMITE_PARTICIPAR_PRO = 5;
 
 async function contarLigasAmigos(user_id: string): Promise<number> {
   if (!supabaseAdmin) return 0;
@@ -53,14 +54,16 @@ async function ehPro(user_id: string): Promise<boolean> {
   }
 }
 
-// Verifica o limite de ligas de amigos para quem não é Pro.
+// Verifica o limite de PARTICIPAÇÃO em ligas de amigos (2 free / 5 pro).
 // Devolve uma mensagem de erro se bateu no limite, ou null se pode avançar.
 async function bloqueioPorLimite(user_id: string): Promise<string | null> {
   const pro = await ehPro(user_id);
-  if (pro) return null;
+  const limite = pro ? LIMITE_PARTICIPAR_PRO : LIMITE_PARTICIPAR_FREE;
   const quantas = await contarLigasAmigos(user_id);
-  if (quantas >= LIMITE_AMIGOS_FREE) {
-    return "Já estás em 2 ligas de amigos. Passa a Ippon Pro para entrares em ligas ilimitadas.";
+  if (quantas >= limite) {
+    return pro
+      ? "Já estás em 5 ligas de amigos — é o máximo, mesmo com Ippon Pro."
+      : "Já estás em 2 ligas de amigos. Passa a Ippon Pro para entrares em até 5.";
   }
   return null;
 }
