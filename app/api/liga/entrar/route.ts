@@ -3,15 +3,20 @@
 // ENTRAR NUMA LIGA por código de convite (servidor, chave secreta).
 //
 // Recebe (POST): { user_id, codigo }
-// Faz: encontra a liga pelo invite_code, e mete o utilizador na league_members
-//      (se ainda não estiver lá).
-// Devolve: { ok, liga } ou { ok:false, erro }
+// Comportamento conforme a privacidade da liga:
+//   - "aberta"  e  "fechada"  → entra já como membro (o código é o convite)
+//   - "mediante_pedido"       → NÃO entra direto; cria um pedido pendente
+//                               (o dono tem de aprovar)
+// Devolve:
+//   { ok:true, liga }              entrou como membro
+//   { ok:true, jaEra:true, liga }  já era membro
+//   { ok:true, pedido:true }       ficou um pedido pendente (mediante_pedido)
+//   { ok:true, jaPediu:true }      já tinha pedido pendente
+//   { ok:false, erro }             caso contrário
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
 
 async function contarLigasAmigos(user_id: string): Promise<number> {
   if (!supabaseAdmin) return 0;
@@ -32,7 +37,6 @@ async function contarLigasAmigos(user_id: string): Promise<number> {
     return 0;
   }
 }
-
 async function ehPro(user_id: string): Promise<boolean> {
   if (!supabaseAdmin) return false;
   try {
@@ -43,24 +47,20 @@ async function ehPro(user_id: string): Promise<boolean> {
     return false;
   }
 }
-
 const LIMITE_AMIGOS_FREE = 2;
 
 export async function POST(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação à base de dados." }, { status: 500 });
   }
-
   let corpo: { user_id?: string; codigo?: string };
   try {
     corpo = await req.json();
   } catch {
     return NextResponse.json({ ok: false, erro: "Pedido inválido." }, { status: 400 });
   }
-
   const user_id = (corpo.user_id || "").trim();
   const codigo = (corpo.codigo || "").trim().toUpperCase();
-
   if (!user_id) return NextResponse.json({ ok: false, erro: "Entra para te juntares a uma liga." }, { status: 401 });
   if (codigo.length < 4) return NextResponse.json({ ok: false, erro: "Código inválido." }, { status: 400 });
 
@@ -70,7 +70,6 @@ export async function POST(req: Request) {
     .select("id, name, type, formato, privacidade, descricao, escudo, invite_code")
     .eq("invite_code", codigo)
     .maybeSingle();
-
   if (erroLiga || !liga) {
     return NextResponse.json({ ok: false, erro: "Não encontrámos nenhuma liga com esse código." }, { status: 404 });
   }
@@ -82,12 +81,42 @@ export async function POST(req: Request) {
     .eq("league_id", liga.id)
     .eq("user_id", user_id)
     .maybeSingle();
-
   if (jaMembro) {
     return NextResponse.json({ ok: true, jaEra: true, liga });
   }
 
-  // Limite: quem não é Pro só pode estar em 2 ligas de amigos (oficiais não contam).
+  // 3) Se a liga é MEDIANTE PEDIDO, não entra direto: cria um pedido pendente.
+  //    (Mesmo entrando pelo código, o dono tem de aprovar.)
+  if (String(liga.privacidade) === "mediante_pedido") {
+    const { data: pedidoExistente } = await supabaseAdmin
+      .from("league_requests")
+      .select("id, estado")
+      .eq("league_id", liga.id)
+      .eq("user_id", user_id)
+      .maybeSingle();
+    if (pedidoExistente) {
+      if (pedidoExistente.estado === "pendente") {
+        return NextResponse.json({ ok: true, pedido: true, jaPediu: true });
+      }
+      if (pedidoExistente.estado === "recusado") {
+        await supabaseAdmin
+          .from("league_requests")
+          .update({ estado: "pendente", created_at: new Date().toISOString(), decided_at: null })
+          .eq("id", pedidoExistente.id);
+        return NextResponse.json({ ok: true, pedido: true });
+      }
+    }
+    const { error: erroPedido } = await supabaseAdmin
+      .from("league_requests")
+      .insert({ league_id: liga.id, user_id, estado: "pendente" });
+    if (erroPedido) {
+      return NextResponse.json({ ok: false, erro: "Não foi possível enviar o teu pedido." }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, pedido: true });
+  }
+
+  // 4) Liga "aberta" ou "fechada": o código é o convite, entra direto.
+  //    Limite: quem não é Pro só pode estar em 2 ligas de amigos (oficiais não contam).
   if (liga.type === "amigos") {
     const pro = await ehPro(user_id);
     if (!pro) {
@@ -102,14 +131,12 @@ export async function POST(req: Request) {
     }
   }
 
-  // 3) Adiciona como membro.
+  // 5) Adiciona como membro.
   const { error: erroMembro } = await supabaseAdmin
     .from("league_members")
     .insert({ league_id: liga.id, user_id, score: 0, position: 0 });
-
   if (erroMembro) {
     return NextResponse.json({ ok: false, erro: "Não foi possível entrar na liga.", detalhe: erroMembro.message }, { status: 500 });
   }
-
   return NextResponse.json({ ok: true, liga });
 }
