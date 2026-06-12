@@ -62,7 +62,7 @@ export default function Termos() {
         </Sec>
 
         <Sec n="6" t="O Ippon Pro é informativo — não garante resultados">
-          Esta é uma condição essencial. O Ippon Pro oferece <strong style={{ color: GOLD }}>apenas informação</strong>, baseada em dados e no histórico dos atletas: resultados em competições passadas, dificuldade dos confrontos e estimativas de desempenho. Ao assinar, reconheces e aceitas que o Ippon Pro é <strong style={{ color: GOLD }}>meramente informativo e não garante qualquer resultado</strong> — nem vitórias, nem pontuação, nem subida de faixa, nem prémios. As estimativas são possibilidades, nunca certezas, e a decisão é sempre tua. O responsável não se responsabiliza por decisões tomadas com base nestas informações.
+          Esta é uma condição essencial. O Ippon Pro oferece <strong style={{ color: GOLD }}>apenas informação</strong>, baseada em dados e no histórico dos atletas: resultados em competições passadas e tendências de desempenho com base nesse histórico. O Ippon Pro <strong style={{ color: GOLD }}>não monta a tua equipa por ti, não indica em quem apostar e não diz quem vai ganhar</strong>. Ao assinar, reconheces e aceitas que o Ippon Pro é <strong style={{ color: GOLD }}>meramente informativo e não garante qualquer resultado</strong> — nem vitórias, nem pontuação, nem subida de faixa, nem prémios. As leituras que mostramos são possibilidades e tendências, nunca certezas, e a decisão é sempre tua. O responsável não se responsabiliza por decisões tomadas com base nestas informações.
         </Sec>
 
         <Sec n="7" t="Prémios">
