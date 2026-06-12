@@ -41,7 +41,7 @@ export default function IpponPro() {
             <span style={{ fontFamily: FD, fontSize: 36, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
             <span style={{ fontSize: 13, color: "#93a39a" }}>{PRECO.periodo}</span>
           </div>
-          {PRECO.emPromocao && <div style={{ fontSize: 11, color: GOLD, marginTop: 2 }}>Oferta de lançamento · cancela quando quiseres</div>}
+          {PRECO.emPromocao && <div style={{ fontSize: 11, color: GOLD, marginTop: 2 }}>Oferta de lançamento · 7 dias grátis · plano anual</div>}
         </div>
 
         {/* Benefícios */}
