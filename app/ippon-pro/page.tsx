@@ -1,6 +1,7 @@
 "use client";
 
 import { Mascot } from "@/components/Mascot";
+import { PRECO } from "@/lib/precos";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -14,6 +15,7 @@ const BENEFITS: { t: string; x: string }[] = [
   { t: "Mínimo para valorizar", x: "Descobre o que o atleta precisa de fazer para ganhares JC." },
   { t: "Dicas e capitães da rodada", x: "Sugestões de quem escalar e em quem apostar a braçadeira." },
   { t: "Barganhas da rodada", x: "Atletas subvalorizados com boa probabilidade de render." },
+  { t: "Prémios e experiências", x: "Sendo PRO concorres a prémios todas as rodadas — e a experiências no mundo do judô." },
   { t: "Ligas e badges exclusivos", x: "Distinções e ligas só para membros Ippon Pro." },
 ];
 
@@ -32,13 +34,14 @@ export default function IpponPro() {
         <div style={{ textAlign: "center", background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "22px 18px", marginBottom: 16 }}>
           <div style={{ width: 92, height: 92, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="sabio" /></div>
           <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.1 }}>Joga com vantagem</div>
-          <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "8px 0 14px" }}>Descobre atletas subvalorizados, vê a valorização esperada e recebe as dicas da rodada antes de escalares.</p>
+          <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "8px 0 6px" }}>Descobre atletas subvalorizados, vê a valorização esperada e recebe as dicas da rodada antes de escalares.</p>
+          <p style={{ fontSize: 13, color: GOLD, fontWeight: 700, lineHeight: 1.4, margin: "0 0 14px" }}>{PRECO.premios}.</p>
           <div>
-            <span style={{ fontSize: 15, color: "#7c8a82", textDecoration: "line-through" }}>9,90€</span>{" "}
-            <span style={{ fontFamily: FD, fontSize: 36, fontWeight: 700, color: GOLD }}>4,90€</span>
-            <span style={{ fontSize: 13, color: "#93a39a" }}>/mês</span>
+            {PRECO.emPromocao && <><span style={{ fontSize: 15, color: "#7c8a82", textDecoration: "line-through" }}>{PRECO.normal}</span>{" "}</>}
+            <span style={{ fontFamily: FD, fontSize: 36, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
+            <span style={{ fontSize: 13, color: "#93a39a" }}>{PRECO.periodo}</span>
           </div>
-          <div style={{ fontSize: 11, color: GOLD, marginTop: 2 }}>Oferta de lançamento · cancela quando quiseres</div>
+          {PRECO.emPromocao && <div style={{ fontSize: 11, color: GOLD, marginTop: 2 }}>Oferta de lançamento · cancela quando quiseres</div>}
         </div>
 
         {/* Benefícios */}
@@ -63,7 +66,7 @@ export default function IpponPro() {
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "12px 16px" }}>
         <div style={{ maxWidth: 460, margin: "0 auto" }}>
           <button onClick={() => alert("Pagamento em breve! Estamos a preparar o Ippon Pro.")} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 15, borderRadius: 12, fontSize: 16, cursor: "pointer" }}>
-            Assinar por 4,90€/mês
+            Assinar por {PRECO.atualComPeriodo}
           </button>
           <a href="/inicio" style={{ display: "block", textAlign: "center", marginTop: 8, color: "#93a39a", fontSize: 12, textDecoration: "none", fontFamily: FB }}>Agora não</a>
         </div>
