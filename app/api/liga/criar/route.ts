@@ -1,33 +1,28 @@
-// app/api/liga/criar/route.ts
+// app/api/liga/pedir/route.ts
 //
-// CRIAR LIGA (no servidor, com a chave secreta — passa por cima do RLS).
+// PEDIR ENTRADA NUMA LIGA (servidor, chave secreta).
 //
-// O cliente não toca nas tabelas diretamente (o RLS está ligado sem políticas,
-// por isso a chave pública não escreve). Esta rota usa supabaseAdmin, igual ao
-// /api/atletas, e faz duas coisas numa só chamada:
-//   1) cria a liga na tabela `leagues`
-//   2) mete o criador como primeiro membro na `league_members`
-//
-// Recebe (POST, corpo JSON):
-//   { user_id, nome, descricao?, formato, privacidade, escudo }
+// Recebe (POST): { user_id, codigo }
+// Comportamento conforme a privacidade da liga:
+//   - "aberta"          → entra já como membro (atalho; igual ao /entrar)
+//   - "mediante_pedido" → cria um pedido PENDENTE em league_requests
+//   - "fechada"         → não se pede pelo mercado; só por código (esta rota
+//                         não deixa pedir uma fechada — devolve erro claro)
 // Devolve:
-//   { ok, liga: { id, invite_code, ... } }  ou  { ok:false, erro }
+//   { ok:true, entrou:true, liga }       quando entrou direto (aberta)
+//   { ok:true, pedido:true }             quando ficou um pedido pendente
+//   { ok:true, jaEra:true, liga }        quando já era membro
+//   { ok:true, jaPediu:true }            quando já tinha pedido pendente
+//   { ok:false, erro }                   caso contrário
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Gera um código de convite curto e legível (sem letras/números ambíguos).
-function novoCodigo(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let s = "";
-  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
-}
+const LIMITE_PARTICIPAR_FREE = 2;
+const LIMITE_PARTICIPAR_PRO = 5;
 
-
-// Conta em quantas ligas de AMIGOS (type "amigos") o utilizador já está.
 async function contarLigasAmigos(user_id: string): Promise<number> {
   if (!supabaseAdmin) return 0;
   try {
@@ -48,7 +43,6 @@ async function contarLigasAmigos(user_id: string): Promise<number> {
   }
 }
 
-// É Pro? (lê do user_metadata do Auth)
 async function ehPro(user_id: string): Promise<boolean> {
   if (!supabaseAdmin) return false;
   try {
@@ -60,22 +54,26 @@ async function ehPro(user_id: string): Promise<boolean> {
   }
 }
 
-// Limite de ligas de amigos para quem não é Pro.
-const LIMITE_AMIGOS_FREE = 2;
+// Verifica o limite de PARTICIPAÇÃO em ligas de amigos (2 free / 5 pro).
+// Devolve uma mensagem de erro se bateu no limite, ou null se pode avançar.
+async function bloqueioPorLimite(user_id: string): Promise<string | null> {
+  const pro = await ehPro(user_id);
+  const limite = pro ? LIMITE_PARTICIPAR_PRO : LIMITE_PARTICIPAR_FREE;
+  const quantas = await contarLigasAmigos(user_id);
+  if (quantas >= limite) {
+    return pro
+      ? "Já estás em 5 ligas de amigos — é o máximo, mesmo com Ippon Pro."
+      : "Já estás em 2 ligas de amigos. Passa a Ippon Pro para entrares em até 5.";
+  }
+  return null;
+}
 
 export async function POST(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação à base de dados." }, { status: 500 });
   }
 
-  let corpo: {
-    user_id?: string;
-    nome?: string;
-    descricao?: string;
-    formato?: string;
-    privacidade?: string;
-    escudo?: unknown;
-  };
+  let corpo: { user_id?: string; codigo?: string };
   try {
     corpo = await req.json();
   } catch {
@@ -83,91 +81,83 @@ export async function POST(req: Request) {
   }
 
   const user_id = (corpo.user_id || "").trim();
-  const nome = (corpo.nome || "").trim();
-  const descricao = (corpo.descricao || "").trim();
-  const formato = (corpo.formato || "pontos").trim();
-  const privacidade = (corpo.privacidade || "fechada").trim();
-  const escudo = corpo.escudo ?? null;
+  const codigo = (corpo.codigo || "").trim().toUpperCase();
+  if (!user_id) return NextResponse.json({ ok: false, erro: "Entra para te juntares a uma liga." }, { status: 401 });
+  if (codigo.length < 4) return NextResponse.json({ ok: false, erro: "Código inválido." }, { status: 400 });
 
-  // Validações mínimas.
-  if (!user_id) return NextResponse.json({ ok: false, erro: "Sessão em falta. Entra para criar uma liga." }, { status: 401 });
-  if (nome.length < 2) return NextResponse.json({ ok: false, erro: "Dá um nome à tua liga (mínimo 2 letras)." }, { status: 400 });
-
-  // Limite: quem não é Pro só pode estar em 2 ligas de amigos.
-  const pro = await ehPro(user_id);
-  if (!pro) {
-    const quantas = await contarLigasAmigos(user_id);
-    if (quantas >= LIMITE_AMIGOS_FREE) {
-      return NextResponse.json({
-        ok: false,
-        limite: true,
-        erro: "Já estás em 2 ligas de amigos. Passa a Ippon Pro para criares e entrares em ligas ilimitadas.",
-      }, { status: 403 });
-    }
-  }
-
-  // Gera um código único (tenta algumas vezes para evitar colisão rara).
-  let invite_code = novoCodigo();
-  for (let tentativa = 0; tentativa < 5; tentativa++) {
-    const { data: existe } = await supabaseAdmin
-      .from("leagues")
-      .select("id")
-      .eq("invite_code", invite_code)
-      .maybeSingle();
-    if (!existe) break;
-    invite_code = novoCodigo();
-  }
-
-  // 1) Cria a liga. type="amigos" distingue das 18 oficiais (type="oficial").
+  // 1) Encontra a liga pelo código.
   const { data: liga, error: erroLiga } = await supabaseAdmin
     .from("leagues")
-    .insert({
-      name: nome,
-      type: "amigos",
-      scope: "privada",
-      created_by: user_id,
-      invite_code,
-      descricao: descricao || null,
-      formato,
-      privacidade,
-      escudo,
-    })
-    .select()
-    .single();
-
+    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code")
+    .eq("invite_code", codigo)
+    .maybeSingle();
   if (erroLiga || !liga) {
-    return NextResponse.json({ ok: false, erro: "Não foi possível criar a liga.", detalhe: erroLiga?.message }, { status: 500 });
+    return NextResponse.json({ ok: false, erro: "Não encontrámos nenhuma liga com esse código." }, { status: 404 });
   }
 
-  // 2) Mete o criador como primeiro membro.
-  const { error: erroMembro } = await supabaseAdmin
+  // 2) Já é membro? Não duplica.
+  const { data: jaMembro } = await supabaseAdmin
     .from("league_members")
-    .insert({
-      league_id: liga.id,
-      user_id,
-      score: 0,
-      position: 1,
-    });
-
-  if (erroMembro) {
-    // A liga foi criada mas o membro falhou. Não é fatal — o criador pode entrar
-    // depois pelo código. Mas avisamos para sabermos que aconteceu.
-    return NextResponse.json({
-      ok: true,
-      aviso: "Liga criada, mas não te adicionámos automaticamente. Entra com o código.",
-      liga: { id: liga.id, name: liga.name, invite_code: liga.invite_code, formato, privacidade },
-    });
+    .select("id")
+    .eq("league_id", liga.id)
+    .eq("user_id", user_id)
+    .maybeSingle();
+  if (jaMembro) {
+    return NextResponse.json({ ok: true, jaEra: true, liga });
   }
 
-  return NextResponse.json({
-    ok: true,
-    liga: {
-      id: liga.id,
-      name: liga.name,
-      invite_code: liga.invite_code,
-      descricao: liga.descricao,
-      formato,
-      privacidade,
-    },
-  });
+  // 3) Decide conforme a privacidade.
+  const priv = String(liga.privacidade || "fechada");
+
+  // 3a) ABERTA → entra direto (com verificação de limite).
+  if (priv === "aberta") {
+    if (liga.type === "amigos") {
+      const bloqueio = await bloqueioPorLimite(user_id);
+      if (bloqueio) return NextResponse.json({ ok: false, limite: true, erro: bloqueio }, { status: 403 });
+    }
+    const { error: erroMembro } = await supabaseAdmin
+      .from("league_members")
+      .insert({ league_id: liga.id, user_id, score: 0, position: 0 });
+    if (erroMembro) {
+      return NextResponse.json({ ok: false, erro: "Não foi possível entrar na liga." }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, entrou: true, liga });
+  }
+
+  // 3b) MEDIANTE PEDIDO → cria (ou confirma) um pedido pendente.
+  if (priv === "mediante_pedido") {
+    // Já tem pedido? Vê em que estado está.
+    const { data: pedidoExistente } = await supabaseAdmin
+      .from("league_requests")
+      .select("id, estado")
+      .eq("league_id", liga.id)
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    if (pedidoExistente) {
+      if (pedidoExistente.estado === "pendente") {
+        return NextResponse.json({ ok: true, jaPediu: true });
+      }
+      if (pedidoExistente.estado === "recusado") {
+        // Foi recusado antes: reabre o pedido (volta a pendente).
+        await supabaseAdmin
+          .from("league_requests")
+          .update({ estado: "pendente", created_at: new Date().toISOString(), decided_at: null })
+          .eq("id", pedidoExistente.id);
+        return NextResponse.json({ ok: true, pedido: true });
+      }
+      // estado "aprovado" mas não é membro (caso raro): deixa pedir de novo.
+    }
+
+    const { error: erroPedido } = await supabaseAdmin
+      .from("league_requests")
+      .insert({ league_id: liga.id, user_id, estado: "pendente" });
+    if (erroPedido) {
+      return NextResponse.json({ ok: false, erro: "Não foi possível enviar o teu pedido." }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, pedido: true });
+  }
+
+  // 3c) FECHADA → não se entra/pede pelo mercado.
+  return NextResponse.json({ ok: false, erro: "Esta liga é fechada." }, { status: 403 });
 }
