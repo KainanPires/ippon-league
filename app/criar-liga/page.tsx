@@ -188,9 +188,10 @@ export default function CriarLiga() {
             <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 22, textAlign: "right" }}>{descricao.length}/400</div>
 
             <Label>Privacidade</Label>
-            <div style={{ display: "flex", gap: 10, marginBottom: 26 }}>
-              <FormatCard on={privacy === "fechada"} onClick={() => setPrivacy("fechada")} title="Fechada" desc="Só entra quem tiver convite ou código." icon="🔒" />
-              <FormatCard on={privacy === "aberta"} onClick={() => setPrivacy("aberta")} title="Aberta" desc="Aparece no mercado de ligas. Qualquer um pode entrar." icon="🌍" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 26 }}>
+              <PrivacyRow on={privacy === "aberta"} onClick={() => setPrivacy("aberta")} title="Aberta" desc="Aparece no mercado de ligas. Qualquer um pode entrar." icon="🌍" />
+              <PrivacyRow on={privacy === "mediante_pedido"} onClick={() => setPrivacy("mediante_pedido")} title="Por aprovação" desc="Aparece no mercado. Tu aprovas quem entra." icon="✋" />
+              <PrivacyRow on={privacy === "fechada"} onClick={() => setPrivacy("fechada")} title="Fechada" desc="Não aparece no mercado. Só entra quem tiver o código." icon="🔒" />
             </div>
 
             {erro && (
@@ -211,7 +212,7 @@ export default function CriarLiga() {
                 <Escudo config={{ ...cfg, name: created.name }} size={84} />
                 <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", marginTop: 10 }}>{created.name}</div>
                 <div style={{ fontSize: 12, color: "#7fd1a3", marginTop: 3 }}>Liga criada! Agora chama o teu dojo. 🥋</div>
-                <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{created.privacidade === "fechada" ? "Fechada" : "Aberta"}</div>
+                <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{nomePrivacidade(created.privacidade)}</div>
               </div>
 
               <Label>Convidar por link</Label>
@@ -245,6 +246,29 @@ function BackArrow() {
 }
 function Label({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 9 }}>{children}</div>;
+}
+
+// Nome amigável do estado de privacidade (para mostrar ao utilizador).
+function nomePrivacidade(p: string): string {
+  if (p === "aberta") return "Aberta";
+  if (p === "mediante_pedido") return "Por aprovação";
+  return "Fechada";
+}
+
+// Linha de privacidade empilhada (ícone + título + descrição, largura total).
+function PrivacyRow({ on, onClick, title, desc, icon }: { on: boolean; onClick: () => void; title: string; desc: string; icon: string }) {
+  return (
+    <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", background: on ? "#16201b" : "#121815", border: `1.5px solid ${on ? GOLD : "#243029"}`, borderRadius: 13, padding: "12px 14px", cursor: "pointer", color: "#f1ede2" }}>
+      <div style={{ fontSize: 22, flexShrink: 0 }}>{icon}</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 2 }}>{title}</div>
+        <div style={{ fontSize: 11.5, color: "#93a39a", lineHeight: 1.4 }}>{desc}</div>
+      </div>
+      <div style={{ marginLeft: "auto", flexShrink: 0, width: 18, height: 18, borderRadius: "50%", border: `2px solid ${on ? GOLD : "#3a4a42"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {on && <div style={{ width: 8, height: 8, borderRadius: "50%", background: GOLD }} />}
+      </div>
+    </button>
+  );
 }
 
 function FormatCard({ on, onClick, title, desc, icon }: { on: boolean; onClick: () => void; title: string; desc: string; icon: string }) {
