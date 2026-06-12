@@ -10,13 +10,15 @@ const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
-// O que tens com o Pro.
+// O que tens com o Pro. Só o que é REAL ou fundamentado na análise. Nada que
+// entregue a decisão do jogador (quem montar / quem é o melhor da rodada).
 const VANTAGENS: { t: string; x: string }[] = [
-  { t: "Scout avançado", x: "Estatísticas baseadas no histórico real de cada atleta nas últimas competições." },
-  { t: "Análise do teu time", x: "Uma leitura honesta da tua escalação: o que parece sólido, onde há dúvida e porquê. Sem te dizer o que fazer — a decisão é sempre tua." },
-  { t: "Recomendações da rodada", x: "Analisamos o chaveamento e os confrontos diretos para estimar possíveis campeões e maiores pontuadores. São estimativas, não garantias." },
-  { t: "Chaveamento das competições", x: "Vê as chaves de cada competição e acompanha o caminho dos teus atletas." },
-  { t: "Acompanhamento ao vivo", x: "No dia da competição, acompanha o desenrolar com base nos dados que recolhemos." },
+  { t: "Scout avançado", x: "Estatísticas baseadas no histórico real de cada atleta: títulos, forma recente e como pontua em cada nível de competição." },
+  { t: "Análise do teu time", x: "Uma leitura honesta da tua escalação: o que parece sólido, onde há risco e porquê. Sem te dizer o que fazer — a decisão é sempre tua." },
+  { t: "Dica de capitão", x: "Entre os atletas que tu escolheste, qual tem o histórico mais forte para esta competição. Continuas a montar o teu time à tua maneira." },
+  { t: "Maior possibilidade de valorização", x: "Pela análise do histórico, vê quais dos teus atletas têm mais hipótese de valorizar e render JC. É uma tendência, não uma garantia." },
+  { t: "Chaveamento das competições", x: "Vê o quadro de lutas de cada competição e acompanha o caminho dos teus atletas na chave." },
+  { t: "Acompanhamento ao vivo", x: "No dia da competição, acompanha as pontuações dos teus atletas em tempo real." },
   { t: "Até 5 ligas ativas", x: "Cria até 5 ligas em simultâneo, entre mata-mata e pontos corridos." },
   { t: "Design exclusivo Pro", x: "Um visual próprio e distinto, só para membros Ippon Pro." },
   { t: "Elegibilidade a prémios", x: "Concorre aos prémios das ligas Mundial e Continental (ver abaixo)." },
@@ -66,6 +68,14 @@ export default function SobrePro() {
           ))}
         </div>
 
+        {/* O que o Pro NÃO faz — protege o jogo e a confiança */}
+        <SectionTitle>O que o Pro não faz</SectionTitle>
+        <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 22 }}>
+          <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.6, margin: 0 }}>
+            O Pro <strong style={{ color: "#cfd8d2" }}>não monta o teu time por ti</strong> e <strong style={{ color: "#cfd8d2" }}>não te diz quem vai ganhar a competição</strong>. Não entregamos "os melhores da rodada" nem em quem apostar — isso tiraria a graça do jogo. Damos-te informação e leituras do histórico; o mérito de acertar é sempre teu.
+          </p>
+        </div>
+
         {/* Prémios */}
         <SectionTitle>Como funcionam os prémios</SectionTitle>
         <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 22 }}>
@@ -95,8 +105,8 @@ export default function SobrePro() {
             <div style={{ width: 40, height: 40, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
             <p style={{ fontSize: 13.5, color: "#dfe6e0", lineHeight: 1.6, margin: 0 }}>Queremos ser muito claros contigo sobre o que o Pro é — e o que não é.</p>
           </div>
-          <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.6, margin: "0 0 10px" }}>O Ippon Pro oferece <strong>apenas informação</strong>, baseada em dados e no histórico dos atletas: os seus resultados naquela competição nos últimos anos, a dificuldade dos confrontos seguintes e a possibilidade de cada um pontuar bem.</p>
-          <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.6, margin: 0 }}>Ao assinar, reconheces que o Pro é <strong style={{ color: GOLD }}>meramente informativo e não garante qualquer resultado</strong>. Mostramos possibilidades e estimativas — nunca certezas. A decisão e a estratégia são sempre tuas.</p>
+          <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.6, margin: "0 0 10px" }}>O Ippon Pro oferece <strong>apenas informação</strong>, baseada em dados e no histórico dos atletas: os seus resultados nas últimas competições e como costumam pontuar em cada nível. Mostramos tendências e possibilidades — por exemplo, quem tem mais hipótese de valorizar.</p>
+          <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.6, margin: 0 }}>Ao assinar, reconheces que o Pro é <strong style={{ color: GOLD }}>meramente informativo e não garante qualquer resultado</strong>. Nunca prometemos certezas nem te dizemos em quem apostar. A decisão e a estratégia são sempre tuas.</p>
         </div>
 
         {/* Link discreto para vendas — só para quem NÃO é Pro */}
