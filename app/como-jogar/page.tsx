@@ -177,7 +177,7 @@ export default function ComoJogar() {
           <section style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", textAlign: "center", marginBottom: 14 }}>
             <div style={{ width: 64, height: 64, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="sabio" /></div>
             <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Joga com vantagem: Ippon Pro</div>
-            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: "6px 0 4px" }}>Scout avançado, valorização esperada, dicas e capitães da rodada.</p>
+            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: "6px 0 4px" }}>Scout avançado, análise do teu time e dica de capitão — informação para decidires melhor. O Pro não joga por ti.</p>
             <p style={{ fontSize: 13, color: GOLD, fontWeight: 700, margin: "0 0 14px" }}>{PRECO.premios}.</p>
             <a href="/ippon-pro" style={{ display: "block", padding: 13, borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>
               Conhecer o Ippon Pro
