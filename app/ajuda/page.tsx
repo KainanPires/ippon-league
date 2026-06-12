@@ -15,7 +15,7 @@ const MOTIVOS: { label: string; assunto: string }[] = [
   { label: "Encontrei um erro", assunto: "Reportar um erro — Ippon League" },
   { label: "Tenho uma sugestão", assunto: "Sugestão — Ippon League" },
   { label: "Dúvida sobre o Ippon Pro", assunto: "Ippon Pro — Ippon League" },
-  { label: "Outro assunto", assunto: "Contacto — Ippon League" },
+  { label: "Outro assunto", assunto: "" },
 ];
 
 const FAQ: { p: string; r: React.ReactNode }[] = [
@@ -41,12 +41,14 @@ export default function Ajuda() {
     temSessao().then(setLogado).catch(() => setLogado(false));
   }, []);
 
-  const assunto = motivo !== null ? MOTIVOS[motivo].assunto : "Contacto — Ippon League";
+  const assunto = motivo !== null ? MOTIVOS[motivo].assunto : "";
+  const su = assunto ? encodeURIComponent(assunto) : "";
 
   // Links que abrem a janela de "escrever email" já preenchida, por serviço.
-  const linkGmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${EMAIL}&su=${encodeURIComponent(assunto)}`;
-  const linkOutlook = `https://outlook.live.com/mail/0/deeplink/compose?to=${EMAIL}&subject=${encodeURIComponent(assunto)}`;
-  const linkMailto = `mailto:${EMAIL}?subject=${encodeURIComponent(assunto)}`;
+  // Quando o assunto é vazio (motivo "Outro"), não incluímos o parâmetro do assunto.
+  const linkGmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${EMAIL}${su ? `&su=${su}` : ""}`;
+  const linkOutlook = `https://outlook.live.com/mail/0/deeplink/compose?to=${EMAIL}${su ? `&subject=${su}` : ""}`;
+  const linkMailto = `mailto:${EMAIL}${su ? `?subject=${su}` : ""}`;
 
   async function copiar() {
     try {
