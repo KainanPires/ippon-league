@@ -54,6 +54,7 @@ export default function Ligas() {
   const [aCarregarMercado, setACarregarMercado] = useState(false);
   const [aEntrarId, setAEntrarId] = useState<string | null>(null);
   const [erroMercado, setErroMercado] = useState("");
+  const [pedidoEnviado, setPedidoEnviado] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let vivo = true;
@@ -121,25 +122,38 @@ export default function Ligas() {
     }
   }
 
-  // Entrar numa liga ABERTA a partir do mercado (entra direto, sem aprovação).
-  async function entrarNaLigaAberta(liga: LigaMercado) {
+  // Ação no mercado: liga "aberta" entra direto; "por aprovação" envia pedido.
+  // Usa a rota /api/liga/pedir, que decide conforme a privacidade.
+  async function acaoMercado(liga: LigaMercado) {
     setErroMercado("");
     setAEntrarId(liga.id);
     try {
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess.session?.user?.id;
       if (!uid) { window.location.href = `/entrar?voltar=/ligas`; return; }
-      const res = await fetch("/api/liga/entrar", {
+      const res = await fetch("/api/liga/pedir", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: uid, codigo: liga.invite_code }),
       });
       const j = await res.json();
       if (!j.ok) {
-        setErroMercado(j.erro || "Não foi possível entrar nesta liga.");
+        setErroMercado(j.erro || "Não foi possível concluir.");
         setAEntrarId(null);
         return;
       }
+      // Entrou direto (aberta) ou já era membro: vai para a liga.
+      if (j.entrou || j.jaEra) {
+        window.location.href = `/liga/${liga.invite_code}`;
+        return;
+      }
+      // Ficou pedido pendente (por aprovação): marca como "pedido enviado".
+      if (j.pedido || j.jaPediu) {
+        setPedidoEnviado((prev) => ({ ...prev, [liga.id]: true }));
+        setAEntrarId(null);
+        return;
+      }
+      // Caso inesperado: tenta abrir a liga.
       window.location.href = `/liga/${liga.invite_code}`;
     } catch {
       setErroMercado("Falha de ligação.");
@@ -219,7 +233,7 @@ export default function Ligas() {
         {tab === "mercado" && (
           <>
             <Section>Ligas abertas</Section>
-            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>Ligas públicas onde qualquer jogador pode entrar. As ligas fechadas não aparecem aqui — só se entra por código.</p>
+            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>Ligas públicas. Nas abertas entras já; nas "por aprovação" o dono aceita o teu pedido. As fechadas não aparecem aqui — só por código.</p>
 
             {mercado === null || aCarregarMercado ? (
               <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
@@ -239,8 +253,10 @@ export default function Ligas() {
                     right={
                       l.sou_membro ? (
                         <a href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}><ActionBtn kind="ver">Abrir</ActionBtn></a>
+                      ) : pedidoEnviado[l.id] ? (
+                        <span style={{ background: "#23291f", color: "#93a39a", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, padding: "7px 11px", borderRadius: 8, whiteSpace: "nowrap" }}>Pedido enviado</span>
                       ) : (
-                        <button onClick={() => entrarNaLigaAberta(l)} disabled={aEntrarId === l.id} style={{ background: "#3f8f5a", color: "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 14px", borderRadius: 8, whiteSpace: "nowrap", cursor: aEntrarId === l.id ? "default" : "pointer", opacity: aEntrarId === l.id ? 0.7 : 1 }}>{aEntrarId === l.id ? "…" : "Entrar"}</button>
+                        <button onClick={() => acaoMercado(l)} disabled={aEntrarId === l.id} style={{ background: l.privacidade === "mediante_pedido" ? "#3a2f12" : "#3f8f5a", color: l.privacidade === "mediante_pedido" ? GOLD : "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 14px", borderRadius: 8, whiteSpace: "nowrap", cursor: aEntrarId === l.id ? "default" : "pointer", opacity: aEntrarId === l.id ? 0.7 : 1 }}>{aEntrarId === l.id ? "…" : l.privacidade === "mediante_pedido" ? "Solicitar" : "Entrar"}</button>
                       )
                     }
                   />
