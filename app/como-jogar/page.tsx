@@ -1,110 +1,221 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { PRECO } from "@/lib/precos";
+import { temSessao } from "@/lib/auth";
 
-const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
-const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
+const FD = "var(--font-geist-mono), system-ui, sans-serif";
+const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
+const APP_URL = "https://ippon-league.vercel.app";
 
-const STEPS = [
-  { title: "Olá, sou o teu sensei!", text: "Em poucos passos ensino-te tudo o que precisas. Avança quando quiseres." },
-  { title: "Monta a tua equipa", text: "Começas com 100 Judocoins (JC). Escolhe 8 atletas e nomeia 1 capitão — o capitão pontua a dobrar." },
-  { title: "Ganha pontos nas lutas", text: "Os teus atletas pontuam pelas ações reais: ippon +10, waza-ari +4, shido a favor +1. Sofrer pontos ou shidos tira." },
-  { title: "Faz o teu património crescer", text: "Se um atleta rende acima do esperado, valoriza e ganhas JC. Compra barato, escala bem e vê o património subir." },
-  { title: "As competições são as rodadas", text: "Cada Grand Slam, Mundial ou Continental é uma rodada. Escala a equipa antes de o mercado fechar." },
-  { title: "Ao vivo e em ligas", text: "Acompanha a pontuação a entrar ao vivo e compete em ligas mundial, nacional, de amigos — e no mata-mata Copa Ippon." },
-  { title: "Sobe de faixa", text: "O teu desempenho mensal sobe (ou desce) a tua faixa — e muda o visual do jogo. Começas na branca." },
+const FAIXAS: { nome: string; cor: string }[] = [
+  { nome: "Branca", cor: "#d7dcd6" },
+  { nome: "Azul", cor: "#3f86d6" },
+  { nome: "Amarela", cor: "#e6b422" },
+  { nome: "Verde", cor: "#3f9f5a" },
+  { nome: "Roxa", cor: "#9b6cc9" },
+  { nome: "Castanha", cor: "#a06a3a" },
+  { nome: "Preta", cor: GOLD },
 ];
 
-const PRO_BENEFITS = [
-  "Scout avançado dos atletas",
-  "Valorização esperada e mínimo para valorizar",
-  "Dicas e capitães recomendados da rodada",
-  "Barganhas da rodada",
-  "Ligas e badges exclusivos",
-  PRECO.premios,
+const PONTOS: { acao: string; aplica: string; sofre: string }[] = [
+  { acao: "Ippon", aplica: "+10", sofre: "−5" },
+  { acao: "Waza-ari", aplica: "+4", sofre: "−2" },
+  { acao: "Yuko", aplica: "+2", sofre: "−1" },
+  { acao: "Shido", aplica: "+1 *", sofre: "−2 **" },
+  { acao: "Hansoku-make direto", aplica: "—", sofre: "−10" },
 ];
 
 export default function ComoJogar() {
-  const total = STEPS.length + 1; // +1 = cartão do Pro
-  const [step, setStep] = useState(0);
-  const isPro = step >= STEPS.length;
+  const [logado, setLogado] = useState(false);
+  const [podePartilhar, setPodePartilhar] = useState(false);
+
+  useEffect(() => {
+    temSessao().then(setLogado).catch(() => setLogado(false));
+    try {
+      const nav = navigator as Navigator & { share?: unknown };
+      setPodePartilhar(typeof nav.share === "function");
+    } catch { setPodePartilhar(false); }
+  }, []);
+
+  async function partilhar() {
+    const texto = "Aprende a jogar a Ippon League — o jogo oficial dos fãs de judô. Monta a tua equipa e dispute com fãs do mundo inteiro!";
+    try {
+      const nav = navigator as Navigator & { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
+      if (nav.share) {
+        await nav.share({ title: "Como se joga a Ippon League", text: texto, url: APP_URL });
+        return;
+      }
+    } catch { /* cancelado */ }
+    try {
+      await navigator.clipboard.writeText(`${texto} ${APP_URL}`);
+      alert("Link copiado! Partilha com quem ainda não joga.");
+    } catch { /* ignora */ }
+  }
 
   return (
-    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FONT_BODY, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}>
-      <div style={{ width: "100%", maxWidth: 460 }}>
-        {/* Progresso */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-          {Array.from({ length: total }).map((_, i) => (
-            <div key={i} style={{ flex: 1, height: 4, borderRadius: 999, background: i <= step ? GOLD : "#243029" }} />
-          ))}
-        </div>
+    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 48px" }}>
+        <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
+          <a href={logado ? "/perfil" : "/"} aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          </a>
+          <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Como se joga</h1>
+          {podePartilhar && (
+            <button onClick={partilhar} aria-label="Partilhar guia" style={{ marginLeft: "auto", width: 34, height: 34, borderRadius: "50%", border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
+            </button>
+          )}
+        </header>
 
-        {!isPro ? (
-          <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 18, padding: 22 }}>
-            <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-              <div style={{ width: 76, height: 76, flexShrink: 0 }}>
-                <Mascot belt="#efeadd" expression="feliz" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
-                  {STEPS[step].title}
-                </div>
-                <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>{STEPS[step].text}</p>
-              </div>
+        <section style={{ textAlign: "center", background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "22px 18px", marginBottom: 16 }}>
+          <div style={{ width: 92, height: 92, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="feliz" /></div>
+          <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.1em" }}>Guia do jogo</div>
+          <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", lineHeight: 1.1 }}>Como se joga a Ippon League</h2>
+          <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>Olá, sou o Dôdo! Em poucos minutos ficas a saber tudo. Lê ao teu ritmo.</p>
+        </section>
+
+        <Secao expr="indicando" titulo="1. Monta a tua equipa">
+          Começas com <strong style={{ color: GOLD }}>100 Judocoins (JC)</strong>. Escolhe 8 atletas — 4 masculinos e 4 femininos — e nomeia 1 capitão. Equilibra estrelas caras com apostas baratas para caberes no orçamento.
+        </Secao>
+
+        <section style={cardStyle}>
+          <Cabecalho expr="determinado" titulo="2. Como pontuas" />
+          <p style={pStyle}>Pontuas pelas <strong>ações reais</strong> dos teus atletas nas lutas — não por medalhas. Aplicar uma ação dá pontos; sofrê-la tira.</p>
+
+          <div style={{ display: "flex", gap: 10, margin: "14px 0" }}>
+            <div style={{ flex: 1, background: "rgba(127,209,163,0.10)", border: "1px solid #1f5e44", borderRadius: 12, padding: "12px 8px", textAlign: "center" }}>
+              <div style={{ width: 56, height: 56, margin: "0 auto 4px" }}><Mascot belt={GOLD} expression="comemorando" /></div>
+              <div style={{ fontSize: 11, color: "#7fd1a3", fontWeight: 700 }}>aplica ippon</div>
+              <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: "#7fd1a3" }}>+10</div>
             </div>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 22 }}>
-              <button
-                onClick={() => setStep((s) => Math.max(0, s - 1))}
-                disabled={step === 0}
-                style={{ background: "transparent", border: "none", color: step === 0 ? "#3c463f" : "#93a39a", fontSize: 14, fontWeight: 700, cursor: step === 0 ? "default" : "pointer", fontFamily: FONT_BODY }}
-              >
-                Anterior
-              </button>
-              <span style={{ fontSize: 12, color: "#5f6f67" }}>{step + 1} de {total}</span>
-              <button
-                onClick={() => setStep((s) => s + 1)}
-                style={{ background: GOLD, border: "none", color: "#1b211e", padding: "10px 20px", borderRadius: 10, fontFamily: FONT_DISPLAY, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}
-              >
-                Seguinte
-              </button>
+            <div style={{ flex: 1, background: "rgba(239,141,131,0.10)", border: "1px solid #5a2f2c", borderRadius: 12, padding: "12px 8px", textAlign: "center" }}>
+              <div style={{ width: 56, height: 56, margin: "0 auto 4px" }}><Mascot belt="#5a2f2c" expression="determinado" /></div>
+              <div style={{ fontSize: 11, color: "#ef8d83", fontWeight: 700 }}>sofre ippon</div>
+              <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: "#ef8d83" }}>−5</div>
             </div>
           </div>
-        ) : (
-          <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 18, padding: 24, textAlign: "center" }}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}>
-              <Mascot belt="#141110" expression="feliz" />
-            </div>
-            {PRECO.emPromocao && <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: GOLD }}>Oferta de lançamento</div>}
-            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 700, textTransform: "uppercase", margin: "6px 0 4px" }}>Joga com vantagem: Ippon Pro</h2>
 
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 10, margin: "10px 0 16px" }}>
-              {PRECO.emPromocao && <span style={{ fontSize: 16, color: "#7c8a82", textDecoration: "line-through" }}>{PRECO.normal}</span>}
-              <span style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
-              <span style={{ fontSize: 13, color: "#93a39a" }}>{PRECO.periodo}</span>
-            </div>
-
-            <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-              {PRO_BENEFITS.map((b) => (
-                <div key={b} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <span style={{ color: GOLD, fontWeight: 700 }}>✓</span>
-                  <span style={{ fontSize: 14, color: "#c7d0c9" }}>{b}</span>
-                </div>
+          <div style={{ fontSize: 11, color: "#7c8a82", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Tabela de pontuação</div>
+          <table style={{ width: "100%", fontSize: 13.5, borderCollapse: "collapse" }}>
+            <tbody>
+              <tr style={{ borderBottom: "1px solid #2a3a33" }}>
+                <td style={{ padding: "7px 0", color: "#93a39a" }}>Ação</td>
+                <td style={{ padding: "7px 0", textAlign: "center", color: "#7fd1a3" }}>Aplica</td>
+                <td style={{ padding: "7px 0", textAlign: "center", color: "#ef8d83" }}>Sofre</td>
+              </tr>
+              {PONTOS.map((p) => (
+                <tr key={p.acao} style={{ borderBottom: "1px solid #1a221d" }}>
+                  <td style={{ padding: "7px 0" }}>{p.acao}</td>
+                  <td style={{ padding: "7px 0", textAlign: "center", color: p.aplica === "—" ? "#5f6f67" : "#7fd1a3", fontFamily: FD }}>{p.aplica}</td>
+                  <td style={{ padding: "7px 0", textAlign: "center", color: p.sofre === "—" ? "#5f6f67" : "#ef8d83", fontFamily: FD }}>{p.sofre}</td>
+                </tr>
               ))}
-            </div>
+            </tbody>
+          </table>
 
-            <a href="/ippon-pro" style={{ display: "block", padding: "13px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>
-              Quero o Ippon Pro
-            </a>
-            <a href="/meu-time" style={{ display: "inline-block", marginTop: 12, fontSize: 13, color: "#93a39a", textDecoration: "none" }}>
-              Talvez depois — ir para o meu time
-            </a>
+          <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 12, padding: "12px 14px", marginTop: 14 }}>
+            <div style={{ fontSize: 12.5, color: "#7fd1a3", fontWeight: 700, marginBottom: 3 }}>* Shido a teu favor (acumula)</div>
+            <p style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.55, margin: "0 0 10px" }}>Ganhas +1 por cada shido que o adversário leva. Ao 3.º, ele perde por hansoku-make e o valor <strong style={{ color: "#f1ede2" }}>dobra</strong>: +1, +2 → <strong style={{ color: "#7fd1a3" }}>+6</strong> no total.</p>
+            <div style={{ fontSize: 12.5, color: "#ef8d83", fontWeight: 700, marginBottom: 3 }}>** Shido contra ti (custo crescente)</div>
+            <p style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.55, margin: 0 }}>Cada shido custa mais: 1.º <strong style={{ color: "#f1ede2" }}>−2</strong>, 2.º <strong style={{ color: "#f1ede2" }}>−3</strong>, 3.º <strong style={{ color: "#f1ede2" }}>−4</strong>. Se levares 3, perdes por hansoku-make: total <strong style={{ color: "#ef8d83" }}>−9</strong>.</p>
           </div>
-        )}
+        </section>
+
+        <Secao expr="determinado" titulo="3. O capitão pontua a dobrar" destaque>
+          Tudo o que o teu capitão fizer conta a <strong style={{ color: GOLD }}>dobrar</strong>. Um ippon do capitão vale +20! Escolhe o atleta que achas que vai brilhar.
+        </Secao>
+
+        <section style={cardStyle}>
+          <Cabecalho expr="sabio" titulo="4. As faixas e a tua evolução" />
+          <p style={pStyle}>Começas na <strong>branca</strong>. A tua faixa reflete o teu desempenho face aos outros jogadores e muda o visual do jogo. Há 7 faixas:</p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, margin: "14px 0" }}>
+            {FAIXAS.map((f) => (
+              <div key={f.nome} style={{ textAlign: "center" }}>
+                <div style={{ width: 48, height: 48, margin: "0 auto" }}><Mascot belt={f.cor} expression="feliz" /></div>
+                <div style={{ height: 5, background: f.cor, borderRadius: 3, margin: "3px 8px" }} />
+                <div style={{ fontSize: 10, color: "#93a39a" }}>{f.nome}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ flex: 1, background: "rgba(127,209,163,0.08)", border: "1px solid #1f5e44", borderRadius: 12, padding: 12 }}>
+              <div style={{ fontSize: 12.5, color: "#7fd1a3", fontWeight: 700, marginBottom: 4 }}>↑ Como subir</div>
+              <p style={{ fontSize: 12, color: "#a9b4ac", lineHeight: 1.5, margin: 0 }}>Pontua bem nas rodadas. Quanto melhor fores face aos outros jogadores no mês, mais alta a tua faixa.</p>
+            </div>
+            <div style={{ flex: 1, background: "rgba(239,141,131,0.08)", border: "1px solid #5a2f2c", borderRadius: 12, padding: 12 }}>
+              <div style={{ fontSize: 12.5, color: "#ef8d83", fontWeight: 700, marginBottom: 4 }}>↓ Como descer</div>
+              <p style={{ fontSize: 12, color: "#a9b4ac", lineHeight: 1.5, margin: 0 }}>Rodadas fracas fazem-te cair. A faixa acompanha o teu desempenho mês a mês — nada fica garantido.</p>
+            </div>
+          </div>
+        </section>
+
+        <Secao expr="indicando" titulo="5. Património e mercado">
+          Os atletas valorizam ou desvalorizam conforme rendem. Compra barato quem está prestes a brilhar e vê o teu <strong style={{ color: GOLD }}>património</strong> crescer rodada após rodada.
+        </Secao>
+
+        <Secao expr="determinado" titulo="6. As competições são as rodadas">
+          Cada Grand Slam, Mundial ou Continental é uma rodada jogável. Escala a tua equipa antes de o mercado fechar e acompanha os pontos a entrar ao vivo.
+        </Secao>
+
+        <Secao expr="feliz" titulo="7. Ligas e mata-mata">
+          Disputa ligas mundial, nacional e de amigos. E na <strong>Copa Ippon</strong> (mata-mata), cada rodada é uma eliminatória — basta uma boa escalação para avançar.
+        </Secao>
+
+        <section style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", textAlign: "center", marginBottom: 14 }}>
+          <div style={{ width: 64, height: 64, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="sabio" /></div>
+          <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Joga com vantagem: Ippon Pro</div>
+          <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: "6px 0 4px" }}>Scout avançado, valorização esperada, dicas e capitães da rodada.</p>
+          <p style={{ fontSize: 13, color: GOLD, fontWeight: 700, margin: "0 0 14px" }}>{PRECO.premios}.</p>
+          <a href="/ippon-pro" style={{ display: "block", padding: 13, borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>
+            Conhecer o Ippon Pro
+          </a>
+        </section>
+
+        <section style={{ background: "#121815", border: `2px solid ${GOLD}`, borderRadius: 18, padding: "22px 18px", textAlign: "center" }}>
+          <div style={{ width: 72, height: 72, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="comemorando" /></div>
+          <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 6px" }}>Pronto para entrar no tatame?</h2>
+          <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 14px" }}>Cria a tua conta, monta a tua equipa e dispute com fãs de judô do mundo inteiro.</p>
+          <a href={logado ? "/meu-time" : "/entrar"} style={{ display: "block", padding: 14, borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>
+            {logado ? "Ir para o meu time" : "Criar a minha conta grátis"}
+          </a>
+          {podePartilhar && (
+            <button onClick={partilhar} style={{ marginTop: 10, background: "transparent", border: "none", color: GOLD, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>
+              Partilhar este guia
+            </button>
+          )}
+          <div style={{ fontSize: 11, color: "#5f6f67", marginTop: 10 }}>ippon-league.vercel.app</div>
+        </section>
       </div>
     </main>
+  );
+}
+
+const cardStyle: React.CSSProperties = {
+  background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 18, marginBottom: 14,
+};
+const pStyle: React.CSSProperties = {
+  fontSize: 14, color: "#c7d0c9", lineHeight: 1.6, margin: 0,
+};
+
+function Cabecalho({ expr, titulo }: { expr: string; titulo: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+      <div style={{ width: 44, height: 44, flexShrink: 0 }}><Mascot belt="#141110" expression={expr as never} /></div>
+      <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase" }}>{titulo}</div>
+    </div>
+  );
+}
+
+function Secao({ expr, titulo, children, destaque }: { expr: string; titulo: string; children: React.ReactNode; destaque?: boolean }) {
+  return (
+    <section style={{ ...cardStyle, border: destaque ? `1px solid ${GOLD}` : "1px solid #243029" }}>
+      <Cabecalho expr={expr} titulo={titulo} />
+      <p style={pStyle}>{children}</p>
+    </section>
   );
 }
