@@ -353,6 +353,7 @@ export async function montarDossie(
     country?: string;
     country_short?: string;
     coach?: string;
+    best_result?: string | null;
     age?: string;
     categories?: string[];
   };
