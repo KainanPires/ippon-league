@@ -16,12 +16,17 @@
 //   4) quando a ronda fica toda decidida, gera a ronda seguinte (final+bronze
 //      nas semifinais); se era a final, marca a copa como terminada
 //
+// Notificações (sino): em cada confronto real avisa o vencedor ("avançaste") e o
+// perdedor ("eliminado"); na final, campeão/vice; no bronze, 3º lugar. Tudo com o
+// nome da liga. As notificações nunca bloqueiam o apuramento (falham em silêncio).
+//
 // Recebe (POST): { league_id }
 // Devolve: { ok, apurou, ronda, decididos, gerouProxima, terminada }
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitionContests, scoreContestSide } from "@/lib/ijf";
 import { decidirConfronto, gerarRondaSeguinte, idCompeticaoSeguinte, type PontosJogador, type ConfrontoDB } from "@/lib/copa";
+import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -55,10 +60,10 @@ export async function POST(req: Request) {
   const league_id = (corpo.league_id || "").trim();
   if (!league_id) return NextResponse.json({ ok: false, erro: "Falta league_id." }, { status: 400 });
 
-  // Liga é copa e já sorteada?
+  // Liga é copa e já sorteada? (name para personalizar as notificações.)
   const { data: liga } = await supabaseAdmin
     .from("leagues")
-    .select("id, formato, copa_estado")
+    .select("id, name, formato, copa_estado")
     .eq("id", league_id)
     .maybeSingle();
   if (!liga) return NextResponse.json({ ok: false, erro: "Liga não encontrada." }, { status: 404 });
@@ -66,6 +71,9 @@ export async function POST(req: Request) {
   if (liga.copa_estado !== "sorteada" && liga.copa_estado !== "a_decorrer") {
     return NextResponse.json({ ok: true, apurou: false, estado: liga.copa_estado });
   }
+
+  const nomeLiga = String(liga.name || "a tua liga");
+  const linkCopa = "/ligas";
 
   // 1) Todos os confrontos da liga.
   const { data: todos } = await supabaseAdmin
@@ -114,10 +122,12 @@ export async function POST(req: Request) {
   }
   const pontosJogador = await pontosPorJogador(Array.from(jogadores), comp, pontosAtletaRaw);
 
-  // Decide cada confronto pendente e grava.
+  // Decide cada confronto pendente e grava. Guarda os resultados para notificar
+  // depois de toda a ronda decidida (assim sabemos se foi a final).
   let decididos = 0;
   for (const c of pendentesRonda) {
     // Confronto com bye (jogador_b null) já deve estar decidido; salvaguarda.
+    // Bye não gera notificação (não houve luta).
     if (!c.jogador_b) {
       await supabaseAdmin.from("copa_confrontos").update({
         vencedor: c.jogador_a, decidido_por: "bye", estado: "decidido",
@@ -136,6 +146,58 @@ export async function POST(req: Request) {
       estado: "decidido",
     }).eq("id", c.id);
     decididos++;
+
+    // --- NOTIFICAÇÕES deste confronto ---
+    const vencedor = r.vencedor;
+    const perdedor = vencedor === c.jogador_a ? c.jogador_b : c.jogador_a;
+    const fase = String(c.fase || "");
+    if (fase === "final") {
+      // Campeão e vice.
+      await criarNotificacaoServidor({
+        paraUserId: vencedor,
+        tipo: "copa_campeao",
+        titulo: "És o CAMPEÃO da Copa Ippon! 🏆",
+        corpo: `Venceste a final e és o campeão da Copa da liga "${nomeLiga}". Que conquista!`,
+        link: linkCopa,
+      });
+      if (perdedor) {
+        await criarNotificacaoServidor({
+          paraUserId: perdedor,
+          tipo: "copa_eliminado",
+          titulo: "Vice-campeão da Copa Ippon 🥈",
+          corpo: `Chegaste à final da Copa da liga "${nomeLiga}" e ficaste em 2º. Grande campanha!`,
+          link: linkCopa,
+        });
+      }
+    } else if (fase === "bronze") {
+      // 3º lugar (o vencedor do confronto de bronze). O perdedor já tinha sido
+      // notificado da eliminação na semifinal, por isso não repetimos.
+      await criarNotificacaoServidor({
+        paraUserId: vencedor,
+        tipo: "copa_avancou",
+        titulo: "3º lugar na Copa Ippon 🥉",
+        corpo: `Venceste o confronto de 3º lugar na Copa da liga "${nomeLiga}". Subiste ao pódio!`,
+        link: linkCopa,
+      });
+    } else {
+      // Ronda normal: avançaste / eliminado.
+      await criarNotificacaoServidor({
+        paraUserId: vencedor,
+        tipo: "copa_avancou",
+        titulo: "Avançaste na Copa! ⚔️",
+        corpo: `Venceste o teu confronto na Copa da liga "${nomeLiga}". Segues em frente — prepara a próxima ronda!`,
+        link: linkCopa,
+      });
+      if (perdedor) {
+        await criarNotificacaoServidor({
+          paraUserId: perdedor,
+          tipo: "copa_eliminado",
+          titulo: "Eliminado da Copa",
+          corpo: `Foste eliminado da Copa da liga "${nomeLiga}" nesta ronda. Na próxima edição, a revanche é tua!`,
+          link: linkCopa,
+        });
+      }
+    }
   }
 
   // 4) A ronda ficou toda decidida? Releio os vencedores reais da base de dados
