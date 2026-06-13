@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
+import { snapdom } from "@zumer/snapdom";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 
@@ -116,52 +117,80 @@ export default function Certificados() {
 function Certificado({ pos, d, liga, participantes, dataFim }: { pos: 1 | 2 | 3; d: Posicao; liga: string; participantes: number; dataFim: string | null | undefined }) {
   const t = TEMAS[pos];
   const beltHex = pos === 1 ? "#efeadd" : pos === 2 ? "#c5ccd6" : "#cd8b5e";
+  const cartaoRef = useRef<HTMLDivElement>(null);
+  const [aGerar, setAGerar] = useState(false);
+
+  async function descarregar() {
+    if (!cartaoRef.current || aGerar) return;
+    setAGerar(true);
+    try {
+      // embedFonts evita a imagem sair em branco por fontes ainda a carregar;
+      // scale 2 dá uma imagem nítida para partilhar.
+      const img = await snapdom.toPng(cartaoRef.current, { scale: 2, embedFonts: true, backgroundColor: "#0c0e0d" });
+      const nomeFicheiro = `certificado-${t.titulo.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-ippon-league.png`;
+      const a = document.createElement("a");
+      a.href = img.src;
+      a.download = nomeFicheiro;
+      a.click();
+    } catch {
+      // Falha silenciosa: o utilizador pode tentar de novo.
+    } finally {
+      setAGerar(false);
+    }
+  }
+
   return (
-    <div style={{ background: t.grad, border: `2px solid ${t.cor}`, borderRadius: 16, padding: "26px 20px", textAlign: "center", position: "relative", overflow: "hidden", marginBottom: 22 }}>
-      {/* Cantos ornamentados */}
-      <div style={{ position: "absolute", top: 9, left: 9, width: 24, height: 24, borderTop: `2px solid ${t.cor}`, borderLeft: `2px solid ${t.cor}`, borderRadius: "5px 0 0 0" }} />
-      <div style={{ position: "absolute", top: 9, right: 9, width: 24, height: 24, borderTop: `2px solid ${t.cor}`, borderRight: `2px solid ${t.cor}`, borderRadius: "0 5px 0 0" }} />
-      <div style={{ position: "absolute", bottom: 9, left: 9, width: 24, height: 24, borderBottom: `2px solid ${t.cor}`, borderLeft: `2px solid ${t.cor}`, borderRadius: "0 0 0 5px" }} />
-      <div style={{ position: "absolute", bottom: 9, right: 9, width: 24, height: 24, borderBottom: `2px solid ${t.cor}`, borderRight: `2px solid ${t.cor}`, borderRadius: "0 0 5px 0" }} />
+    <div style={{ marginBottom: 22 }}>
+      <div ref={cartaoRef} style={{ background: t.grad, border: `2px solid ${t.cor}`, borderRadius: 16, padding: "26px 20px", textAlign: "center", position: "relative", overflow: "hidden" }}>
+        {/* Cantos ornamentados */}
+        <div style={{ position: "absolute", top: 9, left: 9, width: 24, height: 24, borderTop: `2px solid ${t.cor}`, borderLeft: `2px solid ${t.cor}`, borderRadius: "5px 0 0 0" }} />
+        <div style={{ position: "absolute", top: 9, right: 9, width: 24, height: 24, borderTop: `2px solid ${t.cor}`, borderRight: `2px solid ${t.cor}`, borderRadius: "0 5px 0 0" }} />
+        <div style={{ position: "absolute", bottom: 9, left: 9, width: 24, height: 24, borderBottom: `2px solid ${t.cor}`, borderLeft: `2px solid ${t.cor}`, borderRadius: "0 0 0 5px" }} />
+        <div style={{ position: "absolute", bottom: 9, right: 9, width: 24, height: 24, borderBottom: `2px solid ${t.cor}`, borderRight: `2px solid ${t.cor}`, borderRadius: "0 0 5px 0" }} />
 
-      {/* Mascote no canto superior esquerdo, feliz */}
-      <div style={{ position: "absolute", top: 14, left: 16, width: 40, height: 40 }}>
-        <Mascot belt={beltHex} expression="feliz" />
-      </div>
+        {/* Mascote no canto superior esquerdo, feliz */}
+        <div style={{ position: "absolute", top: 14, left: 16, width: 40, height: 40 }}>
+          <Mascot belt={beltHex} expression="feliz" />
+        </div>
 
-      <div style={{ fontFamily: FD, fontSize: 10, letterSpacing: "0.18em", color: "#93a39a", textTransform: "uppercase", marginBottom: 4 }}>Ippon League</div>
-      <div style={{ fontSize: 36, lineHeight: 1, margin: "8px 0 6px" }}>{t.medalha}</div>
-      <div style={{ fontFamily: FD, fontSize: 12.5, letterSpacing: "0.1em", color: t.cor, textTransform: "uppercase", fontWeight: 700 }}>Certificado de {t.titulo}</div>
+        <div style={{ fontFamily: FD, fontSize: 10, letterSpacing: "0.18em", color: "#93a39a", textTransform: "uppercase", marginBottom: 4 }}>Ippon League</div>
+        <div style={{ fontSize: 36, lineHeight: 1, margin: "8px 0 6px" }}>{t.medalha}</div>
+        <div style={{ fontFamily: FD, fontSize: 12.5, letterSpacing: "0.1em", color: t.cor, textTransform: "uppercase", fontWeight: 700 }}>Certificado de {t.titulo}</div>
 
-      <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${t.cor}, transparent)`, margin: "16px 0" }} />
+        <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${t.cor}, transparent)`, margin: "16px 0" }} />
 
-      <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 11, lineHeight: 1.4 }}>{t.frase}<br /><span style={{ color: "#cfd8d2", fontWeight: 700 }}>{liga}</span></div>
+        <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 11, lineHeight: 1.4 }}>{t.frase}<br /><span style={{ color: "#cfd8d2", fontWeight: 700 }}>{liga}</span></div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
-        <div style={{ flexShrink: 0 }}><Escudo config={d.escudo || DEFAULT_IDENTITY} size={50} /></div>
-        <div style={{ textAlign: "left" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <div style={{ fontSize: 21, fontWeight: 700, color: "#f1ede2", lineHeight: 1.1 }}>{d.nome_time}</div>
-            {d.is_pro && <span style={{ background: t.cor, color: "#1b211e", fontFamily: FD, fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, letterSpacing: "0.04em" }}>PRO</span>}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+          <div style={{ flexShrink: 0 }}><Escudo config={d.escudo || DEFAULT_IDENTITY} size={50} /></div>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <div style={{ fontSize: 21, fontWeight: 700, color: "#f1ede2", lineHeight: 1.1 }}>{d.nome_time}</div>
+              {d.is_pro && <span style={{ background: t.cor, color: "#1b211e", fontFamily: FD, fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, letterSpacing: "0.04em" }}>PRO</span>}
+            </div>
           </div>
         </div>
+
+        <div style={{ height: 1, background: "#243029", margin: "18px 0 14px" }} />
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, textAlign: "left" }}>
+          <CampoCert label="Participantes" valor={`${participantes} equipas`} />
+          <CampoCert label="Rondas jogadas" valor={`${d.rondas_jogadas}`} />
+          <CampoCert label="Pontos na copa" valor={`${d.pontos_total}`} cor={t.cor} grande />
+          <CampoCert label="Média por rodada" valor={`${d.media}`} grande />
+        </div>
+
+        <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${t.cor}, transparent)`, margin: "18px 0 12px" }} />
+
+        {dataFim && (
+          <div style={{ fontFamily: FD, fontSize: 10.5, color: "#93a39a", letterSpacing: "0.05em" }}>Copa concluída a {dataPt(dataFim)}</div>
+        )}
+        <div style={{ fontFamily: FD, fontSize: 9.5, color: "#5f6f67", letterSpacing: "0.06em", marginTop: 5 }}>ipponleague.com</div>
       </div>
 
-      <div style={{ height: 1, background: "#243029", margin: "18px 0 14px" }} />
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, textAlign: "left" }}>
-        <CampoCert label="Participantes" valor={`${participantes} equipas`} />
-        <CampoCert label="Rondas jogadas" valor={`${d.rondas_jogadas}`} />
-        <CampoCert label="Pontos na copa" valor={`${d.pontos_total}`} cor={t.cor} grande />
-        <CampoCert label="Média por rodada" valor={`${d.media}`} grande />
-      </div>
-
-      <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${t.cor}, transparent)`, margin: "18px 0 12px" }} />
-
-      {dataFim && (
-        <div style={{ fontFamily: FD, fontSize: 10.5, color: "#93a39a", letterSpacing: "0.05em" }}>Copa concluída a {dataPt(dataFim)}</div>
-      )}
-      <div style={{ fontFamily: FD, fontSize: 9.5, color: "#5f6f67", letterSpacing: "0.06em", marginTop: 5 }}>ipponleague.com</div>
+      <button onClick={descarregar} disabled={aGerar} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", marginTop: 10, background: "transparent", border: `1px solid ${t.cor}`, color: t.cor, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 11, cursor: aGerar ? "default" : "pointer", opacity: aGerar ? 0.7 : 1 }}>
+        {aGerar ? "A gerar imagem…" : "↓ Descarregar certificado"}
+      </button>
     </div>
   );
 }
