@@ -5,12 +5,13 @@ import { Mascot } from "@/components/Mascot";
 import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
 import { Desempenho } from "@/components/Desempenho";
-import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, type DesempenhoRodada } from "@/lib/desempenho";
+import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, mensagemDesempenho, type DesempenhoRodada } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, textoFecho } from "@/lib/calendario";
 import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { PRECO } from "@/lib/precos";
 import { SinoNotificacoes } from "@/components/SinoNotificacoes";
+import { criarNotificacao } from "@/lib/notificacoes";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -200,7 +201,28 @@ export default function Inicio() {
         } catch {}
         if (!active) return;
         const dados = construirDesempenho(candidata.idCompeticao, candidata.nome, teamComp, pontos);
-        if (dados) setDesempenho({ dados, team: teamComp });
+        if (dados) {
+          setDesempenho({ dados, team: teamComp });
+          // Notificação de RESUMO (guardada), personalizada com a pontuação real.
+          // Guarda anti-duplicação local: só uma vez por competição neste aparelho.
+          // (Princípio de ouro: a mensagem usa os dados reais do utilizador.)
+          try {
+            const chaveResumo = `ippon_notif_resumo_${candidata.idCompeticao}`;
+            if (!localStorage.getItem(chaveResumo)) {
+              const cap = dados.capitao;
+              const corpo = cap
+                ? `${mensagemDesempenho(dados.pontuacaoTotal, "")} Fizeste ${dados.pontuacaoTotal} pts — o teu capitão ${cap.atleta.name.split(" ").slice(-1)[0]} somou ${cap.pontos}.`
+                : `${mensagemDesempenho(dados.pontuacaoTotal, "")} Fizeste ${dados.pontuacaoTotal} pts nesta rodada.`;
+              await criarNotificacao({
+                tipo: "resumo_rodada",
+                titulo: `Resumo: ${candidata.nome}`,
+                corpo: corpo.trim(),
+                link: "/meu-time",
+              });
+              localStorage.setItem(chaveResumo, "1");
+            }
+          } catch {}
+        }
       })();
     });
     return () => { active = false; };
