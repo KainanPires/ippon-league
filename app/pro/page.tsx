@@ -20,7 +20,6 @@ type EstadoDossie = "carregando" | "erro" | Dossie;
 
 // Vantagens do Pro que ainda vamos construir (o scout já saiu daqui).
 const A_CHEGAR: { t: string; x: string }[] = [
-  { t: "Recomendações da rodada", x: "Possíveis campeões e maiores pontuadores, a partir do chaveamento." },
   { t: "Chaveamento das competições", x: "As chaves de cada competição e o caminho dos teus atletas." },
   { t: "Dicas e capitães da rodada", x: "Sugestões para te ajudar a decidir." },
 ];
