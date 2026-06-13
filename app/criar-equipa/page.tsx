@@ -10,6 +10,7 @@ import { temSessao, exigirSessao } from "@/lib/auth";
 import { focoMercado, textoFecho } from "@/lib/calendario";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
+import { supabase } from "@/lib/supabase";
 import { PRECO } from "@/lib/precos";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -45,6 +46,7 @@ export default function CriarEquipa() {
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const [cloudWarn, setCloudWarn] = useState(false);
   const [carry, setCarry] = useState<Carry>(null); // atletas que sairam no carry-over
+  const [isPro, setIsPro] = useState(false);
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const router = useRouter();
 
@@ -148,6 +150,15 @@ export default function CriarEquipa() {
           commitSavedFor(idAlvo, cloud);
         }
       });
+    });
+    // Estado Pro: esconde a propaganda "Sê Pro" a quem já é Pro (lê da sessão,
+    // igual ao meu-time e ao inicio).
+    supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
+      if (!active) return;
+      try {
+        const meta = (data.session as { user?: { user_metadata?: { is_pro?: boolean } } } | null)?.user?.user_metadata;
+        setIsPro(!!meta?.is_pro);
+      } catch {}
     });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -285,15 +296,17 @@ export default function CriarEquipa() {
         <p style={{ fontSize: 12, color: "#93a39a", textAlign: "center", marginTop: 14 }}>
           Toca num lugar livre para abrir o Mercado. Toca num atleta para o tornar capitão.
         </p>
-        <a href="/ippon-pro" onClick={(e) => { e.preventDefault(); tryLeave("/ippon-pro"); }} style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16, textDecoration: "none" }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Sê Pro e avalia a tua equipa</div>
-            <div style={{ fontSize: 11.5, color: "#5c4410", marginTop: 2 }}>Scout, valorização esperada e dicas da rodada.</div>
-            <div style={{ fontSize: 11.5, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
-            <span style={{ display: "inline-block", marginTop: 8, background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8 }}>Ver Ippon Pro</span>
-          </div>
-          <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt="#141110" expression="sabio" /></div>
-        </a>
+        {!isPro && (
+          <a href="/ippon-pro" onClick={(e) => { e.preventDefault(); tryLeave("/ippon-pro"); }} style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16, textDecoration: "none" }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Sê Pro e avalia a tua equipa</div>
+              <div style={{ fontSize: 11.5, color: "#5c4410", marginTop: 2 }}>Scout, valorização esperada e dicas da rodada.</div>
+              <div style={{ fontSize: 11.5, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
+              <span style={{ display: "inline-block", marginTop: 8, background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8 }}>Ver Ippon Pro</span>
+            </div>
+            <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt="#141110" expression="sabio" /></div>
+          </a>
+        )}
       </div>
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50 }}>
         <div style={{ background: "#0f1411", borderTop: "1px solid #243029", padding: "9px 14px" }}>
@@ -428,6 +441,7 @@ export default function CriarEquipa() {
           faixa="Branca"
           atletas={resolve(draft.ids)}
           capitao={draft.captain}
+          pro={isPro}
           onClose={() => setModal(null)}
         />
       )}
