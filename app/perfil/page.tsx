@@ -5,6 +5,7 @@ import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/compone
 import { supabase } from "@/lib/supabase";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import { PRECO } from "@/lib/precos";
+import { normalizarFaixa, corDaFaixa, nomeDaFaixa, type Faixa } from "@/lib/faixas";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -24,13 +25,14 @@ type Conta = {
   telefone: string;
   pais: string;
   paisIso: string;
-  faixa: string;
+  faixaJudo: string;   // faixa declarada no registo (judô real) — informativa
   isPro: boolean;
 };
 
 export default function Perfil() {
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [conta, setConta] = useState<Conta | null>(null);
+  const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca"); // faixa OFICIAL do jogo (users.belt)
   const [ready, setReady] = useState(false);
   const [saindo, setSaindo] = useState(false);
   const [abertoDados, setAbertoDados] = useState(false);
@@ -46,7 +48,7 @@ export default function Perfil() {
   useEffect(() => {
     let active = true;
     try { setIdentity(loadIdentity()); } catch {}
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       const u = data.session?.user;
       if (u) {
@@ -62,9 +64,14 @@ export default function Perfil() {
           telefone: String(m.telefone || "").trim(),
           pais: String(m.pais || "").trim(),
           paisIso: String(m.pais_iso || "").trim(),
-          faixa: String(m.faixa || "").trim() || "Branca",
+          faixaJudo: String(m.faixa || "").trim() || "Branca",
           isPro: Boolean(m.is_pro),
         });
+        // Faixa OFICIAL do jogo: lê de users.belt (calculada por desempenho).
+        try {
+          const { data: row } = await supabase.from("users").select("belt").eq("id", u.id).maybeSingle();
+          if (active) setFaixaJogo(normalizarFaixa(row?.belt));
+        } catch { /* fica branca por defeito */ }
       }
       setReady(true);
     });
@@ -128,7 +135,8 @@ export default function Perfil() {
   }
 
   const nomeMostrado = conta?.nome || "Campeão";
-  const faixaMostrada = conta?.faixa || "Branca";
+  const corFaixaJogo = corDaFaixa(faixaJogo);
+  const nomeFaixaJogo = nomeDaFaixa(faixaJogo);
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -140,14 +148,17 @@ export default function Perfil() {
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Perfil</h1>
         </header>
 
-        {/* Cartão do jogador — toca para ver/gerir os teus dados */}
+        {/* Cartão do jogador — a FAIXA DO JOGO é a identidade (Mascot com a cor da faixa) */}
         <button onClick={() => setAbertoDados((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: abertoDados ? 10 : 22, cursor: "pointer", color: "#f1ede2", fontFamily: FB }}>
-          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
-            <Mascot belt="#efeadd" expression="feliz" />
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0, border: `2px solid ${corFaixaJogo}` }}>
+            <Mascot belt={corFaixaJogo} expression="feliz" />
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeMostrado}</div>
-            <div style={{ fontSize: 13, color: GOLD, fontWeight: 700, marginTop: 2 }}>Faixa {faixaMostrada}</div>
+            <div style={{ fontSize: 13, color: GOLD, fontWeight: 700, marginTop: 2, display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ width: 11, height: 11, borderRadius: 3, background: corFaixaJogo, border: "1px solid rgba(255,255,255,0.25)", flexShrink: 0 }} />
+              Faixa {nomeFaixaJogo}
+            </div>
             <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>{abertoDados ? "Toca para fechar" : "Toca para ver os teus dados"}</div>
           </div>
           <span style={{ flexShrink: 0, color: "#93a39a", transform: abertoDados ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}>
@@ -171,8 +182,11 @@ export default function Perfil() {
                   <DataRow label="Email" value={conta.email || "—"} />
                   <DataRow label="Telefone" value={conta.telefone || "—"} />
                   <DataRow label="País" value={conta.pais || "—"} />
-                  <DataRow label="Faixa" value={conta.faixa || "—"} />
+                  <DataRow label="Faixa no judô" value={conta.faixaJudo || "—"} />
                 </div>
+                <p style={{ fontSize: 11, color: "#5f6f67", lineHeight: 1.5, margin: "8px 2px 0" }}>
+                  A tua faixa no judô é informativa. A faixa que conta na Ippon League é a <strong style={{ color: "#93a39a" }}>Faixa {nomeFaixaJogo}</strong>, conquistada pelo teu desempenho.
+                </p>
                 <button onClick={abrirEdicao} style={{ display: "block", width: "100%", textAlign: "center", marginTop: 10, background: "transparent", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 12, cursor: "pointer" }}>Editar dados</button>
               </>
             ) : (
