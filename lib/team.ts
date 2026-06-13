@@ -59,7 +59,8 @@ function garantirSubscricao() {
 }
 
 // Devolve o id do utilizador atual (ou "anon" se deslogado).
-function uid(): string {
+// Exportada para outros módulos (ex: Escudo) isolarem o seu storage pela mesma conta.
+export function uid(): string {
   garantirSubscricao();
   if (_uidCache) return _uidCache;
   const fromStorage = lerUidDoStorage();
