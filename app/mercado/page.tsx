@@ -87,8 +87,16 @@ export default function Mercado() {
   // Mensagem explícita ao completar um género: "Já tens os 4 X, agora os 4 Y".
   const [avisoGenero, setAvisoGenero] = useState<null | { feito: Gender; falta: Gender }>(null);
 
+  // BLOQUEIO DO MERCADO: se há uma competição a decorrer, o mercado fecha por
+  // completo (a equipa está trancada durante a rodada). Decidido pelo calendário,
+  // como o resto da app. Não importa por que caminho se chega aqui — fica bloqueado.
+  const focoAgora = focoMercado();
+  const competicaoADecorrer = focoAgora.aDecorrer;
+
   useEffect(() => {
     let active = true;
+    // Se o mercado está fechado (competição a decorrer), não carrega nada.
+    if (competicaoADecorrer) { setLoading(false); return; }
     let draft: { ids: string[]; captain: string | null } = { ids: [], captain: null };
     try {
       draft = loadDraftFor(COMPETICAO);
@@ -141,6 +149,7 @@ export default function Mercado() {
       });
 
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function persist(next: string[]) {
@@ -162,6 +171,39 @@ export default function Mercado() {
   }
   function clearFilters() {
     setPriceMin(PRICE_MIN); setPriceMax(PRICE_MAX); setCountrySel([]); setFavOnly(false);
+  }
+
+  // ECRÃ DE BLOQUEIO: competição a decorrer → mercado fechado, equipa trancada.
+  if (competicaoADecorrer) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+        <div style={{ maxWidth: 460, margin: "0 auto", padding: "12px 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+            <a href="/inicio" aria-label="Voltar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+            </a>
+            <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>Mercado</span>
+          </div>
+
+          <div style={{ textAlign: "center", padding: "30px 18px", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16 }}>
+            <div style={{ width: 92, height: 92, margin: "0 auto 10px" }}><Mascot belt="#141110" expression="determinado" /></div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 999, padding: "5px 13px", marginBottom: 12 }}>
+              <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83" }}>Competição a decorrer</span>
+            </div>
+            <h2 style={{ fontFamily: FD, fontSize: 21, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>Mercado fechado</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 8px" }}>
+              {focoAgora.aDecorrer ? <><strong style={{ color: "#f1ede2" }}>{focoAgora.aDecorrer.nome}</strong> está a decorrer.</> : "Há uma competição a decorrer."} Durante a rodada, a tua equipa fica trancada — não há compras nem vendas.
+            </p>
+            <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.5, margin: "0 0 20px" }}>
+              O mercado reabre para a próxima competição assim que esta terminar. Acompanha a tua equipa ao vivo entretanto!
+            </p>
+            <a href="/meu-time" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px 24px", borderRadius: 12, fontSize: 15, textDecoration: "none" }}>Ver a minha equipa</a>
+          </div>
+        </div>
+        <style>{`@keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite}`}</style>
+      </main>
+    );
   }
 
   const byId = new Map(pool.map((a) => [a.id, a]));
