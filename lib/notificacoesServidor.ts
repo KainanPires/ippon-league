@@ -58,3 +58,38 @@ export async function nomeDoUtilizador(user_id: string): Promise<string> {
     return "Alguém";
   }
 }
+
+/**
+ * Busca o NOME DO TIME de um utilizador (tabela `equipas`, coluna `nome`).
+ * Devolve null se não tiver time com nome próprio. Usado para identificar o
+ * jogador pelo time (ex: "Kainan (Monstro)"), como ele aparece nas ligas.
+ */
+export async function nomeDoTime(user_id: string): Promise<string | null> {
+  if (!supabaseAdmin) return null;
+  try {
+    // Busca o time deste utilizador. Pode haver mais do que uma linha (um time
+    // por competição); qualquer uma serve para o NOME, que é a identidade e é
+    // o mesmo em todas. limit(1) chega.
+    const { data } = await supabaseAdmin
+      .from("equipas")
+      .select("nome")
+      .eq("user_id", user_id)
+      .limit(1)
+      .maybeSingle();
+    const nome = String(data?.nome || "").trim();
+    // "A minha equipa" é o nome por defeito (sem identidade) — não o usamos.
+    if (!nome || nome.toLowerCase() === "a minha equipa") return null;
+    return nome;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Etiqueta de um jogador para mostrar a outros: "Nome (Time)" se tiver time
+ * com nome; senão só "Nome". É como ele é reconhecido nas ligas.
+ */
+export async function etiquetaJogador(user_id: string): Promise<string> {
+  const [nome, time] = await Promise.all([nomeDoUtilizador(user_id), nomeDoTime(user_id)]);
+  return time ? `${nome} (${time})` : nome;
+}
