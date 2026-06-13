@@ -124,9 +124,12 @@ export default function Mercado() {
         const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
         setPool(list);
         setAthletePool(list);
-        // Quem está a competir agora (vem do cron, via balcão).
+        // Quem está a competir agora (vem do cron, via balcão). Só confiamos
+        // nesta marca se o CALENDÁRIO também concordar que há competição a
+        // decorrer — assim o aviso nunca contradiz a fonte de verdade. (Quando
+        // não há nada a decorrer, ex: competição ainda não começou, ignora-se.)
         const av = j?.a_competir_agora;
-        if (av && Array.isArray(av.ids)) {
+        if (competicaoADecorrer && av && Array.isArray(av.ids)) {
           setAoVivoIds(new Set(av.ids as string[]));
           setAoVivoNome(av.nome ?? null);
         }
