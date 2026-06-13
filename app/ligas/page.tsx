@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { supabase } from "@/lib/supabase";
+import { focoMercado } from "@/lib/calendario";
+import { nomeContinenteDoPais } from "@/lib/continentes";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -15,11 +17,6 @@ const LIM_PART_FREE = 2, LIM_PART_PRO = 5;
 type Tab = "ativas" | "mercado" | "resultados";
 
 function esc(p: Partial<Identity>): Identity { return { ...DEFAULT_IDENTITY, ...p }; }
-
-const OFICIAIS = [
-  { id: "mundial", name: "Liga Mundial", sub: "Concorre aos prémios mundiais", cfg: esc({ bg1: "#1c3a2e", bg2: "#102a20", border: GOLD, symbol: "mundo" }) },
-  { id: "continental", name: "Continental", sub: "Concorre aos prémios do teu continente", cfg: esc({ bg1: "#2f6fb3", bg2: "#25588f", border: "#eaf2fd", symbol: "mapa-europa" }) },
-];
 
 interface MinhaLiga {
   id: string;
@@ -44,6 +41,13 @@ interface LigaMercado {
   sou_dono: boolean;
 }
 
+// Estado da posição do utilizador numa liga oficial (para o cartão).
+interface PosOficial {
+  posicao: number | null;  // null = não está no ranking (não-Pro ou não escalou)
+  escalou: boolean;
+  total: number;           // total de membros no ranking
+}
+
 export default function Ligas() {
   const [tab, setTab] = useState<Tab>("ativas");
   const [mine, setMine] = useState<MinhaLiga[]>([]);
@@ -53,6 +57,11 @@ export default function Ligas() {
   const [erroEntrar, setErroEntrar] = useState("");
   const [souPro, setSouPro] = useState(false);
 
+  // Ligas oficiais: nome do continente + posição do utilizador em cada uma.
+  const [nomeContinente, setNomeContinente] = useState<string | null>(null);
+  const [posMundial, setPosMundial] = useState<PosOficial | null>(null);
+  const [posContinental, setPosContinental] = useState<PosOficial | null>(null);
+
   // Mercado de ligas (carrega só quando se abre a aba).
   const [mercado, setMercado] = useState<LigaMercado[] | null>(null);
   const [aCarregarMercado, setACarregarMercado] = useState(false);
@@ -60,13 +69,20 @@ export default function Ligas() {
   const [erroMercado, setErroMercado] = useState("");
   const [pedidoEnviado, setPedidoEnviado] = useState<Record<string, boolean>>({});
 
+  // Competição da rodada atual (para calcular os rankings oficiais).
+  const foco = focoMercado();
+  const idComp = (foco.aDecorrer ?? foco.atual).idCompeticao;
+
   useEffect(() => {
     let vivo = true;
     (async () => {
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess.session?.user?.id;
-      const meta = sess.session?.user?.user_metadata as { is_pro?: boolean } | undefined;
-      if (vivo) setSouPro(!!meta?.is_pro);
+      const meta = sess.session?.user?.user_metadata as { is_pro?: boolean; pais_iso?: string } | undefined;
+      if (vivo) {
+        setSouPro(!!meta?.is_pro);
+        setNomeContinente(nomeContinenteDoPais(meta?.pais_iso));
+      }
       if (!uid) { if (vivo) { setMine([]); setACarregar(false); } return; }
       try {
         const res = await fetch(`/api/liga/minhas?user_id=${uid}`);
@@ -74,9 +90,35 @@ export default function Ligas() {
         if (vivo && Array.isArray(j.ligas)) setMine(j.ligas);
       } catch {}
       if (vivo) setACarregar(false);
+
+      // Posição nas ligas oficiais (calcula o ranking das duas).
+      carregarPosicaoOficial("mundial", uid, vivo, setPosMundial);
+      carregarPosicaoOficial("continental", uid, vivo, setPosContinental);
     })();
     return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Busca o ranking de uma liga oficial e extrai a posição do próprio utilizador.
+  async function carregarPosicaoOficial(
+    tipo: "mundial" | "continental",
+    uid: string,
+    vivo: boolean,
+    set: (p: PosOficial) => void
+  ) {
+    try {
+      const params = new URLSearchParams({ tipo, comp: idComp, user_id: uid });
+      const res = await fetch(`/api/liga/oficial?${params.toString()}`);
+      const j = await res.json();
+      if (!vivo || !j.ok || !Array.isArray(j.membros)) return;
+      const eu = j.membros.find((m: { user_id: string }) => m.user_id === uid);
+      set({
+        posicao: eu && eu.escalou ? eu.posicao : null,
+        escalou: !!(eu && eu.escalou),
+        total: j.membros.length,
+      });
+    } catch { /* o cartão mostra o estado neutro */ }
+  }
 
   // Carrega o mercado (uma vez). Chamado ao abrir a aba "mercado".
   async function carregarMercado() {
@@ -127,7 +169,6 @@ export default function Ligas() {
   }
 
   // Ação no mercado: liga "aberta" entra direto; "por aprovação" envia pedido.
-  // Usa a rota /api/liga/pedir, que decide conforme a privacidade.
   async function acaoMercado(liga: LigaMercado) {
     setErroMercado("");
     setAEntrarId(liga.id);
@@ -146,18 +187,15 @@ export default function Ligas() {
         setAEntrarId(null);
         return;
       }
-      // Entrou direto (aberta) ou já era membro: vai para a liga.
       if (j.entrou || j.jaEra) {
         window.location.href = `/liga/${liga.invite_code}`;
         return;
       }
-      // Ficou pedido pendente (por aprovação): marca como "pedido enviado".
       if (j.pedido || j.jaPediu) {
         setPedidoEnviado((prev) => ({ ...prev, [liga.id]: true }));
         setAEntrarId(null);
         return;
       }
-      // Caso inesperado: tenta abrir a liga.
       window.location.href = `/liga/${liga.invite_code}`;
     } catch {
       setErroMercado("Falha de ligação.");
@@ -172,6 +210,10 @@ export default function Ligas() {
   const limPart = souPro ? LIM_PART_PRO : LIM_PART_FREE;
   const noLimiteCriar = nCriadas >= limCriar;
   const noLimitePart = nParticipa >= limPart;
+
+  // Configuração visual dos dois cartões oficiais.
+  const cfgMundial = esc({ bg1: "#1c3a2e", bg2: "#102a20", border: GOLD, symbol: "mundo" });
+  const cfgContinental = esc({ bg1: "#2f6fb3", bg2: "#25588f", border: "#eaf2fd", symbol: "mapa-europa" });
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -199,12 +241,30 @@ export default function Ligas() {
         {tab === "ativas" && (
           <>
             <Section>Ligas oficiais · prémios</Section>
-            {OFICIAIS.map((l) => (
-              <OficialRow key={l.id} cfg={l.cfg} name={l.name} sub={l.sub} pro={souPro} />
-            ))}
+
+            {/* Mundial — abre para todos; mostra a posição se estiver no ranking. */}
+            <OficialRow
+              cfg={cfgMundial}
+              name="Liga Mundial"
+              sub="Concorre aos prémios mundiais"
+              href="/oficial/mundial"
+              pos={posMundial}
+              souPro={souPro}
+            />
+
+            {/* Continental — nome do continente real; abre para todos. */}
+            <OficialRow
+              cfg={cfgContinental}
+              name={nomeContinente ? `Liga ${nomeContinente}` : "Liga Continental"}
+              sub="Concorre aos prémios do teu continente"
+              href="/oficial/continental"
+              pos={posContinental}
+              souPro={souPro}
+            />
+
             {!souPro && (
               <a href="/ippon-pro" style={{ display: "block", textAlign: "center", marginTop: 2, marginBottom: 4, background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "11px 14px", borderRadius: 10, textDecoration: "none", fontSize: 12.5, lineHeight: 1.4 }}>
-                🔒 Só membros Pro concorrem aos prémios · passa a Pro
+                🔒 Vês o ranking, mas só Pro concorre aos prémios · passa a Pro
               </a>
             )}
 
@@ -355,25 +415,37 @@ function LeagueRow({ cfg, name, sub, right }: { cfg: Identity; name: string; sub
   );
 }
 
-function OficialRow({ cfg, name, sub, pro }: { cfg: Identity; name: string; sub: string; pro: boolean }) {
-  const conteudo = (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#121815", border: `1px solid ${pro ? "#243029" : "#2a2410"}`, borderRadius: 14, padding: "11px 13px", marginBottom: 9, opacity: pro ? 1 : 0.92 }}>
-      <div style={{ flexShrink: 0, display: "flex", position: "relative" }}>
-        <Escudo config={cfg} size={34} />
-        {!pro && <span style={{ position: "absolute", right: -4, bottom: -4, width: 18, height: 18, borderRadius: "50%", background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>🔒</span>}
+// Cartão de liga oficial. Abre a página de ranking (para todos). À direita mostra
+// a posição do utilizador (se estiver no ranking) ou um convite a ver/ser Pro.
+function OficialRow({ cfg, name, sub, href, pos, souPro }: { cfg: Identity; name: string; sub: string; href: string; pos: PosOficial | null; souPro: boolean }) {
+  let right: React.ReactNode;
+  if (pos && pos.posicao !== null) {
+    // Está no ranking: mostra a posição em destaque.
+    right = (
+      <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: GOLD, lineHeight: 1 }}>{`#${pos.posicao.toLocaleString("pt-PT")}º`}</div>
+        <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase", marginTop: 2 }}>a tua posição</div>
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6 }}>{name}</div>
-        <div style={{ fontSize: 11, color: "#93a39a" }}>{sub}</div>
+    );
+  } else if (souPro) {
+    // É Pro mas ainda não escalou nesta rodada.
+    right = <span style={{ fontFamily: FD, fontWeight: 700, color: "#7c8a82", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Escala para entrar</span>;
+  } else {
+    // Não-Pro: vê o ranking, mas não concorre.
+    right = <ActionBtn kind="ver">Ver ranking</ActionBtn>;
+  }
+  return (
+    <a href={href} style={{ textDecoration: "none", display: "block" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px", marginBottom: 9 }}>
+        <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={cfg} size={34} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+          <div style={{ fontSize: 11, color: "#93a39a" }}>{sub}</div>
+        </div>
+        {right}
       </div>
-      {pro ? (
-        <span style={{ fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 12 }}>Ativa</span>
-      ) : (
-        <span style={{ background: "#3a2f12", color: GOLD, fontSize: 10, fontWeight: 700, padding: "5px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>PRO</span>
-      )}
-    </div>
+    </a>
   );
-  return pro ? conteudo : <a href="/ippon-pro" style={{ textDecoration: "none", display: "block" }}>{conteudo}</a>;
 }
 
 function ActionBtn({ kind, children }: { kind: "ver" | "solicitar"; children: React.ReactNode }) {
