@@ -91,9 +91,9 @@ function Certificado({ pos, d, liga, participantes, dataFim }: { pos: 1 | 2 | 3;
 
         <div style={{ fontFamily: FD, fontSize: 10, letterSpacing: "0.18em", color: "#93a39a", textTransform: "uppercase", marginBottom: 4 }}>Ippon League</div>
         <div style={{ fontSize: 36, lineHeight: 1, margin: "8px 0 6px" }}>{t.medalha}</div>
-        <div style={{ fontFamily: FD, fontSize: 12.5, letterSpacing: "0.1em", color: t.cor, textTransform: "uppercase", fontWeight: 700 }}>Certificado de {t.titulo}</div>
+        <div style={{ fontFamily: FD, fontSize: 15, letterSpacing: "0.08em", color: t.cor, textTransform: "uppercase", fontWeight: 700, textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>Certificado de {t.titulo}</div>
 
-        <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${t.cor}, transparent)`, margin: "16px 0" }} />
+        <div style={{ height: 2, background: t.cor, opacity: 0.55, borderRadius: 2, margin: "16px auto", width: "70%" }} />
 
         <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 11, lineHeight: 1.4 }}>{t.frase}<br /><span style={{ color: "#cfd8d2", fontWeight: 700 }}>{liga}</span></div>
 
@@ -116,7 +116,7 @@ function Certificado({ pos, d, liga, participantes, dataFim }: { pos: 1 | 2 | 3;
           <CampoCert label="Média por rodada" valor={`${d.media}`} grande />
         </div>
 
-        <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${t.cor}, transparent)`, margin: "18px 0 12px" }} />
+        <div style={{ height: 2, background: t.cor, opacity: 0.55, borderRadius: 2, margin: "18px auto 12px", width: "70%" }} />
 
         <div style={{ fontFamily: FD, fontSize: 10.5, color: "#93a39a", letterSpacing: "0.05em" }}>Copa concluída a {dataPt(dataFim)}</div>
         <div style={{ fontFamily: FD, fontSize: 9.5, color: "#5f6f67", letterSpacing: "0.06em", marginTop: 5 }}>ipponleague.com</div>
