@@ -79,6 +79,11 @@ export default function Inicio() {
 
   // teamInfo calculado a cada render (re-resolve quando a lista de atletas chega).
   const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
+  // Já tem equipa COMPLETA guardada? (8 atletas + capitão). Não depende da lista de
+  // atletas estar carregada — basta os ids guardados. Decide o destino do "Escalar":
+  // com equipa -> /meu-time (ver/gerir); sem equipa -> /criar-equipa (montar).
+  const temEquipaCompleta = !!savedTeam && savedTeam.ids.length === 8 && !!savedTeam.captain;
+  const destinoEscalar = temEquipaCompleta ? "/meu-time" : "/criar-equipa";
   // Nome a mostrar: visitante => "Campeão"; com conta => nome real (ou vazio enquanto carrega).
   const nomeMostrado = visitante ? "Campeão" : name;
 
@@ -325,7 +330,7 @@ export default function Inicio() {
                 <a href="/meu-time" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>Ver a minha equipa</a>
               )
             ) : (
-              <a href="/criar-equipa" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>Escalar</a>
+              <a href={destinoEscalar} style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>Escalar</a>
             )}
           </div>
         </Card>
