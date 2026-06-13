@@ -128,7 +128,6 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, o
   const cardRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0.3);
-  const [verPro, setVerPro] = useState(pro); // interruptor de TESTE
   const [busy, setBusy] = useState(false);
   const [podePartilhar, setPodePartilhar] = useState(false);
 
@@ -200,8 +199,8 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, o
   const cardVars = {
     ["--accent" as any]: b.accent,
     ["--chip-text" as any]: b.chipText,
-    ["--glow-accent" as any]: verPro ? GOLD : b.accent,
-    boxShadow: frameShadow(b, verPro),
+    ["--glow-accent" as any]: pro ? GOLD : b.accent,
+    boxShadow: frameShadow(b, pro),
   } as CSSProperties;
 
   return (
@@ -210,17 +209,10 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, o
       <div style={{ width: "100%", maxWidth: 360, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18, textAlign: "center" }}>
         <h2 style={{ fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 12px", color: GOLD }}>Partilhar a equipa</h2>
 
-        {/* Interruptor de TESTE — alterna Normal/Pro. Remover quando o Pro estiver ligado a sério. */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 12, background: "#0c0e0d", border: "1px solid #243029", borderRadius: 10, padding: 4 }}>
-          {[{ k: false, lbl: "Normal" }, { k: true, lbl: "Pro" }].map((opt) => (
-            <button key={String(opt.k)} onClick={() => setVerPro(opt.k)} style={{ flex: 1, padding: "8px 0", borderRadius: 7, border: "none", cursor: "pointer", fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", background: verPro === opt.k ? GOLD : "transparent", color: verPro === opt.k ? "#1b211e" : "#93a39a" }}>{opt.lbl}</button>
-          ))}
-        </div>
-
         {/* Pré-visualização: o cartão real (1080px) escalado para a largura do modal. */}
         <div ref={previewRef} style={{ width: "100%", aspectRatio: "1080 / 1350", borderRadius: 12, overflow: "hidden", marginBottom: 14, position: "relative", background: "#0c0e0d" }}>
           <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1350, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <CardNode innerRef={cardRef} vars={cardVars} pro={verPro} belt={bk} beltName={b.name} identity={identity} linhas={linhas} capitao={capitao} />
+            <CardNode innerRef={cardRef} vars={cardVars} pro={pro} belt={bk} beltName={b.name} identity={identity} linhas={linhas} capitao={capitao} />
           </div>
         </div>
 
