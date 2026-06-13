@@ -281,6 +281,10 @@ export default function MeuTime() {
     setSavingCloud(true);
     const res = await commitSavedCloudFor(alvo.idCompeticao, team, identity);
     setSaved(team);
+    // Sincroniza o rascunho local com o guardado: sem isto, fica um rascunho
+    // "fantasma" diferente do guardado e o meu-time pensaria que há alterações
+    // por guardar ao voltar (ex: voltar do mercado sem mexer em nada).
+    saveDraftFor(alvo.idCompeticao, team);
     setSavingCloud(false);
     setCloudWarn(!res.ok);
     // Se o salvar veio do aviso de saída, continua para o destino depois de guardar.
