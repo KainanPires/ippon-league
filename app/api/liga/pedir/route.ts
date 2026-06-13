@@ -16,6 +16,7 @@
 //   { ok:false, erro }                   caso contrário
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { criarNotificacaoServidor, nomeDoUtilizador } from "@/lib/notificacoesServidor";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -85,10 +86,10 @@ export async function POST(req: Request) {
   if (!user_id) return NextResponse.json({ ok: false, erro: "Entra para te juntares a uma liga." }, { status: 401 });
   if (codigo.length < 4) return NextResponse.json({ ok: false, erro: "Código inválido." }, { status: 400 });
 
-  // 1) Encontra a liga pelo código.
+  // 1) Encontra a liga pelo código. (created_by para podermos notificar o dono.)
   const { data: liga, error: erroLiga } = await supabaseAdmin
     .from("leagues")
-    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code")
+    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code, created_by")
     .eq("invite_code", codigo)
     .maybeSingle();
   if (erroLiga || !liga) {
@@ -144,6 +145,8 @@ export async function POST(req: Request) {
           .from("league_requests")
           .update({ estado: "pendente", created_at: new Date().toISOString(), decided_at: null })
           .eq("id", pedidoExistente.id);
+        // Notifica o dono do (re)pedido.
+        await notificarDonoDoPedido(liga.created_by, user_id, liga.name, liga.id);
         return NextResponse.json({ ok: true, pedido: true });
       }
       // estado "aprovado" mas não é membro (caso raro): deixa pedir de novo.
@@ -155,9 +158,30 @@ export async function POST(req: Request) {
     if (erroPedido) {
       return NextResponse.json({ ok: false, erro: "Não foi possível enviar o teu pedido." }, { status: 500 });
     }
+    // Notifica o dono: "Fulano quer entrar na tua liga X". Personalizado com o
+    // nome real de quem pediu e o nome da liga. Não bloqueia se a notificação falhar.
+    await notificarDonoDoPedido(liga.created_by, user_id, liga.name, liga.id);
     return NextResponse.json({ ok: true, pedido: true });
   }
 
   // 3c) FECHADA → não se entra/pede pelo mercado.
   return NextResponse.json({ ok: false, erro: "Esta liga é fechada." }, { status: 403 });
+}
+
+// Cria a notificação para o DONO da liga sobre um novo pedido de entrada.
+async function notificarDonoDoPedido(
+  donoId: string | null | undefined,
+  quemPediu: string,
+  nomeLiga: string,
+  ligaId: string
+) {
+  if (!donoId || donoId === quemPediu) return; // sem dono, ou o próprio dono — não notifica
+  const nome = await nomeDoUtilizador(quemPediu);
+  await criarNotificacaoServidor({
+    paraUserId: donoId,
+    tipo: "liga_pedido",
+    titulo: "Novo pedido para a tua liga",
+    corpo: `${nome} quer entrar na liga "${nomeLiga}". Aprova ou recusa nos pedidos da liga.`,
+    link: "/ligas",
+  });
 }
