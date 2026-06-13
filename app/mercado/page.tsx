@@ -277,6 +277,11 @@ export default function Mercado() {
   const filtroCount = (priceMin > PRICE_MIN ? 1 : 0) + (priceMax < PRICE_MAX ? 1 : 0) + countrySel.length;
   const jcGlow = guide === 0;
   const focus = guide === 1 ? "price" : guide === 2 ? "scout" : null;
+  // Para onde volta o "Voltar ao Dojo" e a seta: se já tens equipa COMPLETA
+  // (8 atletas + capitão), volta para a vista de gestão (/meu-time); senão, para
+  // o modo de montagem (/criar-equipa). Assim, só passar pelo mercado e voltar
+  // com a equipa já feita leva-te ao /meu-time, não à página de montar.
+  const voltarPara = team.length === 8 && !!captain ? "/meu-time" : "/criar-equipa";
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -286,7 +291,7 @@ export default function Mercado() {
         <div style={{ position: "sticky", top: 0, background: "#0c0e0d", borderBottom: "1px solid #1a221d", zIndex: 5, padding: "12px 14px 10px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <a href="/criar-equipa" aria-label="Voltar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none" }}>
+              <a href={voltarPara} aria-label="Voltar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
               </a>
               <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>Mercado</span>
@@ -414,7 +419,7 @@ export default function Mercado() {
             <span style={{ fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 16 }}>{countM + countF}</span>
             <span style={{ fontFamily: FD, fontWeight: 700, color: "#93a39a", fontSize: 13 }}>/8</span> atletas
           </div>
-          <a href="/criar-equipa" style={{ background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 18px", borderRadius: 10, fontSize: 14, textDecoration: "none" }}>Voltar ao Dojo</a>
+          <a href={voltarPara} style={{ background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 18px", borderRadius: 10, fontSize: 14, textDecoration: "none" }}>Voltar ao Dojo</a>
         </div>
       </div>
 
