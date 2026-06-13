@@ -134,16 +134,11 @@ export default function Mercado() {
           setAoVivoNome(av.nome ?? null);
         }
         setLoading(false);
-        if (list.length > 0) {
-          const ids = new Set(list.map((a) => a.id));
-          const cleanIds = draft.ids.filter((id) => ids.has(id));
-          if (cleanIds.length !== draft.ids.length) {
-            const cap = draft.captain && cleanIds.includes(draft.captain) ? draft.captain : null;
-            setTeam(cleanIds);
-            setCaptain(cap);
-            saveDraftFor(COMPETICAO, { ids: cleanIds, captain: cap });
-          }
-        }
+        // NOTA: não limpamos aqui o rascunho dos atletas não-inscritos. Só ABRIR
+        // o mercado não deve alterar a equipa — senão, voltar ao Dojo sem comprar
+        // nem vender faria a app pedir para guardar sem haver alterações reais.
+        // A limpeza de não-inscritos (carry-over) é feita no /criar-equipa, ao
+        // montar para uma nova competição. Aqui o mercado só compra/vende por ação.
       })
       .catch(() => {
         if (!active) return;
