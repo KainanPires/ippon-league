@@ -10,6 +10,7 @@
 // Devolve: { ok:true, acao } ou { ok:false, erro }
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,14 +19,12 @@ export async function POST(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
   }
-
   let corpo: { user_id?: string; request_id?: string; acao?: string };
   try {
     corpo = await req.json();
   } catch {
     return NextResponse.json({ ok: false, erro: "Pedido inválido." }, { status: 400 });
   }
-
   const user_id = (corpo.user_id || "").trim();
   const request_id = (corpo.request_id || "").trim();
   const acao = (corpo.acao || "").trim();
@@ -33,7 +32,6 @@ export async function POST(req: Request) {
   if (acao !== "aprovar" && acao !== "recusar") {
     return NextResponse.json({ ok: false, erro: "Ação inválida." }, { status: 400 });
   }
-
   // 1) Lê o pedido.
   const { data: pedido } = await supabaseAdmin
     .from("league_requests")
@@ -41,34 +39,37 @@ export async function POST(req: Request) {
     .eq("id", request_id)
     .maybeSingle();
   if (!pedido) return NextResponse.json({ ok: false, erro: "Pedido não encontrado." }, { status: 404 });
-
-  // 2) Confirma que quem decide é o DONO da liga do pedido.
+  // 2) Confirma que quem decide é o DONO da liga do pedido. (name para a notificação.)
   const { data: liga } = await supabaseAdmin
     .from("leagues")
-    .select("id, created_by")
+    .select("id, name, created_by")
     .eq("id", pedido.league_id)
     .maybeSingle();
   if (!liga) return NextResponse.json({ ok: false, erro: "Liga não encontrada." }, { status: 404 });
   if (liga.created_by !== user_id) {
     return NextResponse.json({ ok: false, erro: "Só o dono pode decidir." }, { status: 403 });
   }
-
   // 3) Se já foi decidido antes, não repete.
   if (pedido.estado !== "pendente") {
     return NextResponse.json({ ok: true, jaDecidido: true, acao: pedido.estado });
   }
-
   const agora = new Date().toISOString();
-
   // 4a) RECUSAR.
   if (acao === "recusar") {
     await supabaseAdmin
       .from("league_requests")
       .update({ estado: "recusado", decided_at: agora })
       .eq("id", request_id);
+    // Notifica quem pediu (com tacto, sem desencorajar).
+    await criarNotificacaoServidor({
+      paraUserId: pedido.user_id,
+      tipo: "liga_aprovado", // mesmo tipo "liga_*"; o texto distingue
+      titulo: "Pedido de liga não aceite",
+      corpo: `O teu pedido para a liga "${liga.name}" não foi aceite desta vez. Há muitas outras ligas para entrares!`,
+      link: "/ligas",
+    });
     return NextResponse.json({ ok: true, acao: "recusar" });
   }
-
   // 4b) APROVAR → mete na league_members (se ainda não estiver) e marca aprovado.
   const { data: jaMembro } = await supabaseAdmin
     .from("league_members")
@@ -76,7 +77,6 @@ export async function POST(req: Request) {
     .eq("league_id", pedido.league_id)
     .eq("user_id", pedido.user_id)
     .maybeSingle();
-
   if (!jaMembro) {
     const { error: erroMembro } = await supabaseAdmin
       .from("league_members")
@@ -85,11 +85,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, erro: "Não foi possível adicionar o membro." }, { status: 500 });
     }
   }
-
   await supabaseAdmin
     .from("league_requests")
     .update({ estado: "aprovado", decided_at: agora })
     .eq("id", request_id);
-
+  // Notifica quem pediu: foi aceite! Personalizado com o nome da liga.
+  await criarNotificacaoServidor({
+    paraUserId: pedido.user_id,
+    tipo: "liga_aprovado",
+    titulo: "Entraste na liga!",
+    corpo: `O teu pedido para a liga "${liga.name}" foi aceite. Boa sorte na competição!`,
+    link: "/ligas",
+  });
   return NextResponse.json({ ok: true, acao: "aprovar" });
 }
