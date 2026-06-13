@@ -56,7 +56,7 @@ function sameTeam(a: TeamState, b: TeamState): boolean {
 }
 
 type Modal =
-  | { kind: "saved" | "trash" | "share" | "leave" | "missing" }
+  | { kind: "saved" | "trash" | "share" | "leave" | "missing" | "incompleta" }
   | { kind: "athlete"; a: Athlete }
   | null;
 
@@ -298,10 +298,26 @@ export default function MeuTime() {
     }
     setModal({ kind: "saved" });
   }
-  // PRENDER: ao tentar sair com alterações por guardar, avisa.
+  // PRENDER: ao tentar sair com alterações.
+  // Regra: nunca se guarda uma equipa incompleta. Ao sair:
+  //  - equipa COMPLETA alterada -> avisa para guardar (modal "leave").
+  //  - equipa INCOMPLETA alterada -> avisa que vai descartar as alterações;
+  //    mantém a equipa anterior (saved) se houver, senão fica vazio (modal "incompleta").
+  //  - sem alterações -> sai direto.
   function tryLeave(href: string) {
-    if (dirty) { setLeaveTo(href); setModal({ kind: "leave" }); return; }
-    router.push(href);
+    if (!dirty) { router.push(href); return; }
+    if (!isComplete(team)) { setLeaveTo(href); setModal({ kind: "incompleta" }); return; }
+    setLeaveTo(href); setModal({ kind: "leave" });
+  }
+  // Sair descartando o rascunho incompleto: o rascunho local volta a ser a equipa
+  // guardada (completa ou vazia), para o estado furado não reaparecer ao voltar.
+  function sairDescartando() {
+    saveDraftFor(alvo.idCompeticao, saved);
+    setTeam(saved);
+    const destino = leaveTo;
+    setModal(null);
+    setLeaveTo(null);
+    if (destino) router.push(destino);
   }
 
   // Lugares vazios para completar a equipa (4 masc + 4 fem).
@@ -505,6 +521,24 @@ export default function MeuTime() {
           pro={isPro}
           onClose={() => setModal(null)}
         />
+      )}
+
+      {modal?.kind === "incompleta" && (
+        <div style={overlayBg}>
+          <div style={cardBox}>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="indicando" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Equipa incompleta</h2>
+            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
+              {isComplete(saved)
+                ? "As tuas alterações estão incompletas e não podem ser guardadas assim. Se saíres, mantemos a tua equipa anterior — completa — e descartamos estas alterações."
+                : "Uma equipa só pode ser guardada completa (8 atletas + capitão). Se saíres agora, ficas sem equipa. Queres mesmo sair?"}
+            </p>
+            <button onClick={sairDescartando} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>
+              {isComplete(saved) ? "Sair e manter a anterior" : "Sair sem equipa"}
+            </button>
+            <button onClick={() => { setModal(null); setLeaveTo(null); }} style={ghostBtn}>Continuar a montar</button>
+          </div>
+        </div>
       )}
 
       {mostrarAvaliacao && (
