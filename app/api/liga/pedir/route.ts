@@ -16,7 +16,7 @@
 //   { ok:false, erro }                   caso contrário
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { criarNotificacaoServidor, nomeDoUtilizador } from "@/lib/notificacoesServidor";
+import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -169,6 +169,8 @@ export async function POST(req: Request) {
 }
 
 // Cria a notificação para o DONO da liga sobre um novo pedido de entrada.
+// Mantém-se simples (sem nome/time): só puxa o dono à app. O detalhe de quem
+// pediu (nome + time) vê-se na tela de pedidos da liga.
 async function notificarDonoDoPedido(
   donoId: string | null | undefined,
   quemPediu: string,
@@ -176,12 +178,11 @@ async function notificarDonoDoPedido(
   ligaId: string
 ) {
   if (!donoId || donoId === quemPediu) return; // sem dono, ou o próprio dono — não notifica
-  const nome = await nomeDoUtilizador(quemPediu);
   await criarNotificacaoServidor({
     paraUserId: donoId,
     tipo: "liga_pedido",
-    titulo: "Novo pedido para a tua liga",
-    corpo: `${nome} quer entrar na liga "${nomeLiga}". Aprova ou recusa nos pedidos da liga.`,
+    titulo: "Novo pedido na tua liga",
+    corpo: `Alguém quer entrar na liga "${nomeLiga}". Vê os pedidos para aprovar ou recusar.`,
     link: "/ligas",
   });
 }
