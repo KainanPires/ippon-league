@@ -3,6 +3,11 @@
 // equipa guardada são por competição, por isso montar para o Tahiti não mexe na
 // equipa do Ulaanbaatar. As funções antigas (sem competição) continuam a existir
 // para compatibilidade, mas as páginas devem migrar para as versões "ParaComp".
+//
+// ISOLAMENTO POR CONTA: todas as chaves do localStorage incluem o id do
+// utilizador atual (uid). Assim, duas contas no mesmo browser (ex: uma Pro e
+// uma gratuita) NÃO partilham rascunho, equipa local, preços nem pool. Sem
+// utilizador (deslogado), usa-se o espaço "anon".
 import { ATHLETES, type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 
@@ -15,10 +20,67 @@ const POOL = "ippon_athletes_pool"; // memória partilhada dos atletas reais (do
 const PRECOS = "ippon_team_precos"; // preço de compra por atleta (para o património)
 export const START_JC = 100;
 
-// Chaves por competição: "ippon_team_draft__3295".
-function draftKey(idComp?: string) { return idComp ? `${DRAFT}__${idComp}` : DRAFT; }
-function savedKey(idComp?: string) { return idComp ? `${SAVED}__${idComp}` : SAVED; }
-function precosKey(idComp?: string) { return idComp ? `${PRECOS}__${idComp}` : PRECOS; }
+// ---------------------------------------------------------------------------
+// ID DO UTILIZADOR ATUAL (síncrono) — para isolar as chaves locais por conta.
+// ---------------------------------------------------------------------------
+// O supabase-js guarda a sessão no localStorage numa chave do tipo
+// "sb-<projeto>-auth-token". Lemos o user.id de lá, de forma síncrona, sem
+// precisar de await. Mantemos também um valor em cache, atualizado pelo
+// onAuthStateChange, para ser instantâneo após login/logout.
+let _uidCache: string | null = null;
+let _uidSubscrito = false;
+
+function lerUidDoStorage(): string | null {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return null;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith("sb-") || !k.endsWith("-auth-token")) continue;
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      // O token pode vir como { user: {...} } ou { currentSession: { user } }.
+      const id = parsed?.user?.id ?? parsed?.currentSession?.user?.id ?? null;
+      if (typeof id === "string" && id) return id;
+    }
+  } catch {}
+  return null;
+}
+
+// Subscreve às mudanças de sessão uma única vez, para manter o uid em cache.
+function garantirSubscricao() {
+  if (_uidSubscrito || typeof window === "undefined") return;
+  _uidSubscrito = true;
+  try {
+    supabase.auth.onAuthStateChange((_event, session) => {
+      _uidCache = session?.user?.id ?? null;
+    });
+  } catch {}
+}
+
+// Devolve o id do utilizador atual (ou "anon" se deslogado).
+function uid(): string {
+  garantirSubscricao();
+  if (_uidCache) return _uidCache;
+  const fromStorage = lerUidDoStorage();
+  if (fromStorage) { _uidCache = fromStorage; return fromStorage; }
+  return "anon";
+}
+
+// Chaves por competição E por utilizador:
+//   "ippon_team_draft__<uid>__3295".
+function draftKey(idComp?: string) {
+  return idComp ? `${DRAFT}__${uid()}__${idComp}` : `${DRAFT}__${uid()}`;
+}
+function savedKey(idComp?: string) {
+  return idComp ? `${SAVED}__${uid()}__${idComp}` : `${SAVED}__${uid()}`;
+}
+function precosKey(idComp?: string) {
+  return idComp ? `${PRECOS}__${uid()}__${idComp}` : `${PRECOS}__${uid()}`;
+}
+function poolKey() {
+  return `${POOL}__${uid()}`;
+}
 
 function read(key: string): TeamState | null {
   try {
@@ -34,18 +96,18 @@ function read(key: string): TeamState | null {
 
 // ---- LOCAL (sem competição — compatibilidade) -----------------------------
 export function loadDraft(): TeamState {
-  return read(DRAFT) || read(LEGACY) || { ids: [], captain: null };
+  return read(draftKey()) || read(LEGACY) || { ids: [], captain: null };
 }
 export function saveDraft(t: TeamState) {
-  try { localStorage.setItem(DRAFT, JSON.stringify(t)); } catch {}
+  try { localStorage.setItem(draftKey(), JSON.stringify(t)); } catch {}
 }
 export function loadSaved(): TeamState {
-  return read(SAVED) || { ids: [], captain: null };
+  return read(savedKey()) || { ids: [], captain: null };
 }
 export function commitSaved(t: TeamState) {
   try {
-    localStorage.setItem(SAVED, JSON.stringify(t));
-    localStorage.setItem(DRAFT, JSON.stringify(t));
+    localStorage.setItem(savedKey(), JSON.stringify(t));
+    localStorage.setItem(draftKey(), JSON.stringify(t));
   } catch {}
 }
 
@@ -70,12 +132,13 @@ export function commitSavedFor(idComp: string, t: TeamState) {
 
 // ---- Pool de atletas reais (preenchida pelo Mercado a partir do JudoBase) ---
 // O resolve usa esta pool quando existir; senão cai nos atletas de exemplo.
+// (Isolada por conta também, por consistência — evita qualquer fuga de estado.)
 export function setAthletePool(list: Athlete[]) {
-  try { localStorage.setItem(POOL, JSON.stringify(list)); } catch {}
+  try { localStorage.setItem(poolKey(), JSON.stringify(list)); } catch {}
 }
 export function getAthletePool(): Athlete[] {
   try {
-    const raw = localStorage.getItem(POOL);
+    const raw = localStorage.getItem(poolKey());
     if (raw) {
       const p = JSON.parse(raw);
       if (Array.isArray(p)) return p as Athlete[];
