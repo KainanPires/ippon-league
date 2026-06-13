@@ -64,10 +64,10 @@ const CARD_CSS = `
 .jcard-headglow{position:absolute;top:-120px;left:0;right:0;height:620px;z-index:0;background:radial-gradient(58% 70% at 34% 24%,color-mix(in srgb,var(--glow-accent) 26%,transparent) 0%,transparent 68%),radial-gradient(80% 60% at 80% 6%,color-mix(in srgb,#d9a441 10%,transparent) 0%,transparent 70%);pointer-events:none}
 .jcard-inner{position:relative;z-index:2;height:100%;padding:64px 60px 56px;display:flex;flex-direction:column;box-sizing:border-box}
 .pro-badge{align-self:center;margin-top:-14px;margin-bottom:30px;padding:13px 40px;border-radius:999px;background:linear-gradient(180deg,#f1c969 0%,#d9a441 55%,#b9842c 100%);color:#20160a;font-weight:700;font-size:31px;letter-spacing:5px;text-transform:uppercase;border:1.5px solid #f4d489;box-shadow:0 0 44px rgba(217,164,65,0.6),inset 0 1px 0 rgba(255,255,255,0.5)}
-.jcard-head{display:flex;align-items:center;gap:36px;padding-bottom:30px;margin-bottom:8px;border-bottom:1.5px solid rgba(241,237,226,0.10)}
+.jcard-head{display:flex;flex-direction:column;align-items:center;text-align:center;gap:18px;padding-bottom:30px;margin-bottom:8px;border-bottom:1.5px solid rgba(241,237,226,0.10)}
 .crest-wrap{flex-shrink:0;width:150px;height:172px;display:grid;place-items:center;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.45))}
-.head-text{min-width:0;flex:1}
-.team-name{margin:0;font-weight:700;font-size:70px;line-height:0.96;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2}
+.head-text{min-width:0;width:100%;display:flex;flex-direction:column;align-items:center}
+.team-name{margin:0;font-weight:700;font-size:70px;line-height:0.96;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;text-align:center}
 .belt-pill{display:inline-block;margin-top:20px;padding:11px 32px;border-radius:9px;background:var(--accent);color:var(--chip-text);font-weight:600;font-size:30px;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap}
 .roster{flex:1;display:flex;flex-direction:column;padding:6px 0}
 .row{flex:1 1 0;min-height:0;display:flex;align-items:center;gap:28px;padding:0 6px;border-bottom:1.5px solid rgba(241,237,226,0.07)}
