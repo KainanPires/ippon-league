@@ -1,461 +1,630 @@
-// Gestão da equipa: rascunho (em edição) vs guardada (oficial).
-// Agora cada equipa pertence a UMA competição (id_competicao). O rascunho e a
-// equipa guardada são por competição, por isso montar para o Tahiti não mexe na
-// equipa do Ulaanbaatar. As funções antigas (sem competição) continuam a existir
-// para compatibilidade, mas as páginas devem migrar para as versões "ParaComp".
-//
-// ISOLAMENTO POR CONTA: todas as chaves do localStorage incluem o id do
-// utilizador atual (uid). Assim, duas contas no mesmo browser (ex: uma Pro e
-// uma gratuita) NÃO partilham rascunho, equipa local, preços nem pool. Sem
-// utilizador (deslogado), usa-se o espaço "anon".
-import { ATHLETES, type Athlete } from "@/lib/athletes";
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { Mascot } from "@/components/Mascot";
+import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
+import { loadIdentity } from "@/components/Escudo";
+import { Desempenho } from "@/components/Desempenho";
+import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, type DesempenhoRodada } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
+import { focoMercado, textoFecho } from "@/lib/calendario";
+import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
+import { PRECO } from "@/lib/precos";
 
-export type TeamState = { ids: string[]; captain: string | null };
+const FD = "var(--font-geist-mono), system-ui, sans-serif";
+const FB = "var(--font-geist-sans), system-ui, sans-serif";
+const GOLD = "#d9a441";
 
-const DRAFT = "ippon_team_draft";
-const SAVED = "ippon_team_saved";
-const LEGACY = "ippon_team"; // versão antiga (só ids)
-const POOL = "ippon_athletes_pool"; // memória partilhada dos atletas reais (do Mercado)
-const PRECOS = "ippon_team_precos"; // preço de compra por atleta (para o património)
-export const START_JC = 100;
+const USER = { belt: "Branca" };
 
-// ---------------------------------------------------------------------------
-// ID DO UTILIZADOR ATUAL (síncrono) — para isolar as chaves locais por conta.
-// ---------------------------------------------------------------------------
-// O supabase-js guarda a sessão no localStorage numa chave do tipo
-// "sb-<projeto>-auth-token". Lemos o user.id de lá, de forma síncrona, sem
-// precisar de await. Mantemos também um valor em cache, atualizado pelo
-// onAuthStateChange, para ser instantâneo após login/logout.
-let _uidCache: string | null = null;
-let _uidSubscrito = false;
+const STEPS = [
+  { title: "Como funciona", text: "Vou mostrar-te o essencial em 1 minuto. Avança quando quiseres — ou pula." },
+  { title: "Monta a tua equipa", text: "100 Judocoins, 8 atletas e 1 capitão (pontua a dobrar). É por aqui que começas." },
+  { title: "Pontua pelas ações", text: "Ippon +10, waza-ari +4, shido a favor +1. Acompanhas tudo ao vivo no início." },
+  { title: "Competições e ligas", text: "Cada Grand Slam ou Mundial é uma rodada. Dispute ligas mundial, nacional e de amigos." },
+  { title: "Sobe de faixa", text: "O teu desempenho mensal muda a tua faixa — e o visual do jogo. Boa sorte!" },
+];
 
-function lerUidDoStorage(): string | null {
-  try {
-    if (typeof window === "undefined" || !window.localStorage) return null;
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k || !k.startsWith("sb-") || !k.endsWith("-auth-token")) continue;
-      const raw = localStorage.getItem(k);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      // O token pode vir como { user: {...} } ou { currentSession: { user } }.
-      const id = parsed?.user?.id ?? parsed?.currentSession?.user?.id ?? null;
-      if (typeof id === "string" && id) return id;
-    }
-  } catch {}
+const PRO_BENEFITS = ["Scout avançado: histórico de cada atleta", "Análise do teu time e dica de capitão", "Maior possibilidade de valorização, pela análise", "Acompanhamento ao vivo no dia da competição"];
+
+type TutTarget = "team" | "ligas" | "belt" | "pro" | null;
+function targetForStep(step: number): TutTarget {
+  const idx = step - 1;
+  if (idx === 1) return "team";
+  if (idx === 3) return "ligas";
+  if (idx === 4) return "belt";
   return null;
 }
 
-// Subscreve às mudanças de sessão uma única vez, para manter o uid em cache.
-function garantirSubscricao() {
-  if (_uidSubscrito || typeof window === "undefined") return;
-  _uidSubscrito = true;
-  try {
-    supabase.auth.onAuthStateChange((_event, session) => {
-      _uidCache = session?.user?.id ?? null;
+// "Tem equipa?" depende SÓ de haver ids guardados — não de conseguirmos resolver
+// os atletas. A lista de atletas (pool) vem do Mercado/servidor e pode não estar
+// carregada ainda. Quando não está, mostramos a equipa na mesma, com o Valor em "—".
+function computeTeamInfo(saved: TeamState): { name: string; value: string; last: number } | null {
+  if (saved.ids.length === 0) return null; // só sem ids é que NÃO há equipa
+  const athletes = resolve(saved.ids);
+  const resolvido = athletes.length > 0;
+  const value = Math.round(athletes.reduce((s, a) => s + a.priceJc, 0) * 10) / 10;
+  const last = athletes.reduce((s, a) => s + a.last + (a.id === saved.captain ? a.last : 0), 0);
+  return { name: loadIdentity().name, value: resolvido ? String(value) : "—", last: resolvido ? last : 0 };
+}
+
+export default function Inicio() {
+  const [ready, setReady] = useState(false);
+  const [visitante, setVisitante] = useState(false);
+  const [phase, setPhase] = useState<"tutorial" | null>(null);
+  const [step, setStep] = useState(0);
+  // Nome arranca VAZIO (não "Campeão"): só mostramos quando a sessão resolve.
+  // Visitante => "Campeão"; com conta => nome real. Evita o flash de "Campeão".
+  const [name, setName] = useState("");
+  const [isPro, setIsPro] = useState(false);
+  // Guardamos a EQUIPA encontrada (ids); o teamInfo é calculado ao mostrar, para
+  // atualizar o Valor quando a lista de atletas chegar.
+  const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
+  const [minhasLigas, setMinhasLigas] = useState<{ id: string; name: string; membros: number }[] | null>(null);
+  const [desempenho, setDesempenho] = useState<{ dados: DesempenhoRodada; team: TeamState } | null>(null);
+  const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
+
+  const beltRef = useRef<HTMLAnchorElement | null>(null);
+  const teamRef = useRef<HTMLDivElement | null>(null);
+  const ligasRef = useRef<HTMLAnchorElement | null>(null);
+  const tutTarget: TutTarget = phase === "tutorial" ? targetForStep(step) : null;
+
+  // Foco do mercado (regra única no calendário): competição-alvo, a que decorre, estado.
+  const foco = focoMercado();
+  const comp = foco.atual;
+  const ehClassico = comp.classico;
+  const emAndamento = foco.aDecorrer !== null; // a competição da semana já fechou/decorre
+  const alvo = foco.alvo;            // competição de mercado aberto (onde se monta)
+  const aDecorrer = foco.aDecorrer;  // competição a decorrer (mercado fechado), se houver
+
+  // teamInfo calculado a cada render (re-resolve quando a lista de atletas chega).
+  const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
+  // Nome a mostrar: visitante => "Campeão"; com conta => nome real (ou vazio enquanto carrega).
+  const nomeMostrado = visitante ? "Campeão" : name;
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }: { data: { session: { user?: { id?: string; user_metadata?: { nome?: string } } } | null } }) => {
+      if (!active) return;
+
+      if (!data.session) {
+        // VISITANTE: sem sessão. Mostra "Campeão" + convite. NUNCA lê a equipa local.
+        setVisitante(true);
+        setSavedTeam(null);
+        setReady(true);
+        return;
+      }
+
+      // LOGADO: a partir daqui podemos usar nome e equipa.
+      setVisitante(false);
+      // As tuas ligas (reais): busca as ligas onde este utilizador é membro.
+      const userId = data.session.user?.id;
+      if (userId) {
+        fetch(`/api/liga/minhas?user_id=${userId}`)
+          .then((r) => r.json())
+          .then((j) => {
+            if (!active) return;
+            const ligas = Array.isArray(j?.ligas) ? j.ligas : [];
+            setMinhasLigas(ligas.map((l: { id: string; name: string; membros?: number }) => ({ id: l.id, name: l.name, membros: l.membros ?? 1 })));
+          })
+          .catch(() => { if (active) setMinhasLigas([]); });
+      }
+      try {
+        // Nome do utilizador: PRIMEIRO a conta (user_metadata.nome — sempre certo
+        // e isolado por sessão); só como recurso o localStorage, isolado por conta.
+        const metaName = data.session.user?.user_metadata?.nome;
+        const savedName = localStorage.getItem(`ippon_name__${uid()}`) ?? localStorage.getItem("ippon_name");
+        if (metaName) setName(String(metaName).split(" ")[0]);
+        else if (savedName) setName(savedName);
+        else setName("Campeão"); // conta sem nome definido: recurso final
+        // Estado Pro: controla as "duas saídas" do cartão Pro (vendas vs central).
+        const meta = (data.session.user?.user_metadata ?? {}) as { is_pro?: boolean };
+        setIsPro(Boolean(meta.is_pro));
+        // Onboarding: só auto-aparece a quem registou agora ("pending") E cuja conta
+        // ainda não o viu. Assim não volta em logins futuros nem noutro dispositivo.
+        if (localStorage.getItem("ippon_onboarding") === "pending") {
+          tutoriaisVistosConta().then((vistos) => {
+            if (!active) return;
+            if (vistos["ippon_onboarding"]) {
+              try { localStorage.setItem("ippon_onboarding", "done"); } catch {}
+            } else {
+              setStep(0);
+              setPhase("tutorial");
+            }
+          });
+        }
+        // Cache local (instantâneo): tenta a competição a decorrer; senão a de mercado aberto (alvo).
+        const localDecorrer = aDecorrer ? loadSavedFor(aDecorrer.idCompeticao) : { ids: [], captain: null };
+        const localBase = localDecorrer.ids.length > 0 ? localDecorrer : loadSavedFor(alvo.idCompeticao);
+        if (localBase.ids.length > 0) setSavedTeam(localBase);
+      } catch {}
+      setReady(true);
+      // Carrega a lista de atletas das competições relevantes (mesma fonte do Mercado),
+      // para o resolve() traduzir os ids da equipa e o Valor deixar de ser "—".
+      const compsPool = aDecorrer ? [aDecorrer.idCompeticao, alvo.idCompeticao] : [alvo.idCompeticao];
+      Promise.all(
+        compsPool.map((id) => fetch(`/api/atletas?id=${id}`).then((r) => r.json()).catch(() => null))
+      ).then((resultados) => {
+        if (!active) return;
+        const merged = new Map<string, { id: string }>();
+        for (const j of resultados) {
+          const list = Array.isArray(j?.atletas) ? j.atletas : [];
+          for (const a of list) merged.set(a.id, a);
+        }
+        if (merged.size > 0) {
+          // setAthletePool espera Athlete[]; a lista do servidor já vem nesse formato.
+          setAthletePool(Array.from(merged.values()) as never);
+          bumpPool((t) => t + 1);
+        }
+      });
+      // Equipa oficial da conta: a da competição a decorrer (se existir), senão a da competição de mercado aberto.
+      (async () => {
+        const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
+        if (!active) return;
+        if (naDecorrer && naDecorrer.ids.length > 0) {
+          setSavedTeam(naDecorrer);
+          return;
+        }
+        const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
+        if (!active || !naAlvo || naAlvo.ids.length === 0) return;
+        setSavedTeam(naAlvo); // nunca apagar um estado bom (só atualiza se tiver equipa)
+      })();
+
+      // "O TEU DESEMPENHO NA RODADA": se a competição em que escalei já terminou
+      // (tem resultados) e ainda não a vi, prepara o popup. Espera o pool de atletas.
+      (async () => {
+        // Candidata: a competição a decorrer/que decorreu esta semana (ex.: Tahiti).
+        // É a rodada mais recente em que a pessoa pode ter escalado.
+        const candidata = aDecorrer;
+        if (!active || !candidata) return;
+        // Já viu?
+        const vistos = await desempenhosVistosConta();
+        if (!active || vistos[candidata.idCompeticao]) return;
+        // A equipa dessa competição.
+        const teamComp = await loadSavedCloudFor(candidata.idCompeticao);
+        if (!active || !teamComp || teamComp.ids.length === 0) return;
+        // Há resultados? (só dispara quando a competição terminou e o JudoBase publicou)
+        const pontos = await buscarResultados(candidata.idCompeticao);
+        if (!active || !pontos) return;
+        // Garante o pool de atletas dessa competição para o resolve() funcionar.
+        try {
+          const j = await fetch(`/api/atletas?id=${candidata.idCompeticao}`).then((r) => r.json());
+          const list = Array.isArray(j?.atletas) ? j.atletas : [];
+          if (list.length > 0) setAthletePool(list as never);
+        } catch {}
+        if (!active) return;
+        const dados = construirDesempenho(candidata.idCompeticao, candidata.nome, teamComp, pontos);
+        if (dados) setDesempenho({ dados, team: teamComp });
+      })();
     });
-  } catch {}
-}
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-// Devolve o id do utilizador atual (ou "anon" se deslogado).
-// Exportada para outros módulos (ex: Escudo) isolarem o seu storage pela mesma conta.
-export function uid(): string {
-  garantirSubscricao();
-  if (_uidCache) return _uidCache;
-  const fromStorage = lerUidDoStorage();
-  if (fromStorage) { _uidCache = fromStorage; return fromStorage; }
-  return "anon";
-}
+  useEffect(() => {
+    if (phase !== "tutorial") return;
+    const t = targetForStep(step);
+    const el = t === "team" ? teamRef.current : t === "ligas" ? ligasRef.current : t === "belt" ? beltRef.current : null;
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [phase, step]);
 
-// Chaves por competição E por utilizador:
-//   "ippon_team_draft__<uid>__3295".
-function draftKey(idComp?: string) {
-  return idComp ? `${DRAFT}__${uid()}__${idComp}` : `${DRAFT}__${uid()}`;
-}
-function savedKey(idComp?: string) {
-  return idComp ? `${SAVED}__${uid()}__${idComp}` : `${SAVED}__${uid()}`;
-}
-function precosKey(idComp?: string) {
-  return idComp ? `${PRECOS}__${uid()}__${idComp}` : `${PRECOS}__${uid()}`;
-}
-function poolKey() {
-  return `${POOL}__${uid()}`;
-}
+  const glow = (n: TutTarget) => (tutTarget === n ? "iltut" : undefined);
 
-function read(key: string): TeamState | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
-    if (Array.isArray(p)) return { ids: p, captain: null };
-    return { ids: Array.isArray(p.ids) ? p.ids : [], captain: p.captain ?? null };
-  } catch {
-    return null;
+  function finishOnboarding() {
+    marcarTutorialVisto("ippon_onboarding"); // local (este aparelho) + conta (todos)
+    setPhase(null);
   }
-}
 
-// ---- LOCAL (sem competição — compatibilidade) -----------------------------
-export function loadDraft(): TeamState {
-  return read(draftKey()) || read(LEGACY) || { ids: [], captain: null };
-}
-export function saveDraft(t: TeamState) {
-  try { localStorage.setItem(draftKey(), JSON.stringify(t)); } catch {}
-}
-export function loadSaved(): TeamState {
-  return read(savedKey()) || { ids: [], captain: null };
-}
-export function commitSaved(t: TeamState) {
-  try {
-    localStorage.setItem(savedKey(), JSON.stringify(t));
-    localStorage.setItem(draftKey(), JSON.stringify(t));
-  } catch {}
-}
-
-// ---- LOCAL por competição --------------------------------------------------
-export function loadDraftFor(idComp: string): TeamState {
-  return read(draftKey(idComp)) || { ids: [], captain: null };
-}
-export function saveDraftFor(idComp: string, t: TeamState) {
-  try { localStorage.setItem(draftKey(idComp), JSON.stringify(t)); } catch {}
-}
-export function loadSavedFor(idComp: string): TeamState {
-  return read(savedKey(idComp)) || { ids: [], captain: null };
-}
-export function commitSavedFor(idComp: string, t: TeamState) {
-  try {
-    localStorage.setItem(savedKey(idComp), JSON.stringify(t));
-    localStorage.setItem(draftKey(idComp), JSON.stringify(t));
-    // Guarda o preço de compra de cada atleta neste momento (para o património).
-    localStorage.setItem(precosKey(idComp), JSON.stringify(pricesOf(t)));
-  } catch {}
-}
-
-// ---- Pool de atletas reais (preenchida pelo Mercado a partir do JudoBase) ---
-// O resolve usa esta pool quando existir; senão cai nos atletas de exemplo.
-// (Isolada por conta também, por consistência — evita qualquer fuga de estado.)
-export function setAthletePool(list: Athlete[]) {
-  try { localStorage.setItem(poolKey(), JSON.stringify(list)); } catch {}
-}
-export function getAthletePool(): Athlete[] {
-  try {
-    const raw = localStorage.getItem(poolKey());
-    if (raw) {
-      const p = JSON.parse(raw);
-      if (Array.isArray(p)) return p as Athlete[];
-    }
-  } catch {}
-  return [];
-}
-
-// ---- Cálculo (igual) -------------------------------------------------------
-export function resolve(ids: string[]): Athlete[] {
-  const pool = getAthletePool();
-  const source = pool.length > 0 ? pool : ATHLETES; // atletas reais quando existirem
-  const byId = new Map<string, Athlete>();
-  for (const a of source) byId.set(a.id, a);
-  return ids.map((id) => byId.get(id)).filter(Boolean) as Athlete[];
-}
-export function jcLeft(t: TeamState): number {
-  const a = resolve(t.ids);
-  return Math.round((START_JC - a.reduce((s, x) => s + x.priceJc, 0)) * 10) / 10;
-}
-export function counts(t: TeamState) {
-  const a = resolve(t.ids);
-  return { m: a.filter((x) => x.gender === "M").length, f: a.filter((x) => x.gender === "F").length, total: a.length };
-}
-export function isComplete(t: TeamState): boolean {
-  const c = counts(t);
-  return c.m === 4 && c.f === 4 && !!t.captain;
-}
-export function missing(t: TeamState): string[] {
-  const c = counts(t);
-  const out: string[] = [];
-  if (c.m < 4) out.push(`${4 - c.m} atleta${4 - c.m > 1 ? "s" : ""} masculino${4 - c.m > 1 ? "s" : ""}`);
-  if (c.f < 4) out.push(`${4 - c.f} atleta${4 - c.f > 1 ? "s" : ""} feminino${4 - c.f > 1 ? "s" : ""}`);
-  if (!t.captain) out.push("escolher o capitão");
-  return out;
-}
-
-// ---- Preço de compra / património -----------------------------------------
-// Mapa { id_person: preço } com o preço ATUAL de cada atleta da equipa — usado
-// como "preço de compra" no momento em que a equipa é guardada.
-export function pricesOf(t: TeamState): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const a of resolve(t.ids)) out[a.id] = a.priceJc;
-  return out;
-}
-// Lê os preços de compra guardados localmente para uma competição.
-export function loadPrecosFor(idComp: string): Record<string, number> {
-  try {
-    const raw = localStorage.getItem(precosKey(idComp));
-    if (raw) {
-      const p = JSON.parse(raw);
-      if (p && typeof p === "object") return p as Record<string, number>;
-    }
-  } catch {}
-  return {};
-}
-// Lê os preços de compra guardados na nuvem (tabela equipas) para uma competição.
-export async function loadPrecosCloudFor(idComp: string): Promise<Record<string, number>> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return {};
-    const { data, error } = await supabase
-      .from("equipas")
-      .select("precos")
-      .eq("user_id", userId)
-      .eq("id_competicao", idComp)
-      .maybeSingle();
-    if (error || !data || !data.precos || typeof data.precos !== "object") return {};
-    return data.precos as Record<string, number>;
-  } catch {
-    return {};
+  function openTutorial() {
+    setStep(0);
+    setPhase("tutorial");
   }
-}
-// Património = 100 + Σ (preço de agora − preço de compra) dos atletas da equipa.
-// Sem atletas, ou sem preços de compra, devolve exatamente START_JC (100).
-export function patrimonio(t: TeamState, precosCompra: Record<string, number>): number {
-  const atuais = resolve(t.ids);
-  let delta = 0;
-  for (const a of atuais) {
-    const compra = precosCompra[a.id];
-    if (typeof compra === "number") delta += a.priceJc - compra;
+
+  if (!ready) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#7c8a82", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: FD, fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase" }}>A carregar…</div>
+      </main>
+    );
   }
-  return Math.round((START_JC + delta) * 10) / 10;
+
+  return (
+    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+      <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes iltut{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.75)}50%{box-shadow:0 0 0 9px rgba(74,144,217,0.18)}} .iltut{animation:iltut 1.3s ease-in-out infinite} @keyframes ilentrar{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.28)}} .ilentrar{animation:ilentrar 1.5s ease-in-out infinite;border-radius:999px}`}</style>
+
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 14px 86px" }}>
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          {visitante ? (
+            <a href="/entrar?voltar=/inicio" className="ilentrar" style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: `1px solid ${GOLD}`, borderRadius: 999, padding: "5px 14px 5px 5px", textDecoration: "none", color: "#f1ede2" }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
+                <Mascot belt="#efeadd" expression="feliz" />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>Campeão</div>
+                <div style={{ fontSize: 11, color: GOLD }}>Entrar para jogar</div>
+              </div>
+            </a>
+          ) : (
+            <a ref={beltRef} className={glow("belt")} href="/perfil" style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: "1px solid #243029", borderRadius: 999, padding: "5px 14px 5px 5px", textDecoration: "none", color: "#f1ede2" }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
+                <Mascot belt="#efeadd" expression="feliz" />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{nomeMostrado || "\u00A0"}</div>
+                <div style={{ fontSize: 11, color: GOLD }}>Faixa {USER.belt}</div>
+              </div>
+            </a>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={openTutorial} aria-label="Como se joga" style={iconBtn}>?</button>
+            <div style={{ position: "relative", ...iconBtn, cursor: "default" }}>
+              <BellIcon />
+              <span style={{ position: "absolute", top: 7, right: 8, width: 7, height: 7, borderRadius: "50%", background: "#e2655a" }} />
+            </div>
+          </div>
+        </header>
+
+        {isPro ? (
+          <a href="/pro" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "13px 14px", marginBottom: 14, textDecoration: "none" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>A tua central Pro</span>
+                <span style={{ background: "#1b211e", color: GOLD, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>★ Pro</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#5c4410", marginTop: 3 }}>Análise do teu time e as tuas vantagens</div>
+            </div>
+            <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Abrir</span>
+          </a>
+        ) : (
+          <a href="/ippon-pro" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "11px 14px", marginBottom: 14, textDecoration: "none" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Ippon Pro</span>
+                {PRECO.emPromocao && <span style={{ background: "#1b211e", color: GOLD, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>{PRECO.etiqueta}</span>}
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
+                {PRECO.emPromocao && <span style={{ fontSize: 12, color: "#7a5e12", textDecoration: "line-through" }}>{PRECO.normal}</span>}
+                <span style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: "#3a2a08" }}>{PRECO.atual}</span>
+                <span style={{ fontSize: 11, color: "#5c4410" }}>{PRECO.periodo}</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#5c4410", marginTop: 2 }}>Joga com vantagem competitiva</div>
+              <div style={{ fontSize: 11, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
+            </div>
+            <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Assinar</span>
+          </a>
+        )}
+
+        <div ref={teamRef} className={glow("team")}>
+          {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo)} /> : <TeamCreate />}
+        </div>
+
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <CardTitle>{ehClassico ? (emAndamento ? "Clássico atual" : "Próximo clássico") : (emAndamento ? "Competição atual" : "Próxima competição")}</CardTitle>
+            {ehClassico && (
+              <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#3a2f12", color: GOLD, fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.03em" }}>↻ Clássico</span>
+            )}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>{comp.nome}</div>
+          <div style={{ fontSize: 12, color: "#93a39a", marginTop: 2 }}>
+            {comp.nivel}{ehClassico ? " · rodada especial" : ""} · está a valer pontos
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+            {emAndamento ? (
+              <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#e2655a", fontSize: 12, fontWeight: 700 }}>
+                <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
+                Em andamento · acompanha aqui
+              </span>
+            ) : (
+              <span style={{ fontSize: 12, color: "#7fd1a3" }}>{textoFecho(comp)}</span>
+            )}
+            {emAndamento ? (
+              visitante ? (
+                <a href="/entrar?voltar=/inicio" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>Entrar para jogar</a>
+              ) : (
+                <a href="/meu-time" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>Ver a minha equipa</a>
+              )
+            ) : (
+              <a href="/criar-equipa" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>Escalar</a>
+            )}
+          </div>
+        </Card>
+
+        {emAndamento ? (
+          <Card>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}>
+              <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
+              <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#e2655a" }}>Ao vivo agora</span>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{aDecorrer?.nome ?? comp.nome}</div>
+            <div style={{ fontSize: 12, color: "#93a39a", marginTop: 3, lineHeight: 1.4 }}>
+              A competição está a decorrer. Acompanha as pontuações dos teus atletas no teu time, ao vivo.
+            </div>
+          </Card>
+        ) : (
+          <Card>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3a463f" }} />
+              <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#6f7d76" }}>Ao vivo</span>
+            </div>
+            <div style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.4 }}>
+              Sem competição a decorrer agora. Quando houver, acompanhas aqui as lutas e as pontuações ao vivo.
+            </div>
+          </Card>
+        )}
+
+        <a ref={ligasRef} className={glow("ligas")} href="/ligas" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+          <Card>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: minhasLigas && minhasLigas.length > 0 ? 6 : 0 }}>
+              <CardTitle>As tuas ligas</CardTitle>
+              <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: GOLD }}>Ver todas ›</span>
+            </div>
+            {minhasLigas === null ? (
+              <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6 }}>A carregar as tuas ligas…</div>
+            ) : minhasLigas.length === 0 ? (
+              <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6, lineHeight: 1.4 }}>
+                Ainda não estás em nenhuma liga. Entra numa liga oficial ou cria uma com os teus amigos.
+              </div>
+            ) : (
+              minhasLigas.slice(0, 4).map((l) => (
+                <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                  <span style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "70%" }}>{l.name}</span>
+                  <span style={{ fontSize: 12, color: "#93a39a" }}>{l.membros} {l.membros === 1 ? "membro" : "membros"}</span>
+                </div>
+              ))
+            )}
+          </Card>
+        </a>
+
+      </div>
+
+      <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 62, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
+        <Tab label="Início" active icon={<HomeIcon />} href="/inicio" />
+        <Tab label="Competições" icon={<TrophyIcon />} href="/ligas" />
+        <Tab label="Atletas" icon={<AthletesIcon />} href="/atletas" />
+        <Tab label="Pro" icon={<BoltIcon />} href={isPro ? "/pro" : "/ippon-pro"} />
+      </nav>
+
+      {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || "Campeão"} target={tutTarget} />}
+
+      {desempenho && (
+        <Desempenho
+          dados={desempenho.dados}
+          identity={loadIdentity()}
+          team={desempenho.team}
+          nome={nomeMostrado || "Campeão"}
+          onClose={() => {
+            marcarDesempenhoVisto(desempenho.dados.idCompeticao);
+            setDesempenho(null);
+          }}
+        />
+      )}
+    </main>
+  );
 }
 
-// ---------------------------------------------------------------------------
-// CARRY-OVER ENTRE COMPETIÇÕES
-// ---------------------------------------------------------------------------
-// Quando uma nova competição abre, a equipa NÃO transita sozinha: cada equipa é
-// guardada por competição e a nova começa vazia. Estas funções trazem a última
-// equipa guardada como PONTO DE PARTIDA e largam quem não está inscrito na nova.
-// Decisão (opção A): só semeamos o rascunho — NÃO há commit automático na nuvem.
-// A pessoa revê e carrega em "Salvar equipa" ("Reescala o teu time", liberdade
-// total para trocar só os que cairam ou refazer tudo). Assim nunca se grava uma
-// equipa furada (sem capitão / com menos de 8): o isComplete trata disso.
-
-export type CarryResult = {
-  team: TeamState;          // equipa já podada (só inscritos); capitão limpo se caiu
-  dropped: string[];        // ids dos atletas que sairam por não estarem inscritos
-  captainDropped: boolean;  // o capitão estava entre os que sairam
+const iconBtn: React.CSSProperties = {
+  width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent",
+  color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer",
 };
 
-// Poda uma equipa-base contra os atletas INSCRITOS na competição-alvo.
-// `inscritosIds` = ids (id_person) presentes na pool da competição-alvo.
-// GUARDA DE SEGURANÇA: se a lista de inscritos vier vazia, NÃO larga ninguém
-// (evita apagar a equipa por uma falha de rede ou pool ainda não carregada).
-export function carryOver(base: TeamState, inscritosIds: string[]): CarryResult {
-  if (base.ids.length === 0 || inscritosIds.length === 0) {
-    return { team: base, dropped: [], captainDropped: false };
-  }
-  const inscritos = new Set(inscritosIds);
-  const ficam = base.ids.filter((id) => inscritos.has(id));
-  const dropped = base.ids.filter((id) => !inscritos.has(id));
-  const captainDropped = base.captain != null && !inscritos.has(base.captain);
-  return {
-    team: { ids: ficam, captain: captainDropped ? null : base.captain },
-    dropped,
-    captainDropped,
-  };
+function Card({ children }: { children: React.ReactNode }) {
+  return <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 13, marginBottom: 12 }}>{children}</div>;
+}
+function CardTitle({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>{children}</div>;
 }
 
-// A última equipa guardada na nuvem que NÃO seja a da competição-alvo (a mais
-// recente). Serve de base ao carry-over. Ordena por `atualizado_em`; se essa
-// coluna não existir no schema, tenta de novo sem ordenação (não parte nada).
-export async function loadLatestSavedCloudExcept(
-  idCompAlvo: string
-): Promise<{ team: TeamState; idComp: string } | null> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return null;
-
-    const base = supabase
-      .from("equipas")
-      .select("atletas, capitao, id_competicao, atualizado_em")
-      .eq("user_id", userId)
-      .neq("id_competicao", idCompAlvo);
-
-    // 1ª tentativa: a mais recente por atualizado_em.
-    let resp = await base
-      .order("atualizado_em", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    // Se a coluna de ordenação não existir (ou outro erro), tenta sem order.
-    if (resp.error) {
-      resp = await supabase
-        .from("equipas")
-        .select("atletas, capitao, id_competicao")
-        .eq("user_id", userId)
-        .neq("id_competicao", idCompAlvo)
-        .limit(1)
-        .maybeSingle();
-    }
-
-    const data = resp.data as
-      | { atletas?: unknown; capitao?: unknown; id_competicao?: unknown }
-      | null;
-    if (resp.error || !data) return null;
-    const ids = Array.isArray(data.atletas) ? (data.atletas as string[]) : [];
-    if (ids.length === 0) return null;
-    const captain = (data.capitao as string | null) ?? null;
-    return { team: { ids, captain }, idComp: String(data.id_competicao) };
-  } catch {
-    return null;
-  }
+function TeamCreate() {
+  return (
+    <div style={{ border: "1px solid #2a4d3e", borderRadius: 16, overflow: "hidden", marginBottom: 14, background: "repeating-linear-gradient(45deg,#1c3a2e 0 16px,#1a352a 16px 32px)" }}>
+      <div style={{ padding: "20px 16px", textAlign: "center" }}>
+        <div style={{ width: 64, height: 64, margin: "0 auto 6px" }}>
+          <Mascot belt="#efeadd" expression="feliz" />
+        </div>
+        <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase" }}>Cria a tua equipa</div>
+        <div style={{ fontSize: 12, color: "#cfe4d8", margin: "4px 0 14px" }}>Monta 8 atletas com 100 Judocoins e escolhe o teu capitão.</div>
+        <a href="/criar-equipa" style={{ display: "block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 13, borderRadius: 11, fontSize: 15, textDecoration: "none" }}>
+          Criar a minha equipa
+        </a>
+      </div>
+    </div>
+  );
 }
 
-// ---------------------------------------------------------------------------
-// NUVEM (Supabase) — equipa oficial ligada à conta do jogador E à competição.
-// ---------------------------------------------------------------------------
-export type CloudResult = { ok: boolean; error?: string };
-type TeamIdentity = { name?: string; [k: string]: unknown };
-
-/**
- * Grava a equipa oficial de uma competição: primeiro no dispositivo (rápido),
- * depois na conta do jogador (tabela `equipas`, uma por user+competição).
- */
-export async function commitSavedCloudFor(idComp: string, t: TeamState, identity?: TeamIdentity): Promise<CloudResult> {
-  commitSavedFor(idComp, t);
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return { ok: false, error: "sem sessão" };
-
-    const payload: Record<string, unknown> = {
-      user_id: userId,
-      id_competicao: idComp,
-      atletas: t.ids,
-      capitao: t.captain,
-      precos: pricesOf(t), // preço de compra de cada atleta, para o património
-      atualizado_em: new Date().toISOString(),
-    };
-    if (identity) {
-      if (identity.name) payload.nome = identity.name;
-      payload.escudo = identity;
-    }
-
-    const { error } = await supabase.from("equipas").upsert(payload, { onConflict: "user_id,id_competicao" });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
-  } catch (e) {
-    const msg = (e as { message?: string })?.message || "erro desconhecido";
-    return { ok: false, error: msg };
-  }
+function TeamBuilt({ info, fechoTexto }: { info: { name: string; value: string; last: number }; fechoTexto: string }) {
+  return (
+    <div style={{ border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
+      <div style={{ background: "#1c3a2e", padding: 9, textAlign: "center", fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aee9c9" }}>A minha equipa</div>
+      <div style={{ background: "#0f1411", padding: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+          <div style={{ width: 48, height: 48 }}>
+            <Mascot belt="#efeadd" expression="feliz" />
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{info.name}</div>
+            <div style={{ fontSize: 12, color: GOLD }}>Faixa Branca</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", textAlign: "center", marginBottom: 12 }}>
+          {(() => {
+            // Património = o que sobra (100 − valor da equipa). Só real quando temos o valor.
+            const temValor = info.value !== "—";
+            const valorNum = temValor ? Number(info.value) : 0;
+            const patrimonio = temValor ? `JC ${Math.round((100 - valorNum) * 10) / 10}` : "—";
+            return [[patrimonio, "Património"], [String(info.last), "Última"], [`JC ${info.value}`, "Valor"]].map(([v, l]) => (
+              <div key={l}>
+                <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: l === "Património" ? GOLD : "#f1ede2" }}>{v}</div>
+                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{l}</div>
+              </div>
+            ));
+          })()}
+        </div>
+        <div style={{ fontSize: 12, color: "#7fd1a3", marginBottom: 10 }}>{fechoTexto}</div>
+        <a href="/meu-time" style={{ display: "block", background: GOLD, color: "#1b211e", textAlign: "center", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 14, textDecoration: "none" }}>
+          Ver o meu time
+        </a>
+      </div>
+    </div>
+  );
 }
 
-/**
- * Lê a equipa oficial de uma competição guardada na conta do jogador.
- * Devolve null se não houver sessão, se não houver equipa, ou em erro de rede.
- */
-export async function loadSavedCloudFor(idComp: string): Promise<TeamState | null> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return null;
-
-    const { data, error } = await supabase
-      .from("equipas")
-      .select("atletas, capitao")
-      .eq("user_id", userId)
-      .eq("id_competicao", idComp)
-      .maybeSingle();
-
-    if (error || !data) return null;
-    const ids = Array.isArray(data.atletas) ? (data.atletas as string[]) : [];
-    const captain = (data.capitao as string | null) ?? null;
-    return { ids, captain };
-  } catch {
-    return null;
-  }
+function Tab({ label, icon, active, href }: { label: string; icon: React.ReactNode; active?: boolean; href?: string }) {
+  const baseStyle: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? GOLD : "#6f7d76", textDecoration: "none" };
+  const content = (
+    <>
+      {icon}
+      <span style={{ fontSize: 11, fontWeight: active ? 700 : 400 }}>{label}</span>
+    </>
+  );
+  return href ? <a href={href} style={baseStyle}>{content}</a> : <div style={baseStyle}>{content}</div>;
 }
 
-// ---- Cloud antigas (compatibilidade — assumem a competição atual) ----------
-// Mantidas para as páginas ainda não migradas não partirem. Internamente já não
-// devem ser a via principal; preferir as versões "...For".
-export async function commitSavedCloud(t: TeamState, identity?: TeamIdentity): Promise<CloudResult> {
-  commitSaved(t);
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return { ok: false, error: "sem sessão" };
-    const payload: Record<string, unknown> = {
-      user_id: userId,
-      atletas: t.ids,
-      capitao: t.captain,
-      atualizado_em: new Date().toISOString(),
-    };
-    if (identity) {
-      if (identity.name) payload.nome = identity.name;
-      payload.escudo = identity;
-    }
-    const { error } = await supabase.from("equipas").upsert(payload, { onConflict: "user_id" });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
-  } catch (e) {
-    const msg = (e as { message?: string })?.message || "erro desconhecido";
-    return { ok: false, error: msg };
-  }
-}
-export async function loadSavedCloud(): Promise<TeamState | null> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return null;
-    const { data, error } = await supabase
-      .from("equipas")
-      .select("atletas, capitao")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (error || !data) return null;
-    const ids = Array.isArray(data.atletas) ? (data.atletas as string[]) : [];
-    const captain = (data.capitao as string | null) ?? null;
-    return { ids, captain };
-  } catch {
-    return null;
-  }
+function Overlay({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.78)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 100 }}>
+      <div style={{ width: "100%", maxWidth: 320 }}>{children}</div>
+    </div>
+  );
 }
 
-// ---------------------------------------------------------------------------
-// IDENTIDADE (nome + escudo) — propagar para a tabela `equipas`.
-// ---------------------------------------------------------------------------
-// O ecrã /escudo guardava o nome só no localStorage; a liga lê o nome da
-// tabela `equipas`. Esta função actualiza o `nome` e o `escudo` em TODAS as
-// linhas de equipa da conta, para que qualquer competição (e a liga) mostrem
-// o nome certo. Se a conta ainda não tem nenhuma equipa, não há nada a
-// actualizar — o nome chega à `equipas` quando a 1ª equipa for guardada (o
-// commitSavedCloudFor já leva a identidade).
-export async function atualizarIdentidadeCloud(identity: TeamIdentity): Promise<CloudResult> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id as string | undefined;
-    if (!userId) return { ok: false, error: "sem sessão" };
+function Tutorial({ step, setStep, onClose, name, target }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string; target: TutTarget }) {
+  const total = STEPS.length + 2;
+  const isWelcome = step === 0;
+  const isPro = step === STEPS.length + 1;
+  const teach = STEPS[step - 1];
 
-    const nome = (identity.name || "").toString().trim();
-    const campos: Record<string, unknown> = { escudo: identity };
-    if (nome) campos.nome = nome;
-
-    // Actualiza todas as linhas de equipa desta conta.
-    const { error } = await supabase
-      .from("equipas")
-      .update(campos)
-      .eq("user_id", userId);
-
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
-  } catch (e) {
-    const msg = (e as { message?: string })?.message || "erro desconhecido";
-    return { ok: false, error: msg };
+  if (target) {
+    const title = isPro ? "Ippon Pro" : teach.title;
+    const text = isPro
+      ? `Toca aqui para teres o Ippon Pro: scout avançado, análise do teu time e dica de capitão. ${PRECO.atualComPeriodo}.`
+      : teach.text;
+    return (
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
+        <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
+          <div style={{ width: 56, height: 56, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
+          <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px" }}>
+            <div style={{ textAlign: "right", marginBottom: 4 }}>
+              <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB }}>Pular ✕</button>
+            </div>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{title}</div>
+            <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{text}</p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+              <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>Anterior</button>
+              <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
+              <button onClick={() => (isPro ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{isPro ? "Concluir" : "Seguinte"}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
+
+  return (
+    <Overlay>
+      <div style={{ textAlign: "right", marginBottom: 8 }}>
+        <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>Pular tutorial ✕</button>
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 999, background: i <= step ? GOLD : "#3a463f" }} />
+        ))}
+      </div>
+
+      {isWelcome ? (
+        <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <div style={{ width: 64, height: 64, flexShrink: 0 }}>
+              <Mascot belt="#141110" expression="comemorando" />
+            </div>
+            <div>
+              <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>Olá, {name}! Sou o Dôdo</div>
+              <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>Sou o teu sensei aqui na Ippon League e vou guiar-te. Vou apontar no ecrã o que importa. Bora começar?</p>
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+            <button onClick={() => setStep(1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 20px", borderRadius: 9, fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Vamos!</button>
+          </div>
+        </div>
+      ) : isPro ? (
+        <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 20, textAlign: "center" }}>
+          <div style={{ width: 80, height: 80, margin: "0 auto 2px" }}>
+            <Mascot belt="#141110" expression="sabio" />
+          </div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>Oferta de lançamento</div>
+          <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0" }}>Ippon Pro</div>
+          <div style={{ margin: "6px 0 14px" }}>
+            {PRECO.emPromocao && <><span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through" }}>{PRECO.normal}</span>{" "}</>}
+            <span style={{ fontFamily: FD, fontSize: 30, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
+            <span style={{ fontSize: 12, color: "#93a39a" }}>/mês</span>
+          </div>
+          <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
+            {PRO_BENEFITS.map((b) => (
+              <div key={b} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+                <span style={{ color: GOLD, fontWeight: 700 }}>✓</span>
+                <span style={{ fontSize: 13, color: "#c7d0c9" }}>{b}</span>
+              </div>
+            ))}
+          </div>
+          <a href="/ippon-pro" style={{ display: "block", width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 15, borderRadius: 12, fontSize: 16, textDecoration: "none", boxSizing: "border-box" }}>Seja Ippon Pro agora</a>
+          <a href="/ippon-pro" style={{ display: "block", marginTop: 9, textAlign: "center", color: GOLD, fontSize: 13, fontWeight: 700, textDecoration: "none", fontFamily: FB }}>Saber mais</a>
+          <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB }}>Continuar sem pagar</button>
+        </div>
+      ) : (
+        <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <div style={{ width: 64, height: 64, flexShrink: 0 }}>
+              <Mascot belt="#141110" expression="indicando" />
+            </div>
+            <div>
+              <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>{teach.title}</div>
+              <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{teach.text}</p>
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+            <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>Anterior</button>
+            <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
+            <button onClick={() => setStep(step + 1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Seguinte</button>
+          </div>
+        </div>
+      )}
+    </Overlay>
+  );
 }
 
-// Esta conta já tem alguma equipa com nome próprio (≠ "A minha equipa")?
-// Usado pelo Dojo para decidir se obriga a pessoa a dar nome ao time.
-export function temNomeProprio(identity: TeamIdentity): boolean {
-  const nome = (identity.name || "").toString().trim();
-  return nome.length > 0 && nome.toLowerCase() !== "a minha equipa";
+function BellIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  );
+}
+function HomeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" />
+    </svg>
+  );
+}
+function TrophyIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 6H5v2a3 3 0 0 0 3 3M16 6h3v2a3 3 0 0 1-3 3M10 17h4M9 21h6M12 13v4" />
+    </svg>
+  );
+}
+function AthletesIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="8" cy="6" r="3" /><circle cx="17" cy="7" r="2.5" /><path d="M3 20v-1a5 5 0 0 1 10 0v1M14 20v-1a4 4 0 0 1 7-2.6" />
+    </svg>
+  );
+}
+function BoltIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" />
+    </svg>
+  );
 }
