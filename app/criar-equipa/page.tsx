@@ -188,6 +188,9 @@ export default function CriarEquipa() {
     setSavingCloud(true);
     const res = await commitSavedCloudFor(alvo.idCompeticao, draft, identity);
     setSaved(draft);
+    // Sincroniza o rascunho local com o guardado, para não ficar um rascunho
+    // "fantasma" que faria o meu-time pedir para guardar sem haver alterações.
+    saveDraftFor(alvo.idCompeticao, draft);
     setCarry(null); // a partir daqui a equipa desta competição está confirmada
     setSavingCloud(false);
     setCloudWarn(!res.ok);
@@ -199,9 +202,13 @@ export default function CriarEquipa() {
       setModal({ kind: "precisaNome" });
     } else if (res.ok && devePedirAvaliacao()) {
       // Fim da jornada (conta + equipa + nome): pede avaliação se for altura.
+      // Ao fechar a avaliação, segue para a vista de gestão (/meu-time).
       setMostrarAvaliacao(true);
     } else {
-      setModal({ kind: "saved" });
+      // Equipa guardada e com nome: vai para a vista de gestão da equipa
+      // (/meu-time), com património, valor e "Ver Mercado" — em vez de ficar
+      // preso na vista de montagem.
+      router.push("/meu-time");
     }
   }
   const all = resolve(draft.ids);
@@ -395,7 +402,7 @@ export default function CriarEquipa() {
         </div>
       )}
       {mostrarAvaliacao && (
-        <Avaliacao nomeTime={identity.name} onClose={() => setMostrarAvaliacao(false)} />
+        <Avaliacao nomeTime={identity.name} onClose={() => { setMostrarAvaliacao(false); router.push("/meu-time"); }} />
       )}
       {modal?.kind === "saved" && (
         <div style={overlayBg}>
