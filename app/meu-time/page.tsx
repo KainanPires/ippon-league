@@ -98,11 +98,14 @@ export default function MeuTime() {
         setSaved(localDecorrer);
         setIdComp(aDecorrer.idCompeticao);
       } else {
-        // Mercado aberto: o rascunho é o ponto de edição; arranca do guardado.
+        // Mercado aberto. O "Meu Time" mostra a equipa guardada; o rascunho só
+        // entra como ponto de edição se for MESMO uma edição em curso (diferente
+        // do guardado). Caso contrário, team = saved, para não haver falso "tens
+        // alterações por guardar" (ex.: rascunho com a mesma equipa noutra ordem).
         const s = loadSavedFor(alvo.idCompeticao);
         const d = loadDraftFor(alvo.idCompeticao);
-        const base = d.ids.length > 0 ? d : s;
-        setTeam(base);
+        const edicaoEmCurso = d.ids.length > 0 && !sameTeam(d, s);
+        setTeam(edicaoEmCurso ? d : s);
         setSaved(s);
         setIdComp(alvo.idCompeticao);
       }
@@ -140,15 +143,21 @@ export default function MeuTime() {
         if (naDecorrer && naDecorrer.ids.length > 0 && aDecorrer) {
           setTeam(naDecorrer);
           setSaved(naDecorrer);
+          saveDraftFor(aDecorrer.idCompeticao, naDecorrer);
           setIdComp(aDecorrer.idCompeticao);
           return;
         }
         const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
         if (!active || !naAlvo) return;
         setSaved(naAlvo);
-        // Só adota a equipa da nuvem como base de edição se não há edição em curso.
+        // A equipa guardada na conta (nuvem) é a fonte de verdade. Para o "Meu Time"
+        // não pensar que há alterações por guardar quando NÃO há (ex.: voltar do
+        // mercado sem mexer), alinhamos TUDO à nuvem: o que se vê (team), a
+        // referência (saved) e o rascunho local. Só NÃO alinhamos se o utilizador
+        // tem uma edição mesmo diferente da nuvem em curso (compras/vendas reais).
         const curDraft = loadDraftFor(alvo.idCompeticao);
-        if (curDraft.ids.length === 0 || sameTeam(curDraft, loadSavedFor(alvo.idCompeticao))) {
+        const edicaoEmCurso = curDraft.ids.length > 0 && !sameTeam(curDraft, naAlvo);
+        if (!edicaoEmCurso) {
           setTeam(naAlvo);
           saveDraftFor(alvo.idCompeticao, naAlvo);
           commitSavedFor(alvo.idCompeticao, naAlvo);
