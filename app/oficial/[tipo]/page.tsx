@@ -33,6 +33,7 @@ export default function PaginaOficial() {
   const [nomeContinente, setNomeContinente] = useState<string | null>(null);
   const [meuId, setMeuId] = useState<string | null>(null);
   const [souPro, setSouPro] = useState(false);
+  const [pesquisa, setPesquisa] = useState("");
 
   // A competição da rodada atual (mesma fonte do resto da app).
   const foco = focoMercado();
@@ -41,6 +42,17 @@ export default function PaginaOficial() {
   const emAndamento = foco.aDecorrer !== null;
 
   const titulo = ehMundial ? "Liga Mundial" : (nomeContinente ? `Liga ${nomeContinente}` : "Liga Continental");
+
+  // Filtragem da lista pela pesquisa: aceita nome do time OU número de posição.
+  // Mantém a posição real de cada membro (só esconde os que não correspondem).
+  const termo = pesquisa.trim().toLowerCase();
+  const ehNumero = termo !== "" && /^\d+$/.test(termo);
+  const membrosVisiveis = termo === ""
+    ? membros
+    : membros.filter((m) => {
+        if (ehNumero) return m.escalou && m.posicao === Number(termo);
+        return (m.nome_time || "").toLowerCase().includes(termo);
+      });
 
   useEffect(() => {
     let vivo = true;
@@ -157,8 +169,27 @@ export default function PaginaOficial() {
             {membros.length === 0 ? (
               <Aviso>Ainda sem membros Pro nesta rodada.</Aviso>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {membros.map((m) => {
+              <>
+                {/* Barra de pesquisa: nome do time ou número de posição. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "9px 12px", marginBottom: 11 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c8a82" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
+                  <input
+                    value={pesquisa}
+                    onChange={(e) => setPesquisa(e.target.value)}
+                    placeholder="Procurar por time ou posição (ex: 3165)"
+                    inputMode="text"
+                    style={{ flex: 1, background: "transparent", border: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB, outline: "none" }}
+                  />
+                  {pesquisa && (
+                    <button onClick={() => setPesquisa("")} aria-label="Limpar" style={{ background: "transparent", border: "none", color: "#7c8a82", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+                  )}
+                </div>
+
+                {membrosVisiveis.length === 0 ? (
+                  <Aviso>Sem resultados para "{pesquisa}".</Aviso>
+                ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {membrosVisiveis.map((m) => {
                   const euMesmo = m.user_id === meuId;
                   const ouro = m.posicao === 1 && m.escalou;
                   return (
@@ -180,7 +211,9 @@ export default function PaginaOficial() {
                     </div>
                   );
                 })}
-              </div>
+                </div>
+                )}
+              </>
             )}
           </>
         )}
