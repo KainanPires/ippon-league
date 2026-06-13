@@ -165,10 +165,22 @@ function marcarCalculadaVista(chave: string) {
 
 /**
  * Gera as notificações calculadas do momento (mercado + faixa/ranking).
- * `ranking` é opcional: se a app souber a posição atual e a anterior, passamos
- * para gerar avisos de subida/descida. Sem isso, só geramos as de mercado.
+ *
+ * ── PRINCÍPIO DE OURO (vale para TODA notificação, calculada ou guardada) ──
+ * Uma notificação NUNCA é genérica. Antes de gerar o texto, verifica-se o estado
+ * REAL do utilizador e a mensagem é ajustada a ele. Exemplos:
+ *   • mercado a fechar → COM equipa: "confere a tua equipa"; SEM equipa: "escala já!"
+ *   • o destino (link) também muda conforme o estado (/meu-time vs /criar-equipa).
+ * Ao adicionar QUALQUER notificação nova (aqui ou na Leva 2), passa pelos dados
+ * do utilizador (tem equipa? que faixa? que posição?) e personaliza título, corpo
+ * e link. Nada de mensagens iguais para toda a gente.
+ *
+ * `opts` traz o que se sabe do utilizador neste momento. Quanto mais completo,
+ * mais personalizadas as notificações. Tudo é opcional: o que faltar, não gera
+ * a notificação correspondente (em vez de gerar uma genérica).
  */
 export function gerarCalculadas(opts?: {
+  temEquipa?: boolean;        // já tem equipa COMPLETA escalada para a competição-alvo?
   faixaAtual?: string;
   faixaAnterior?: string;
   posicaoAtual?: number;
@@ -181,27 +193,48 @@ export function gerarCalculadas(opts?: {
     out.push({ id: "calc:" + chave, lida: !!vistas[chave], criadaEm: Date.now(), calculada: true, ...n });
   };
 
-  // --- MERCADO (a partir do calendário) ---
+  // --- MERCADO (a partir do calendário, AJUSTADO ao estado do utilizador) ---
   try {
     const foco = focoMercado();
+    const temEquipa = !!opts?.temEquipa;
     if (foco.aDecorrer) {
+      // A decorrer: a mensagem muda conforme escalou ou não.
       push("mercado_a_decorrer:" + foco.aDecorrer.idCompeticao, {
         tipo: "mercado",
-        titulo: "Competição a decorrer",
-        corpo: `${foco.aDecorrer.nome} está a decorrer. Acompanha a tua equipa ao vivo.`,
-        link: "/meu-time",
+        titulo: temEquipa ? "A tua equipa está em jogo" : "Competição a decorrer",
+        corpo: temEquipa
+          ? `${foco.aDecorrer.nome} está a decorrer. Acompanha os pontos da tua equipa ao vivo.`
+          : `${foco.aDecorrer.nome} está a decorrer. Não escalaste a tempo — prepara-te para a próxima.`,
+        link: temEquipa ? "/meu-time" : "/inicio",
       });
     } else {
       const est = estadoMercado(foco.alvo);
       if (est.estado === "aberto") {
-        // Última chance: faltam menos de ~24h para fechar.
         const urgente = est.msAteFecho !== null && est.msAteFecho <= 24 * 60 * 60 * 1000;
-        push(`mercado_${urgente ? "ultima" : "aberto"}:${foco.alvo.idCompeticao}`, {
-          tipo: "mercado",
-          titulo: urgente ? "Última chance para escalar" : "Mercado aberto",
-          corpo: `${foco.alvo.nome} — ${textoFecho(foco.alvo)}.`,
-          link: "/criar-equipa",
-        });
+        const fecho = textoFecho(foco.alvo); // ex: "Mercado fecha em 4h 12min"
+        // Chave distinta por estado+urgência+equipa, para o "visto" não se confundir.
+        const chave = `mercado_${temEquipa ? "tem" : "sem"}_${urgente ? "urg" : "calmo"}:${foco.alvo.idCompeticao}`;
+        if (temEquipa) {
+          // JÁ TEM equipa: lembra de conferir, sem pressão de montar.
+          push(chave, {
+            tipo: "mercado",
+            titulo: urgente ? `Última hora para ajustar a equipa` : `A tua equipa está pronta`,
+            corpo: urgente
+              ? `${fecho} para ${foco.alvo.nome}. Confere o teu capitão e os teus atletas antes de fechar.`
+              : `${foco.alvo.nome} — ${fecho}. Podes ainda trocar atletas ou o capitão.`,
+            link: "/meu-time",
+          });
+        } else {
+          // NÃO TEM equipa: incentiva a escalar; urgência se falta pouco.
+          push(chave, {
+            tipo: "mercado",
+            titulo: urgente ? `Escala já! O mercado está a fechar` : `Monta a tua equipa`,
+            corpo: urgente
+              ? `${fecho} para ${foco.alvo.nome}. Escala a tua equipa rápido para entrares nesta rodada!`
+              : `${foco.alvo.nome} — ${fecho}. Monta os teus 8 atletas e escolhe o capitão.`,
+            link: "/criar-equipa",
+          });
+        }
       }
     }
   } catch {}
