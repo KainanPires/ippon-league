@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
-import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, type TeamState } from "@/lib/team";
+import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
 import { Desempenho } from "@/components/Desempenho";
 import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, type DesempenhoRodada } from "@/lib/desempenho";
@@ -53,7 +53,9 @@ export default function Inicio() {
   const [visitante, setVisitante] = useState(false);
   const [phase, setPhase] = useState<"tutorial" | null>(null);
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("Campeão");
+  // Nome arranca VAZIO (não "Campeão"): só mostramos quando a sessão resolve.
+  // Visitante => "Campeão"; com conta => nome real. Evita o flash de "Campeão".
+  const [name, setName] = useState("");
   const [isPro, setIsPro] = useState(false);
   // Guardamos a EQUIPA encontrada (ids); o teamInfo é calculado ao mostrar, para
   // atualizar o Valor quando a lista de atletas chegar.
@@ -77,6 +79,8 @@ export default function Inicio() {
 
   // teamInfo calculado a cada render (re-resolve quando a lista de atletas chega).
   const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
+  // Nome a mostrar: visitante => "Campeão"; com conta => nome real (ou vazio enquanto carrega).
+  const nomeMostrado = visitante ? "Campeão" : name;
 
   useEffect(() => {
     let active = true;
@@ -94,9 +98,9 @@ export default function Inicio() {
       // LOGADO: a partir daqui podemos usar nome e equipa.
       setVisitante(false);
       // As tuas ligas (reais): busca as ligas onde este utilizador é membro.
-      const uid = data.session.user?.id;
-      if (uid) {
-        fetch(`/api/liga/minhas?user_id=${uid}`)
+      const userId = data.session.user?.id;
+      if (userId) {
+        fetch(`/api/liga/minhas?user_id=${userId}`)
           .then((r) => r.json())
           .then((j) => {
             if (!active) return;
@@ -106,10 +110,13 @@ export default function Inicio() {
           .catch(() => { if (active) setMinhasLigas([]); });
       }
       try {
-        const savedName = localStorage.getItem("ippon_name");
+        // Nome do utilizador: PRIMEIRO a conta (user_metadata.nome — sempre certo
+        // e isolado por sessão); só como recurso o localStorage, isolado por conta.
         const metaName = data.session.user?.user_metadata?.nome;
+        const savedName = localStorage.getItem(`ippon_name__${uid()}`) ?? localStorage.getItem("ippon_name");
         if (metaName) setName(String(metaName).split(" ")[0]);
         else if (savedName) setName(savedName);
+        else setName("Campeão"); // conta sem nome definido: recurso final
         // Estado Pro: controla as "duas saídas" do cartão Pro (vendas vs central).
         const meta = (data.session.user?.user_metadata ?? {}) as { is_pro?: boolean };
         setIsPro(Boolean(meta.is_pro));
@@ -243,7 +250,7 @@ export default function Inicio() {
                 <Mascot belt="#efeadd" expression="feliz" />
               </div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{name}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{nomeMostrado || "\u00A0"}</div>
                 <div style={{ fontSize: 11, color: GOLD }}>Faixa {USER.belt}</div>
               </div>
             </a>
@@ -378,14 +385,14 @@ export default function Inicio() {
         <Tab label="Pro" icon={<BoltIcon />} href={isPro ? "/pro" : "/ippon-pro"} />
       </nav>
 
-      {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={name} target={tutTarget} />}
+      {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || "Campeão"} target={tutTarget} />}
 
       {desempenho && (
         <Desempenho
           dados={desempenho.dados}
           identity={loadIdentity()}
           team={desempenho.team}
-          nome={name}
+          nome={nomeMostrado || "Campeão"}
           onClose={() => {
             marcarDesempenhoVisto(desempenho.dados.idCompeticao);
             setDesempenho(null);
