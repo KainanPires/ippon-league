@@ -263,7 +263,7 @@ export default function Inicio() {
           )}
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={openTutorial} aria-label="Como se joga" style={iconBtn}>?</button>
-            <SinoNotificacoes />
+            <SinoNotificacoes calcOpts={{ temEquipa: temEquipaCompleta }} />
           </div>
         </header>
 
