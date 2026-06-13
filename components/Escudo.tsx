@@ -1,5 +1,7 @@
 "use client";
 
+import { uid } from "@/lib/team";
+
 export type ShapeId = "classic" | "round" | "circle" | "hex" | "diamond";
 export type PatternId = "solido" | "listras-v" | "listras-h" | "xadrez" | "cruz" | "diagonal" | "metade";
 export type SymbolId = "none" | "estrela" | "montanha" | "torii" | "chama" | "raio" | "punho" | "trofeu" | "taca" | "medalha" | "bandeirola" | "flamula" | "mundo" | "mapa-americas" | "mapa-europa" | "mapa-africa" | "mapa-asia" | "mapa-oceania";
@@ -28,11 +30,16 @@ export const DEFAULT_IDENTITY: Identity = {
   symbol: "estrela",
 };
 
-const KEY = "ippon_identity";
+// Chave da identidade, ISOLADA POR CONTA: "ippon_identity__<uid>".
+// Assim o nome/escudo de uma conta não aparece noutra no mesmo browser.
+const KEY_BASE = "ippon_identity";
+function identityKey() { return `${KEY_BASE}__${uid()}`; }
 
 export function loadIdentity(): Identity {
   try {
-    const raw = localStorage.getItem(KEY);
+    // Primeiro a chave isolada por conta; se não houver, tenta a chave antiga
+    // (migração suave de quem já tinha identidade gravada na chave global).
+    const raw = localStorage.getItem(identityKey()) ?? localStorage.getItem(KEY_BASE);
     if (!raw) return DEFAULT_IDENTITY;
     return { ...DEFAULT_IDENTITY, ...JSON.parse(raw) };
   } catch {
@@ -40,7 +47,7 @@ export function loadIdentity(): Identity {
   }
 }
 export function saveIdentity(id: Identity) {
-  try { localStorage.setItem(KEY, JSON.stringify(id)); } catch {}
+  try { localStorage.setItem(identityKey(), JSON.stringify(id)); } catch {}
 }
 
 export const SHAPES: ShapeId[] = ["classic", "round", "circle", "hex", "diamond"];
