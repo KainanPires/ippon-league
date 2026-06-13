@@ -78,6 +78,7 @@ export default function MeuTime() {
   // momento (edição quando mercado aberto; competição quando a decorrer).
   const [guide, setGuide] = useState<number | null>(null);
   const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
+  const [isPro, setIsPro] = useState(false);
   const router = useRouter();
 
   const foco = focoMercado();
@@ -129,6 +130,10 @@ export default function MeuTime() {
         return;
       }
       setReady(true);
+      try {
+        const meta = (data.session as { user?: { user_metadata?: { is_pro?: boolean } } } | null)?.user?.user_metadata;
+        setIsPro(!!meta?.is_pro);
+      } catch {}
       (async () => {
         const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
         if (!active) return;
@@ -497,6 +502,7 @@ export default function MeuTime() {
           faixa="Branca"
           atletas={resolve(team.ids)}
           capitao={team.captain}
+          pro={isPro}
           onClose={() => setModal(null)}
         />
       )}
