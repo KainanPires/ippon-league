@@ -12,12 +12,11 @@ import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { PRECO } from "@/lib/precos";
 import { SinoNotificacoes } from "@/components/SinoNotificacoes";
 import { criarNotificacao } from "@/lib/notificacoes";
+import { normalizarFaixa, corDaFaixa, nomeDaFaixa, type Faixa } from "@/lib/faixas";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-
-const USER = { belt: "Branca" };
 
 const STEPS = [
   { title: "Como funciona", text: "Vou mostrar-te o essencial em 1 minuto. Avança quando quiseres — ou pula." },
@@ -59,6 +58,8 @@ export default function Inicio() {
   // Visitante => "Campeão"; com conta => nome real. Evita o flash de "Campeão".
   const [name, setName] = useState("");
   const [isPro, setIsPro] = useState(false);
+  // Faixa OFICIAL do jogo (users.belt, calculada por desempenho). "branca" por defeito.
+  const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
   // Guardamos a EQUIPA encontrada (ids); o teamInfo é calculado ao mostrar, para
   // atualizar o Valor quando a lista de atletas chegar.
   const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
@@ -127,6 +128,11 @@ export default function Inicio() {
         // Estado Pro: controla as "duas saídas" do cartão Pro (vendas vs central).
         const meta = (data.session.user?.user_metadata ?? {}) as { is_pro?: boolean };
         setIsPro(Boolean(meta.is_pro));
+        // Faixa OFICIAL do jogo: lê de users.belt (calculada por desempenho mensal).
+        if (userId) {
+          supabase.from("users").select("belt").eq("id", userId).maybeSingle()
+            .then(({ data: row }) => { if (active) setFaixaJogo(normalizarFaixa(row?.belt)); });
+        }
         // Onboarding: só auto-aparece a quem registou agora ("pending") E cuja conta
         // ainda não o viu. Assim não volta em logins futuros nem noutro dispositivo.
         if (localStorage.getItem("ippon_onboarding") === "pending") {
@@ -274,12 +280,12 @@ export default function Inicio() {
             </a>
           ) : (
             <a ref={beltRef} className={glow("belt")} href="/perfil" style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: "1px solid #243029", borderRadius: 999, padding: "5px 14px 5px 5px", textDecoration: "none", color: "#f1ede2" }}>
-              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
-                <Mascot belt="#efeadd" expression="feliz" />
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0, border: `2px solid ${corDaFaixa(faixaJogo)}` }}>
+                <Mascot belt={corDaFaixa(faixaJogo)} expression="feliz" />
               </div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{nomeMostrado || "\u00A0"}</div>
-                <div style={{ fontSize: 11, color: GOLD }}>Faixa {USER.belt}</div>
+                <div style={{ fontSize: 11, color: GOLD }}>Faixa {nomeDaFaixa(faixaJogo)}</div>
               </div>
             </a>
           )}
@@ -320,7 +326,7 @@ export default function Inicio() {
         )}
 
         <div ref={teamRef} className={glow("team")}>
-          {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo)} /> : <TeamCreate />}
+          {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo)} faixa={faixaJogo} /> : <TeamCreate />}
         </div>
 
         <Card>
@@ -457,18 +463,18 @@ function TeamCreate() {
   );
 }
 
-function TeamBuilt({ info, fechoTexto }: { info: { name: string; value: string; last: number }; fechoTexto: string }) {
+function TeamBuilt({ info, fechoTexto, faixa }: { info: { name: string; value: string; last: number }; fechoTexto: string; faixa: Faixa }) {
   return (
     <div style={{ border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
       <div style={{ background: "#1c3a2e", padding: 9, textAlign: "center", fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aee9c9" }}>A minha equipa</div>
       <div style={{ background: "#0f1411", padding: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <div style={{ width: 48, height: 48 }}>
-            <Mascot belt="#efeadd" expression="feliz" />
+            <Mascot belt={corDaFaixa(faixa)} expression="feliz" />
           </div>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>{info.name}</div>
-            <div style={{ fontSize: 12, color: GOLD }}>Faixa Branca</div>
+            <div style={{ fontSize: 12, color: GOLD }}>Faixa {nomeDaFaixa(faixa)}</div>
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", textAlign: "center", marginBottom: 12 }}>
