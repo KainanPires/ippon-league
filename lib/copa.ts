@@ -22,6 +22,7 @@ export interface ConfrontoInicial {
   jogador_b: string | null;  // null = bye (jogador_a passa sozinho)
   id_competicao: string;     // competição desta ronda
   estado: "pendente";
+  metade: "cima" | "baixo";  // metade da chave (para a repescagem/cruzamento)
 }
 
 // Embaralha uma lista (Fisher-Yates). Recebe a função aleatória para ser testável.
@@ -91,6 +92,7 @@ export function gerarPrimeiraRonda(
       jogador_b: null,
       id_competicao: idCompeticaoInicial,
       estado: "pendente",
+      metade: "cima", // provisório; definido a seguir pela posição na chave
     });
   }
 
@@ -104,8 +106,19 @@ export function gerarPrimeiraRonda(
       jogador_b: aJogar[i + 1],
       id_competicao: idCompeticaoInicial,
       estado: "pendente",
+      metade: "cima", // provisório; definido a seguir pela posição na chave
     });
   }
+
+  // 3) METADE da chave: os confrontos da 1ª ronda são sempre tamanho/2 (par).
+  // A primeira metade deles é a metade de CIMA (semifinal de cima); a segunda,
+  // a de BAIXO. É a divisão que a repescagem/cruzamento diagonal precisam. Os
+  // byes vêm primeiro na lista, mas isso não desequilibra: a contagem é sempre
+  // metade-metade (validado por simulação para 8/4/3/6/5 inscritos).
+  const totalConfrontos = confrontos.length;
+  confrontos.forEach((c, idx) => {
+    c.metade = idx < totalConfrontos / 2 ? "cima" : "baixo";
+  });
 
   return confrontos;
 }
