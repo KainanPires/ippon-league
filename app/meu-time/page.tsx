@@ -599,6 +599,18 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
   const up = a.variation >= 0;
   const [detalhe, setDetalhe] = useState<EstadoDetalhe>({ fase: "carregando" });
 
+  // Resumo de lutas (para o card "Desempenho" durante a competição). Conta
+  // vitórias/derrotas a partir do detalhe já carregado — sem chamadas extra.
+  const resumoLutas = (() => {
+    if (detalhe.fase !== "ok") return null;
+    let v = 0, d = 0;
+    for (const l of detalhe.lutas) {
+      if (l.venceu === true) v++;
+      else if (l.venceu === false) d++;
+    }
+    return { lutas: detalhe.lutas.length, vitorias: v, derrotas: d };
+  })();
+
   // Busca a decomposição luta-a-luta só quando há resultados (competição a
   // decorrer ou encerrada). Sem resultados não faz sentido (e poupa a chamada).
   useEffect(() => {
@@ -639,8 +651,26 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
             <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: GOLD }}>JC {a.priceJc.toFixed(1)}</div>
           </div>
           <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "10px 12px" }}>
-            <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>Valorização</div>
-            <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: up ? "#7fd1a3" : "#ef8d83" }}>{up ? "▲" : "▼"} {Math.abs(a.variation)}%</div>
+            {temResultados ? (
+              <>
+                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>Desempenho</div>
+                {resumoLutas ? (
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 }}>
+                    <span style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: "#f1ede2" }}>{resumoLutas.lutas}</span>
+                    <span style={{ fontSize: 11, color: "#93a39a" }}>{resumoLutas.lutas === 1 ? "luta" : "lutas"}</span>
+                    <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#7fd1a3", marginLeft: 2 }}>{resumoLutas.vitorias}V</span>
+                    <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#ef8d83" }}>{resumoLutas.derrotas}D</span>
+                  </div>
+                ) : (
+                  <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, color: "#5f6f67", marginTop: 2 }}>—</div>
+                )}
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>Valorização</div>
+                <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: up ? "#7fd1a3" : "#ef8d83" }}>{up ? "▲" : "▼"} {Math.abs(a.variation)}%</div>
+              </>
+            )}
           </div>
         </div>
 
