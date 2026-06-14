@@ -56,33 +56,66 @@ function Atletas() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    // Duas fontes: pontos (resultados) + identidade do atleta (atletas).
-    Promise.all([
-      fetch(`/api/resultados?comp=${idComp}`).then((r) => r.json()).catch(() => null),
-      fetch(`/api/atletas?id=${idComp}`).then((r) => r.json()).catch(() => null),
-    ]).then(([res, atl]) => {
+
+    // FONTE CORRETA (igual ao Meu Time): pontuamos cada atleta por
+    // competitor.contests, que traz as lutas completas mesmo durante o evento.
+    // O competition.contests (modo antigo do /api/resultados) vinha incompleto
+    // e deixava categorias inteiras de fora do ranking.
+    //
+    // Estratégia: 1) buscar a lista de inscritos da competição (/api/atletas),
+    // que dá TODOS os atletas + a sua identidade; 2) pedir os pontos desses IDs
+    // ao /api/resultados no modo ?persons= (que usa competitor.contests).
+    //
+    // Sem tick ao vivo: estas chamadas acontecem 1x por abertura da página.
+    // NOTA p/ futuro: o querystring leva todos os IDs. Para competições muito
+    // grandes (centenas de inscritos) pode aproximar-se do limite de URL — nessa
+    // altura migrar para POST ou para um modo no servidor que pontua a lista de
+    // competidores diretamente. Para já (opens), o GET chega.
+    (async () => {
+      // 1) Lista de atletas inscritos + identidade.
+      let lista: Athlete[] = [];
+      try {
+        const atl = await fetch(`/api/atletas?id=${idComp}`).then((r) => r.json()).catch(() => null);
+        lista = Array.isArray(atl?.atletas) ? atl.atletas : [];
+      } catch {}
+
       if (!active) return;
 
-      const pontos: Record<string, number> = res && res.pontos ? res.pontos : {};
-      setTemResultados(!!(res && res.tem_resultados));
-
-      // Mapa id_person -> dados do atleta (nome, país, categoria).
-      const lista: Athlete[] = Array.isArray(atl?.atletas) ? atl.atletas : [];
       const byId = new Map<string, Athlete>();
       for (const a of lista) byId.set(a.id, a);
+      const ids = lista.map((a) => a.id).filter(Boolean);
 
-      // Constrói as linhas a partir de QUEM PONTUOU (chaves do mapa de pontos).
-      const base = Object.entries(pontos).map(([id, pts]) => {
-        const a = byId.get(id);
-        return {
-          id,
-          name: a?.name ?? `Atleta ${id}`,
-          countryIso: a?.countryIso ?? "—",
-          category: a?.category ?? "",
-          gender: (a?.gender ?? "") as "M" | "F" | "",
-          pontos: Math.round((pts as number) * 10) / 10,
-        };
-      });
+      // 2) Pontos desses atletas, pela fonte correta (competitor.contests).
+      let pontos: Record<string, number> = {};
+      let houveResultados = false;
+      if (ids.length > 0) {
+        try {
+          const res = await fetch(
+            `/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`
+          ).then((r) => r.json()).catch(() => null);
+          pontos = res && res.pontos ? res.pontos : {};
+          houveResultados = !!(res && res.tem_resultados);
+        } catch {}
+      }
+
+      if (!active) return;
+      setTemResultados(houveResultados);
+
+      // Constrói as linhas só de QUEM JÁ PONTUOU (teve lutas). Atletas inscritos
+      // que ainda não lutaram não entram no ranking (entram quando lutarem).
+      const base = Object.entries(pontos)
+        .filter(([, pts]) => typeof pts === "number")
+        .map(([id, pts]) => {
+          const a = byId.get(id);
+          return {
+            id,
+            name: a?.name ?? `Atleta ${id}`,
+            countryIso: a?.countryIso ?? "—",
+            category: a?.category ?? "",
+            gender: (a?.gender ?? "") as "M" | "F" | "",
+            pontos: Math.round((pts as number) * 10) / 10,
+          };
+        });
 
       // Ordena por pontos desc; em empate, por nome para ser estável.
       base.sort((x, y) => (y.pontos - x.pontos) || x.name.localeCompare(y.name));
@@ -95,7 +128,8 @@ function Atletas() {
 
       setRows(ranked);
       setLoading(false);
-    });
+    })();
+
     return () => { active = false; };
   }, [idComp]);
 
