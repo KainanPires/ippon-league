@@ -156,6 +156,27 @@ export function resolve(ids: string[]): Athlete[] {
   for (const a of source) byId.set(a.id, a);
   return ids.map((id) => byId.get(id)).filter(Boolean) as Athlete[];
 }
+
+// ---- Resolução "rica" (NÃO esconde atletas ausentes) -----------------------
+// Diferente do resolve(): em vez de DEITAR FORA os ids que a pool não conhece,
+// devolve-os como marcadores { id, ausente:true }. Serve o ecrã "Meu Time"
+// poder mostrar honestamente que a equipa tem 8 atletas, dos quais alguns já
+// não estão inscritos na competição (em vez de os fazer desaparecer).
+// Mantém a ORDEM original dos ids.
+export type SlotResolvido =
+  | { ausente: false; atleta: Athlete }
+  | { ausente: true; id: string };
+
+export function resolveRich(ids: string[]): SlotResolvido[] {
+  const pool = getAthletePool();
+  const source = pool.length > 0 ? pool : ATHLETES;
+  const byId = new Map<string, Athlete>();
+  for (const a of source) byId.set(a.id, a);
+  return ids.map((id) => {
+    const a = byId.get(id);
+    return a ? { ausente: false as const, atleta: a } : { ausente: true as const, id };
+  });
+}
 export function jcLeft(t: TeamState): number {
   const a = resolve(t.ids);
   return Math.round((START_JC - a.reduce((s, x) => s + x.priceJc, 0)) * 10) / 10;
