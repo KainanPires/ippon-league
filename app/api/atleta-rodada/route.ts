@@ -25,6 +25,8 @@ import {
   isHansokuMake,
   type IjfContest,
 } from "@/lib/ijf";
+import { getCompetitorResults } from "@/lib/scout";
+import { estadoDoAtleta, textoEstado, type EstadoAtleta } from "@/lib/estado-atleta";
 import { POINTS, type ActionType } from "@/lib/engine";
 
 export const dynamic = "force-dynamic";
@@ -199,11 +201,11 @@ export async function GET(req: Request) {
   try {
     contests = await getCompetitionContests(comp);
   } catch {
-    return NextResponse.json({ comp, person, tem_resultados: false, total: 0, lutas: [] });
+    return NextResponse.json({ comp, person, tem_resultados: false, total: 0, n_lutas: 0, lutas: [], estado: "a_aguardar", estado_texto: textoEstado("a_aguardar"), place: null });
   }
 
   if (!contests || contests.length === 0) {
-    return NextResponse.json({ comp, person, tem_resultados: false, total: 0, lutas: [] });
+    return NextResponse.json({ comp, person, tem_resultados: false, total: 0, n_lutas: 0, lutas: [], estado: "a_aguardar", estado_texto: textoEstado("a_aguardar"), place: null });
   }
 
   // Lutas deste atleta, na ordem em que vêm (normalmente cronológica).
@@ -248,12 +250,31 @@ export async function GET(req: Request) {
     });
   }
 
+  // ESTADO DE PARTICIPAÇÃO do atleta nesta competição.
+  // Fonte de verdade: o `place` do competitor.results (declaração oficial da IJF
+  // de que a participação terminou). nLutas = quantas lutas teve aqui.
+  // A decisão fica na função pura estadoDoAtleta (lib/estado-atleta) — se um dia
+  // mudarmos a fonte, mexe-se só aqui, nunca na UI.
+  const nLutas = lutas.length;
+  let place: string | null = null;
+  try {
+    const rows = await getCompetitorResults(person);
+    const desta = rows.find((r) => String(r.id_competition) === comp);
+    place = desta ? String(desta.place ?? "") : null;
+  } catch {
+    place = null; // sem dados de resultado: a função trata como "a aguardar"
+  }
+  const estado: EstadoAtleta = estadoDoAtleta(nLutas, place);
+
   return NextResponse.json({
     comp,
     person,
     tem_resultados: lutas.length > 0,
     total: Math.round(total * 10) / 10,
-    n_lutas: lutas.length,
+    n_lutas: nLutas,
     lutas,
+    estado,
+    estado_texto: textoEstado(estado),
+    place,
   });
 }
