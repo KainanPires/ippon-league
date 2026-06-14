@@ -68,8 +68,32 @@ interface Rubrica {
   negativo: boolean;
 }
 
-// Nome legível da fase (ronda). Usa round_name se vier; senão um fallback simples.
-function nomeRonda(f: IjfContest): string {
+// É uma luta de POULE? (grupo "todos contra todos", usado até 5 atletas).
+// A API marca estas lutas com round_code a começar por "small_" (ex.:
+// "small_3_plus_final_1-3"). O round_NAME destas lutas é ENGANADOR — a API
+// chama "Semi Final" a todas as lutas do grupo, o que dava o falso "3 semifinais".
+// Por isso detetamos a poule pelo round_code, que é fiável.
+function ehPoule(f: IjfContest): boolean {
+  const rc = (f.round_code || "").toLowerCase();
+  return rc.startsWith("small_");
+}
+
+// Nome legível da fase (ronda).
+// REGRA (decidida com dados reais da API):
+//  - POULE (round_code "small_...") -> "Poule · Nª luta", onde N é a ordem da
+//    luta DESTE atleta dentro da poule. Não rotulamos "final da poule": numa
+//    poule, a luta decisiva depende da classificação (vitórias/desempates), que
+//    não calculamos; a API marca uma "_final" mas pode não ser a verdadeira
+//    decisão. Logo, apenas numeramos honestamente todas as lutas da poule.
+//  - CHAVE NORMAL (mata-mata) -> mantemos o round_name da API (Semi Final,
+//    Bronze, Final...), que ali é razoável. A distinção fina repescagem-vs-bronze
+//    fica para o futuro chaveamento reconstruído (projeto C).
+// `ordemPoule` é a posição (1, 2, 3...) desta luta entre as lutas de poule do
+// atleta; só é usado quando a luta é de poule.
+function nomeRonda(f: IjfContest, ordemPoule: number): string {
+  if (ehPoule(f)) {
+    return `Poule · ${ordemPoule}ª luta`;
+  }
   const rn = (f.round_name || "").trim();
   if (rn) {
     // "best 64" / "best 32" -> mais humano; o resto fica como vem.
@@ -77,6 +101,7 @@ function nomeRonda(f: IjfContest): string {
     if (m) return `Eliminatória de ${m[1]}`;
     return rn.charAt(0).toUpperCase() + rn.slice(1);
   }
+  // Sem round_name: cair no round_code da chave normal.
   const rc = (f.round_code || "").toLowerCase();
   if (/final/.test(rc) && !/semi|quarter|repe/.test(rc)) return "Final";
   if (/semi/.test(rc)) return "Meia-final";
@@ -192,6 +217,9 @@ export async function GET(req: Request) {
   }[] = [];
 
   let total = 0;
+  // Contador da ordem das lutas de POULE deste atleta (para numerar "Poule · Nª luta").
+  // Só conta lutas de poule; as de chave normal não entram nesta numeração.
+  let ordemPoule = 0;
 
   for (const f of contests) {
     const side = ladoDoAtleta(f, person);
@@ -207,9 +235,12 @@ export async function GET(req: Request) {
       return w === person;
     })();
 
+    // Se é luta de poule, incrementa a ordem ANTES de nomear (1ª, 2ª, 3ª...).
+    if (ehPoule(f)) ordemPoule += 1;
+
     lutas.push({
       id_fight: String(f.id_fight ?? ""),
-      ronda: nomeRonda(f),
+      ronda: nomeRonda(f, ordemPoule),
       venceu,
       hansoku,
       pontos: Math.round(pontosLuta * 10) / 10,
