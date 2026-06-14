@@ -178,7 +178,21 @@ export default function MeuTime() {
     let active = true;
     if (!idComp) return;
     const buscarPontos = () => {
-      fetch(`/api/resultados?comp=${idComp}`)
+      // Pontuamos os atletas DESTA equipa via competitor.contests (por atleta),
+      // que traz as lutas completas mesmo quando competition.contests está
+      // incompleto durante o evento (ex.: Tahiti só devolvia algumas categorias,
+      // deixando atletas que já lutaram a 0). Lemos os ids guardados no momento
+      // da chamada (sem depender do estado, para não reiniciar o tick ao vivo).
+      let ids: string[] = [];
+      try {
+        const guardada = loadSavedFor(idComp);
+        const rascunho = loadDraftFor(idComp);
+        ids = (guardada.ids.length > 0 ? guardada.ids : rascunho.ids).map(String);
+      } catch {}
+      const qs = ids.length > 0
+        ? `/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`
+        : `/api/resultados?comp=${idComp}`;
+      fetch(qs)
         .then((r) => r.json())
         .then((j) => {
           if (!active) return;
