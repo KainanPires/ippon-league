@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { Mascot } from "@/components/Mascot";
-import { CartaoEquipa } from "@/components/CartaoEquipa";
+import { CartaoDesempenho } from "@/components/CartaoDesempenho";
 import type { Identity } from "@/components/Escudo";
 import type { TeamState } from "@/lib/team";
-import { resolve } from "@/lib/team";
 import { type DesempenhoRodada, mensagemDesempenho } from "@/lib/desempenho";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -20,12 +19,16 @@ export function Desempenho({
   identity,
   team,
   nome,
+  faixa = "Branca",
+  pro = false,
   onClose,
 }: {
   dados: DesempenhoRodada;
   identity: Identity;
   team: TeamState;
   nome: string;
+  faixa?: string;
+  pro?: boolean;
   onClose: () => void;
 }) {
   const [partilhar, setPartilhar] = useState(false);
@@ -82,11 +85,11 @@ export function Desempenho({
       </div>
 
       {partilhar && (
-        <CartaoEquipa
+        <CartaoDesempenho
           identity={identity}
-          faixa="Branca"
-          atletas={resolve(team.ids)}
-          capitao={team.captain}
+          faixa={faixa}
+          dados={dados}
+          pro={pro}
           onClose={() => setPartilhar(false)}
         />
       )}
