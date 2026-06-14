@@ -3,10 +3,13 @@
 // Lógica PURA da Copa Ippon (mata-mata). Sem base de dados, sem rede — só
 // raciocínio, para ser testável. A rota /api/copa/sortear usa estas funções.
 //
-// Mecanismo: eliminação simples 1v1 por ronda + disputa de 3º lugar.
-// - Qualquer número de jogadores; byes por sorteio puro até à potência de 2.
-// - Forma A: geramos só a 1ª ronda; as seguintes nascem no apuramento (Fase C).
-// - Desempate (na Fase C): pontos da rodada → pontos do capitão → sorteio.
+// Mecanismo (ATUAL, em produção): eliminação simples 1v1 por ronda + disputa de
+// 3º lugar. Mantido INTACTO para o /api/copa/apurar continuar a funcionar.
+//
+// Mecanismo (NOVO, secção "MOTOR COMPLETO" no fim): modelo validado com o Kainan
+// — eliminação + repescagem em cadeia (4 cadeias) + cruzamento diagonal + 2
+// bronzes + final por pontos ACUMULADOS. Funções puras, prontas para o apurar
+// ser migrado para este modelo (Fase 3). NÃO removem nem alteram o que está acima.
 
 import { proximaDepoisDe, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
 
@@ -259,4 +262,231 @@ export function gerarRondaSeguinte(
     });
   }
   return novos;
+}
+
+// ===========================================================================
+// ===========================================================================
+// MOTOR COMPLETO (modelo validado com o Kainan) — repescagem em cadeia,
+// cruzamento diagonal, 2 bronzes e final por pontos ACUMULADOS.
+//
+// Esta secção é NOVA e INDEPENDENTE do que está acima. Lógica pura, validada por
+// simulação numérica (8, 4, 3, 2 jogadores). Ainda NÃO está ligada ao apurar —
+// fica pronta para a migração (Fase 3). Não toca em nada do mecanismo atual.
+//
+// Modelo (chave de 8+):
+//  - Eliminação até às semis (vencedores avançam por pontos da competição).
+//  - 4 semifinalistas: A,B (metade de cima), C,D (metade de baixo).
+//  - REPESCAGEM, 1 cadeia por semifinalista: quem ele venceu ANTES da semi luta
+//    em cadeia (1º vs 2º, vencedor vs 3º...) -> campeão de repescagem dele.
+//  - Campeões de repescagem da MESMA metade enfrentam-se (A×B, C×D).
+//  - CRUZAMENTO DIAGONAL: campeão rep. cima × semi-perdedor de baixo -> bronze 1;
+//    campeão rep. baixo × semi-perdedor de cima -> bronze 2.
+//  - FINAL: os 2 finalistas ACUMULAM pontos desde a semi (chegada à final) até
+//    ao dia do bronze. Maior soma = campeão.
+//  - <8: sem repescagem; os 2 semi-perdedores disputam 1 bronze (3 -> 3º direto).
+// ===========================================================================
+
+export type Metade = "cima" | "baixo";
+
+// Decide um confronto 1v1 só por pontos (com fallback determinístico no empate).
+// Versão simples para o motor completo; o desempate em cascata fica no apurar
+// (que tem os pontos do capitão). Aqui `b` null = bye (passa `a`).
+export function vencedorPorPontos(
+  a: string,
+  b: string | null,
+  pontos: Record<string, number>
+): string {
+  if (b == null) return a;
+  const pa = pontos[a] ?? 0;
+  const pb = pontos[b] ?? 0;
+  if (pa !== pb) return pa > pb ? a : b;
+  return a; // empate: fallback determinístico (no apurar usa-se a cascata real)
+}
+
+// Nome da ronda da chave principal pelo nº de jogadores nessa ronda.
+export function nomeRondaPorTamanho(jogadoresNaRonda: number): string {
+  switch (jogadoresNaRonda) {
+    case 2: return "Final";
+    case 4: return "Semifinal";
+    case 8: return "Quartas de final";
+    case 16: return "Oitavas de final";
+    case 32: return "Ronda de 32";
+    case 64: return "Ronda de 64";
+    default: return `Ronda de ${jogadoresNaRonda}`;
+  }
+}
+
+// Um par a disputar (b null = bye).
+export interface ParChave { a: string; b: string | null; }
+
+// Constrói os pares da 1ª ronda com byes (os primeiros `byes` da lista passam).
+export function paresPrimeiraRonda(inscritosBaralhados: string[]): ParChave[] {
+  const tamanho = tamanhoChave(inscritosBaralhados.length);
+  const byes = tamanho - inscritosBaralhados.length;
+  const comBye = inscritosBaralhados.slice(0, byes);
+  const aJogar = inscritosBaralhados.slice(byes);
+  const pares: ParChave[] = [];
+  for (const j of comBye) pares.push({ a: j, b: null });
+  for (let i = 0; i < aJogar.length; i += 2) pares.push({ a: aJogar[i], b: aJogar[i + 1] ?? null });
+  return pares;
+}
+
+// Resultado completo de uma Copa simulada/calculada com o motor completo.
+export interface ResultadoCopa {
+  campeao: string | null;
+  vice: string | null;
+  bronzes: string[];          // 0, 1 ou 2 medalhistas de bronze
+  finalistas: string[];
+  acumuladoFinal: Record<string, number>; // pontos acumulados de cada finalista
+}
+
+// Função de pontos por ronda: dado o índice da competição (0,1,2...), devolve o
+// mapa { jogador: pontos } dessa competição. No apuramento real, isto é a
+// pontuação da equipa de cada jogador na competição dessa ronda.
+export type PontosPorRonda = (indiceCompeticao: number) => Record<string, number>;
+
+/**
+ * Calcula uma Copa COMPLETA do início ao fim, dado o sorteio (já baralhado) e a
+ * função de pontos por ronda. PURA e determinística (o vencedorFn é injetável).
+ *
+ * É a versão "tudo de uma vez" — útil para testes e para a chave visual projetar
+ * o desfecho. No apuramento real (dinâmico), o apurar fará isto ronda a ronda,
+ * reutilizando as mesmas regras (cadeias, cruzamento, acumulação).
+ *
+ * @param inscritosBaralhados  ordem de sorteio (use embaralhar() antes)
+ * @param pontosPorRonda       pontos de cada jogador por competição (índice)
+ * @param vencedorFn           como decidir um par (default: por pontos)
+ */
+export function calcularCopaCompleta(
+  inscritosBaralhados: string[],
+  pontosPorRonda: PontosPorRonda,
+  vencedorFn: (a: string, b: string | null, pontos: Record<string, number>) => string = vencedorPorPontos
+): ResultadoCopa {
+  const inscritos = inscritosBaralhados;
+  if (inscritos.length < 2) {
+    return { campeao: inscritos[0] ?? null, vice: null, bronzes: [], finalistas: inscritos.slice(0, 1), acumuladoFinal: {} };
+  }
+
+  const tamanho = tamanhoChave(inscritos.length);
+  const chavePequena = inscritos.length < 8;
+
+  // caminho[v] = quem v venceu ANTES da semifinal (para as cadeias de repescagem)
+  const caminho: Record<string, string[]> = {};
+  for (const j of inscritos) caminho[j] = [];
+  const metade: Record<string, Metade> = {};
+  const derrotaRonda: Record<string, number> = {}; // perdedor -> tamanho da ronda
+
+  let rondaPares = paresPrimeiraRonda(inscritos);
+  let jogadoresNaRonda = tamanho;
+  let compIdx = 0;
+  let primeira = true;
+
+  while (jogadoresNaRonda > 2) {
+    const pontos = pontosPorRonda(compIdx);
+    const vencedores: string[] = [];
+    rondaPares.forEach((par, idxPar) => {
+      if (primeira) {
+        const m: Metade = idxPar < rondaPares.length / 2 ? "cima" : "baixo";
+        if (par.a) metade[par.a] = m;
+        if (par.b) metade[par.b] = m;
+      }
+      const v = vencedorFn(par.a, par.b, pontos);
+      if (par.b != null) {
+        const perd = v === par.a ? par.b : par.a;
+        // A cadeia inclui só vitórias ANTES da semi (jogadoresNaRonda > 4).
+        if (jogadoresNaRonda > 4) caminho[v].push(perd);
+        derrotaRonda[perd] = jogadoresNaRonda;
+        if (metade[perd] === undefined && metade[v] !== undefined) metade[perd] = metade[v];
+      }
+      vencedores.push(v);
+    });
+    rondaPares = [];
+    for (let i = 0; i < vencedores.length; i += 2) {
+      rondaPares.push({ a: vencedores[i], b: vencedores[i + 1] ?? null });
+    }
+    jogadoresNaRonda /= 2;
+    compIdx++;
+    primeira = false;
+  }
+
+  const finalistas = [rondaPares[0].a, rondaPares[0].b].filter(Boolean) as string[];
+  const compChegadaFinal = compIdx;
+
+  // Semifinalistas perdedores (perderam na ronda de tamanho 4), por metade.
+  const semiPerdedores = Object.keys(derrotaRonda).filter((p) => derrotaRonda[p] === 4);
+  const semiPerdCima = semiPerdedores.find((p) => metade[p] === "cima") ?? null;
+  const semiPerdBaixo = semiPerdedores.find((p) => metade[p] === "baixo") ?? null;
+
+  let bronzes: string[] = [];
+
+  if (chavePequena) {
+    // <8: sem repescagem. Os 2 semi-perdedores disputam 1 bronze (3 -> 3º direto).
+    if (semiPerdedores.length >= 2) {
+      const pts = pontosPorRonda(compIdx);
+      bronzes = [vencedorFn(semiPerdedores[0], semiPerdedores[1], pts)];
+      compIdx++;
+    } else if (semiPerdedores.length === 1) {
+      bronzes = [semiPerdedores[0]];
+    }
+  } else {
+    const semifinalistas = [...finalistas, ...semiPerdedores];
+
+    // Corre a cadeia de um semifinalista (quem ele venceu, em cadeia).
+    const cadeia = (sf: string): string | null => {
+      const venceu = caminho[sf] ?? [];
+      if (venceu.length === 0) return null;
+      let atual = venceu[0];
+      for (let i = 1; i < venceu.length; i++) {
+        const pts = pontosPorRonda(compIdx);
+        atual = vencedorFn(atual, venceu[i], pts);
+        compIdx++;
+      }
+      return atual;
+    };
+
+    const sfCima = semifinalistas.filter((s) => metade[s] === "cima");
+    const sfBaixo = semifinalistas.filter((s) => metade[s] === "baixo");
+
+    const repA = sfCima[0] ? cadeia(sfCima[0]) : null;
+    const repB = sfCima[1] ? cadeia(sfCima[1]) : null;
+    const repC = sfBaixo[0] ? cadeia(sfBaixo[0]) : null;
+    const repD = sfBaixo[1] ? cadeia(sfBaixo[1]) : null;
+
+    // Campeões de repescagem da mesma metade enfrentam-se (A×B, C×D).
+    const confronto = (x: string | null, y: string | null): string | null => {
+      if (!x) return y; if (!y) return x;
+      const pts = pontosPorRonda(compIdx);
+      const v = vencedorFn(x, y, pts);
+      compIdx++;
+      return v;
+    };
+    const repCima = confronto(repA, repB);
+    const repBaixo = confronto(repC, repD);
+
+    // Cruzamento diagonal -> 2 bronzes.
+    if (repCima || semiPerdBaixo) {
+      const pts = pontosPorRonda(compIdx);
+      bronzes.push(vencedorFn((repCima ?? semiPerdBaixo)!, semiPerdBaixo ?? repCima, pts));
+    }
+    if (repBaixo || semiPerdCima) {
+      const pts = pontosPorRonda(compIdx);
+      bronzes.push(vencedorFn((repBaixo ?? semiPerdCima)!, semiPerdCima ?? repBaixo, pts));
+    }
+    compIdx++;
+  }
+
+  // FINAL: acumula pontos dos finalistas desde a semi (chegada à final) até agora.
+  const acumuladoFinal: Record<string, number> = {};
+  for (const f of finalistas) acumuladoFinal[f] = 0;
+  const inicioAcum = Math.max(0, compChegadaFinal - 1);
+  for (let c = inicioAcum; c < compIdx; c++) {
+    const pts = pontosPorRonda(c);
+    for (const f of finalistas) acumuladoFinal[f] += (pts[f] ?? 0);
+  }
+
+  const [fa, fb] = finalistas;
+  const campeao = fb == null ? fa : (acumuladoFinal[fa] >= acumuladoFinal[fb] ? fa : fb);
+  const vice = fb == null ? null : (campeao === fa ? fb : fa);
+
+  return { campeao: campeao ?? null, vice: vice ?? null, bronzes, finalistas, acumuladoFinal };
 }
