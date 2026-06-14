@@ -118,9 +118,9 @@ function rubricasDaLuta(f: IjfContest, side: "b" | "w", hansoku: boolean): Rubri
 
   // Shidos PROVOCADOS no adversário (penalty do adversário): +1 cada; dobra se
   // este lado venceu POR hansoku-make.
-  const shidosProvocados = toInt((f as Record<string, unknown>)[`penalty_${opp}`]);
+  const shidosProvocados = toInt((f as unknown as Record<string, unknown>)[`penalty_${opp}`]);
   if (shidosProvocados > 0) {
-    const shidosSofridos = toInt((f as Record<string, unknown>)[`penalty_${side}`]);
+    const shidosSofridos = toInt((f as unknown as Record<string, unknown>)[`penalty_${side}`]);
     const venceuPorHansoku = hansoku && shidosSofridos < 3 && shidosProvocados >= 3;
     const pts = shidosProvocados * (POINTS["shido_provocado"] ?? 1) * (venceuPorHansoku ? 2 : 1);
     rubricas.push({
@@ -132,7 +132,7 @@ function rubricasDaLuta(f: IjfContest, side: "b" | "w", hansoku: boolean): Rubri
   }
 
   // Shidos SOFRIDOS por este lado (penalty do próprio lado): custo crescente.
-  const shidosSofridos = toInt((f as Record<string, unknown>)[`penalty_${side}`]);
+  const shidosSofridos = toInt((f as unknown as Record<string, unknown>)[`penalty_${side}`]);
   if (shidosSofridos > 0) {
     const pts = custoShidosSofridos(shidosSofridos);
     rubricas.push({
@@ -152,12 +152,12 @@ function contestActionsForPersonBySide(f: IjfContest, side: "b" | "w"): ActionTy
   const opp = side === "b" ? "w" : "b";
   const out: ActionType[] = [];
   const push = (a: ActionType, n: number) => { for (let i = 0; i < n; i++) out.push(a); };
-  push("ippon_feito", toInt((f as Record<string, unknown>)[`ippon_${side}`]));
-  push("waza_ari_feito", toInt((f as Record<string, unknown>)[`waza_${side}`]));
-  push("yuko_feito", toInt((f as Record<string, unknown>)[`yuko_${side}`]));
-  push("ippon_sofrido", toInt((f as Record<string, unknown>)[`ippon_${opp}`]));
-  push("waza_ari_sofrido", toInt((f as Record<string, unknown>)[`waza_${opp}`]));
-  push("yuko_sofrido", toInt((f as Record<string, unknown>)[`yuko_${opp}`]));
+  push("ippon_feito", toInt((f as unknown as Record<string, unknown>)[`ippon_${side}`]));
+  push("waza_ari_feito", toInt((f as unknown as Record<string, unknown>)[`waza_${side}`]));
+  push("yuko_feito", toInt((f as unknown as Record<string, unknown>)[`yuko_${side}`]));
+  push("ippon_sofrido", toInt((f as unknown as Record<string, unknown>)[`ippon_${opp}`]));
+  push("waza_ari_sofrido", toInt((f as unknown as Record<string, unknown>)[`waza_${opp}`]));
+  push("yuko_sofrido", toInt((f as unknown as Record<string, unknown>)[`yuko_${opp}`]));
   return out;
 }
 
