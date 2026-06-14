@@ -65,10 +65,13 @@ export async function POST(req: Request) {
   if (!user_id) return NextResponse.json({ ok: false, erro: "Entra para te juntares a uma liga." }, { status: 401 });
   if (codigo.length < 4) return NextResponse.json({ ok: false, erro: "Código inválido." }, { status: 400 });
 
-  // 1) Encontra a liga pelo código.
+  // 1) Encontra a liga pelo código. Inclui os campos da COPA (copa_estado,
+  //    copa_fecho_inscricao, copa_competicao_inicial) para a página da liga
+  //    saber o estado da copa — sem eles, o cartão fica sempre em "inscrição"
+  //    e o sorteio automático nunca dispara.
   const { data: liga, error: erroLiga } = await supabaseAdmin
     .from("leagues")
-    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code")
+    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code, copa_estado, copa_fecho_inscricao, copa_competicao_inicial")
     .eq("invite_code", codigo)
     .maybeSingle();
   if (erroLiga || !liga) {
