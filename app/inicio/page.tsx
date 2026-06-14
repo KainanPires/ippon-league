@@ -424,6 +424,8 @@ export default function Inicio() {
           identity={loadIdentity()}
           team={desempenho.team}
           nome={nomeMostrado || "Campeão"}
+          faixa={nomeDaFaixa(faixaJogo)}
+          pro={isPro}
           onClose={() => {
             marcarDesempenhoVisto(desempenho.dados.idCompeticao);
             setDesempenho(null);
