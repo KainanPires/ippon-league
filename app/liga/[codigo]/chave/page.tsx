@@ -3,293 +3,350 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { competicaoPorId } from "@/lib/copa";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
-// Um confronto como vem da rota /api/copa/chave.
-interface Confronto {
+// ---- Tipos do que a rota /api/copa/chave devolve ----
+interface ConfrontoAPI {
   id: string;
   ronda: number;
   ordem: number;
   fase: "normal" | "final" | "bronze";
-  jogador_a: string | null;
+  jogador_a: string;
   jogador_b: string | null;
-  id_competicao: string | null;
+  id_competicao: string;
   pontos_a: number | null;
   pontos_b: number | null;
   vencedor: string | null;
   decidido_por: string | null;
   estado: "pendente" | "decidido";
 }
-interface Identidade { user_id: string; nome_time: string; escudo: Identity | null }
-interface ChaveResp {
+interface Identidade { nome_time: string; escudo: Identity | null; }
+interface RespostaChave {
   liga: { id: string; name: string; escudo: Identity | null; copa_estado: string };
-  confrontos: Confronto[];
+  confrontos: ConfrontoAPI[];
   identidades: Record<string, Identidade>;
   nInscritos: number;
   totalRondas: number;
   podio: { campeao?: string; vice?: string; terceiro?: string };
 }
 
-// Nome de uma ronda conforme quantas faltam até à final.
-// ronda atual `r`, total `tot`: a última é Final, a penúltima Semifinais, etc.
-function nomeRonda(r: number, tot: number): string {
-  const desdeOfim = tot - r; // 0 = final, 1 = meias, 2 = quartos...
-  if (desdeOfim === 0) return "Final";
-  if (desdeOfim === 1) return "Semifinais";
-  if (desdeOfim === 2) return "Quartos de final";
-  if (desdeOfim === 3) return "Oitavos de final";
-  return `${r}ª Ronda`;
+// Nome da ronda pelo nº de jogadores nela (a última ronda "normal" é a semi).
+// Recebemos as rondas em nº (1,2,3...) e o total; convertemos para nomes.
+function nomeRonda(ronda: number, totalRondas: number): string {
+  // A última ronda (== totalRondas) é a final; a anterior, a semifinal; etc.
+  const apartirDoFim = totalRondas - ronda; // 0 = final, 1 = semi, 2 = quartas...
+  switch (apartirDoFim) {
+    case 0: return "Final";
+    case 1: return "Semifinais";
+    case 2: return "Quartas de final";
+    case 3: return "Oitavas de final";
+    case 4: return "Ronda de 32";
+    default: return `Ronda ${ronda}`;
+  }
 }
 
-function comoFoiDecidido(d: string | null): string {
-  if (d === "pontos") return "Decidido pelos pontos da rodada";
-  if (d === "capitao") return "Empate na rodada — decidido pelo capitão";
-  if (d === "sorteio") return "Empate total — decidido por sorteio";
-  if (d === "bye") return "Passou automaticamente (bye)";
-  return "";
-}
-
-export default function ChaveCopa() {
+export default function PaginaChave() {
   const params = useParams();
-  const codigo = String(params?.codigo || "");
-  const [data, setData] = useState<ChaveResp | null>(null);
-  const [estado, setEstado] = useState<"carregar" | "pronto" | "erro" | "vazia">("carregar");
-  const [detalhe, setDetalhe] = useState<Confronto | null>(null);
+  const codigo = String(params?.codigo || "").toUpperCase();
+
+  const [dados, setDados] = useState<RespostaChave | null>(null);
+  const [estado, setEstado] = useState<"carregando" | "ok" | "erro">("carregando");
+  const [erro, setErro] = useState("");
+  const [tutorial, setTutorial] = useState(false);
 
   useEffect(() => {
     let vivo = true;
     (async () => {
       try {
-        // A rota da chave aceita o código da liga diretamente e resolve o resto.
         const res = await fetch(`/api/copa/chave?codigo=${encodeURIComponent(codigo)}`);
-        const j: ChaveResp = await res.json();
+        const j = await res.json();
         if (!vivo) return;
-        if (!j || !j.liga) { setEstado("erro"); return; }
-        setData(j);
-        setEstado(j.confrontos.length === 0 ? "vazia" : "pronto");
+        if (j.erro) { setErro(j.erro); setEstado("erro"); return; }
+        setDados(j as RespostaChave);
+        setEstado("ok");
       } catch {
-        if (vivo) setEstado("erro");
+        if (!vivo) return;
+        setErro("Não foi possível carregar a chave.");
+        setEstado("erro");
       }
     })();
     return () => { vivo = false; };
   }, [codigo]);
 
-  const idn = (uid: string | null): Identidade | null => {
-    if (!uid || !data) return null;
-    return data.identidades[uid] || { user_id: uid, nome_time: "Equipa", escudo: null };
+  const nome = (uid: string | null): string => {
+    if (!uid) return "—";
+    return dados?.identidades[uid]?.nome_time ?? "Equipa";
   };
-
-  // Agrupa confrontos por ronda.
-  const porRonda: Record<number, Confronto[]> = {};
-  if (data) for (const c of data.confrontos) (porRonda[c.ronda] ||= []).push(c);
-  const rondasComDados = Object.keys(porRonda).map(Number).sort((a, b) => a - b);
-  const ultimaRondaComDados = rondasComDados.length ? Math.max(...rondasComDados) : 0;
-  const totalRondas = data?.totalRondas || ultimaRondaComDados;
+  const escudoDe = (uid: string | null): Identity =>
+    (uid && dados?.identidades[uid]?.escudo) || DEFAULT_IDENTITY;
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 48px" }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 60px" }}>
         <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
-          <a href={`/liga/${codigo}`} aria-label="Voltar à liga" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          <a href={`/liga/${codigo}`} aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           </a>
-          <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>Chave da Copa</h1>
+          <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>Chave da Copa</h1>
+          <button onClick={() => setTutorial(true)} aria-label="Como funciona a chave" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
 
-        {estado === "carregar" && (
-          <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar a chave…</div>
+        {estado === "carregando" && (
+          <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82", fontFamily: FD, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar a chave…</div>
         )}
 
         {estado === "erro" && (
-          <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 22, textAlign: "center", fontSize: 14, color: "#c7d0c9" }}>
-            Não foi possível abrir a chave. Volta à liga e tenta de novo.
+          <div style={{ textAlign: "center", padding: "40px 16px", background: "#1a1110", border: "1px solid #3a2420", borderRadius: 16 }}>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#ef8d83", marginBottom: 8 }}>Ups</div>
+            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{erro}</p>
+            <a href={`/liga/${codigo}`} style={{ display: "inline-block", marginTop: 12, color: GOLD, fontSize: 13, textDecoration: "none", fontFamily: FD, fontWeight: 700 }}>Voltar à liga</a>
           </div>
         )}
 
-        {estado === "vazia" && (
-          <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 22, textAlign: "center" }}>
-            <div style={{ fontSize: 30, marginBottom: 8 }}>🥋</div>
-            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>A chave ainda não foi sorteada</div>
-            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>Quando as inscrições fecharem, o sorteio acontece e os confrontos aparecem aqui.</p>
-          </div>
-        )}
-
-        {estado === "pronto" && data && (
-          <>
-            {/* Pódio (quando terminada) */}
-            {data.liga.copa_estado === "terminada" && (
-              <>
-                <Podio data={data} idn={idn} />
-                <a href={`/liga/${codigo}/certificado`} style={{ display: "block", textAlign: "center", marginBottom: 22, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 11, textDecoration: "none" }}>
-                  Ver certificados do pódio
-                </a>
-              </>
-            )}
-
-            {/* Rondas empilhadas (com dados) */}
-            {rondasComDados.map((r) => (
-              <section key={r} style={{ marginBottom: 18 }}>
-                <RondaTitulo nome={nomeRonda(r, totalRondas)} comp={porRonda[r][0]?.id_competicao} />
-                <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                  {porRonda[r].map((c) => (
-                    <ConfrontoCard key={c.id} c={c} idn={idn} onClick={() => c.estado === "decidido" && c.jogador_b ? setDetalhe(c) : undefined} />
-                  ))}
-                </div>
-              </section>
-            ))}
-
-            {/* Rondas futuras "a aguardar" (estrutura prevista, ainda sem dados) */}
-            {Array.from({ length: Math.max(0, totalRondas - ultimaRondaComDados) }).map((_, i) => {
-              const r = ultimaRondaComDados + i + 1;
-              return (
-                <section key={`f${r}`} style={{ marginBottom: 18, opacity: 0.5 }}>
-                  <RondaTitulo nome={nomeRonda(r, totalRondas)} comp={null} />
-                  <div style={{ background: "#10140f", border: "1px dashed #243029", borderRadius: 12, padding: "16px", textAlign: "center", fontSize: 12.5, color: "#7c8a82", fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    A aguardar os apurados
-                  </div>
-                </section>
-              );
-            })}
-          </>
+        {estado === "ok" && dados && (
+          <ChaveConteudo dados={dados} nome={nome} escudoDe={escudoDe} onAbrirTutorial={() => setTutorial(true)} />
         )}
       </div>
 
-      {/* Detalhe do confronto */}
-      {detalhe && (
-        <DetalheConfronto c={detalhe} idn={idn} onClose={() => setDetalhe(null)} />
-      )}
+      {tutorial && <TutorialChave onClose={() => setTutorial(false)} />}
     </main>
   );
 }
 
-function RondaTitulo({ nome, comp }: { nome: string; comp: string | null | undefined }) {
-  const nomeComp = comp ? competicaoPorId(comp)?.nome : null;
+function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial }: {
+  dados: RespostaChave;
+  nome: (uid: string | null) => string;
+  escudoDe: (uid: string | null) => Identity;
+  onAbrirTutorial: () => void;
+}) {
+  const { confrontos, totalRondas, podio, liga, nInscritos } = dados;
+  const terminada = liga.copa_estado === "terminada";
+  const chaveGrande = nInscritos >= 8; // repescagem em cadeia só com 8+
+
+  // Agrupa os confrontos por ronda. A final e o bronze estão na última ronda.
+  const rondas = Array.from(new Set(confrontos.map((c) => c.ronda))).sort((a, b) => a - b);
+
   return (
-    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 9 }}>
-      <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: GOLD }}>{nome}</span>
-      {nomeComp && <span style={{ fontSize: 10.5, color: "#7c8a82", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "60%" }}>{nomeComp}</span>}
-    </div>
+    <>
+      {/* Pódio (no topo) quando a copa terminou. */}
+      {terminada && (podio.campeao || podio.vice || podio.terceiro) && (
+        <Podio podio={podio} nome={nome} escudoDe={escudoDe} />
+      )}
+
+      {/* Cabeçalho da liga + nº de inscritos. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 11, background: "#0f1411", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px", marginBottom: 14 }}>
+        <div style={{ flexShrink: 0 }}><Escudo config={liga.escudo || DEFAULT_IDENTITY} size={38} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{liga.name}</div>
+          <div style={{ fontSize: 11, color: "#93a39a" }}>{nInscritos} {nInscritos === 1 ? "equipa" : "equipas"} · {chaveGrande ? "com repescagem" : "mata-mata simples"}</div>
+        </div>
+        <button onClick={onAbrirTutorial} style={{ flexShrink: 0, background: "transparent", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", padding: "7px 11px", borderRadius: 9, cursor: "pointer" }}>Como funciona</button>
+      </div>
+
+      {/* Eliminação principal: uma secção por ronda. */}
+      {rondas.map((r) => {
+        const daRonda = confrontos.filter((c) => c.ronda === r).sort((a, b) => a.ordem - b.ordem);
+        const normais = daRonda.filter((c) => c.fase === "normal");
+        const final = daRonda.find((c) => c.fase === "final");
+        const bronze = daRonda.find((c) => c.fase === "bronze");
+
+        return (
+          <div key={r} style={{ marginBottom: 18 }}>
+            <SecaoTitulo>{nomeRonda(r, totalRondas)}</SecaoTitulo>
+
+            {/* Confrontos normais da ronda. */}
+            {normais.map((c) => (
+              <CartaoConfronto key={c.id} c={c} nome={nome} escudoDe={escudoDe} />
+            ))}
+
+            {/* Na última ronda: a final em destaque + o bronze. */}
+            {final && (
+              <CartaoConfronto c={final} nome={nome} escudoDe={escudoDe} destaque="final" />
+            )}
+            {bronze && (
+              <CartaoConfronto c={bronze} nome={nome} escudoDe={escudoDe} destaque="bronze" />
+            )}
+          </div>
+        );
+      })}
+
+      {/* Zona de repescagem — só faz sentido com chave grande (8+). Como o motor
+          que a gera ainda não está ligado, mostramos a estrutura PREVISTA, de
+          forma explicativa, para o jogador entender o que aí vem. */}
+      {chaveGrande && (
+        <div style={{ marginBottom: 18 }}>
+          <SecaoTitulo>Repescagem e bronze</SecaoTitulo>
+          <div style={{ background: "#101511", border: "1px dashed #2f4a3c", borderRadius: 14, padding: "14px 15px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 17 }}>🥋</span>
+              <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", color: "#aee9c9" }}>Há sempre uma segunda chance</span>
+            </div>
+            <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 8px" }}>
+              No judô, quem perde para um semifinalista entra na <strong style={{ color: "#f1ede2" }}>repescagem</strong>. Os derrotados de cada semifinalista lutam em cadeia até sair um campeão de repescagem, que depois disputa o <strong style={{ color: GOLD }}>bronze</strong>. São <strong style={{ color: "#f1ede2" }}>dois bronzes</strong> — tal como numa competição real.
+            </p>
+            <button onClick={onAbrirTutorial} style={{ background: "transparent", border: "none", color: GOLD, fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", cursor: "pointer", padding: 0 }}>Ver como funciona →</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 8, fontSize: 11, color: "#5f6f67", textAlign: "center", lineHeight: 1.5 }}>
+        Cada ronda é uma competição real. Os pontos do confronto são os pontos da tua equipa nessa competição (capitão a dobrar).
+      </div>
+    </>
   );
 }
 
-function ConfrontoCard({ c, idn, onClick }: { c: Confronto; idn: (u: string | null) => Identidade | null; onClick?: () => void }) {
-  const a = idn(c.jogador_a);
-  const b = idn(c.jogador_b);
-  const bye = !c.jogador_b;
-  const clicavel = c.estado === "decidido" && !bye;
-  const fase = c.fase === "final" ? "🏆 Final" : c.fase === "bronze" ? "🥉 Disputa de 3º" : null;
+// Um cartão de confronto: dois jogadores, escudo + nome + pontos, vencedor
+// destacado. `destaque` muda a moldura (final dourada, bronze acobreado).
+function CartaoConfronto({ c, nome, escudoDe, destaque }: {
+  c: ConfrontoAPI;
+  nome: (uid: string | null) => string;
+  escudoDe: (uid: string | null) => Identity;
+  destaque?: "final" | "bronze";
+}) {
+  const decidido = c.estado === "decidido";
+  const bye = c.jogador_b === null;
+  const venceuA = decidido && c.vencedor === c.jogador_a;
+  const venceuB = decidido && c.vencedor === c.jogador_b;
+
+  const cor = destaque === "final" ? GOLD : destaque === "bronze" ? "#c87f43" : "#243029";
+  const etiqueta = destaque === "final" ? "Final" : destaque === "bronze" ? "Disputa de bronze" : null;
 
   return (
-    <button
-      onClick={onClick}
-      disabled={!clicavel}
-      style={{ display: "block", width: "100%", textAlign: "left", background: "#121815", border: `1px solid ${c.fase === "final" ? GOLD : "#243029"}`, borderRadius: 12, padding: "10px 12px", cursor: clicavel ? "pointer" : "default", fontFamily: FB }}
-    >
-      {fase && <div style={{ fontSize: 10, fontWeight: 700, color: c.fase === "final" ? GOLD : "#cb9a5a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 7 }}>{fase}</div>}
-      <LinhaJogador ident={a} pontos={c.pontos_a} venceu={c.vencedor === c.jogador_a} decidido={c.estado === "decidido"} />
+    <div style={{ background: "#121815", border: `1px solid ${cor}`, borderRadius: 13, padding: "10px 12px", marginBottom: 9 }}>
+      {etiqueta && (
+        <div style={{ fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: cor, marginBottom: 7 }}>{etiqueta}</div>
+      )}
+      <LinhaJogador uid={c.jogador_a} pontos={c.pontos_a} venceu={venceuA} perdeu={decidido && !venceuA} nome={nome} escudoDe={escudoDe} />
       {bye ? (
-        <div style={{ fontSize: 11, color: "#7c8a82", padding: "6px 0 2px", fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.06em" }}>Passou automaticamente</div>
+        <div style={{ fontSize: 11, color: "#7c8a82", textAlign: "center", padding: "4px 0", fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.05em" }}>passou (sem adversário)</div>
       ) : (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "3px 0" }}>
-            <div style={{ flex: 1, height: 1, background: "#1c241f" }} />
-            <span style={{ fontSize: 9, color: "#5f6f67", fontFamily: FD }}>VS</span>
-            <div style={{ flex: 1, height: 1, background: "#1c241f" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "2px 0" }}>
+            <div style={{ flex: 1, height: 1, background: "#1a221d" }} />
+            <span style={{ fontSize: 9.5, color: "#5f6f67", fontFamily: FD, fontWeight: 700 }}>{estadoLabel(c)}</span>
+            <div style={{ flex: 1, height: 1, background: "#1a221d" }} />
           </div>
-          <LinhaJogador ident={b} pontos={c.pontos_b} venceu={c.vencedor === c.jogador_b} decidido={c.estado === "decidido"} />
+          <LinhaJogador uid={c.jogador_b} pontos={c.pontos_b} venceu={venceuB} perdeu={decidido && !venceuB} nome={nome} escudoDe={escudoDe} />
         </>
       )}
-      {clicavel && (
-        <div style={{ fontSize: 10, color: "#5f6f67", marginTop: 7, fontFamily: FD }}>Toca para ver o detalhe →</div>
-      )}
-    </button>
+    </div>
   );
 }
 
-function LinhaJogador({ ident, pontos, venceu, decidido }: { ident: Identidade | null; pontos: number | null; venceu: boolean; decidido: boolean }) {
-  if (!ident) {
-    return <div style={{ fontSize: 13, color: "#5f6f67", padding: "4px 0" }}>A aguardar…</div>;
+function estadoLabel(c: ConfrontoAPI): string {
+  if (c.estado === "decidido") {
+    if (c.decidido_por === "sorteio") return "decidido por sorteio";
+    if (c.decidido_por === "capitao") return "decidido pelo capitão";
+    return "decidido";
   }
+  return "a aguardar";
+}
+
+function LinhaJogador({ uid, pontos, venceu, perdeu, nome, escudoDe }: {
+  uid: string | null;
+  pontos: number | null;
+  venceu: boolean;
+  perdeu: boolean;
+  nome: (uid: string | null) => string;
+  escudoDe: (uid: string | null) => Identity;
+}) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
-      <div style={{ flexShrink: 0, opacity: decidido && !venceu ? 0.5 : 1 }}><Escudo config={ident.escudo || DEFAULT_IDENTITY} size={28} /></div>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: venceu ? GOLD : "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", opacity: decidido && !venceu ? 0.6 : 1 }}>
-        {ident.nome_time}
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", opacity: perdeu ? 0.5 : 1 }}>
+      <div style={{ flexShrink: 0 }}><Escudo config={escudoDe(uid)} size={28} /></div>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: venceu ? GOLD : "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {nome(uid)}
+        {venceu && <span style={{ marginLeft: 6, fontSize: 11 }}>✓</span>}
       </span>
-      {venceu && decidido && <span style={{ fontSize: 13, flexShrink: 0 }}>✓</span>}
-      {decidido && pontos !== null && (
-        <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, color: venceu ? GOLD : "#93a39a", flexShrink: 0 }}>{pontos}</span>
-      )}
+      <span style={{ flexShrink: 0, fontFamily: FD, fontSize: 15, fontWeight: 700, color: venceu ? GOLD : "#93a39a" }}>
+        {pontos !== null && pontos !== undefined ? (pontos >= 0 ? "+" : "") + pontos : "—"}
+      </span>
     </div>
   );
 }
 
-function Podio({ data, idn }: { data: ChaveResp; idn: (u: string | null) => Identidade | null }) {
-  const campeao = idn(data.podio.campeao || null);
-  const vice = idn(data.podio.vice || null);
-  const terceiro = idn(data.podio.terceiro || null);
-  return (
-    <div style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "18px 16px", marginBottom: 22, textAlign: "center" }}>
-      <div style={{ fontSize: 30, marginBottom: 4 }}>🏆</div>
-      <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: GOLD, marginBottom: 14, letterSpacing: "0.04em" }}>Copa terminada</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <PodioLinha medalha="🥇" titulo="Campeão" ident={campeao} destaque />
-        {vice && <PodioLinha medalha="🥈" titulo="Vice-campeão" ident={vice} />}
-        {terceiro && <PodioLinha medalha="🥉" titulo="3º lugar" ident={terceiro} />}
-      </div>
-    </div>
-  );
-}
-
-function PodioLinha({ medalha, titulo, ident, destaque }: { medalha: string; titulo: string; ident: Identidade | null; destaque?: boolean }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 11, background: destaque ? "rgba(217,164,65,0.12)" : "rgba(12,14,13,0.5)", border: `1px solid ${destaque ? GOLD : "#2f2a18"}`, borderRadius: 12, padding: "10px 12px" }}>
-      <span style={{ fontSize: 22, flexShrink: 0 }}>{medalha}</span>
-      <div style={{ flexShrink: 0 }}><Escudo config={ident?.escudo || DEFAULT_IDENTITY} size={34} /></div>
-      <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: destaque ? GOLD : "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ident?.nome_time || "—"}</div>
-        <div style={{ fontSize: 10.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em" }}>{titulo}</div>
-      </div>
-    </div>
-  );
-}
-
-function DetalheConfronto({ c, idn, onClose }: { c: Confronto; idn: (u: string | null) => Identidade | null; onClose: () => void }) {
-  const a = idn(c.jogador_a);
-  const b = idn(c.jogador_b);
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 100 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "#10160f", borderTop: `2px solid ${GOLD}`, borderRadius: "18px 18px 0 0", padding: "18px 16px 26px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>Detalhe do confronto</span>
-          <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer" }}>✕</button>
-        </div>
-
-        <LadoDetalhe ident={a} pontos={c.pontos_a} venceu={c.vencedor === c.jogador_a} />
-        <div style={{ textAlign: "center", fontFamily: FD, fontSize: 11, color: "#5f6f67", margin: "8px 0" }}>VS</div>
-        <LadoDetalhe ident={b} pontos={c.pontos_b} venceu={c.vencedor === c.jogador_b} />
-
-        <div style={{ marginTop: 16, padding: "11px 13px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
-          {comoFoiDecidido(c.decidido_por)}
+function Podio({ podio, nome, escudoDe }: {
+  podio: { campeao?: string; vice?: string; terceiro?: string };
+  nome: (uid: string | null) => string;
+  escudoDe: (uid: string | null) => Identity;
+}) {
+  const linha = (uid: string | undefined, medalha: string, label: string, cor: string) => {
+    if (!uid) return null;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 11, background: "#121815", border: `1px solid ${cor}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+        <span style={{ fontSize: 22, flexShrink: 0 }}>{medalha}</span>
+        <div style={{ flexShrink: 0 }}><Escudo config={escudoDe(uid)} size={32} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nome(uid)}</div>
+          <div style={{ fontSize: 10.5, color: cor, fontFamily: FD, fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
         </div>
       </div>
+    );
+  };
+  return (
+    <div style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "16px 15px", marginBottom: 16 }}>
+      <div style={{ textAlign: "center", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: GOLD, marginBottom: 12 }}>🏆 Pódio da Copa</div>
+      {linha(podio.campeao, "🥇", "Campeão", GOLD)}
+      {linha(podio.vice, "🥈", "Vice-campeão", "#c0c0c0")}
+      {linha(podio.terceiro, "🥉", "3º lugar", "#c87f43")}
     </div>
   );
 }
 
-function LadoDetalhe({ ident, pontos, venceu }: { ident: Identidade | null; pontos: number | null; venceu: boolean }) {
+function SecaoTitulo({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, background: venceu ? "rgba(217,164,65,0.10)" : "#121815", border: `1px solid ${venceu ? GOLD : "#243029"}`, borderRadius: 12, padding: "12px 14px" }}>
-      <div style={{ flexShrink: 0 }}><Escudo config={ident?.escudo || DEFAULT_IDENTITY} size={40} /></div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: venceu ? GOLD : "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ident?.nome_time || "—"}</div>
-        {venceu && <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, textTransform: "uppercase", marginTop: 2 }}>Avançou ✓</div>}
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+      <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cdb86a" }}>{children}</span>
+      <div style={{ flex: 1, height: 1, background: "#1a221d" }} />
+    </div>
+  );
+}
+
+// Tutorial DIDÁTICO da chave — explica o formato do mata-mata de judô.
+function TutorialChave({ onClose }: { onClose: () => void }) {
+  const [passo, setPasso] = useState(0);
+  const passos = [
+    {
+      t: "Mata-mata por competições",
+      x: "Cada ronda da Copa é uma competição real. Os pontos do teu confronto são os pontos da tua equipa nessa competição (com o capitão a dobrar), tal como no ranking. Quem pontuar mais, avança.",
+    },
+    {
+      t: "Eliminação até às meias",
+      x: "Vais avançando enquanto venceres. Em caso de empate, decide quem teve o capitão com mais pontos; se ainda empatar, sorteio. Chega às semifinais quem vencer todos os confrontos do seu lado da chave.",
+    },
+    {
+      t: "A repescagem (8+ equipas)",
+      x: "No judô, quem perde para um semifinalista não está fora! Os derrotados de cada semifinalista lutam entre si, em cadeia, até sair um campeão de repescagem. É a tua segunda chance.",
+    },
+    {
+      t: "Os dois bronzes",
+      x: "Os campeões de repescagem de cada metade disputam o bronze cruzando com o semifinalista perdedor do outro lado. Por isso há DOIS bronzes — e quem perdeu a semifinal ainda tem de os disputar (não recebe a medalha de borla).",
+    },
+    {
+      t: "A final é por pontos",
+      x: "Os dois finalistas não decidem o título numa só competição: acumulam pontos a partir do momento em que chegam à final, até ao dia do bronze. Quem somar mais é o campeão. Assim o título não se decide pela sorte de uma rodada.",
+    },
+  ];
+  const s = passos[passo];
+  const ultimo = passo === passos.length - 1;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 100 }}>
+      <div style={{ width: "100%", maxWidth: 340, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12 }}>
+          <span style={{ fontSize: 22 }}>🥋</span>
+          <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{s.t}</span>
+        </div>
+        <p style={{ fontSize: 13.5, color: "#dfe6e0", lineHeight: 1.6, margin: "0 0 18px" }}>{s.x}</p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <button onClick={() => (passo > 0 ? setPasso(passo - 1) : onClose())} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>{passo > 0 ? "Anterior" : "Fechar"}</button>
+          <span style={{ fontSize: 11, color: "#5f6f67" }}>{passo + 1} de {passos.length}</span>
+          <button onClick={() => (ultimo ? onClose() : setPasso(passo + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{ultimo ? "Entendi" : "Seguinte"}</button>
+        </div>
       </div>
-      <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: venceu ? GOLD : "#93a39a", flexShrink: 0 }}>{pontos ?? "—"}</div>
     </div>
   );
 }
