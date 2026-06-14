@@ -461,6 +461,7 @@ export default function MeuTime() {
           score={scoreOf(modal.a)}
           temResultados={temResultados}
           editavel={editavel}
+          idComp={idComp}
           onCaptain={() => tornarCapitao(modal.a.id)}
           onSell={() => vender(modal.a.id)}
           onClose={() => setModal(null)}
@@ -573,8 +574,49 @@ export default function MeuTime() {
   );
 }
 
-function AthleteDetail({ a, captain, score, temResultados, editavel, onCaptain, onSell, onClose }: { a: Athlete; captain: boolean; score: number; temResultados: boolean; editavel: boolean; onCaptain: () => void; onSell: () => void; onClose: () => void }) {
+/* =========================================================================
+ * DECOMPOSIÇÃO LUTA-A-LUTA (popup do atleta)
+ * ========================================================================= */
+
+interface Rubrica { label: string; quantidade: number; pontos: number; negativo: boolean }
+interface LutaDetalhe {
+  id_fight: string;
+  ronda: string;
+  venceu: boolean | null;
+  hansoku: boolean;
+  pontos: number;
+  rubricas: Rubrica[];
+}
+type EstadoDetalhe =
+  | { fase: "carregando" }
+  | { fase: "erro" }
+  | { fase: "vazio" }
+  | { fase: "ok"; lutas: LutaDetalhe[]; total: number };
+
+const sinal = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+
+function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onCaptain, onSell, onClose }: { a: Athlete; captain: boolean; score: number; temResultados: boolean; editavel: boolean; idComp: string; onCaptain: () => void; onSell: () => void; onClose: () => void }) {
   const up = a.variation >= 0;
+  const [detalhe, setDetalhe] = useState<EstadoDetalhe>({ fase: "carregando" });
+
+  // Busca a decomposição luta-a-luta só quando há resultados (competição a
+  // decorrer ou encerrada). Sem resultados não faz sentido (e poupa a chamada).
+  useEffect(() => {
+    if (!temResultados) return;
+    let active = true;
+    setDetalhe({ fase: "carregando" });
+    fetch(`/api/atleta-rodada?comp=${encodeURIComponent(idComp)}&person=${encodeURIComponent(a.id)}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!active) return;
+        const lutas: LutaDetalhe[] = Array.isArray(j?.lutas) ? j.lutas : [];
+        if (!j || !j.tem_resultados || lutas.length === 0) { setDetalhe({ fase: "vazio" }); return; }
+        setDetalhe({ fase: "ok", lutas, total: typeof j.total === "number" ? j.total : 0 });
+      })
+      .catch(() => { if (active) setDetalhe({ fase: "erro" }); });
+    return () => { active = false; };
+  }, [a.id, idComp, temResultados]);
+
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.78)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 100 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "#10160f", borderTop: `2px solid ${captain ? "#FF8F00" : "#243029"}`, borderRadius: "18px 18px 0 0", padding: "16px 16px 24px", maxHeight: "86%", overflowY: "auto" }}>
@@ -616,18 +658,88 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, onCaptain, 
           </div>
         )}
 
+        {/* DECOMPOSIÇÃO luta-a-luta — só quando há resultados. */}
+        {temResultados && (
+          <DetalheLutas estado={detalhe} captain={captain} />
+        )}
+
         {/* AÇÕES: só quando editável (mercado aberto). Em competição, não se mexe. */}
         {editavel ? (
-          <>
+          <div style={{ marginTop: 16 }}>
             <button onClick={onCaptain} style={{ ...primaryBtn, background: captain ? "#1c3a2e" : GOLD, color: captain ? "#aee9c9" : "#1b211e" }}>
               {captain ? "Remover capitão" : "Tornar capitão (pontua x2)"}
             </button>
             <button onClick={onSell} style={{ display: "block", width: "100%", marginTop: 10, textAlign: "center", border: "1px solid #5a2f2c", background: "transparent", color: "#ef8d83", padding: "11px", borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer" }}>Vender</button>
-          </>
-        ) : (
-          <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 12 }}>O detalhe luta a luta liga-se em breve.</p>
-        )}
+          </div>
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+// Lista das lutas decompostas (ou estados de carregamento/vazio).
+function DetalheLutas({ estado, captain }: { estado: EstadoDetalhe; captain: boolean }) {
+  if (estado.fase === "carregando") {
+    return (
+      <div style={{ marginTop: 14, textAlign: "center", fontSize: 12, color: "#93a39a", fontFamily: FD, letterSpacing: "0.05em" }}>
+        A carregar o detalhe…
+      </div>
+    );
+  }
+  if (estado.fase === "erro" || estado.fase === "vazio") {
+    return (
+      <div style={{ marginTop: 14, textAlign: "center", fontSize: 12, color: "#5f6f67" }}>
+        {estado.fase === "erro"
+          ? "Não foi possível carregar o detalhe agora."
+          : "Este atleta ainda não tem lutas registadas nesta competição."}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 10 }}>
+        Como pontuou {captain && <span style={{ color: "#FF8F00" }}>· valores simples (capitão dobra no total)</span>}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {estado.lutas.map((l, idx) => (
+          <div key={l.id_fight || idx} style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 12, overflow: "hidden" }}>
+            {/* Cabeçalho da luta: ronda, resultado, total da luta. */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", background: "#16201b", borderBottom: "1px solid #243029" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: "#cfd8d2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.ronda}</span>
+                {l.venceu === true && <span style={{ fontSize: 9, color: "#7fd1a3", border: "1px solid #2a4d3e", borderRadius: 5, padding: "1px 5px", fontWeight: 700 }}>VITÓRIA</span>}
+                {l.venceu === false && <span style={{ fontSize: 9, color: "#ef8d83", border: "1px solid #5a2f2c", borderRadius: 5, padding: "1px 5px", fontWeight: 700 }}>DERROTA</span>}
+                {l.hansoku && <span style={{ fontSize: 9, color: "#e2655a", border: "1px solid #5a2f2c", borderRadius: 5, padding: "1px 5px", fontWeight: 700 }}>HANSOKU</span>}
+              </div>
+              <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, color: l.pontos >= 0 ? "#7fd1a3" : "#ef8d83", flexShrink: 0 }}>{sinal(l.pontos)}</span>
+            </div>
+            {/* Rubricas (ações) da luta. */}
+            <div style={{ padding: "8px 12px", display: "flex", flexDirection: "column", gap: 5 }}>
+              {l.rubricas.length === 0 ? (
+                <div style={{ fontSize: 11.5, color: "#5f6f67", fontStyle: "italic" }}>Sem ações pontuáveis nesta luta.</div>
+              ) : (
+                l.rubricas.map((r, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 12.5, color: "#d6ddd6" }}>{r.label}</span>
+                    <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, color: r.negativo ? "#ef8d83" : "#7fd1a3" }}>{sinal(r.pontos)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Total simples (soma das lutas, sem dobrar). Ajuda a fechar a conta. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: "10px 12px", background: "#141a17", border: "1px solid #243029", borderRadius: 12 }}>
+        <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#93a39a" }}>Total nas lutas</span>
+        <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: GOLD }}>{sinal(estado.total)} pts</span>
+      </div>
+      {captain && (
+        <div style={{ fontSize: 11, color: "#FF8F00", marginTop: 6, textAlign: "center" }}>
+          Como capitão, este total conta a dobrar na tua pontuação da rodada.
+        </div>
+      )}
     </div>
   );
 }
