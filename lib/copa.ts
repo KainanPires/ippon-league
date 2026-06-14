@@ -249,11 +249,20 @@ export function gerarRondaSeguinte(
         id_competicao: idCompeticaoProxima, estado: "pendente",
       },
     ];
-    // Bronze só se houver mesmo 2 perdedores (não houve bye nas semis).
+    // Bronze conforme o nº de perdedores REAIS (byes não geram perdedor):
+    //  - 2 perdedores (chave de 4-7): disputam o bronze entre si.
+    //  - 1 perdedor (chave de 3): fica 3º DIRETO, sem disputa (jogador_b null).
+    //  - 0 perdedores (chave de 2): sem bronze.
     if (perdedores.length === 2) {
       novos.push({
         ronda: proximaRonda, ordem: 1, fase: "bronze",
         jogador_a: perdedores[0], jogador_b: perdedores[1],
+        id_competicao: idCompeticaoProxima, estado: "pendente",
+      });
+    } else if (perdedores.length === 1) {
+      novos.push({
+        ronda: proximaRonda, ordem: 1, fase: "bronze",
+        jogador_a: perdedores[0], jogador_b: null, // 3º direto, sem adversário
         id_competicao: idCompeticaoProxima, estado: "pendente",
       });
     }
