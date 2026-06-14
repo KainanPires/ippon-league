@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, jcLeft, isComplete, missing, loadSavedCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
+import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
@@ -236,14 +236,22 @@ export default function MeuTime() {
 
   if (!ready) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
 
-  const athletes = resolve(team.ids);
+  // RESOLUÇÃO RICA: separa os atletas que a pool conhece (resolvidos) dos que
+  // já não estão na pool (ausentes — ex.: saíram dos inscritos da competição).
+  // Em vez de os esconder (bug antigo do resolve + filter), mostramo-los numa
+  // secção "Indisponíveis" para a equipa nunca parecer ter menos atletas do que
+  // os 8 que a pessoa guardou.
+  const slots = resolveRich(team.ids);
+  const athletes = slots.filter((s) => !s.ausente).map((s) => (s as { ausente: false; atleta: Athlete }).atleta);
+  const ausentesIds = slots.filter((s) => s.ausente).map((s) => (s as { ausente: true; id: string }).id);
   const temEquipa = team.ids.length > 0;
   // "A carregar" só ENQUANTO ainda estamos a tentar buscar a lista de atletas.
-  // Depois de a tentativa terminar (poolPronto), se os atletas não resolverem,
-  // deixamos de carregar e a página trata como "sem equipa" (com botão montar).
-  const aCarregarAtletas = temEquipa && athletes.length === 0 && !poolPronto;
-  const equipaIrresoluvel = temEquipa && athletes.length === 0 && poolPronto;
-  const hasTeam = athletes.length > 0;
+  // Depois de a tentativa terminar (poolPronto), se NENHUM atleta resolver e não
+  // há ausentes conhecidos, tratamos como "sem equipa". Se há ids mas nenhum
+  // resolve, ainda assim mostramos (como ausentes) — nunca "desaparecem".
+  const aCarregarAtletas = temEquipa && athletes.length === 0 && ausentesIds.length === 0 && !poolPronto;
+  const equipaIrresoluvel = temEquipa && athletes.length === 0 && ausentesIds.length === 0 && poolPronto;
+  const hasTeam = athletes.length > 0 || ausentesIds.length > 0;
   const males = athletes.filter((a) => a.gender === "M");
   const females = athletes.filter((a) => a.gender === "F");
   const squadValue = fmt(athletes.reduce((s, a) => s + a.priceJc, 0));
@@ -280,6 +288,11 @@ export default function MeuTime() {
   function vender(id: string) {
     update({ ids: team.ids.filter((x) => x !== id), captain: team.captain === id ? null : team.captain });
     setModal(null);
+  }
+  // Remove um atleta AUSENTE (indisponível) da equipa — só quando editável.
+  // Não abre modal: é uma remoção direta de um id que já não tem dados.
+  function removerAusente(id: string) {
+    update({ ids: team.ids.filter((x) => x !== id), captain: team.captain === id ? null : team.captain });
   }
   function limparTudo() {
     update({ ids: [], captain: null });
@@ -379,6 +392,28 @@ export default function MeuTime() {
               </div>
             </div>
 
+            {/* AVISO de atletas indisponíveis: a equipa tem ids que já não estão
+                na competição (saíram dos inscritos). Mostramo-los em baixo para
+                a equipa não parecer mais pequena, e explicamos o que fazer. */}
+            {ausentesIds.length > 0 && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a1f1c,#10160f)", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "11px 13px", marginBottom: 12 }}>
+                <div style={{ width: 30, height: 30, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: "#e2655a" }}>
+                    {ausentesIds.length === 1 ? "1 atleta indisponível" : `${ausentesIds.length} atletas indisponíveis`}
+                  </div>
+                  <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "5px 0 0" }}>
+                    {ausentesIds.length === 1
+                      ? "Um atleta da tua equipa não está inscrito nesta competição, por isso não pontua nesta rodada."
+                      : "Alguns atletas da tua equipa não estão inscritos nesta competição, por isso não pontuam nesta rodada."}
+                    {editavel
+                      ? " Substitui-os no Mercado e guarda a equipa."
+                      : " Vais poder substituí-los quando o mercado abrir para a próxima competição."}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <section className={destaque === "atletas" || destaque === "vazio" ? "ilglow" : undefined} style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
               <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
                 <SectionLabel>Masculino</SectionLabel>
@@ -393,6 +428,34 @@ export default function MeuTime() {
                 </div>
               </div>
             </section>
+
+            {/* SECÇÃO DE INDISPONÍVEIS: atletas guardados na equipa que a pool já
+                não conhece (sem dados de nome/género/preço). Mostramos só o id e,
+                se editável, um botão para os remover. Fora da grelha M/F porque
+                não sabemos o género destes ids. */}
+            {ausentesIds.length > 0 && (
+              <div style={{ marginTop: 14, background: "#121815", border: "1px solid #3a2422", borderRadius: 14, padding: "12px 14px" }}>
+                <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#ef8d83", marginBottom: 10 }}>
+                  Indisponíveis nesta competição
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {ausentesIds.map((id) => (
+                    <div key={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#161109", border: "1px dashed #5a3a36", borderRadius: 10, padding: "9px 11px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                        <div style={{ width: 30, height: 34, borderRadius: 6, background: "#1a1410", border: "1px dashed #5a3a36", display: "flex", alignItems: "center", justifyContent: "center", color: "#7c5a52", fontSize: 16, flexShrink: 0 }}>?</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: "#d6c2bd" }}>Atleta indisponível</div>
+                          <div style={{ fontSize: 10.5, color: "#7c5a52" }}>Não está inscrito nesta competição</div>
+                        </div>
+                      </div>
+                      {editavel && (
+                        <button onClick={() => removerAusente(id)} aria-label="Remover atleta indisponível" style={{ flexShrink: 0, border: "1px solid #5a2f2c", background: "transparent", color: "#ef8d83", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "7px 12px", borderRadius: 9, cursor: "pointer" }}>Remover</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className={destaque === "total" ? "ilglow" : undefined} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
