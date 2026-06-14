@@ -9,7 +9,8 @@
 //
 // O que faz:
 //   1) encontra a ronda mais baixa com confrontos PENDENTES
-//   2) confirma que a competição dessa ronda já terminou (tem resultados)
+//   2) confirma que a competição dessa ronda já TERMINOU (regra das 60h —
+//      competicaoFechada — para não decidir a meio de uma competição de 2 dias)
 //   3) para cada confronto pendente: calcula os pontos de cada jogador
 //      (mesma lógica do ranking: equipa na competição, capitão a dobrar) e
 //      decide o vencedor com o desempate em cascata (pontos → capitão → sorteio)
@@ -25,7 +26,8 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitionContests, scoreContestSide } from "@/lib/ijf";
-import { decidirConfronto, gerarRondaSeguinte, idCompeticaoSeguinte, type PontosJogador, type ConfrontoDB } from "@/lib/copa";
+import { decidirConfronto, gerarRondaSeguinte, idCompeticaoSeguinte, competicaoPorId, type PontosJogador, type ConfrontoDB } from "@/lib/copa";
+import { competicaoFechada } from "@/lib/calendario";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
 export const dynamic = "force-dynamic";
@@ -101,7 +103,18 @@ export async function POST(req: Request) {
   const comp = pendentesRonda[0].id_competicao;
   if (!comp) return NextResponse.json({ ok: false, erro: "Ronda sem competição definida." }, { status: 400 });
 
-  // 2) A competição já terminou? (tem lutas/resultados). Se não, ainda não apura.
+  // 2a) A competição já TERMINOU? Regra das 60h (competicaoFechada). NÃO basta
+  //     ter lutas: uma competição de 2 dias pode ter o dia 1 já jogado mas o
+  //     dia 2 ainda por vir. Só apuramos depois de a competição fechar mesmo,
+  //     senão decidiríamos a ronda a meio (bug dos dias diferentes).
+  const semana = competicaoPorId(comp);
+  if (semana && !competicaoFechada(semana)) {
+    return NextResponse.json({ ok: true, apurou: false, aDecorrer: true, ronda: rondaAtual, motivo: "competicao_nao_terminou" });
+  }
+
+  // 2b) Salvaguarda adicional: a competição já tem lutas/resultados? Se não,
+  //     ainda não apura (mesmo que a janela de 60h tenha passado, sem dados não
+  //     há nada a calcular).
   const pontosAtletaRaw = await pontuacaoDaCompeticao(comp);
   const nLutas = (pontosAtletaRaw.__n_lutas as number) || 0;
   delete (pontosAtletaRaw as Record<string, number>).__n_lutas;
