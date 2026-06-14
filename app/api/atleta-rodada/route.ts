@@ -73,13 +73,23 @@ interface Rubrica {
   negativo: boolean;
 }
 
-function ehPoule(f: IjfContest): boolean {
+// É uma luta de POULE (grupo todos-contra-todos)?
+//  - Sinal 1: round_code começa por "small_" (poules pequenas, até ~5 atletas).
+//  - Sinal 2: o mesmo round_name aparece MAIS DO QUE UMA VEZ para este atleta
+//    nesta competição. Numa eliminação direta normal, cada fase (Quartos,
+//    Meia-final, Final...) ocorre UMA vez por atleta; se "Quarter Final" ou
+//    "Semi Final" se repete, é porque a API está a reutilizar o rótulo para as
+//    lutas de um grupo round-robin (caso das categorias maiores da Tahiti, cujo
+//    round_code é "cont_open_..." e não "small_"). `repetido` é calculado a
+//    partir da contagem de round_names do próprio atleta (ver GET).
+function ehPoule(f: IjfContest, repetido: boolean): boolean {
   const rc = (f.round_code || "").toLowerCase();
-  return rc.startsWith("small_");
+  if (rc.startsWith("small_")) return true;
+  return repetido;
 }
 
-function nomeRonda(f: IjfContest, ordemPoule: number): string {
-  if (ehPoule(f)) {
+function nomeRonda(f: IjfContest, ordemPoule: number, ehPouleLuta: boolean): string {
+  if (ehPouleLuta) {
     return `Poule · ${ordemPoule}ª luta`;
   }
   const rn = (f.round_name || "").trim();
@@ -200,6 +210,16 @@ export async function GET(req: Request) {
   let total = 0;
   let ordemPoule = 0;
 
+  // Conta quantas vezes cada round_name aparece NAS LUTAS DESTE ATLETA nesta
+  // competição. Se um round_name se repete, são lutas de poule (a API reutiliza
+  // o rótulo) — ver ehPoule. Numa eliminação direta cada fase ocorre 1 vez.
+  const contRoundName = new Map<string, number>();
+  for (const f of contests) {
+    if (ladoDoAtleta(f, person) === null) continue;
+    const rn = (f.round_name || "").toLowerCase().trim();
+    contRoundName.set(rn, (contRoundName.get(rn) ?? 0) + 1);
+  }
+
   for (const f of contests) {
     const side = ladoDoAtleta(f, person);
     if (!side) continue;
@@ -214,11 +234,15 @@ export async function GET(req: Request) {
       return w === person;
     })();
 
-    if (ehPoule(f)) ordemPoule += 1;
+    // É poule? (small_ no código, ou round_name repetido para este atleta.)
+    const rn = (f.round_name || "").toLowerCase().trim();
+    const repetido = (contRoundName.get(rn) ?? 0) > 1;
+    const pouleLuta = ehPoule(f, repetido);
+    if (pouleLuta) ordemPoule += 1;
 
     lutas.push({
       id_fight: String(f.id_fight ?? ""),
-      ronda: nomeRonda(f, ordemPoule),
+      ronda: nomeRonda(f, ordemPoule, pouleLuta),
       venceu,
       hansoku,
       pontos: Math.round(pontosLuta * 10) / 10,
