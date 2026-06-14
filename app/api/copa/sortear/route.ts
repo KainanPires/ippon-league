@@ -10,7 +10,7 @@
 // Faz:
 //   1) valida que a liga é copa em estado "inscricao" e que o prazo passou
 //   2) lê os inscritos (league_members)
-//   3) gera a 1ª ronda (lib/copa) e grava em copa_confrontos
+//   3) gera a 1ª ronda (lib/copa) e grava em copa_confrontos (com a METADE)
 //   4) marca copa_estado = "sorteada"
 // Devolve: { ok, sorteada, confrontos } ou { ok:false, erro }
 import { NextResponse } from "next/server";
@@ -79,7 +79,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, erro: "São precisos pelo menos 2 inscritos para sortear a copa.", poucos: true }, { status: 400 });
   }
 
-  // 3) Gera a 1ª ronda e grava.
+  // 3) Gera a 1ª ronda e grava (incluindo a METADE de cada confronto, para a
+  // repescagem/cruzamento diagonal saberem a que lado da chave cada um pertence).
   const confrontos = gerarPrimeiraRonda(inscritos, idCompInicial);
   const linhas = confrontos.map((c) => ({
     league_id,
@@ -90,6 +91,7 @@ export async function POST(req: Request) {
     jogador_b: c.jogador_b,
     id_competicao: c.id_competicao,
     estado: c.estado,
+    metade: c.metade,
     // Confrontos com bye já têm vencedor decidido (passam automaticamente).
     ...(c.jogador_b === null
       ? { vencedor: c.jogador_a, decidido_por: "bye", estado: "decidido" }
