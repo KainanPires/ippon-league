@@ -230,3 +230,105 @@ export function textoFecho(s: SemanaCalendario, agora: Date = new Date()): strin
   if (dias <= 1) return "Mercado fecha em 1 dia";
   return `Mercado fecha em ${dias} dias`;
 }
+
+// ===========================================================================
+// COMPETIÇÃO TERMINADA — regra das 60 HORAS (para a Copa, e no futuro ranking
+// e valorização). Uma competição de judô dura tipicamente 1-2 dias; algumas
+// dividem-se em dois dias (dia 1 pesos leves, dia 2 o resto). Por isso NÃO
+// podemos considerar "terminada" só porque já houve lutas (o dia 1 pode ter
+// acabado mas o dia 2 ainda vem). Regra robusta: a competição só se considera
+// terminada 60 HORAS após o seu início — cobre com folga os 2 dias e absorve
+// erros de fuso/horário de verão (temos ~12h de margem sobre as ~48h reais).
+//
+// Início usado:
+//   1) Se a competição tem `inicioUTC` (hora oficial confirmada) → usa-o. Preciso.
+//   2) Senão → assume que começa às 9h LOCAIS do dia `de`, no fuso da cidade
+//      (derivado do nome). É a política acordada: "se não houver horário, a
+//      competição começa às 9h do horário local".
+//   3) Se a cidade não estiver na tabela de fusos → fallback seguro: conta a
+//      partir da meia-noite UTC do dia `de` e usa 72h (margem extra), para
+//      NUNCA fechar cedo demais. (Sinal de que falta confirmar o inicioUTC.)
+// ===========================================================================
+
+export const HORAS_ATE_FECHO_COPA = 60;
+const HORAS_FALLBACK_SEM_FUSO = 72; // margem extra quando não sabemos o fuso
+
+// Fuso horário (offset base em horas vs UTC) das cidades do CALENDARIO_2026.
+// Offsets-BASE (sem horário de verão): a margem de 60h absorve a diferença de
+// DST, por isso não precisamos de precisão ao minuto aqui. A chave é a 1ª
+// palavra do nome da competição (a cidade). Confirmados por pesquisa.
+const FUSO_POR_CIDADE: Record<string, number> = {
+  // Américas
+  Lima: -5,
+  Montreal: -5,
+  San: -6,        // "San Salvador"
+  // Europa / África do Norte (offsets base; no verão a Europa fica +1, coberto pela margem)
+  Casablanca: 1,
+  Sofia: 2,
+  Paris: 1,
+  Ljubljana: 1,
+  Warsaw: 1,
+  Dubrovnik: 1,
+  Sarajevo: 1,
+  Tallinn: 2,
+  Lausanne: 1,
+  Hungary: 1,     // Budapeste
+  Skopje: 1,
+  Malaga: 1,
+  Rome: 1,
+  Zagreb: 1,
+  Grand: 1,       // "Grand Prix Upper Austria" (Linz) — Áustria, +1
+  La: 1,          // "La Nucia/Benidorm" — Espanha, +1
+  Campeonato: 1,  // "Campeonato Europeu/Africano" — assume Europa Central; confirmar inicioUTC
+  // Médio Oriente / Cáucaso / Ásia Central
+  Tbilisi: 4,
+  Abu: 4,         // "Abu Dhabi"
+  Baku: 4,
+  Tashkent: 5,
+  Dushanbe: 5,
+  Qazaqstan: 6,   // Astana / Cazaquistão
+  // Ásia Oriental
+  Ulaanbaatar: 8,
+  Qingdao: 8,
+  Taipei: 8,
+  Kowloon: 8,     // Hong Kong
+  Tokyo: 9,
+  // África subsariana
+  Algiers: 1,
+  Dar: 3,         // "Dar Es Salaam"
+  // Oceania
+  Tahiti: -10,
+};
+
+/** Extrai a chave de cidade (1ª palavra do nome) para procurar o fuso. */
+function chaveCidade(nome: string): string {
+  return (nome || "").trim().split(/\s+/)[0] || "";
+}
+
+/**
+ * A competição já se considera TERMINADA neste instante?
+ * Regra das 60h a partir do início (ver explicação acima).
+ */
+export function competicaoFechada(s: SemanaCalendario, agora: Date = new Date()): boolean {
+  // 1) Hora oficial confirmada: início + 60h.
+  if (s.inicioUTC) {
+    const fim = new Date(s.inicioUTC).getTime() + HORAS_ATE_FECHO_COPA * 3600 * 1000;
+    return agora.getTime() >= fim;
+  }
+
+  // 2) Sem hora: 9h locais do dia `de`, no fuso da cidade.
+  const fuso = FUSO_POR_CIDADE[chaveCidade(s.nome)];
+  if (fuso !== undefined) {
+    // 9h locais = 9h - fuso, em UTC. Ex.: Tahiti (-10) → 9h locais = 19h UTC.
+    const [ano, mes, dia] = s.de.split("/").map((x) => parseInt(x, 10));
+    const inicioUtcMs = Date.UTC(ano, mes - 1, dia, 9 - fuso, 0, 0);
+    const fim = inicioUtcMs + HORAS_ATE_FECHO_COPA * 3600 * 1000;
+    return agora.getTime() >= fim;
+  }
+
+  // 3) Cidade desconhecida: fallback seguro (meia-noite UTC do dia `de` + 72h).
+  const [ano, mes, dia] = s.de.split("/").map((x) => parseInt(x, 10));
+  const inicioUtcMs = Date.UTC(ano, mes - 1, dia, 0, 0, 0);
+  const fim = inicioUtcMs + HORAS_FALLBACK_SEM_FUSO * 3600 * 1000;
+  return agora.getTime() >= fim;
+}
