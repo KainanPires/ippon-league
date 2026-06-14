@@ -77,6 +77,11 @@ export default function MeuTime() {
   // Tutorial: passo atual (null = fechado). O conjunto de passos muda conforme o
   // momento (edição quando mercado aberto; competição quando a decorrer).
   const [guide, setGuide] = useState<number | null>(null);
+  // Qual chave de tutorial está ABERTA agora. Guardamos no momento de abrir para
+  // que o "Pular/Concluir" marque EXATAMENTE essa chave — sem isto, abrir e
+  // gravar podiam usar chaves diferentes (edição vs competição) num instante de
+  // carregamento, e o tutorial reaparecia sempre. (Bug corrigido.)
+  const [tutKeyAberta, setTutKeyAberta] = useState<TutKey | null>(null);
   const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const router = useRouter();
@@ -226,6 +231,7 @@ export default function MeuTime() {
         if (vistos[chave]) {
           try { localStorage.setItem(chave, "done"); } catch {}
         } else {
+          setTutKeyAberta(chave); // regista QUAL tutorial abriu (para o pular gravar a certa)
           setGuide(0);
         }
       });
@@ -359,7 +365,7 @@ export default function MeuTime() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           </a>
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>Meu Time</h1>
-          <button onClick={() => setGuide(0)} aria-label="Como funciona" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
+          <button onClick={() => { setTutKeyAberta(emCompeticao ? TUT_COMP_KEY : TUT_EDICAO_KEY); setGuide(0); }} aria-label="Como funciona" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
 
         {(!temEquipa || equipaIrresoluvel) ? (
@@ -628,8 +634,12 @@ export default function MeuTime() {
           step={guide}
           setStep={setGuide}
           onClose={() => {
-            marcarTutorialVisto(emCompeticao ? TUT_COMP_KEY : TUT_EDICAO_KEY);
+            // Marca como visto EXATAMENTE a chave que abriu este tutorial.
+            // (Usar tutKeyAberta — não recalcular por emCompeticao — evita o bug
+            // de abrir um tutorial e gravar outro, que o fazia reaparecer sempre.)
+            marcarTutorialVisto(tutKeyAberta ?? (emCompeticao ? TUT_COMP_KEY : TUT_EDICAO_KEY));
             setGuide(null);
+            setTutKeyAberta(null);
           }}
         />
       )}
