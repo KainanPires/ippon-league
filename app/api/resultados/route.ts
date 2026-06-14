@@ -1,33 +1,81 @@
 // app/api/resultados/route.ts
 //
-// RESULTADOS REAIS — passo 1c (alimentação para a app).
+// RESULTADOS REAIS — pontos de cada atleta numa competição.
 //
-// Dado uma competição, devolve quanto CADA atleta pontuou de verdade, somando a
-// pontuação de todas as lutas dele. A pontuação de cada luta é calculada por
-// scoreContestSide (lib/ijf.ts), que já aplica as regras fechadas: shido sofrido
-// crescente (-2,-3,-4), shido provocado +1 (x2 só em vitória por hansoku-make) e
-// hansoku-make a contar como hansoku (sem o ippon fantasma).
+// FONTE (corrigido): quando recebe a lista de atletas (?persons=id1,id2,...),
+// busca as lutas DE CADA ATLETA via competitor.contests e filtra pela competição.
+// Isto resolve o caso em que competition.contests vem INCOMPLETO durante/logo
+// após o evento (ex.: Tahiti 2026 só devolvia -52 e -60, deixando os outros
+// atletas a 0 mesmo já tendo lutado). O competitor.contests traz o histórico
+// completo do atleta, com as lutas da competição em curso.
 //
-// O id de cada atleta é o id_person do JudoBase — o MESMO id que vem do mercado
-// (/api/atletas), por isso a equipa do jogador casa diretamente com este mapa.
+// Retrocompatível: SEM ?persons, mantém o comportamento antigo (competition.contests,
+// todos os atletas da competição) — usado onde se quer o mapa completo.
 //
-// Uso: /api/resultados?comp=3131   (competicao terminada -> tem pontos)
-//      /api/resultados?comp=3295   (Tahiti -> ainda sem lutas, mapa vazio)
+// Os campos das lutas são idênticos nos dois endpoints, por isso o cálculo
+// (scoreContestSide / scoreContestForPerson) é o mesmo.
+//
+// Uso:
+//   /api/resultados?comp=3295&persons=4143,67160,32250   (pontua só estes — recomendado)
+//   /api/resultados?comp=3131                            (todos — modo antigo)
 import { NextResponse } from "next/server";
-import { getCompetitionContests, scoreContestSide } from "@/lib/ijf";
+import {
+  getCompetitionContests,
+  getCompetitorContests,
+  scoreContestSide,
+  scoreContestForPerson,
+} from "@/lib/ijf";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const comp = searchParams.get("comp");
+  const comp = (searchParams.get("comp") || "").trim();
+  const personsParam = (searchParams.get("persons") || "").trim();
+
   if (!comp) {
     return NextResponse.json(
       { erro: "Falta ?comp=<id_competition>. Ex.: /api/resultados?comp=3131" },
       { status: 400 }
     );
   }
+
+  // MODO POR ATLETA (recomendado): pontua só os atletas pedidos, buscando as
+  // lutas de cada um (competitor.contests) filtradas pela competição.
+  if (personsParam) {
+    const ids = personsParam.split(",").map((s) => s.trim()).filter(Boolean);
+    const pontos: Record<string, number> = {};
+    let nLutas = 0;
+
+    // Em paralelo, mas com cuidado: cada atleta é uma chamada à API.
+    await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const todas = await getCompetitorContests(id);
+          const desta = (todas || []).filter((f) => String(f.id_competition) === comp);
+          let soma = 0;
+          for (const f of desta) soma += scoreContestForPerson(f, id);
+          pontos[id] = Math.round(soma * 10) / 10;
+          nLutas += desta.length;
+        } catch {
+          pontos[id] = 0;
+        }
+      })
+    );
+
+    return NextResponse.json({
+      comp,
+      modo: "por_atleta",
+      tem_resultados: nLutas > 0,
+      n_lutas: nLutas,
+      n_atletas: Object.keys(pontos).length,
+      pontos,
+    });
+  }
+
+  // MODO ANTIGO (todos os atletas da competição) — competition.contests.
+  // Mantido por retrocompatibilidade. Pode vir incompleto durante o evento.
   const contests = await getCompetitionContests(comp);
-  // Soma os pontos de cada atleta (por id_person) ao longo de todas as lutas.
   const pontos: Record<string, number> = {};
   for (const f of contests) {
     const lados: ["b" | "w", string][] = [
@@ -41,9 +89,10 @@ export async function GET(req: Request) {
   }
   return NextResponse.json({
     comp,
+    modo: "por_competicao",
     tem_resultados: contests.length > 0,
     n_lutas: contests.length,
     n_atletas: Object.keys(pontos).length,
-    pontos, // { "<id_person>": <pontos>, ... }
+    pontos,
   });
 }
