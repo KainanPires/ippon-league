@@ -14,7 +14,7 @@ interface ConfrontoAPI {
   id: string;
   ronda: number;
   ordem: number;
-  fase: "normal" | "final" | "bronze";
+  fase: "normal" | "final" | "bronze" | "repescagem";
   jogador_a: string;
   jogador_b: string | null;
   id_competicao: string;
@@ -23,6 +23,7 @@ interface ConfrontoAPI {
   vencedor: string | null;
   decidido_por: string | null;
   estado: "pendente" | "decidido";
+  metade?: "cima" | "baixo" | null;
 }
 interface Identidade { nome_time: string; escudo: Identity | null; }
 interface RespostaChave {
@@ -149,6 +150,9 @@ function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial, onVerEquipa }: 
   const { confrontos, totalRondas, podio, liga, nInscritos } = dados;
   const terminada = liga.copa_estado === "terminada";
   const chaveGrande = nInscritos >= 8; // repescagem em cadeia só com 8+
+  // Já existem confrontos de repescagem gerados pelo motor? Se sim, mostram-se
+  // nas rondas (a sério); se não (início da copa), mostra-se a nota explicativa.
+  const temRepescagemReal = confrontos.some((c) => c.fase === "repescagem");
 
   // Competição a decorrer agora (mercado fechado). Confrontos desta competição
   // podem ser espreitados; os de uma ronda com mercado ainda aberto, não.
@@ -174,37 +178,57 @@ function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial, onVerEquipa }: 
         <button onClick={onAbrirTutorial} style={{ flexShrink: 0, background: "transparent", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", padding: "7px 11px", borderRadius: 9, cursor: "pointer" }}>Como funciona</button>
       </div>
 
-      {/* Eliminação principal: uma secção por ronda. */}
+      {/* Eliminação principal: uma secção por ronda. A ronda das semifinais traz
+          a repescagem em paralelo; a última traz a final e os dois bronzes. */}
       {rondas.map((r) => {
         const daRonda = confrontos.filter((c) => c.ronda === r).sort((a, b) => a.ordem - b.ordem);
         const normais = daRonda.filter((c) => c.fase === "normal");
+        const repescagens = daRonda.filter((c) => c.fase === "repescagem");
         const final = daRonda.find((c) => c.fase === "final");
-        const bronze = daRonda.find((c) => c.fase === "bronze");
+        const bronzes = daRonda.filter((c) => c.fase === "bronze");
+
+        // Título conforme o conteúdo: bloco final, semis+repescagem, ou o nome
+        // normal pela posição na chave.
+        const titulo = final
+          ? "Final e bronzes"
+          : repescagens.length > 0
+          ? "Semifinais e repescagem"
+          : nomeRonda(r, totalRondas);
 
         return (
           <div key={r} style={{ marginBottom: 18 }}>
-            <SecaoTitulo>{nomeRonda(r, totalRondas)}</SecaoTitulo>
+            <SecaoTitulo>{titulo}</SecaoTitulo>
 
-            {/* Confrontos normais da ronda. */}
+            {/* Confrontos normais (eliminação / semifinais). */}
             {normais.map((c) => (
               <CartaoConfronto key={c.id} c={c} nome={nome} escudoDe={escudoDe} idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} />
             ))}
 
-            {/* Na última ronda: a final em destaque + o bronze. */}
+            {/* Repescagem desta ronda (corre em paralelo com as semifinais). */}
+            {repescagens.length > 0 && (
+              <>
+                <div style={{ fontFamily: FD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7fb89a", margin: "10px 0 7px" }}>Repescagem</div>
+                {repescagens.map((c) => (
+                  <CartaoConfronto key={c.id} c={c} nome={nome} escudoDe={escudoDe} destaque="repescagem" idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} />
+                ))}
+              </>
+            )}
+
+            {/* Bloco final: a final em destaque + os dois bronzes (cruzados). */}
             {final && (
               <CartaoConfronto c={final} nome={nome} escudoDe={escudoDe} destaque="final" idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} />
             )}
-            {bronze && (
-              <CartaoConfronto c={bronze} nome={nome} escudoDe={escudoDe} destaque="bronze" idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} />
-            )}
+            {bronzes.map((c) => (
+              <CartaoConfronto key={c.id} c={c} nome={nome} escudoDe={escudoDe} destaque="bronze" idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} />
+            ))}
           </div>
         );
       })}
 
-      {/* Zona de repescagem — só faz sentido com chave grande (8+). Como o motor
-          que a gera ainda não está ligado, mostramos a estrutura PREVISTA, de
-          forma explicativa, para o jogador entender o que aí vem. */}
-      {chaveGrande && (
+      {/* Nota explicativa da repescagem — só ENQUANTO ela ainda não foi gerada
+          (início da copa, antes das semis). Quando os confrontos reais existem,
+          aparecem nas rondas acima e esta nota desaparece. */}
+      {chaveGrande && !temRepescagemReal && (
         <div style={{ marginBottom: 18 }}>
           <SecaoTitulo>Repescagem e bronze</SecaoTitulo>
           <div style={{ background: "#101511", border: "1px dashed #2f4a3c", borderRadius: 14, padding: "14px 15px" }}>
@@ -233,7 +257,7 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa
   c: ConfrontoAPI;
   nome: (uid: string | null) => string;
   escudoDe: (uid: string | null) => Identity;
-  destaque?: "final" | "bronze";
+  destaque?: "final" | "bronze" | "repescagem";
   idADecorrer: string | null;
   onVerEquipa: (uid: string, comp: string) => void;
 }) {
@@ -244,7 +268,7 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa
   // Trancado enquanto o mercado desta ronda não fechar (anti-cópia).
   const trancado = !podeVerEquipa(c, idADecorrer);
 
-  const cor = destaque === "final" ? GOLD : destaque === "bronze" ? "#c87f43" : "#243029";
+  const cor = destaque === "final" ? GOLD : destaque === "bronze" ? "#c87f43" : destaque === "repescagem" ? "#5b8f73" : "#243029";
   const etiqueta = destaque === "final" ? "Final" : destaque === "bronze" ? "Disputa de bronze" : null;
 
   return (
