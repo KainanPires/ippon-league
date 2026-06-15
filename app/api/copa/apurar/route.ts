@@ -7,23 +7,26 @@
 // atual ainda tem competição a decorrer, ou já está decidida e a seguinte já
 // existe, não duplica nada.
 //
-// FONTE DOS PONTOS (corrigido): lê de resultados_atletas (CONGELADO pelo motor
-// lib/congelar), NÃO de getCompetitionContests (que vinha incompleto durante e
-// após o evento — era a causa de o apurar nunca decidir, o bug do mata-mata).
+// MOTOR (Fase 2): usa gerarRondaSeguinteComRepescagem (lib/copa) — eliminação +
+// repescagem em paralelo com as semis + bloco final com 2 bronzes cruzados.
+// A escalação de cada confronto continua a ser decidida pela cascata
+// (pontos -> capitão -> sorteio) e os pontos vêm de resultados_atletas
+// (CONGELADO pelo motor lib/congelar). A `metade` (lado da chave) é lida e
+// propagada para a repescagem/cruzamento funcionarem; a `fase` aceita o novo
+// valor "repescagem" (coluna text — sem alteração à tabela).
 //
 // O que faz:
 //   1) encontra a ronda mais baixa com confrontos PENDENTES
-//   2) confirma que a competição dessa ronda já está CONGELADA (tem resultados
-//      em resultados_atletas) — se não, ainda não apura
-//   3) para cada confronto: calcula os pontos de cada jogador (equipa na
-//      competição, capitão a dobrar) e decide com o desempate em cascata
-//   4) quando a ronda fica toda decidida, gera a ronda seguinte
+//   2) confirma que a competição dessa ronda já está CONGELADA — se não, não apura
+//   3) decide cada confronto da ronda (semis e repescagem decidem-se juntos,
+//      por estarem na mesma competição)
+//   4) quando a ronda fica toda decidida, gera a ronda seguinte (com repescagem)
 //
 // Recebe (POST): { league_id }
 // Devolve: { ok, apurou, ronda, decididos, gerouProxima, terminada }
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { decidirConfronto, gerarRondaSeguinte, idCompeticaoSeguinte, competicaoPorId, type PontosJogador, type ConfrontoDB } from "@/lib/copa";
+import { decidirConfronto, gerarRondaSeguinteComRepescagem, idCompeticaoSeguinte, type PontosJogador, type ConfrontoRonda } from "@/lib/copa";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
 export const dynamic = "force-dynamic";
@@ -68,10 +71,10 @@ export async function POST(req: Request) {
   const nomeLiga = String(liga.name || "a tua liga");
   const linkCopa = "/ligas";
 
-  // 1) Todos os confrontos da liga.
+  // 1) Todos os confrontos da liga (inclui `metade`, necessária à repescagem).
   const { data: todos } = await supabaseAdmin
     .from("copa_confrontos")
-    .select("id, ronda, ordem, fase, jogador_a, jogador_b, id_competicao, vencedor, estado")
+    .select("id, ronda, ordem, fase, jogador_a, jogador_b, id_competicao, vencedor, estado, metade")
     .eq("league_id", league_id)
     .order("ronda", { ascending: true })
     .order("ordem", { ascending: true });
@@ -138,6 +141,7 @@ export async function POST(req: Request) {
     const vencedor = r.vencedor;
     const perdedor = vencedor === c.jogador_a ? c.jogador_b : c.jogador_a;
     const fase = String(c.fase || "");
+
     if (fase === "final") {
       await criarNotificacaoServidor({
         paraUserId: vencedor,
@@ -156,14 +160,48 @@ export async function POST(req: Request) {
         });
       }
     } else if (fase === "bronze") {
+      // Vencedor do bronze sobe ao pódio (3º). O perdedor fica às portas do pódio.
       await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_avancou",
         titulo: "3º lugar na Copa Ippon 🥉",
-        corpo: `Venceste o confronto de 3º lugar na Copa da liga "${nomeLiga}". Subiste ao pódio!`,
+        corpo: `Venceste a disputa do bronze na Copa da liga "${nomeLiga}". Subiste ao pódio!`,
         link: linkCopa,
       });
+      if (perdedor) {
+        await criarNotificacaoServidor({
+          paraUserId: perdedor,
+          tipo: "copa_eliminado",
+          titulo: "Às portas do pódio",
+          corpo: `Perdeste a disputa do bronze na Copa da liga "${nomeLiga}", mas chegaste muito longe. Que campanha!`,
+          link: linkCopa,
+        });
+      }
+    } else if (fase === "repescagem") {
+      // A repescagem é a última chance: quem ganha segue para o bronze; quem
+      // perde, aí sim, está eliminado.
+      await criarNotificacaoServidor({
+        paraUserId: vencedor,
+        tipo: "copa_avancou",
+        titulo: "Venceste na repescagem! 🔁",
+        corpo: `Ganhaste o teu confronto de repescagem na Copa da liga "${nomeLiga}" e segues para a disputa do bronze. A segunda chance é tua!`,
+        link: linkCopa,
+      });
+      if (perdedor) {
+        await criarNotificacaoServidor({
+          paraUserId: perdedor,
+          tipo: "copa_eliminado",
+          titulo: "Eliminado na repescagem",
+          corpo: `Perdeste o confronto de repescagem na Copa da liga "${nomeLiga}". Foi uma boa campanha — para a próxima, a revanche é tua!`,
+          link: linkCopa,
+        });
+      }
     } else {
+      // Fase "normal" (quartos/semis): o VENCEDOR avança. O PERDEDOR NÃO é
+      // notificado de eliminação — no judô há repescagem: quem perde um quarto
+      // vai à repescagem, quem perde uma semi vai ao bronze. Será notificado
+      // nessa fase (ganhar/perder a repescagem, ou o bronze). Evita o falso
+      // "foste eliminado" a quem ainda tem campanha pela frente.
       await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_avancou",
@@ -171,22 +209,13 @@ export async function POST(req: Request) {
         corpo: `Venceste o teu confronto na Copa da liga "${nomeLiga}". Segues em frente — prepara a próxima ronda!`,
         link: linkCopa,
       });
-      if (perdedor) {
-        await criarNotificacaoServidor({
-          paraUserId: perdedor,
-          tipo: "copa_eliminado",
-          titulo: "Eliminado da Copa",
-          corpo: `Foste eliminado da Copa da liga "${nomeLiga}" nesta ronda. Na próxima edição, a revanche é tua!`,
-          link: linkCopa,
-        });
-      }
     }
   }
 
-  // 4) A ronda ficou toda decidida? Gera a ronda seguinte.
+  // 4) A ronda ficou toda decidida? Gera a ronda seguinte (com repescagem).
   const { data: rondaFinal } = await supabaseAdmin
     .from("copa_confrontos")
-    .select("ronda, ordem, fase, jogador_a, jogador_b, vencedor, estado")
+    .select("ronda, ordem, fase, jogador_a, jogador_b, vencedor, estado, metade")
     .eq("league_id", league_id)
     .eq("ronda", rondaAtual)
     .order("ordem", { ascending: true });
@@ -203,7 +232,7 @@ export async function POST(req: Request) {
     } else {
       const idProxima = idCompeticaoSeguinte(comp);
       if (idProxima) {
-        const novos = gerarRondaSeguinte(rondaFinal as ConfrontoDB[], idProxima);
+        const novos = gerarRondaSeguinteComRepescagem(rondaFinal as ConfrontoRonda[], idProxima);
         if (novos.length > 0) {
           const linhas = novos.map((n) => ({
             league_id,
@@ -213,6 +242,7 @@ export async function POST(req: Request) {
             jogador_a: n.jogador_a,
             jogador_b: n.jogador_b,
             id_competicao: n.id_competicao,
+            metade: n.metade,
             estado: "pendente",
             ...(n.jogador_b === null ? { vencedor: n.jogador_a, decidido_por: "bye", estado: "decidido" } : {}),
           }));
