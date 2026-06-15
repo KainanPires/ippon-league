@@ -119,10 +119,14 @@ function MeuTimeInner() {
         setSaved(localDecorrer);
         setIdComp(aDecorrer.idCompeticao);
       } else if (montar) {
-        // Marca "montar" ativa (veio do lixo): mostra VAZIO, não carrega a equipa
-        // salva. A pessoa está a montar uma nova no ciclo mercado<->meu-time.
-        setTeam({ ids: [], captain: null });
-        setSaved(loadSavedFor(alvo.idCompeticao)); // guarda a salva como referência (não a mostra)
+        // Marca "montar" ativa (veio do lixo): IGNORA a equipa salva (a antiga,
+        // na nuvem), mas RESPEITA o rascunho — o que a pessoa está a montar no
+        // mercado. Se não mexeu no mercado, o rascunho está vazio -> mostra vazio
+        // (e a antiga volta ao sair do ciclo). Se montou, o rascunho tem os
+        // atletas -> mostra-os, para escolher capitão e salvar.
+        const d = loadDraftFor(alvo.idCompeticao);
+        setTeam(d);
+        setSaved(loadSavedFor(alvo.idCompeticao)); // a antiga, só como referência
         setIdComp(alvo.idCompeticao);
       } else {
         // Mercado aberto. O "Meu Time" mostra a equipa guardada; o rascunho só
@@ -177,8 +181,9 @@ function MeuTimeInner() {
         const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
         if (!active || !naAlvo) return;
         setSaved(naAlvo);
-        // Marca "montar" ativa: NÃO repor o team a partir da nuvem — fica vazio
-        // (a pessoa está a montar uma nova). Só guardamos a salva como referência.
+        // Marca "montar" ativa: NÃO repor o team a partir da nuvem (a antiga). O
+        // team já reflete o rascunho (vazio se não mexeu, ou a equipa montada no
+        // mercado). Só guardamos a salva (antiga) como referência.
         if (montar) return;
         // A equipa guardada na conta (nuvem) é a fonte de verdade. Para o "Meu Time"
         // não pensar que há alterações por guardar quando NÃO há (ex.: voltar do
@@ -381,6 +386,15 @@ function MeuTimeInner() {
   //    mantém a equipa anterior (saved) se houver, senão fica vazio (modal "incompleta").
   //  - sem alterações -> sai direto.
   function tryLeave(href: string) {
+    // No ciclo "montar" (veio do lixo): sair para fora do mercado descarta o que
+    // se montou e deixa a equipa antiga voltar (só salvar confirma uma nova). Se
+    // o destino é o mercado, fica no ciclo (não descarta). Limpamos o rascunho
+    // para a equipa salva (antiga) reaparecer ao voltar.
+    if (montar && !href.startsWith("/mercado")) {
+      saveDraftFor(alvo.idCompeticao, saved);
+      router.push(href);
+      return;
+    }
     if (!dirty) { router.push(href); return; }
     if (!isComplete(team)) { setLeaveTo(href); setModal({ kind: "incompleta" }); return; }
     setLeaveTo(href); setModal({ kind: "leave" });
