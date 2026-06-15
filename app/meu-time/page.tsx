@@ -70,10 +70,14 @@ export default function MeuTime() {
   );
 }
 
-// Decide entre o TEU próprio dojo (MeuTimeInner — editável / em competição) e o
-// MODO VISITA (ver o dojo de um rival a partir da liga, via ?ver=<user>&comp=<id>).
-// Só é visita quando ?ver existe, ?comp existe, e o alvo NÃO és tu. Se ?ver és
-// tu mesmo (clicaste no teu nome na liga), cai no fluxo normal.
+// Decide entre o TEU dojo VIVO (MeuTimeInner — editável / em competição) e o
+// MODO VISITA (só-leitura) — ver um dojo via ?ver=<user>&comp=<id>, vindo da
+// liga ou da chave da Copa.
+// Regra: é VISITA quando (a) o alvo é um rival, OU (b) sou eu mas a competição
+// pedida NÃO é a que está viva agora (ex.: ver o meu próprio time numa ronda
+// passada da Copa). Só caio no MeuTimeInner editável quando sou eu E na ronda
+// atual — que é o caso normal de abrir o "Meu Time" e de clicar no meu nome na
+// liga (cujo ?comp é sempre a competição que decorre).
 function MeuTimeRouter() {
   const searchParams = useSearchParams();
   const ver = searchParams.get("ver");
@@ -91,34 +95,56 @@ function MeuTimeRouter() {
     return () => { active = false; };
   }, []);
 
+  // A competição "viva" agora: a que decorre (mercado fechado) ou a próxima de
+  // mercado aberto. Serve para distinguir o meu dojo editável de uma ronda passada.
+  const foco = focoMercado();
+  const compViva = (foco.aDecorrer ?? foco.alvo).idCompeticao;
+
   if (ver && comp) {
     // Ainda a descobrir quem sou: espera (evita piscar o dojo errado).
     if (meuId === undefined) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
-    if (meuId !== ver) return <DojoVisita alvoUserId={ver} idComp={comp} />;
-    // ver === eu -> é o meu próprio dojo -> fluxo normal.
+    const ehRival = meuId !== ver;
+    const rondaPassada = comp !== compViva;
+    if (ehRival || rondaPassada) return <DojoVisita alvoUserId={ver} idComp={comp} />;
+    // sou eu E na ronda atual -> o meu dojo vivo/editável (fluxo normal).
   }
   return <MeuTimeInner />;
 }
 
 // ===========================================================================
-// MODO VISITA — ver o dojo de um RIVAL (só-leitura), a partir da liga.
+// MODO VISITA — ver um DOJO em só-leitura (rival na liga, ou qualquer equipa
+// numa ronda da Copa, incluindo a minha própria numa ronda passada).
 // ---------------------------------------------------------------------------
-// A equipa do rival é lida pela rota de SERVIDOR /api/equipa-na-rodada, que usa
-// service-role e contorna a RLS de `equipas` (do cliente não conseguiríamos ler
-// a linha de outro user — viria vazio). Dela tiramos ids + capitão + nome +
-// escudo. Os atletas resolvem-se pela pool da competição (/api/atletas?id=comp,
-// para ter género/preço, igual ao próprio dojo) e os pontos ao vivo por
-// /api/resultados (mesma fonte do ranking da liga). NADA é editável: sem lixo,
-// sem partilhar, sem salvar, sem capitão/vender — só o detalhe luta-a-luta.
+// FONTE PRINCIPAL: /api/equipa-na-rodada (servidor, service-role, contorna a RLS).
+// Devolve sempre nome + escudo + capitão + a lista de atletas com nome/país/
+// categoria/pontos congelados — funciona mesmo em rondas antigas da Copa.
+// ENRIQUECIMENTO: /api/atletas?id=comp (a "pool") dá género e preço. Quando a
+// pool resolve TODOS os atletas (ronda a decorrer / competição recente) mostramos
+// a GRELHA de tatame (M/F) com detalhe luta-a-luta; quando não (histórico sem
+// pool), caímos numa LISTA com pontos — sem perder informação.
+// PONTOS: ao vivo via /api/resultados só na ronda que decorre agora; nas rondas
+// passadas usamos os pontos congelados que a equipa-na-rodada já trouxe.
+// NADA é editável: sem lixo, sem partilhar, sem salvar, sem capitão/vender.
 // ===========================================================================
+type ItemVisita = {
+  id: string;
+  nome: string;
+  pais: string;       // ISO ("JP") ou já IOC ("JPN"); code3() normaliza
+  categoria: string;  // ex.: "73"
+  capitao: boolean;
+  gender?: string;    // "M" | "F" quando a pool resolveu
+  athlete?: Athlete;  // Athlete completo da pool (para a grelha e o detalhe)
+};
+
 function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string }) {
   const router = useRouter();
   const [fase, setFase] = useState<"carregando" | "sem-equipa" | "erro" | "ok">("carregando");
+  const [souEu, setSouEu] = useState(false);
   const [nomeTime, setNomeTime] = useState("Equipa");
   const [escudoAlvo, setEscudoAlvo] = useState<Identity | null>(null);
-  const [ids, setIds] = useState<string[]>([]);
+  const [nomeComp, setNomeComp] = useState<string>("");
+  const [itens, setItens] = useState<ItemVisita[]>([]);
   const [capitao, setCapitao] = useState<string | null>(null);
-  const [poolMap, setPoolMap] = useState<Map<string, Athlete>>(new Map());
   const [pontos, setPontos] = useState<Record<string, number>>({});
   const [temResultados, setTemResultados] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null);
@@ -127,58 +153,82 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   const foco = focoMercado();
   const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp;
 
-  // 1) Sessão (exige login) + equipa do rival (servidor) + pool da competição.
+  // 1) Sessão (exige login) + equipa do alvo (servidor) + pool da competição.
   useEffect(() => {
     let active = true;
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (!active) return;
-      if (!(data as { session: unknown }).session) { window.location.href = "/entrar"; return; }
+      const sess = (data as { session: { user?: { id?: string } } | null }).session;
+      if (!sess) { window.location.href = "/entrar"; return; }
+      setSouEu((sess.user?.id ?? "") === alvoUserId);
 
       const poolP = fetch(`/api/atletas?id=${idComp}`).then((r) => r.json()).catch(() => null);
       const eqP = fetch(`/api/equipa-na-rodada?user=${encodeURIComponent(alvoUserId)}&comp=${encodeURIComponent(idComp)}`).then((r) => r.json()).catch(() => null);
       const [poolJson, eqJson] = await Promise.all([poolP, eqP]);
       if (!active) return;
 
-      const m = new Map<string, Athlete>();
-      const lista: Athlete[] = Array.isArray(poolJson?.atletas) ? poolJson.atletas : [];
-      for (const a of lista) m.set(a.id, a);
-      setPoolMap(m);
-
       if (!eqJson || !eqJson.ok) { setFase("erro"); return; }
+      if (typeof eqJson?.competicao?.nome === "string") setNomeComp(eqJson.competicao.nome);
       if (!eqJson.tem_equipa) {
         if (typeof eqJson.nome_time === "string") setNomeTime(eqJson.nome_time);
         setFase("sem-equipa");
         return;
       }
-      const listaAtletas: { id: unknown }[] = Array.isArray(eqJson.atletas) ? eqJson.atletas : [];
-      setIds(listaAtletas.map((x) => String(x.id)));
+
+      const pool = new Map<string, Athlete>();
+      const lista: Athlete[] = Array.isArray(poolJson?.atletas) ? poolJson.atletas : [];
+      for (const a of lista) pool.set(a.id, a);
+
+      const base: { id: unknown; nome?: unknown; pais?: unknown; categoria?: unknown; pontos?: unknown; capitao?: unknown }[] =
+        Array.isArray(eqJson.atletas) ? eqJson.atletas : [];
+      const novosItens: ItemVisita[] = base.map((a) => {
+        const id = String(a.id);
+        const p = pool.get(id);
+        return {
+          id,
+          nome: p?.name || String(a.nome || "Atleta"),
+          pais: p?.countryIso || String(a.pais || ""),
+          categoria: p?.category || String(a.categoria || ""),
+          capitao: !!a.capitao,
+          gender: p?.gender,
+          athlete: p,
+        };
+      });
+      const pontosBase: Record<string, number> = {};
+      for (const a of base) pontosBase[String(a.id)] = Number(a.pontos) || 0;
+
+      setItens(novosItens);
       setCapitao(eqJson.capitao ? String(eqJson.capitao) : null);
       setNomeTime(String(eqJson.nome_time || "Equipa"));
       setEscudoAlvo((eqJson.escudo as Identity) ?? null);
+      setPontos(pontosBase);
+      // Ronda passada -> há resultados congelados; ronda a decorrer -> espera a
+      // resposta do /api/resultados (efeito 2) para saber se já há lutas.
+      setTemResultados(!aDecorrerAgora);
       setFase("ok");
     })();
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alvoUserId, idComp]);
 
-  // 2) Pontos do rival (+ tick ao vivo se a competição decorre agora).
+  // 2) Pontos AO VIVO — só quando esta é a competição que decorre agora.
   useEffect(() => {
-    if (fase !== "ok" || ids.length === 0) return;
+    if (fase !== "ok" || !aDecorrerAgora || itens.length === 0) return;
     let active = true;
+    const ids = itens.map((i) => i.id);
     const buscar = () => {
       fetch(`/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`)
         .then((r) => r.json())
         .then((j) => {
           if (!active) return;
-          setPontos(j && j.pontos ? j.pontos : {});
+          if (j && j.pontos) setPontos(j.pontos);
           setTemResultados(!!(j && j.tem_resultados));
           setUltimaAtualizacao(Date.now());
         })
         .catch(() => {});
     };
     buscar();
-    if (!aDecorrerAgora) return () => { active = false; };
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       buscar();
@@ -191,15 +241,16 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
       document.removeEventListener("visibilitychange", onVis);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fase, ids, idComp, aDecorrerAgora]);
+  }, [fase, aDecorrerAgora, itens, idComp]);
 
-  const resolvidos = ids.map((id) => poolMap.get(id)).filter(Boolean) as Athlete[];
-  const ausentes = ids.filter((id) => !poolMap.get(id));
-  const males = resolvidos.filter((a) => a.gender === "M");
-  const females = resolvidos.filter((a) => a.gender === "F");
-  const scoreOf = (a: Athlete) => { const b = pontos[a.id] ?? 0; return a.id === capitao ? b * 2 : b; };
-  const totalPts = Math.round(resolvidos.reduce((s, a) => s + scoreOf(a), 0) * 10) / 10;
-  const squadValue = fmt(resolvidos.reduce((s, a) => s + a.priceJc, 0));
+  const scoreOf = (id: string, cap: boolean) => { const b = pontos[id] ?? 0; return cap ? b * 2 : b; };
+  const totalPts = Math.round(itens.reduce((s, i) => s + scoreOf(i.id, i.capitao), 0) * 10) / 10;
+  // Grelha de tatame só quando a pool deu género (e Athlete) para TODOS. Senão,
+  // lista robusta (histórico sem pool) — igual ao antigo modal da chave.
+  const podeGrelha = itens.length > 0 && itens.every((i) => (i.gender === "M" || i.gender === "F") && !!i.athlete);
+  const males = itens.filter((i) => i.gender === "M" && i.athlete);
+  const females = itens.filter((i) => i.gender === "F" && i.athlete);
+  const squadValue = podeGrelha ? fmt(itens.reduce((s, i) => s + (i.athlete?.priceJc ?? 0), 0)) : null;
   const phase: MarketPhase = temResultados ? "ao-vivo" : "fechado";
   const horaTick = ultimaAtualizacao
     ? new Date(ultimaAtualizacao).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -210,10 +261,10 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
       <style>{`@keyframes ilp{0%,100%{opacity:1}50%{opacity:.25}} .ilp{animation:ilp 1.1s ease-in-out infinite}`}</style>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 40px" }}>
         <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
-          <button onClick={() => router.back()} aria-label="Voltar à liga" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", cursor: "pointer", flexShrink: 0 }}>
+          <button onClick={() => router.back()} aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", cursor: "pointer", flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           </button>
-          <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>Dojo do rival</h1>
+          <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>{souEu ? "O teu dojo" : "Dojo do rival"}</h1>
         </header>
 
         {fase === "carregando" && (
@@ -233,8 +284,8 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
         {fase === "sem-equipa" && (
           <div style={{ textAlign: "center", padding: "26px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
             <div style={{ width: 90, height: 90, margin: "0 auto 6px" }}><Mascot belt={BELT_HEX} expression="indicando" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Ainda sem equipa</h2>
-            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>Este treinador ainda não escalou equipa para esta rodada.</p>
+            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Sem equipa nesta rodada</h2>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{souEu ? "Não escalaste equipa nesta competição." : "Este treinador não escalou equipa nesta competição."}</p>
           </div>
         )}
 
@@ -245,30 +296,48 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.06em" }}>Dojo de</div>
                 <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeTime}</div>
+                {nomeComp && <div style={{ fontSize: 11, color: "#7fd1a3", marginTop: 1 }}>{nomeComp}</div>}
               </div>
             </div>
 
-            <section style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
-              <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
-                <SectionLabel>Masculino</SectionLabel>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
-                  {males.map((a) => <Cell key={a.id} a={a} captain={a.id === capitao} score={scoreOf(a)} phase={phase} onClick={() => setModal(a)} />)}
+            {podeGrelha ? (
+              <section style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
+                <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
+                  <SectionLabel>Masculino</SectionLabel>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
+                    {males.map((i) => <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={phase} onClick={() => setModal(i.athlete!)} />)}
+                  </div>
+                  <SectionLabel>Feminino</SectionLabel>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                    {females.map((i) => <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={phase} onClick={() => setModal(i.athlete!)} />)}
+                  </div>
                 </div>
-                <SectionLabel>Feminino</SectionLabel>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-                  {females.map((a) => <Cell key={a.id} a={a} captain={a.id === capitao} score={scoreOf(a)} phase={phase} onClick={() => setModal(a)} />)}
-                </div>
-              </div>
-            </section>
-
-            {ausentes.length > 0 && (
-              <div style={{ marginTop: 14, background: "#121815", border: "1px solid #3a2422", borderRadius: 14, padding: "12px 14px" }}>
-                <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#ef8d83", marginBottom: 6 }}>
-                  {ausentes.length === 1 ? "1 atleta indisponível" : `${ausentes.length} atletas indisponíveis`}
-                </div>
-                <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>
-                  {ausentes.length === 1 ? "Um atleta desta equipa não está inscrito nesta competição." : "Alguns atletas desta equipa não estão inscritos nesta competição."}
-                </p>
+              </section>
+            ) : (
+              // FALLBACK em lista (histórico sem pool): país + nome + CAP + pontos
+              // simples por atleta. O capitão dobra só no total, em baixo.
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                {itens.map((i) => {
+                  const p = pontos[i.id] ?? 0;
+                  return (
+                    <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#141a17", border: `1px solid ${i.capitao ? "#FF8F00" : "#243029"}`, borderRadius: 11, padding: "9px 11px" }}>
+                      <div style={{ width: 30, height: 34, borderRadius: 6, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 8, padding: "1px 3px", borderRadius: 2 }}>{code3(i.pais)}</div>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{i.nome}</span>
+                          {i.capitao && <span style={{ background: "#FF8F00", color: "#1b1208", fontFamily: FD, fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 5, flexShrink: 0 }}>CAP</span>}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: "#93a39a" }}>{code3(i.pais)}{i.categoria ? ` · ${i.categoria}kg` : ""}</div>
+                      </div>
+                      <div style={{ flexShrink: 0, textAlign: "right" }}>
+                        <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: p >= 0 ? "#7fd1a3" : "#ef8d83" }}>{p >= 0 ? "+" : ""}{p}</span>
+                        <div style={{ fontSize: 8.5, color: "#5f6f67", textTransform: "uppercase" }}>pts</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -276,17 +345,17 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={BELT_HEX} expression={phase === "ao-vivo" ? "determinado" : "feliz"} /></div>
                 <div>
-                  <div style={{ fontSize: 12, color: "#93a39a" }}>{phase === "ao-vivo" ? "A rodada está a decorrer!" : "Pré-competição"}</div>
-                  <div style={{ fontSize: 12, color: "#7fd1a3", fontWeight: 700, marginTop: 2 }}>{`Valor da equipa: JC ${squadValue}`}</div>
+                  <div style={{ fontSize: 12, color: "#93a39a" }}>{aDecorrerAgora ? "A rodada está a decorrer!" : "Resultado da rodada"}</div>
+                  {squadValue && <div style={{ fontSize: 12, color: "#7fd1a3", fontWeight: 700, marginTop: 2 }}>{`Valor da equipa: JC ${squadValue}`}</div>}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>{phase === "ao-vivo" ? totalPts : `JC ${squadValue}`}</div>
-                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{phase === "ao-vivo" ? "pts" : "valor"}</div>
+                <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>{totalPts >= 0 ? "+" : ""}{totalPts}</div>
+                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
               </div>
             </div>
 
-            {phase === "ao-vivo" && horaTick && (
+            {aDecorrerAgora && horaTick && (
               <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 11, color: "#7fd1a3" }}>
                   <span className="ilp" style={{ width: 7, height: 7, borderRadius: "50%", background: "#7fd1a3" }} />
@@ -296,7 +365,9 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
             )}
 
             <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
-              Estás a ver o dojo de um rival. Toca num atleta para ver como pontuou.
+              {podeGrelha
+                ? (souEu ? "A tua equipa nesta rodada. Toca num atleta para ver como pontuou." : "Estás a ver o dojo de um rival. Toca num atleta para ver como pontuou.")
+                : "Pontos de cada atleta nesta competição. O capitão (CAP) conta a dobrar no total."}
             </p>
           </>
         )}
@@ -306,7 +377,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
         <AthleteDetail
           a={modal}
           captain={modal.id === capitao}
-          score={scoreOf(modal)}
+          score={scoreOf(modal.id, modal.id === capitao)}
           temResultados={temResultados}
           editavel={false}
           idComp={idComp}
