@@ -69,8 +69,8 @@ const CARD_CSS = `
 .dhero-label{font-weight:500;font-size:34px;letter-spacing:6px;text-transform:uppercase;color:#93a39a;margin-bottom:30px}
 .dhero-pts{font-family:'Arial Black','Helvetica Neue',Helvetica,Arial,sans-serif;font-weight:900;font-size:230px;line-height:1.1;letter-spacing:-4px;color:var(--score-color);text-shadow:0 0 80px var(--score-glow);display:block;height:250px}
 .dhero-unit{font-weight:500;font-size:38px;line-height:1.35;letter-spacing:5px;text-transform:uppercase;color:#93a39a;margin-top:30px}
-.dhero-comp{margin-top:52px;font-weight:700;font-size:42px;line-height:1.25;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;max-width:90%}
-.dcards{display:flex;gap:24px;margin:36px 0 8px}
+.dhero-comp{margin-top:50px;font-weight:700;font-size:38px;line-height:1.2;letter-spacing:0.3px;text-transform:uppercase;color:#f1ede2;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dcards{display:flex;gap:24px;margin:56px 0 8px}
 .dchip-card{flex:1;background:rgba(12,14,13,0.55);border:2px solid var(--card-border);border-radius:20px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:6px}
 .dchip-role{font-weight:700;font-size:24px;letter-spacing:3px;text-transform:uppercase;color:var(--role-color)}
 .dchip-flag{margin-top:4px;background:var(--accent);color:var(--chip-text);font-family:'Courier New',Courier,monospace;font-weight:700;font-size:26px;letter-spacing:1px;padding:4px 14px;border-radius:7px}
@@ -180,10 +180,14 @@ export function CartaoDesempenho({
     setBusy(false);
     if (!blob) return;
     const file = new File([blob], "ippon-desempenho.png", { type: "image/png" });
+    // Link para a app: a raiz encaminha conforme a sessão (com conta -> início;
+    // sem conta -> entrada/cadastro).
+    const link = "https://ippon-league.vercel.app";
+    const texto = `Fiz ${sinal(dados.pontuacaoTotal)} pts em ${dados.nomeCompeticao} na Ippon League! Joga também: ${link}`;
     const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean; share?: (d: unknown) => Promise<void> };
     try {
       if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
-        await nav.share({ files: [file], title: "O meu desempenho na Ippon League", text: `Fiz ${sinal(dados.pontuacaoTotal)} pts em ${dados.nomeCompeticao}!` });
+        await nav.share({ files: [file], title: "O meu desempenho na Ippon League", text: texto, url: link });
         return;
       }
     } catch { /* cancelado */ }
