@@ -138,7 +138,7 @@ type ItemVisita = {
 
 function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string }) {
   const router = useRouter();
-  const [fase, setFase] = useState<"carregando" | "sem-equipa" | "erro" | "ok">("carregando");
+  const [fase, setFase] = useState<"carregando" | "sem-equipa" | "erro" | "ok" | "bloqueado">("carregando");
   const [souEu, setSouEu] = useState(false);
   const [nomeTime, setNomeTime] = useState("Equipa");
   const [escudoAlvo, setEscudoAlvo] = useState<Identity | null>(null);
@@ -170,6 +170,8 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
 
       if (!eqJson || !eqJson.ok) { setFase("erro"); return; }
       if (typeof eqJson?.competicao?.nome === "string") setNomeComp(eqJson.competicao.nome);
+      // Portão do servidor: mercado ainda aberto -> não há escalação para mostrar.
+      if (eqJson.bloqueado) { setFase("bloqueado"); return; }
       if (!eqJson.tem_equipa) {
         if (typeof eqJson.nome_time === "string") setNomeTime(eqJson.nome_time);
         setFase("sem-equipa");
@@ -286,6 +288,17 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
             <div style={{ width: 90, height: 90, margin: "0 auto 6px" }}><Mascot belt={BELT_HEX} expression="indicando" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Sem equipa nesta rodada</h2>
             <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{souEu ? "Não escalaste equipa nesta competição." : "Este treinador não escalou equipa nesta competição."}</p>
+          </div>
+        )}
+
+        {fase === "bloqueado" && (
+          <div style={{ textAlign: "center", padding: "28px 18px", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16 }}>
+            <div style={{ fontSize: 32, marginBottom: 6 }}>🔒</div>
+            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Mercado ainda aberto</h2>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>
+              As equipas {nomeComp ? <>de <strong style={{ color: "#f1ede2" }}>{nomeComp}</strong> </> : "desta rodada "}
+              só ficam visíveis quando o mercado fechar. Assim ninguém copia a escalação antes da hora — volta quando a competição começar.
+            </p>
           </div>
         )}
 
