@@ -56,6 +56,10 @@ export default function PaginaChave() {
   const [estado, setEstado] = useState<"carregando" | "ok" | "erro">("carregando");
   const [erro, setErro] = useState("");
   const [tutorial, setTutorial] = useState(false);
+  // Modal "ver equipa de uma pessoa naquela ronda": guarda o user + competição
+  // do confronto clicado. A equipa é a daquela competição (fixa) — sem risco de
+  // mostrar a equipa nova que o jogador montou para a competição seguinte.
+  const [verEquipa, setVerEquipa] = useState<{ uid: string; comp: string } | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -109,20 +113,24 @@ export default function PaginaChave() {
         )}
 
         {estado === "ok" && dados && (
-          <ChaveConteudo dados={dados} nome={nome} escudoDe={escudoDe} onAbrirTutorial={() => setTutorial(true)} />
+          <ChaveConteudo dados={dados} nome={nome} escudoDe={escudoDe} onAbrirTutorial={() => setTutorial(true)} onVerEquipa={(uid, comp) => setVerEquipa({ uid, comp })} />
         )}
       </div>
 
       {tutorial && <TutorialChave onClose={() => setTutorial(false)} />}
+      {verEquipa && (
+        <ModalEquipaRodada uid={verEquipa.uid} comp={verEquipa.comp} nome={nome} onClose={() => setVerEquipa(null)} />
+      )}
     </main>
   );
 }
 
-function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial }: {
+function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial, onVerEquipa }: {
   dados: RespostaChave;
   nome: (uid: string | null) => string;
   escudoDe: (uid: string | null) => Identity;
   onAbrirTutorial: () => void;
+  onVerEquipa: (uid: string, comp: string) => void;
 }) {
   const { confrontos, totalRondas, podio, liga, nInscritos } = dados;
   const terminada = liga.copa_estado === "terminada";
@@ -161,15 +169,15 @@ function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial }: {
 
             {/* Confrontos normais da ronda. */}
             {normais.map((c) => (
-              <CartaoConfronto key={c.id} c={c} nome={nome} escudoDe={escudoDe} />
+              <CartaoConfronto key={c.id} c={c} nome={nome} escudoDe={escudoDe} onVerEquipa={onVerEquipa} />
             ))}
 
             {/* Na última ronda: a final em destaque + o bronze. */}
             {final && (
-              <CartaoConfronto c={final} nome={nome} escudoDe={escudoDe} destaque="final" />
+              <CartaoConfronto c={final} nome={nome} escudoDe={escudoDe} destaque="final" onVerEquipa={onVerEquipa} />
             )}
             {bronze && (
-              <CartaoConfronto c={bronze} nome={nome} escudoDe={escudoDe} destaque="bronze" />
+              <CartaoConfronto c={bronze} nome={nome} escudoDe={escudoDe} destaque="bronze" onVerEquipa={onVerEquipa} />
             )}
           </div>
         );
@@ -203,11 +211,12 @@ function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial }: {
 
 // Um cartão de confronto: dois jogadores, escudo + nome + pontos, vencedor
 // destacado. `destaque` muda a moldura (final dourada, bronze acobreado).
-function CartaoConfronto({ c, nome, escudoDe, destaque }: {
+function CartaoConfronto({ c, nome, escudoDe, destaque, onVerEquipa }: {
   c: ConfrontoAPI;
   nome: (uid: string | null) => string;
   escudoDe: (uid: string | null) => Identity;
   destaque?: "final" | "bronze";
+  onVerEquipa: (uid: string, comp: string) => void;
 }) {
   const decidido = c.estado === "decidido";
   const bye = c.jogador_b === null;
@@ -222,7 +231,7 @@ function CartaoConfronto({ c, nome, escudoDe, destaque }: {
       {etiqueta && (
         <div style={{ fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: cor, marginBottom: 7 }}>{etiqueta}</div>
       )}
-      <LinhaJogador uid={c.jogador_a} pontos={c.pontos_a} venceu={venceuA} perdeu={decidido && !venceuA} nome={nome} escudoDe={escudoDe} />
+      <LinhaJogador uid={c.jogador_a} pontos={c.pontos_a} venceu={venceuA} perdeu={decidido && !venceuA} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_a && onVerEquipa(c.jogador_a, c.id_competicao)} />
       {bye ? (
         <div style={{ fontSize: 11, color: "#7c8a82", textAlign: "center", padding: "4px 0", fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.05em" }}>passou (sem adversário)</div>
       ) : (
@@ -232,7 +241,7 @@ function CartaoConfronto({ c, nome, escudoDe, destaque }: {
             <span style={{ fontSize: 9.5, color: "#5f6f67", fontFamily: FD, fontWeight: 700 }}>{estadoLabel(c)}</span>
             <div style={{ flex: 1, height: 1, background: "#1a221d" }} />
           </div>
-          <LinhaJogador uid={c.jogador_b} pontos={c.pontos_b} venceu={venceuB} perdeu={decidido && !venceuB} nome={nome} escudoDe={escudoDe} />
+          <LinhaJogador uid={c.jogador_b} pontos={c.pontos_b} venceu={venceuB} perdeu={decidido && !venceuB} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_b && onVerEquipa(c.jogador_b, c.id_competicao)} />
         </>
       )}
     </div>
@@ -248,25 +257,32 @@ function estadoLabel(c: ConfrontoAPI): string {
   return "a aguardar";
 }
 
-function LinhaJogador({ uid, pontos, venceu, perdeu, nome, escudoDe }: {
+function LinhaJogador({ uid, pontos, venceu, perdeu, nome, escudoDe, onVerEquipa }: {
   uid: string | null;
   pontos: number | null;
   venceu: boolean;
   perdeu: boolean;
   nome: (uid: string | null) => string;
   escudoDe: (uid: string | null) => Identity;
+  onVerEquipa?: () => void;
 }) {
+  const clicavel = !!uid && !!onVerEquipa;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", opacity: perdeu ? 0.5 : 1 }}>
+    <button
+      onClick={() => { if (clicavel) onVerEquipa!(); }}
+      disabled={!clicavel}
+      style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", opacity: perdeu ? 0.5 : 1, width: "100%", background: "transparent", border: "none", cursor: clicavel ? "pointer" : "default", textAlign: "left", fontFamily: FB }}
+    >
       <div style={{ flexShrink: 0 }}><Escudo config={escudoDe(uid)} size={28} /></div>
       <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: venceu ? GOLD : "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {nome(uid)}
         {venceu && <span style={{ marginLeft: 6, fontSize: 11 }}>✓</span>}
       </span>
+      {clicavel && <span style={{ flexShrink: 0, fontSize: 10, color: "#5f6f67", fontFamily: FD }}>ver equipa ›</span>}
       <span style={{ flexShrink: 0, fontFamily: FD, fontSize: 15, fontWeight: 700, color: venceu ? GOLD : "#93a39a" }}>
         {pontos !== null && pontos !== undefined ? (pontos >= 0 ? "+" : "") + pontos : "—"}
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -303,6 +319,109 @@ function SecaoTitulo({ children }: { children: React.ReactNode }) {
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
       <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cdb86a" }}>{children}</span>
       <div style={{ flex: 1, height: 1, background: "#1a221d" }} />
+    </div>
+  );
+}
+
+// Modal que mostra a EQUIPA de um jogador NAQUELA competição (ronda), buscada à
+// rota /api/equipa-na-rodada. Só leitura: nome do atleta + país + categoria +
+// pontos simples daquela rodada, capitão destacado, e o total da equipa.
+interface AtletaRodada { id: string; nome: string; pais: string; categoria: string; pontos: number; capitao: boolean }
+interface RespostaEquipaRodada {
+  ok: boolean;
+  tem_equipa?: boolean;
+  nome_time?: string;
+  escudo?: Identity | null;
+  competicao?: { id: string; nome: string };
+  atletas?: AtletaRodada[];
+  total?: number;
+}
+
+const IOC_CHAVE: Record<string, string> = {
+  JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
+  TR: "TUR", UZ: "UZB", RU: "AIN", DE: "GER", XK: "KOS", IT: "ITA", CA: "CAN",
+  SI: "SLO", HR: "CRO", NL: "NED",
+};
+const cod3 = (iso: string) => IOC_CHAVE[iso] || iso;
+
+function ModalEquipaRodada({ uid, comp, nome, onClose }: { uid: string; comp: string; nome: (uid: string | null) => string; onClose: () => void }) {
+  const [dados, setDados] = useState<RespostaEquipaRodada | null>(null);
+  const [estado, setEstado] = useState<"carregando" | "ok" | "vazio" | "erro">("carregando");
+
+  useEffect(() => {
+    let vivo = true;
+    fetch(`/api/equipa-na-rodada?user=${encodeURIComponent(uid)}&comp=${encodeURIComponent(comp)}`)
+      .then((r) => r.json())
+      .then((j: RespostaEquipaRodada) => {
+        if (!vivo) return;
+        if (!j || !j.ok) { setEstado("erro"); return; }
+        if (!j.tem_equipa) { setDados(j); setEstado("vazio"); return; }
+        setDados(j);
+        setEstado("ok");
+      })
+      .catch(() => { if (vivo) setEstado("erro"); });
+    return () => { vivo = false; };
+  }, [uid, comp]);
+
+  const tituloTime = dados?.nome_time || nome(uid);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 120 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "#10160f", borderTop: `2px solid ${GOLD}`, borderRadius: "18px 18px 0 0", padding: "16px 16px 26px", maxHeight: "86%", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+          <div style={{ flexShrink: 0 }}><Escudo config={dados?.escudo || DEFAULT_IDENTITY} size={40} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tituloTime}</div>
+            <div style={{ fontSize: 11, color: "#93a39a" }}>{dados?.competicao?.nome || ""}</div>
+          </div>
+          <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer", flexShrink: 0 }}>✕</button>
+        </div>
+
+        {estado === "carregando" && (
+          <div style={{ textAlign: "center", padding: "30px 16px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar a equipa…</div>
+        )}
+        {estado === "erro" && (
+          <div style={{ textAlign: "center", padding: "26px 16px", color: "#ef8d83", fontSize: 13 }}>Não foi possível carregar a equipa desta rodada.</div>
+        )}
+        {estado === "vazio" && (
+          <div style={{ textAlign: "center", padding: "26px 16px", color: "#c7d0c9", fontSize: 13, lineHeight: 1.5 }}>
+            Este jogador não tinha equipa escalada nesta competição.
+          </div>
+        )}
+
+        {estado === "ok" && dados && dados.atletas && (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 8 }}>
+              {dados.atletas.map((a) => (
+                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#141a17", border: `1px solid ${a.capitao ? "#FF8F00" : "#243029"}`, borderRadius: 11, padding: "9px 11px" }}>
+                  <div style={{ width: 30, height: 34, borderRadius: 6, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 8, padding: "1px 3px", borderRadius: 2 }}>{cod3(a.pais)}</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{a.nome}</span>
+                      {a.capitao && <span style={{ background: "#FF8F00", color: "#1b1208", fontFamily: FD, fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 5, flexShrink: 0 }}>CAP</span>}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "#93a39a" }}>{cod3(a.pais)}{a.categoria ? ` · ${a.categoria}kg` : ""}</div>
+                  </div>
+                  <div style={{ flexShrink: 0, textAlign: "right" }}>
+                    <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: a.pontos >= 0 ? "#7fd1a3" : "#ef8d83" }}>{a.pontos >= 0 ? "+" : ""}{a.pontos}</span>
+                    <div style={{ fontSize: 8.5, color: "#5f6f67", textTransform: "uppercase" }}>pts</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "11px 13px", background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12 }}>
+              <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#f1ede2" }}>Total da equipa</span>
+              <span style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: GOLD }}>{(dados.total ?? 0) >= 0 ? "+" : ""}{dados.total ?? 0} pts</span>
+            </div>
+            <div style={{ fontSize: 10.5, color: "#5f6f67", textAlign: "center", marginTop: 8, lineHeight: 1.4 }}>
+              Pontos de cada atleta nesta competição. O capitão (CAP) conta a dobrar no total.
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
