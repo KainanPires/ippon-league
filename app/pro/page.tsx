@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { supabase } from "@/lib/supabase";
 import { loadSavedCloudFor, resolve, setAthletePool, type TeamState } from "@/lib/team";
-import { focoMercado } from "@/lib/calendario";
+import { focoMercado, numeroDaRodada } from "@/lib/calendario";
 import type { Athlete } from "@/lib/athletes";
 import type { Dossie } from "@/lib/scout";
 
@@ -29,6 +29,7 @@ export default function DashboardPro() {
   const [estado, setEstado] = useState<"carregando" | "pro">("carregando");
   const [nome, setNome] = useState("Campeão");
   const [compNome, setCompNome] = useState("");
+  const [rodadaComp, setRodadaComp] = useState<number | null>(null); // nº da rodada no calendário (1..52)
   const [atletas, setAtletas] = useState<Athlete[] | null>(null);
   const [capitao, setCapitao] = useState<string | null>(null);
   const [dossies, setDossies] = useState<Record<string, EstadoDossie>>({});
@@ -54,6 +55,7 @@ export default function DashboardPro() {
       const compFoco = foco.aDecorrer ?? foco.alvo;
       const idComp = compFoco.idCompeticao;
       setCompNome(compFoco.nome);
+      setRodadaComp(numeroDaRodada(idComp));
 
       // Lista de atletas da competição (para nome/país/preço dos cartões).
       try {
@@ -124,7 +126,7 @@ export default function DashboardPro() {
         <SectionTitle>O scout do teu time</SectionTitle>
         {compNome && (
           <p style={{ fontSize: 12, color: "#93a39a", margin: "0 0 12px", lineHeight: 1.5 }}>
-            Média de pontos de cada atleta <strong style={{ color: "#cfd8d2" }}>no nível desta competição</strong> ({compNome}). Toca para o dossiê completo.
+            Média de pontos de cada atleta <strong style={{ color: "#cfd8d2" }}>no nível desta competição</strong> ({compNome}{rodadaComp ? ` · Rodada ${rodadaComp}` : ""}). Toca para o dossiê completo.
           </p>
         )}
 
