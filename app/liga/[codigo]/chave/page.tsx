@@ -48,6 +48,15 @@ function nomeRonda(ronda: number, totalRondas: number): string {
   }
 }
 
+// Abre o DOJO de um jogador NAQUELA ronda (competição). Reutiliza a mesma página
+// do "Meu Time" em modo visita (grelha de tatame, pontos e detalhe luta-a-luta),
+// tal como o "ver dojo" da liga — uma única experiência para ver equipas alheias.
+// Como cada ronda é uma competição própria (id_competicao), passamos o comp da
+// ronda: o modo visita mostra a escalação FIXA daquela rodada.
+function abrirDojo(uid: string, comp: string) {
+  window.location.href = `/meu-time?ver=${encodeURIComponent(uid)}&comp=${encodeURIComponent(comp)}`;
+}
+
 export default function PaginaChave() {
   const params = useParams();
   const codigo = String(params?.codigo || "").toUpperCase();
@@ -56,10 +65,6 @@ export default function PaginaChave() {
   const [estado, setEstado] = useState<"carregando" | "ok" | "erro">("carregando");
   const [erro, setErro] = useState("");
   const [tutorial, setTutorial] = useState(false);
-  // Modal "ver equipa de uma pessoa naquela ronda": guarda o user + competição
-  // do confronto clicado. A equipa é a daquela competição (fixa) — sem risco de
-  // mostrar a equipa nova que o jogador montou para a competição seguinte.
-  const [verEquipa, setVerEquipa] = useState<{ uid: string; comp: string } | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -113,14 +118,11 @@ export default function PaginaChave() {
         )}
 
         {estado === "ok" && dados && (
-          <ChaveConteudo dados={dados} nome={nome} escudoDe={escudoDe} onAbrirTutorial={() => setTutorial(true)} onVerEquipa={(uid, comp) => setVerEquipa({ uid, comp })} />
+          <ChaveConteudo dados={dados} nome={nome} escudoDe={escudoDe} onAbrirTutorial={() => setTutorial(true)} onVerEquipa={abrirDojo} />
         )}
       </div>
 
       {tutorial && <TutorialChave onClose={() => setTutorial(false)} />}
-      {verEquipa && (
-        <ModalEquipaRodada uid={verEquipa.uid} comp={verEquipa.comp} nome={nome} onClose={() => setVerEquipa(null)} />
-      )}
     </main>
   );
 }
@@ -319,109 +321,6 @@ function SecaoTitulo({ children }: { children: React.ReactNode }) {
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
       <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cdb86a" }}>{children}</span>
       <div style={{ flex: 1, height: 1, background: "#1a221d" }} />
-    </div>
-  );
-}
-
-// Modal que mostra a EQUIPA de um jogador NAQUELA competição (ronda), buscada à
-// rota /api/equipa-na-rodada. Só leitura: nome do atleta + país + categoria +
-// pontos simples daquela rodada, capitão destacado, e o total da equipa.
-interface AtletaRodada { id: string; nome: string; pais: string; categoria: string; pontos: number; capitao: boolean }
-interface RespostaEquipaRodada {
-  ok: boolean;
-  tem_equipa?: boolean;
-  nome_time?: string;
-  escudo?: Identity | null;
-  competicao?: { id: string; nome: string };
-  atletas?: AtletaRodada[];
-  total?: number;
-}
-
-const IOC_CHAVE: Record<string, string> = {
-  JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
-  TR: "TUR", UZ: "UZB", RU: "AIN", DE: "GER", XK: "KOS", IT: "ITA", CA: "CAN",
-  SI: "SLO", HR: "CRO", NL: "NED",
-};
-const cod3 = (iso: string) => IOC_CHAVE[iso] || iso;
-
-function ModalEquipaRodada({ uid, comp, nome, onClose }: { uid: string; comp: string; nome: (uid: string | null) => string; onClose: () => void }) {
-  const [dados, setDados] = useState<RespostaEquipaRodada | null>(null);
-  const [estado, setEstado] = useState<"carregando" | "ok" | "vazio" | "erro">("carregando");
-
-  useEffect(() => {
-    let vivo = true;
-    fetch(`/api/equipa-na-rodada?user=${encodeURIComponent(uid)}&comp=${encodeURIComponent(comp)}`)
-      .then((r) => r.json())
-      .then((j: RespostaEquipaRodada) => {
-        if (!vivo) return;
-        if (!j || !j.ok) { setEstado("erro"); return; }
-        if (!j.tem_equipa) { setDados(j); setEstado("vazio"); return; }
-        setDados(j);
-        setEstado("ok");
-      })
-      .catch(() => { if (vivo) setEstado("erro"); });
-    return () => { vivo = false; };
-  }, [uid, comp]);
-
-  const tituloTime = dados?.nome_time || nome(uid);
-
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 120 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "#10160f", borderTop: `2px solid ${GOLD}`, borderRadius: "18px 18px 0 0", padding: "16px 16px 26px", maxHeight: "86%", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-          <div style={{ flexShrink: 0 }}><Escudo config={dados?.escudo || DEFAULT_IDENTITY} size={40} /></div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tituloTime}</div>
-            <div style={{ fontSize: 11, color: "#93a39a" }}>{dados?.competicao?.nome || ""}</div>
-          </div>
-          <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer", flexShrink: 0 }}>✕</button>
-        </div>
-
-        {estado === "carregando" && (
-          <div style={{ textAlign: "center", padding: "30px 16px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar a equipa…</div>
-        )}
-        {estado === "erro" && (
-          <div style={{ textAlign: "center", padding: "26px 16px", color: "#ef8d83", fontSize: 13 }}>Não foi possível carregar a equipa desta rodada.</div>
-        )}
-        {estado === "vazio" && (
-          <div style={{ textAlign: "center", padding: "26px 16px", color: "#c7d0c9", fontSize: 13, lineHeight: 1.5 }}>
-            Este jogador não tinha equipa escalada nesta competição.
-          </div>
-        )}
-
-        {estado === "ok" && dados && dados.atletas && (
-          <>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 8 }}>
-              {dados.atletas.map((a) => (
-                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#141a17", border: `1px solid ${a.capitao ? "#FF8F00" : "#243029"}`, borderRadius: 11, padding: "9px 11px" }}>
-                  <div style={{ width: 30, height: 34, borderRadius: 6, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 8, padding: "1px 3px", borderRadius: 2 }}>{cod3(a.pais)}</div>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{a.nome}</span>
-                      {a.capitao && <span style={{ background: "#FF8F00", color: "#1b1208", fontFamily: FD, fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 5, flexShrink: 0 }}>CAP</span>}
-                    </div>
-                    <div style={{ fontSize: 10.5, color: "#93a39a" }}>{cod3(a.pais)}{a.categoria ? ` · ${a.categoria}kg` : ""}</div>
-                  </div>
-                  <div style={{ flexShrink: 0, textAlign: "right" }}>
-                    <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: a.pontos >= 0 ? "#7fd1a3" : "#ef8d83" }}>{a.pontos >= 0 ? "+" : ""}{a.pontos}</span>
-                    <div style={{ fontSize: 8.5, color: "#5f6f67", textTransform: "uppercase" }}>pts</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, padding: "11px 13px", background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12 }}>
-              <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#f1ede2" }}>Total da equipa</span>
-              <span style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: GOLD }}>{(dados.total ?? 0) >= 0 ? "+" : ""}{dados.total ?? 0} pts</span>
-            </div>
-            <div style={{ fontSize: 10.5, color: "#5f6f67", textAlign: "center", marginTop: 8, lineHeight: 1.4 }}>
-              Pontos de cada atleta nesta competição. O capitão (CAP) conta a dobrar no total.
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }
