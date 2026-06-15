@@ -74,7 +74,7 @@ const CARD_CSS = `
 .dchip-card{flex:1;background:rgba(12,14,13,0.55);border:2px solid var(--card-border);border-radius:20px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:6px}
 .dchip-role{font-weight:700;font-size:24px;letter-spacing:3px;text-transform:uppercase;color:var(--role-color)}
 .dchip-flag{margin-top:4px;background:var(--accent);color:var(--chip-text);font-family:'Courier New',Courier,monospace;font-weight:700;font-size:26px;letter-spacing:1px;padding:4px 14px;border-radius:7px}
-.dchip-name{font-weight:700;font-size:40px;line-height:1;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dchip-name{font-weight:700;font-size:32px;line-height:1.06;letter-spacing:0.3px;text-transform:uppercase;color:#f1ede2;max-width:100%;overflow-wrap:break-word;word-break:break-word;min-height:68px;display:flex;align-items:center;justify-content:center;text-align:center}
 .dchip-pts{font-family:'Courier New',Courier,monospace;font-weight:700;font-size:46px;color:var(--pts-color)}
 .dcard-foot{margin-top:14px;padding-top:26px;border-top:1.5px solid rgba(241,237,226,0.10);text-align:center}
 .dfoot-main{font-weight:700;font-size:46px;letter-spacing:8px;text-transform:uppercase;color:#d9a441;text-shadow:0 0 26px rgba(217,164,65,0.35)}
@@ -187,7 +187,7 @@ export function CartaoDesempenho({
     const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean; share?: (d: unknown) => Promise<void> };
     try {
       if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
-        await nav.share({ files: [file], title: "O meu desempenho na Ippon League", text: texto, url: link });
+        await nav.share({ files: [file], title: "O meu desempenho na Ippon League", text: texto });
         return;
       }
     } catch { /* cancelado */ }
