@@ -115,6 +115,9 @@ async function pontuarAtletasDaCompeticao(
     let pontos = 0;
     let vitorias = 0;
     let derrotas = 0;
+    // Agregado de AÇÕES (a "razão" do ponto): soma de todas as lutas. Só para
+    // exibição no popup do ranking. O total de pontos vem de scoreContestForPerson.
+    const acc = { ippon: 0, waza: 0, yuko: 0, shido_provocado: 0, ippon_sof: 0, waza_sof: 0, yuko_sof: 0, shido_sof: 0 };
     for (const f of desta) {
       pontos += scoreContestForPerson(f, id);
       const w = String(f.id_winner ?? "");
@@ -122,8 +125,29 @@ async function pontuarAtletasDaCompeticao(
         if (w === id) vitorias++;
         else derrotas++;
       }
+      // Lado do atleta nesta luta + agregação das ações (campos crus da API).
+      const lado = String(f.id_person_blue) === id ? "b" : (String(f.id_person_white) === id ? "w" : null);
+      if (lado) {
+        const opp = lado === "b" ? "w" : "b";
+        const num = (campo: string) => { const x = parseInt(String((f as unknown as Record<string, unknown>)[campo] ?? "0"), 10); return isNaN(x) ? 0 : x; };
+        const hansoku = num("penalty_b") >= 3 || num("penalty_w") >= 3;
+        // Em hansoku-make o ippon é fantasma: não o contamos (nem feito nem sofrido).
+        if (!hansoku) {
+          acc.ippon += num(`ippon_${lado}`);
+          acc.ippon_sof += num(`ippon_${opp}`);
+        }
+        acc.waza += num(`waza_${lado}`);
+        acc.yuko += num(`yuko_${lado}`);
+        acc.waza_sof += num(`waza_${opp}`);
+        acc.yuko_sof += num(`yuko_${opp}`);
+        acc.shido_provocado += num(`penalty_${opp}`); // shido do adversário = provocado por este atleta
+        acc.shido_sof += num(`penalty_${lado}`);        // shido deste lado = sofrido
+      }
     }
     pontos = round1(pontos);
+    // Remove os campos a zero para o jsonb ficar compacto (o popup só mostra o que existe).
+    const acoes: Record<string, number> = {};
+    for (const [k, v] of Object.entries(acc)) if (v > 0) acoes[k] = v;
 
     // Expectativa: calcularForma sobre TODO o histórico (reaproveita a busca).
     const forma = calcularForma(lutas, id);
@@ -153,6 +177,7 @@ async function pontuarAtletasDaCompeticao(
         preco_novo: r.newPrice,
         variacao_jc: r.delta,
         variacao_pct: r.appliedVariationPct,
+        acoes,
         congelado_em: new Date().toISOString(),
       },
       { onConflict: "id_competicao,id_person" }
