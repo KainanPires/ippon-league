@@ -383,7 +383,9 @@ export default function Inicio() {
           </div>
         </Card>
 
-        {emAndamento ? (
+        {/* Janela "ao vivo" — só aparece quando há mesmo uma competição a decorrer.
+            Fora de competição não mostra nada (não faz sentido um "ao vivo" vazio). */}
+        {emAndamento && (
           <Card>
             <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}>
               <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
@@ -392,16 +394,6 @@ export default function Inicio() {
             <div style={{ fontSize: 13, fontWeight: 700 }}>{aDecorrer?.nome ?? comp.nome}</div>
             <div style={{ fontSize: 12, color: "#93a39a", marginTop: 3, lineHeight: 1.4 }}>
               A competição está a decorrer. Acompanha as pontuações dos teus atletas no teu time, ao vivo.
-            </div>
-          </Card>
-        ) : (
-          <Card>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3a463f" }} />
-              <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#6f7d76" }}>Ao vivo</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.4 }}>
-              Sem competição a decorrer agora. Quando houver, acompanhas aqui as lutas e as pontuações ao vivo.
             </div>
           </Card>
         )}
