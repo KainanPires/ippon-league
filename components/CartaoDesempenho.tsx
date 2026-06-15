@@ -66,10 +66,10 @@ const CARD_CSS = `
 .dteam-name{margin:0;font-weight:700;font-size:58px;line-height:0.98;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .dbelt-pill{display:inline-block;margin-top:14px;padding:9px 26px;border-radius:9px;background:var(--accent);color:var(--chip-text);font-weight:600;font-size:26px;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap}
 .dhero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:0}
-.dhero-label{font-weight:500;font-size:34px;letter-spacing:6px;text-transform:uppercase;color:#93a39a;margin-bottom:18px}
-.dhero-pts{font-weight:700;font-size:240px;line-height:1;letter-spacing:-2px;color:var(--score-color);text-shadow:0 0 80px var(--score-glow)}
-.dhero-unit{font-weight:500;font-size:40px;letter-spacing:8px;text-transform:uppercase;color:#93a39a;margin-top:14px}
-.dhero-comp{margin-top:34px;font-weight:600;font-size:44px;line-height:1.1;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;max-width:90%}
+.dhero-label{font-weight:500;font-size:34px;letter-spacing:6px;text-transform:uppercase;color:#93a39a;margin-bottom:30px}
+.dhero-pts{font-weight:700;font-size:230px;line-height:1.1;letter-spacing:-2px;color:var(--score-color);text-shadow:0 0 80px var(--score-glow);display:block;height:250px}
+.dhero-unit{font-weight:500;font-size:40px;letter-spacing:8px;text-transform:uppercase;color:#93a39a;margin-top:28px}
+.dhero-comp{margin-top:40px;font-weight:600;font-size:44px;line-height:1.2;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;max-width:90%}
 .dcards{display:flex;gap:24px;margin:36px 0 8px}
 .dchip-card{flex:1;background:rgba(12,14,13,0.55);border:2px solid var(--card-border);border-radius:20px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:6px}
 .dchip-role{font-weight:700;font-size:24px;letter-spacing:3px;text-transform:uppercase;color:var(--role-color)}
@@ -158,7 +158,24 @@ export function CartaoDesempenho({
     if (!node) return null;
     try {
       const h2i = await loadHtmlToImage() as { toBlob: (n: HTMLElement, o: Record<string, unknown>) => Promise<Blob> };
-      if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch {} }
+      // Garante que a fonte Oswald (a do cartão) está carregada ANTES de capturar.
+      // Sem isto, o html-to-image rasteriza com uma fonte de fallback de métricas
+      // diferentes -> o texto sai sobreposto na imagem (apesar de a pré-visualização
+      // estar bem). Pedimos explicitamente os pesos usados e esperamos.
+      try {
+        const docFonts = (document as unknown as { fonts?: { load: (f: string) => Promise<unknown>; ready: Promise<unknown> } }).fonts;
+        if (docFonts) {
+          await Promise.all([
+            docFonts.load("700 240px Oswald"),
+            docFonts.load("600 44px Oswald"),
+            docFonts.load("500 40px Oswald"),
+            docFonts.load("700 46px 'JetBrains Mono'"),
+          ]).catch(() => {});
+          await docFonts.ready;
+        }
+      } catch {}
+      // Pequena pausa extra para o layout assentar com a fonte já aplicada.
+      await new Promise((r) => setTimeout(r, 120));
       return await h2i.toBlob(node, { width: 1080, height: 1350, pixelRatio: 1, cacheBust: true, backgroundColor: "#0c0e0d" });
     } catch { return null; }
   }
