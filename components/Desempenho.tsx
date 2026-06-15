@@ -5,7 +5,7 @@ import { Mascot } from "@/components/Mascot";
 import { CartaoDesempenho } from "@/components/CartaoDesempenho";
 import type { Identity } from "@/components/Escudo";
 import type { TeamState } from "@/lib/team";
-import { type DesempenhoRodada, mensagemDesempenho } from "@/lib/desempenho";
+import { type DesempenhoRodada, type ResumoExtra, mensagemDesempenho } from "@/lib/desempenho";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -21,6 +21,7 @@ export function Desempenho({
   nome,
   faixa = "Branca",
   pro = false,
+  extra,
   onClose,
 }: {
   dados: DesempenhoRodada;
@@ -29,6 +30,7 @@ export function Desempenho({
   nome: string;
   faixa?: string;
   pro?: boolean;
+  extra?: ResumoExtra | null;
   onClose: () => void;
 }) {
   const [partilhar, setPartilhar] = useState(false);
@@ -55,6 +57,42 @@ export function Desempenho({
           </div>
 
           <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "10px 0 18px" }}>{mensagemDesempenho(total, nome)}</p>
+
+          {/* BÓNUS: posição na rodada + comparação com a média (só no modal) */}
+          {extra && extra.totalJogadores > 0 && (
+            <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: GOLD }}>{extra.posicao}º</div>
+                  <div style={{ fontSize: 9.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em" }}>de {extra.totalJogadores}</div>
+                </div>
+                <div style={{ width: 1, height: 34, background: "#243029" }} />
+                <div>
+                  <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: "#cfd8d2" }}>{extra.media}</div>
+                  <div style={{ fontSize: 9.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em" }}>média geral</div>
+                </div>
+                {extra.patrimonio != null && (
+                  <>
+                    <div style={{ width: 1, height: 34, background: "#243029" }} />
+                    <div>
+                      <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: extra.ganho >= 0 ? "#7fd1a3" : "#ef8d83" }}>
+                        {extra.ganho >= 0 ? "+" : ""}{extra.ganho}
+                      </div>
+                      <div style={{ fontSize: 9.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em" }}>JC rodada</div>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: extra.acimaDaMedia ? "#7fd1a3" : "#d9a441", marginTop: 10, fontWeight: 700 }}>
+                {extra.acimaDaMedia ? "Acima da média da rodada! 👏" : "Abaixo da média — a próxima é tua."}
+              </div>
+              {extra.patrimonio != null && (
+                <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>
+                  Património: <span style={{ color: GOLD, fontWeight: 700 }}>JC {extra.patrimonio}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Capitão + melhor atleta */}
           <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
