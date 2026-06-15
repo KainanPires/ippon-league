@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { competicaoDaSemana, competicaoFechada, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
+import { competicaoDaSemana, competicaoFechada, focoMercado, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
 import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes } from "@/lib/ijf";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { congelarCompeticao } from "@/lib/congelar";
@@ -265,10 +265,15 @@ export async function GET(req: Request) {
   }
 
   // (B) Prepara os preços da competição que se aproxima (14 categorias).
+  // IMPORTANTE: calcula a competição que o MERCADO vai mostrar — focoMercado().alvo
+  // — e não competicaoDaSemana(). Quando o mercado da competição da semana já
+  // fechou, o mercado salta para a PRÓXIMA (alvo); se o cron calculasse a "da
+  // semana", a competição que se escala ficava sem preços (média 0.0). Alinhar
+  // os dois resolve isso.
   let comp = searchParams.get("comp");
   let alvo: SemanaCalendario | null = null;
   if (!comp) {
-    alvo = competicaoDaSemana(hoje);
+    alvo = focoMercado(hoje).alvo;
     comp = alvo.idCompeticao;
   }
 
