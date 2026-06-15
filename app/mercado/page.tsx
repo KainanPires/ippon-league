@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
 import { loadDraftFor, saveDraftFor, setAthletePool } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
@@ -29,16 +30,14 @@ const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Aposta": ["#2a1f3a", "#b79be0"],
 };
 
-type SortId = "caros" | "baratos" | "valorizados" | "desvalorizados" | "media" | "piores" | "val-esperada" | "min-valorizar";
+type SortId = "caros" | "baratos" | "valorizados" | "desvalorizados" | "media" | "min-valorizar";
 const SORTS: { id: SortId; label: string; pro?: boolean }[] = [
   { id: "caros", label: "Mais caros" },
   { id: "baratos", label: "Mais baratos" },
   { id: "valorizados", label: "Valorizados" },
   { id: "desvalorizados", label: "Desvalorizados" },
   { id: "media", label: "Maior média" },
-  { id: "piores", label: "Piores na última rodada" },
-  { id: "val-esperada", label: "Maior valorização esperada", pro: true },
-  { id: "min-valorizar", label: "Menos pontos p/ valorizar", pro: true },
+  { id: "min-valorizar", label: "Mínimo para valorizar", pro: true },
 ];
 const sortLabel = (id: SortId) => SORTS.find((s) => s.id === id)?.label || "Ordenar";
 
@@ -60,7 +59,13 @@ const code3 = (iso: string) => iso;
 
 type SheetKind = "ord" | "fil" | null;
 
-export default function Mercado() {
+function MercadoInner() {
+  // Marca "montar" (?montar=1): vem do lixo do Meu Time. Mantém o ciclo
+  // mercado<->meu-time a montar uma equipa nova. Aqui só a usamos para: (a) partir
+  // do rascunho vazio, e (b) o "Voltar ao Dojo" levar de volta a /meu-time?montar=1.
+  const searchParams = useSearchParams();
+  const montar = searchParams.get("montar") === "1";
+
   const [pool, setPool] = useState<Athlete[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState("");
@@ -99,9 +104,18 @@ export default function Mercado() {
     if (competicaoADecorrer) { setLoading(false); return; }
     let draft: { ids: string[]; captain: string | null } = { ids: [], captain: null };
     try {
-      draft = loadDraftFor(COMPETICAO);
-      setTeam(draft.ids);
-      setCaptain(draft.captain);
+      // Com a marca "montar" (veio do lixo), o mercado parte do VAZIO: a equipa
+      // antiga não deve reaparecer no rascunho. Esvaziamos o rascunho desta
+      // competição uma vez, no arranque.
+      if (montar) {
+        saveDraftFor(COMPETICAO, { ids: [], captain: null });
+        setTeam([]);
+        setCaptain(null);
+      } else {
+        draft = loadDraftFor(COMPETICAO);
+        setTeam(draft.ids);
+        setCaptain(draft.captain);
+      }
       const f = localStorage.getItem(FAV_KEY);
       if (f) setFavs(JSON.parse(f));
       // Guia do Mercado: só aparece se ainda não foi visto neste aparelho NEM na conta.
@@ -230,7 +244,7 @@ export default function Mercado() {
       case "valorizados": return b.variation - a.variation;
       case "desvalorizados": return a.variation - b.variation;
       case "media": return b.avg - a.avg;
-      case "piores": return a.last - b.last;
+      case "min-valorizar": return expEsperada(a) - expEsperada(b);
       default: return b.priceJc - a.priceJc;
     }
   });
@@ -277,11 +291,13 @@ export default function Mercado() {
   const filtroCount = (priceMin > PRICE_MIN ? 1 : 0) + (priceMax < PRICE_MAX ? 1 : 0) + countrySel.length;
   const jcGlow = guide === 0;
   const focus = guide === 1 ? "price" : guide === 2 ? "scout" : null;
-  // Para onde volta o "Voltar ao Dojo" e a seta: se já tens equipa COMPLETA
-  // (8 atletas + capitão), volta para a vista de gestão (/meu-time); senão, para
-  // o modo de montagem (/criar-equipa). Assim, só passar pelo mercado e voltar
-  // com a equipa já feita leva-te ao /meu-time, não à página de montar.
-  const voltarPara = team.length === 8 && !!captain ? "/meu-time" : "/criar-equipa";
+  // Para onde volta o "Voltar ao Dojo" e a seta. Com a marca "montar" (veio do
+  // lixo), mantém o ciclo: volta sempre a /meu-time?montar=1 (para ver o vazio/o
+  // que está a montar). Sem a marca: se já tens equipa COMPLETA (8 + capitão),
+  // vai para /meu-time; senão, para /criar-equipa.
+  const voltarPara = montar
+    ? "/meu-time?montar=1"
+    : team.length === 8 && !!captain ? "/meu-time" : "/criar-equipa";
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -390,6 +406,11 @@ export default function Mercado() {
                       <div className={idx === 0 && focus === "scout" ? "glow" : undefined} style={{ fontSize: 11, color: "#7c8a82", marginTop: 2, display: "inline-block", padding: "2px 4px" }}>
                         Média {a.avg.toFixed(1)} · Última {a.last}
                       </div>
+                      {sort === "min-valorizar" && (
+                        <div style={{ fontSize: 11, color: GOLD, marginTop: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                          <LockIcon /> Mínimo p/ valorizar: {fmt(expEsperada(a))} pts
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => toggle(a)}
@@ -513,6 +534,25 @@ export default function Mercado() {
       {guide !== null && <Tutorial step={guide} setStep={setGuide} onClose={finishTutorial} />}
     </main>
   );
+}
+
+// useSearchParams() exige um limite de Suspense no Next.js — o componente real
+// vive em MercadoInner, envolvido aqui.
+export default function Mercado() {
+  return (
+    <Suspense fallback={<main style={{ minHeight: "100vh", background: "#0c0e0d" }} />}>
+      <MercadoInner />
+    </Suspense>
+  );
+}
+
+// "Mínimo para valorizar" (Pro): quantos pontos o atleta precisa de fazer na
+// competição para superar a sua expectativa — acima disso, o preço sobe e o
+// jogador ganha JC. A expectativa é a média típica do atleta (campo avg, que vem
+// da forma: média 12m). Fazer MAIS do que isto valoriza; logo, quem tem este
+// número mais baixo é mais fácil de valorizar.
+function expEsperada(a: Athlete): number {
+  return Math.max(0, Math.round((a.avg || 0) * 10) / 10);
 }
 
 const cnt: React.CSSProperties = { background: GOLD, color: "#1b211e", borderRadius: 999, fontSize: 11, fontWeight: 700, padding: "1px 7px" };
