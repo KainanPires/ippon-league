@@ -22,7 +22,9 @@ export function Desempenho({
   faixa = "Branca",
   pro = false,
   extra,
-  onClose,
+  daGaleria = false,
+  onFechar,
+  onNaoMostrarMais,
 }: {
   dados: DesempenhoRodada;
   identity: Identity;
@@ -31,7 +33,9 @@ export function Desempenho({
   faixa?: string;
   pro?: boolean;
   extra?: ResumoExtra | null;
-  onClose: () => void;
+  daGaleria?: boolean;
+  onFechar: () => void;
+  onNaoMostrarMais?: () => void;
 }) {
   const [partilhar, setPartilhar] = useState(false);
   const total = dados.pontuacaoTotal;
@@ -118,7 +122,20 @@ export function Desempenho({
           <button onClick={() => setPartilhar(true)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>
             Partilhar desempenho
           </button>
-          <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Fechar</button>
+          {/* Da galeria: só "Fechar". Do popup automático: "Não mostrar mais" (esconde
+              o popup automático) + "Fechar" (só fecha, volta a aparecer no próximo login). */}
+          {daGaleria ? (
+            <button onClick={onFechar} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Fechar</button>
+          ) : (
+            <>
+              {onNaoMostrarMais && (
+                <button onClick={onNaoMostrarMais} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: "1px solid #243029", background: "transparent", color: "#cfd8d2", fontFamily: FB, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+                  Não mostrar mais
+                </button>
+              )}
+              <button onClick={onFechar} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Fechar (ver mais tarde)</button>
+            </>
+          )}
         </div>
       </div>
 
