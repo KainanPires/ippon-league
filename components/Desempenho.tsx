@@ -49,7 +49,9 @@ export function Desempenho({
           <div style={{ width: 80, height: 80, margin: "0 auto 6px" }}>
             <Mascot belt="#141110" expression={total >= 30 ? "comemorando" : "feliz"} />
           </div>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#93a39a" }}>O teu desempenho</div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#93a39a" }}>
+            {dados.numeroRodada ? `Rodada ${dados.numeroRodada} · O teu desempenho` : "O teu desempenho"}
+          </div>
           <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 2px", lineHeight: 1.1 }}>{dados.nomeCompeticao}</h2>
 
           {/* Pontuação grande */}
