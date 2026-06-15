@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { competicaoDaSemana, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
-import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes, getCompetitionContests, scoreContestSide } from "@/lib/ijf";
+import { competicaoDaSemana, competicaoFechada, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
+import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes } from "@/lib/ijf";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { congelarCompeticao } from "@/lib/congelar";
 
 // CRON — prepara sozinho os preços/forma da competição que se aproxima.
 // Corre 1x/dia (vercel.json). Com Fluid Compute, uma função corre até 300s — as
@@ -10,9 +11,14 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 //   /api/cron                  -> prepara a competição que se aproxima (14 categorias)
 //   /api/cron?comp=ID          -> força uma competição específica
 //   /api/cron?key=SEGREDO      -> disparo MANUAL para teste (em vez do cabeçalho da Vercel)
+//   /api/cron?congelar=ID      -> força CONGELAR uma competição específica (teste)
 //
-// Além disso (acrescentado para o sistema de FAIXAS / ranking geral):
-//   (C) regista os pontos dos jogadores nas competições terminadas (tabela pontuacoes)
+// Etapas:
+//   (A) atualiza "a competir agora" (aviso no Mercado)
+//   (B) prepara preços da competição que se aproxima (14 categorias via /api/calcular)
+//   (C) CONGELA as competições recentes terminadas (motor lib/congelar): preenche
+//       resultados_atletas, resultados_rodada, precos_atletas, pontuacoes,
+//       users.patrimony_jc — com a FONTE CORRETA (competitor.contests por atleta).
 //   (D) no início do mês (dia 1), recalcula as faixas do mês anterior (users.belt)
 //
 // Protegido por CRON_SECRET: a Vercel envia "Authorization: Bearer <CRON_SECRET>"
@@ -34,7 +40,7 @@ const CHAVE_AO_VIVO = "_a_competir_agora";
 
 // A partir de quantos jogadores ativos os percentis de faixa "ligam".
 const MIN_JOGADORES = 100;
-// Janela (dias) para procurar competições recém-terminadas a registar.
+// Janela (dias) para procurar competições recém-terminadas a congelar.
 const JANELA_DIAS = 21;
 // Faixas por ordem (melhor → pior). 5+10+15+20+20+20 = 90%; resto (~10%) = branca.
 const ESCADA: { faixa: string; fatia: number }[] = [
@@ -95,62 +101,28 @@ async function atualizarAoVivo(hoje: Date): Promise<{ ao_vivo: string | null; at
   return { ao_vivo: atual.nome, atletas_ao_vivo: ids.length };
 }
 
-// (C) Regista os pontos dos jogadores numa competição terminada (idempotente).
-async function registarPontosCompeticao(comp: string, mes: string): Promise<number> {
-  if (!supabaseAdmin) return 0;
-  const contests = await getCompetitionContests(comp);
-  if (contests.length === 0) return 0; // ainda não terminou / sem resultados
-
-  const pontosAtleta: Record<string, number> = {};
-  for (const f of contests) {
-    const lados: ["b" | "w", string][] = [
-      ["b", String(f.id_person_blue ?? "")],
-      ["w", String(f.id_person_white ?? "")],
-    ];
-    for (const [side, id] of lados) {
-      if (!id) continue;
-      pontosAtleta[id] = (pontosAtleta[id] ?? 0) + scoreContestSide(f, side);
-    }
-  }
-
-  const { data: equipas } = await supabaseAdmin
-    .from("equipas")
-    .select("user_id, atletas, capitao")
-    .eq("id_competicao", comp);
-  const lista = equipas || [];
-  if (lista.length === 0) return 0;
-
-  const linhas = lista.map((e) => {
-    const ids = Array.isArray(e.atletas) ? (e.atletas as string[]).map(String) : [];
-    const capitao = e.capitao ? String(e.capitao) : null;
-    let total = 0;
-    for (const aid of ids) {
-      const p = pontosAtleta[aid] ?? 0;
-      total += p;
-      if (capitao && aid === capitao) total += p; // capitão a dobrar
-    }
-    return { user_id: e.user_id, id_competicao: comp, pontos: Math.round(total * 10) / 10, mes, atualizada_em: new Date().toISOString() };
-  });
-
-  const { error } = await supabaseAdmin
-    .from("pontuacoes")
-    .upsert(linhas, { onConflict: "user_id,id_competicao" });
-  return error ? 0 : linhas.length;
-}
-
-// Regista todas as competições recentes (janela) que já têm resultados.
-async function registarPontosRecentes(hoje: Date): Promise<{ comp: string; registados: number }[]> {
+// (C) CONGELA as competições recentes que já TERMINARAM (regra das 60h).
+// Usa o motor lib/congelar (fonte correta competitor.contests). Idempotente:
+// o motor tem retoma e não incha. Devolve um resumo por competição.
+async function congelarRecentes(hoje: Date): Promise<{ comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean }[]> {
   const agora = hoje.getTime();
   const janelaMs = JANELA_DIAS * 24 * 60 * 60 * 1000;
   const candidatas = CALENDARIO_2026.filter((s) => {
     const inicio = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
-    return inicio <= agora && agora - inicio <= janelaMs;
+    const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
+    return dentroDaJanela && competicaoFechada(s, hoje); // só as JÁ TERMINADAS (60h)
   });
-  const out: { comp: string; registados: number }[] = [];
+
+  const out: { comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean }[] = [];
   for (const s of candidatas) {
     const mes = s.de.slice(0, 7).replace("/", "-");
-    const n = await registarPontosCompeticao(s.idCompeticao, mes);
-    if (n > 0) out.push({ comp: s.idCompeticao, registados: n });
+    const anoEpoca = parseInt(s.de.slice(0, 4), 10);
+    try {
+      const r = await congelarCompeticao(s.idCompeticao, mes, anoEpoca);
+      out.push({ comp: s.idCompeticao, nome: s.nome, processados: r.atletasProcessados, faltam: r.atletasEmFalta, utilizadores: r.utilizadores, completa: r.completa });
+    } catch (e) {
+      out.push({ comp: s.idCompeticao, nome: s.nome, processados: 0, faltam: -1, utilizadores: 0, completa: false });
+    }
   }
   return out;
 }
@@ -212,6 +184,16 @@ export async function GET(req: Request) {
   const t0 = Date.now();
   const hoje = new Date();
 
+  // Disparo manual de congelamento de UMA competição (teste): ?congelar=ID
+  const congelarId = (searchParams.get("congelar") || "").trim();
+  if (congelarId) {
+    const s = CALENDARIO_2026.find((c) => c.idCompeticao === congelarId);
+    const mes = s ? s.de.slice(0, 7).replace("/", "-") : new Date().toISOString().slice(0, 7);
+    const anoEpoca = s ? parseInt(s.de.slice(0, 4), 10) : hoje.getUTCFullYear();
+    const r = await congelarCompeticao(congelarId, mes, anoEpoca);
+    return NextResponse.json({ feito: true, modo: "congelar_forcado", resultado: r, ms_total: Date.now() - t0 });
+  }
+
   // (A) Atualiza a lista de "a competir agora" (para o aviso no Mercado).
   let aoVivo: { ao_vivo: string | null; atletas_ao_vivo: number } = { ao_vivo: null, atletas_ao_vivo: 0 };
   try {
@@ -250,10 +232,12 @@ export async function GET(req: Request) {
   const totalAtualizados = passos.reduce((s, p) => s + (p.atualizados || 0), 0);
   const ok = passos.filter((p) => p.ok).length;
 
-  // (C) Regista os pontos dos jogadores nas competições recém-terminadas.
-  let registos: { comp: string; registados: number }[] = [];
+  // (C) CONGELA as competições recentes terminadas (motor lib/congelar).
+  // Preenche resultados_atletas, resultados_rodada, precos_atletas, pontuacoes
+  // e users.patrimony_jc — com a fonte correta. Idempotente.
+  let congelamentos: { comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean }[] = [];
   try {
-    registos = await registarPontosRecentes(hoje);
+    congelamentos = await congelarRecentes(hoje);
   } catch { /* não bloqueia o resto do cron */ }
 
   // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
@@ -280,7 +264,7 @@ export async function GET(req: Request) {
     atletas_a_competir_agora: aoVivo.atletas_ao_vivo,
     categorias_ok: `${ok}/${CATS.length}`,
     total_atletas_atualizados: totalAtualizados,
-    pontos_registados: registos,
+    congelamentos,
     faixas,
     ms_total: Date.now() - t0,
     passos,
