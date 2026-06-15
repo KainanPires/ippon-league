@@ -67,7 +67,7 @@ const CARD_CSS = `
 .dbelt-pill{display:inline-block;margin-top:14px;padding:9px 26px;border-radius:9px;background:var(--accent);color:var(--chip-text);font-weight:600;font-size:26px;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap}
 .dhero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:0}
 .dhero-label{font-weight:500;font-size:34px;letter-spacing:6px;text-transform:uppercase;color:#93a39a;margin-bottom:30px}
-.dhero-pts{font-weight:700;font-size:230px;line-height:1.1;letter-spacing:-2px;color:var(--score-color);text-shadow:0 0 80px var(--score-glow);display:block;height:250px}
+.dhero-pts{font-family:'Arial Black','Helvetica Neue',Helvetica,Arial,sans-serif;font-weight:900;font-size:230px;line-height:1.1;letter-spacing:-4px;color:var(--score-color);text-shadow:0 0 80px var(--score-glow);display:block;height:250px}
 .dhero-unit{font-weight:500;font-size:40px;letter-spacing:8px;text-transform:uppercase;color:#93a39a;margin-top:28px}
 .dhero-comp{margin-top:40px;font-weight:600;font-size:44px;line-height:1.2;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;max-width:90%}
 .dcards{display:flex;gap:24px;margin:36px 0 8px}
