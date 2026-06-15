@@ -184,6 +184,23 @@ export async function GET(req: Request) {
   const t0 = Date.now();
   const hoje = new Date();
 
+  // Disparo manual de RE-CONGELAMENTO (limpa e refaz do zero): ?recongelar=ID
+  // Útil quando mudámos o motor e queremos refazer uma competição já congelada,
+  // sem ter de apagar à mão no Supabase. Limpa as linhas dessa competição nas
+  // tabelas de resultados e depois congela de novo.
+  const recongelarId = (searchParams.get("recongelar") || "").trim();
+  if (recongelarId) {
+    if (supabaseAdmin) {
+      await supabaseAdmin.from("resultados_atletas").delete().eq("id_competicao", recongelarId);
+      await supabaseAdmin.from("resultados_rodada").delete().eq("id_competicao", recongelarId);
+    }
+    const s = CALENDARIO_2026.find((c) => c.idCompeticao === recongelarId);
+    const mes = s ? s.de.slice(0, 7).replace("/", "-") : new Date().toISOString().slice(0, 7);
+    const anoEpoca = s ? parseInt(s.de.slice(0, 4), 10) : hoje.getUTCFullYear();
+    const r = await congelarCompeticao(recongelarId, mes, anoEpoca);
+    return NextResponse.json({ feito: true, modo: "recongelar_forcado", limpou: true, resultado: r, ms_total: Date.now() - t0 });
+  }
+
   // Disparo manual de congelamento de UMA competição (teste): ?congelar=ID
   const congelarId = (searchParams.get("congelar") || "").trim();
   if (congelarId) {
