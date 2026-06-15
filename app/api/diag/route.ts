@@ -1,4 +1,4 @@
-// app/api/diagnostico-classicos/route.ts
+// app/api/diagnostico-classicos/route.ts  (ou app/api/diag/route.ts)
 //
 // ROTA DE DIAGNÓSTICO (temporária) — listar competições ANTIGAS do JudoBase
 // para escolhermos novos CLÁSSICOS para o calendário.
@@ -9,23 +9,20 @@
 //
 // Protegida pelo CRON_SECRET, igual ao cron: dispara com ?key=<CRON_SECRET>.
 //
+// NOTA SOBRE has_results: NAO e "1"/"0". E a CONTAGEM de resultados/medalhas
+// (ex.: "112", "41"); "0" = sem resultados (camps, eventos por realizar). Por
+// isso o criterio de "tem resultados" e has_results > 0.
+//
 // DOIS MODOS:
-//   1) ?modo=amostra&ano=2024   -> resposta CRUA de um ano, SEM filtrar nada.
-//      Serve para vermos os valores reais de competition_code, ages, has_results,
-//      status, etc. — para afinar a classificação sem adivinhar. (É o 1º a correr.)
-//
-//   2) ?modo=classicos          -> varre 2015..2025, filtra para os tipos que o
-//      Kainan quer (Grand Slam / Grand Prix > Mundial > Masters > Olimpíada),
-//      só seniores, exclui equipas/kata e os ids JÁ usados no calendário, e
-//      devolve a lista ordenada pela preferência, pronta a escolher.
-//
-// Filtros opcionais do modo classicos:
-//   &comResultados=1  -> só competições com has_results "ligado" (ver temResultados)
+//   modo=amostra&ano=2024  -> resposta CRUA de um ano, SEM filtrar nada (debug).
+//   modo=classicos         -> varre 2015..2025, filtra para os tipos do Kainan
+//      (Grand Slam / Grand Prix > Mundial > Masters > Olimpiada), so seniores
+//      individuais COM resultados, exclui equipas/kata/camps e os ids JA usados
+//      no calendario, e devolve a lista ordenada pela preferencia.
 //
 // Exemplos:
-//   /api/diagnostico-classicos?key=SEGREDO&modo=amostra&ano=2023
-//   /api/diagnostico-classicos?key=SEGREDO&modo=classicos
-//   /api/diagnostico-classicos?key=SEGREDO&modo=classicos&comResultados=1
+//   /api/diag?key=SEGREDO&modo=amostra&ano=2023
+//   /api/diag?key=SEGREDO&modo=classicos
 
 import { NextResponse } from "next/server";
 import { getCompetitions, type IjfCompetition } from "@/lib/ijf";
@@ -45,38 +42,48 @@ function autorizado(key: string | null): boolean {
   return key === secret;
 }
 
-// Tipos de clássico que o Kainan quer, por ordem de PREFERÊNCIA.
-type TipoClassico = "Grand Slam" | "Grand Prix" | "Mundial" | "Masters" | "Olimpíada";
+// Tipos de classico que o Kainan quer, por ordem de PREFERENCIA.
+type TipoClassico = "Grand Slam" | "Grand Prix" | "Mundial" | "Masters" | "Olimpiada";
 const PRIORIDADE: Record<TipoClassico, number> = {
   "Grand Slam": 1,
   "Grand Prix": 1,
   "Mundial": 2,
   "Masters": 3,
-  "Olimpíada": 4,
+  "Olimpiada": 4,
 };
 
-// Classifica uma competição pelo NOME (os nomes do JudoBase são consistentes em
-// inglês). Mais fiável do que adivinhar competition_code. Devolve null para tudo
-// o que NÃO interessa como clássico (opens, european cups, continentais, etc.)
-// ou que não seja senior individual (junior/cadet/veteran/equipas/kata).
+// Classifica uma competicao pelo NOME (os nomes do JudoBase sao consistentes em
+// ingles — confirmado na amostra de 2024). Devolve null para tudo o que NAO
+// interessa: opens, european cups, continentais, e ainda eventos paralelos
+// (paralimpicos, IBSA, militares, universitarios, clubes, camps), kata, equipas
+// e categorias nao-senior (junior/cadet/veteran).
 function classificar(nome: string): TipoClassico | null {
   const n = (nome || "").toLowerCase();
-  // Fora: categorias não-senior, equipas e kata.
-  if (/junior|cadet|veteran|kata|\bteam(s)?\b|mixed team/.test(n)) return null;
-  // Ordem importa: testar o mais específico primeiro.
-  if (/olympic/.test(n)) return "Olimpíada";
-  if (/world championship/.test(n)) return "Mundial"; // seniores (junior já saiu acima)
+  // Paralimpicos fora (contem "olympic"/"paralympic").
+  if (/paralympic/.test(n)) return null;
+  // Olimpiada primeiro (antes de qualquer exclusao por "games").
+  if (/olympic/.test(n)) return "Olimpiada";
+  // Eventos a excluir mesmo que contenham um padrao de tipo.
+  if (/junior|cadet|veteran|kata|\bteam(s)?\b|mixed team|military|universit|\bclub\b|training camp|ibsa/.test(n)) return null;
+  // Restantes tipos preferidos.
+  if (/world championship/.test(n)) return "Mundial"; // seniores (junior/kata ja sairam)
   if (/grand slam/.test(n)) return "Grand Slam";
   if (/grand prix/.test(n)) return "Grand Prix";
   if (/masters/.test(n)) return "Masters";
   return null;
 }
 
-// has_results "ligado"? Tolerante a vários formatos (o formato exato confirma-se
-// no modo amostra). Competições passadas (2015-2025) quase sempre têm resultados.
+// has_results e a CONTAGEM de resultados. "tem resultados" = numero > 0.
 function temResultados(c: IjfCompetition): boolean {
-  const v = String(c.has_results ?? "").trim().toLowerCase();
-  return v === "1" || v === "true" || v === "yes" || v === "y";
+  const n = parseInt(String(c.has_results ?? "0"), 10);
+  return !isNaN(n) && n > 0;
+}
+
+// So seniores: a competicao tem de incluir "sen" em ages (e o nome ja filtra
+// junior/cadet). Tolerante: se ages vier vazio/ausente, nao exclui por aqui.
+function ehSenior(c: IjfCompetition): boolean {
+  if (!Array.isArray(c.ages) || c.ages.length === 0) return true;
+  return c.ages.some((a) => String(a).toLowerCase().includes("sen"));
 }
 
 interface LinhaClassico {
@@ -89,21 +96,21 @@ interface LinhaClassico {
   cidade: string;
   pais: string;
   competition_code: string;
-  has_results: string;
+  resultados: number;
 }
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get("key");
   if (!autorizado(key)) {
-    return NextResponse.json({ erro: "Não autorizado. Usa ?key=<CRON_SECRET>." }, { status: 401 });
+    return NextResponse.json({ erro: "Nao autorizado. Usa ?key=<CRON_SECRET>." }, { status: 401 });
   }
 
   const t0 = Date.now();
   const modo = (searchParams.get("modo") || "classicos").trim();
 
   // ---------------------------------------------------------------------------
-  // MODO AMOSTRA — resposta crua de um ano, sem filtrar. Para vermos os campos.
+  // MODO AMOSTRA — resposta crua de um ano, sem filtrar. Para inspecionar campos.
   // ---------------------------------------------------------------------------
   if (modo === "amostra") {
     const ano = parseInt(searchParams.get("ano") || "2024", 10);
@@ -112,7 +119,6 @@ export async function GET(req: Request) {
       modo: "amostra",
       ano,
       total: comps.length,
-      // Mostra os campos que interessam para afinar a classificação/os filtros.
       competicoes: comps.map((c) => ({
         id_competition: c.id_competition,
         name: c.name,
@@ -132,9 +138,8 @@ export async function GET(req: Request) {
   }
 
   // ---------------------------------------------------------------------------
-  // MODO CLASSICOS — varre 2015..2025, filtra e ordena pela preferência.
+  // MODO CLASSICOS — varre 2015..2025, filtra e ordena pela preferencia.
   // ---------------------------------------------------------------------------
-  const soComResultados = searchParams.get("comResultados") === "1";
   const usados = new Set(CALENDARIO_2026.map((c) => String(c.idCompeticao)));
 
   const anosFalhados: number[] = [];
@@ -148,10 +153,11 @@ export async function GET(req: Request) {
     for (const c of comps) {
       const id = String(c.id_competition ?? "").trim();
       if (!id || vistos.has(id)) continue;
-      if (usados.has(id)) continue; // já está no calendário — não repetir
+      if (usados.has(id)) continue;        // ja esta no calendario — nao repetir
+      if (!temResultados(c)) continue;     // sem resultados nao serve como classico
+      if (!ehSenior(c)) continue;          // so seniores
       const tipo = classificar(c.name || "");
-      if (!tipo) continue; // não é um dos tipos preferidos
-      if (soComResultados && !temResultados(c)) continue;
+      if (!tipo) continue;                 // nao e um dos tipos preferidos
 
       vistos.add(id);
       const data = String(c.date_from || "");
@@ -166,15 +172,15 @@ export async function GET(req: Request) {
         cidade: c.city ?? "",
         pais: c.country_short ?? "",
         competition_code: c.competition_code ?? "",
-        has_results: String(c.has_results ?? ""),
+        resultados: parseInt(String(c.has_results ?? "0"), 10) || 0,
       });
     }
   }
 
-  // Ordena: 1º pela preferência de tipo, depois pela data (mais recente primeiro).
+  // Ordena: 1o pela preferencia de tipo, depois pela data (mais recente primeiro).
   linhas.sort((a, b) => (a.prioridade - b.prioridade) || b.data.localeCompare(a.data));
 
-  // Também agrupa por tipo, para ser fácil escolher e mesclar recentes/antigas.
+  // Agrupa por tipo, para ser facil escolher e mesclar recentes/antigas.
   const porTipo: Record<string, LinhaClassico[]> = {};
   for (const l of linhas) (porTipo[l.tipo] ||= []).push(l);
 
@@ -184,7 +190,6 @@ export async function GET(req: Request) {
   return NextResponse.json({
     modo: "classicos",
     anos: `${ANO_INICIO}-${ANO_FIM}`,
-    so_com_resultados: soComResultados,
     anos_sem_resposta: anosFalhados,
     total_encontradas: linhas.length,
     contagem_por_tipo: contagem,
