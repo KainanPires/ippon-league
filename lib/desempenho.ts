@@ -14,10 +14,12 @@
 import { supabase } from "@/lib/supabase";
 import { resolve, type TeamState } from "@/lib/team";
 import type { Athlete } from "@/lib/athletes";
+import { numeroDaRodada } from "@/lib/calendario";
 
 export interface DesempenhoRodada {
   idCompeticao: string;
   nomeCompeticao: string;
+  numeroRodada: number | null;  // número da rodada no calendário (1..52)
   pontuacaoTotal: number;     // soma dos atletas, capitão a dobrar
   atletas: { atleta: Athlete; pontos: number; capitao: boolean }[];
   melhor: { atleta: Athlete; pontos: number } | null;
@@ -97,6 +99,7 @@ export function construirDesempenho(
   return {
     idCompeticao,
     nomeCompeticao,
+    numeroRodada: numeroDaRodada(idCompeticao),
     pontuacaoTotal,
     atletas: linhas.map(({ atleta, pontos, capitao }) => ({ atleta, pontos, capitao })),
     melhor,
