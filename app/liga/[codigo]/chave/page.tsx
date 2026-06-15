@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+import { focoMercado } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -55,6 +56,17 @@ function nomeRonda(ronda: number, totalRondas: number): string {
 // ronda: o modo visita mostra a escalação FIXA daquela rodada.
 function abrirDojo(uid: string, comp: string) {
   window.location.href = `/meu-time?ver=${encodeURIComponent(uid)}&comp=${encodeURIComponent(comp)}`;
+}
+
+// PORTÃO ANTI-CÓPIA (igual à liga): só se pode espreitar a equipa de um confronto
+// quando NÃO há nada a copiar — ou seja, a ronda já passou (confronto decidido)
+// OU é a ronda que decorre agora com o MERCADO JÁ FECHADO. Enquanto o mercado da
+// ronda estiver aberto (ou for uma ronda futura), fica trancado: ver a escalação
+// e o capitão do rival antes do fecho permitiria copiá-los.
+function podeVerEquipa(c: ConfrontoAPI, idADecorrer: string | null): boolean {
+  if (c.estado === "decidido") return true;               // ronda já decidida (passada)
+  if (idADecorrer && c.id_competicao === idADecorrer) return true; // a decorrer, mercado fechado
+  return false;                                            // mercado aberto / ronda futura -> trancado
 }
 
 export default function PaginaChave() {
@@ -138,6 +150,10 @@ function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial, onVerEquipa }: 
   const terminada = liga.copa_estado === "terminada";
   const chaveGrande = nInscritos >= 8; // repescagem em cadeia só com 8+
 
+  // Competição a decorrer agora (mercado fechado). Confrontos desta competição
+  // podem ser espreitados; os de uma ronda com mercado ainda aberto, não.
+  const idADecorrer = focoMercado().aDecorrer?.idCompeticao ?? null;
+
   // Agrupa os confrontos por ronda. A final e o bronze estão na última ronda.
   const rondas = Array.from(new Set(confrontos.map((c) => c.ronda))).sort((a, b) => a - b);
 
@@ -171,15 +187,15 @@ function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial, onVerEquipa }: 
 
             {/* Confrontos normais da ronda. */}
             {normais.map((c) => (
-              <CartaoConfronto key={c.id} c={c} nome={nome} escudoDe={escudoDe} onVerEquipa={onVerEquipa} />
+              <CartaoConfronto key={c.id} c={c} nome={nome} escudoDe={escudoDe} idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} />
             ))}
 
             {/* Na última ronda: a final em destaque + o bronze. */}
             {final && (
-              <CartaoConfronto c={final} nome={nome} escudoDe={escudoDe} destaque="final" onVerEquipa={onVerEquipa} />
+              <CartaoConfronto c={final} nome={nome} escudoDe={escudoDe} destaque="final" idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} />
             )}
             {bronze && (
-              <CartaoConfronto c={bronze} nome={nome} escudoDe={escudoDe} destaque="bronze" onVerEquipa={onVerEquipa} />
+              <CartaoConfronto c={bronze} nome={nome} escudoDe={escudoDe} destaque="bronze" idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} />
             )}
           </div>
         );
@@ -213,17 +229,20 @@ function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial, onVerEquipa }: 
 
 // Um cartão de confronto: dois jogadores, escudo + nome + pontos, vencedor
 // destacado. `destaque` muda a moldura (final dourada, bronze acobreado).
-function CartaoConfronto({ c, nome, escudoDe, destaque, onVerEquipa }: {
+function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa }: {
   c: ConfrontoAPI;
   nome: (uid: string | null) => string;
   escudoDe: (uid: string | null) => Identity;
   destaque?: "final" | "bronze";
+  idADecorrer: string | null;
   onVerEquipa: (uid: string, comp: string) => void;
 }) {
   const decidido = c.estado === "decidido";
   const bye = c.jogador_b === null;
   const venceuA = decidido && c.vencedor === c.jogador_a;
   const venceuB = decidido && c.vencedor === c.jogador_b;
+  // Trancado enquanto o mercado desta ronda não fechar (anti-cópia).
+  const trancado = !podeVerEquipa(c, idADecorrer);
 
   const cor = destaque === "final" ? GOLD : destaque === "bronze" ? "#c87f43" : "#243029";
   const etiqueta = destaque === "final" ? "Final" : destaque === "bronze" ? "Disputa de bronze" : null;
@@ -233,7 +252,7 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, onVerEquipa }: {
       {etiqueta && (
         <div style={{ fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: cor, marginBottom: 7 }}>{etiqueta}</div>
       )}
-      <LinhaJogador uid={c.jogador_a} pontos={c.pontos_a} venceu={venceuA} perdeu={decidido && !venceuA} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_a && onVerEquipa(c.jogador_a, c.id_competicao)} />
+      <LinhaJogador uid={c.jogador_a} pontos={c.pontos_a} venceu={venceuA} perdeu={decidido && !venceuA} trancado={trancado} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_a && onVerEquipa(c.jogador_a, c.id_competicao)} />
       {bye ? (
         <div style={{ fontSize: 11, color: "#7c8a82", textAlign: "center", padding: "4px 0", fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.05em" }}>passou (sem adversário)</div>
       ) : (
@@ -243,7 +262,7 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, onVerEquipa }: {
             <span style={{ fontSize: 9.5, color: "#5f6f67", fontFamily: FD, fontWeight: 700 }}>{estadoLabel(c)}</span>
             <div style={{ flex: 1, height: 1, background: "#1a221d" }} />
           </div>
-          <LinhaJogador uid={c.jogador_b} pontos={c.pontos_b} venceu={venceuB} perdeu={decidido && !venceuB} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_b && onVerEquipa(c.jogador_b, c.id_competicao)} />
+          <LinhaJogador uid={c.jogador_b} pontos={c.pontos_b} venceu={venceuB} perdeu={decidido && !venceuB} trancado={trancado} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_b && onVerEquipa(c.jogador_b, c.id_competicao)} />
         </>
       )}
     </div>
@@ -259,28 +278,38 @@ function estadoLabel(c: ConfrontoAPI): string {
   return "a aguardar";
 }
 
-function LinhaJogador({ uid, pontos, venceu, perdeu, nome, escudoDe, onVerEquipa }: {
+function LinhaJogador({ uid, pontos, venceu, perdeu, trancado, nome, escudoDe, onVerEquipa }: {
   uid: string | null;
   pontos: number | null;
   venceu: boolean;
   perdeu: boolean;
+  trancado: boolean;
   nome: (uid: string | null) => string;
   escudoDe: (uid: string | null) => Identity;
   onVerEquipa?: () => void;
 }) {
-  const clicavel = !!uid && !!onVerEquipa;
+  const temJogador = !!uid;
+  // Clicável quando há jogador. Se estiver trancado (mercado aberto), o clique
+  // explica que abre ao fechar — não navega, para não revelar a escalação.
+  const acaoClique = () => {
+    if (!temJogador || !onVerEquipa) return;
+    if (trancado) { alert("As equipas desta ronda abrem quando o mercado fechar. 🔒"); return; }
+    onVerEquipa();
+  };
   return (
     <button
-      onClick={() => { if (clicavel) onVerEquipa!(); }}
-      disabled={!clicavel}
-      style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", opacity: perdeu ? 0.5 : 1, width: "100%", background: "transparent", border: "none", cursor: clicavel ? "pointer" : "default", textAlign: "left", fontFamily: FB }}
+      onClick={acaoClique}
+      disabled={!temJogador}
+      style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", opacity: perdeu ? 0.5 : 1, width: "100%", background: "transparent", border: "none", cursor: temJogador ? "pointer" : "default", textAlign: "left", fontFamily: FB }}
     >
       <div style={{ flexShrink: 0 }}><Escudo config={escudoDe(uid)} size={28} /></div>
       <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: venceu ? GOLD : "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {nome(uid)}
         {venceu && <span style={{ marginLeft: 6, fontSize: 11 }}>✓</span>}
       </span>
-      {clicavel && <span style={{ flexShrink: 0, fontSize: 10, color: "#5f6f67", fontFamily: FD }}>ver equipa ›</span>}
+      {temJogador && (
+        <span style={{ flexShrink: 0, fontSize: 10, color: "#5f6f67", fontFamily: FD }}>{trancado ? "🔒" : "ver equipa ›"}</span>
+      )}
       <span style={{ flexShrink: 0, fontFamily: FD, fontSize: 15, fontWeight: 700, color: venceu ? GOLD : "#93a39a" }}>
         {pontos !== null && pontos !== undefined ? (pontos >= 0 ? "+" : "") + pontos : "—"}
       </span>
