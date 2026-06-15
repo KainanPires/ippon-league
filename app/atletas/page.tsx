@@ -30,6 +30,7 @@ type RankRow = {
   vitorias?: number;
   derrotas?: number;
   variacaoJc?: number;
+  acoes?: Record<string, number>;
 };
 
 export default function AtletasPage() {
@@ -116,7 +117,7 @@ function Atletas() {
       const url = compParam ? `/api/ranking-atletas?comp=${compParam}` : `/api/ranking-atletas`;
       let j: {
         nome?: string; tem_resultados?: boolean;
-        atletas?: Array<{ id: string; nome: string; countryIso: string; category: string; gender: string; pontos: number; n_lutas: number; vitorias: number; derrotas: number; variacao_jc: number; posicao: number }>;
+        atletas?: Array<{ id: string; nome: string; countryIso: string; category: string; gender: string; pontos: number; n_lutas: number; vitorias: number; derrotas: number; variacao_jc: number; acoes: Record<string, number>; posicao: number }>;
       } | null = null;
       try {
         j = await fetch(url).then((r) => r.json()).catch(() => null);
@@ -139,6 +140,7 @@ function Atletas() {
         vitorias: a.vitorias,
         derrotas: a.derrotas,
         variacaoJc: a.variacao_jc,
+        acoes: a.acoes && typeof a.acoes === "object" ? a.acoes : {},
       }));
       setRows(ranked);
       setLoading(false);
@@ -223,6 +225,27 @@ function Row({ r, onClick }: { r: RankRow; onClick: () => void }) {
   );
 }
 
+// Traduz o objeto de ações agregadas em linhas legíveis (a "razão" do ponto).
+// Positivas primeiro, depois as sofridas. Só as que existem.
+function linhasDeAcoes(a: Record<string, number>): { label: string; qtd: number; negativo: boolean }[] {
+  const def: { chave: string; label: string; negativo: boolean }[] = [
+    { chave: "ippon", label: "Ippon", negativo: false },
+    { chave: "waza", label: "Waza-ari", negativo: false },
+    { chave: "yuko", label: "Yuko", negativo: false },
+    { chave: "shido_provocado", label: "Shido provocado", negativo: false },
+    { chave: "ippon_sof", label: "Ippon sofrido", negativo: true },
+    { chave: "waza_sof", label: "Waza-ari sofrido", negativo: true },
+    { chave: "yuko_sof", label: "Yuko sofrido", negativo: true },
+    { chave: "shido_sof", label: "Shido sofrido", negativo: true },
+  ];
+  const out: { label: string; qtd: number; negativo: boolean }[] = [];
+  for (const d of def) {
+    const q = Number(a[d.chave] || 0);
+    if (q > 0) out.push({ label: d.label, qtd: q, negativo: d.negativo });
+  }
+  return out;
+}
+
 // Popup do atleta — SIMPLIFICADO (#2): pontos + nº de lutas e V/D. Sem fases.
 function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClose: () => void }) {
   const temLutas = typeof r.nLutas === "number";
@@ -280,6 +303,23 @@ function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClo
         <div style={{ fontSize: 11.5, color: "#93a39a", textAlign: "center", lineHeight: 1.5 }}>
           Pontuação em <span style={{ color: "#cfd8d2" }}>{nomeComp}</span>, somada pelas ações nas lutas (ippons, waza-aris, shidos).
         </div>
+
+        {/* A "razão" do ponto: resumo agregado das ações na competição (#scout). */}
+        {r.acoes && Object.keys(r.acoes).length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 10 }}>
+              Como pontuou
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {linhasDeAcoes(r.acoes).map((l, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "8px 12px" }}>
+                  <span style={{ fontSize: 12.5, color: "#d6ddd6" }}>{l.label}</span>
+                  <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, color: l.negativo ? "#ef8d83" : "#7fd1a3" }}>{l.qtd}×</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
