@@ -1,17 +1,28 @@
 // app/api/equipa-na-rodada/route.ts
 //
 // Devolve a EQUIPA que um utilizador usou numa competição específica, para o
-// modal da chave (ver como o adversário fez os pontos daquela ronda).
+// modo VISITA (ver o dojo de um rival na liga, ou de qualquer equipa numa ronda
+// da Copa, incluindo a própria numa ronda passada).
 //
 // IMPORTANTE: a equipa é lida de `equipas` POR competição (id_competicao). Como
 // cada ronda da copa é uma competição diferente, esta é a escalação FIXA daquela
 // rodada — não muda quando o jogador edita a equipa para a próxima competição.
 // Os pontos vêm de `resultados_atletas` (congelado). Sem risco de "equipa errada".
 //
+// PORTÃO ANTI-CÓPIA (servidor): esta rota NÃO devolve a escalação de uma
+// competição cujo mercado ainda está ABERTO — ver o time e o capitão de um rival
+// antes do fecho permitiria copiá-los. A regra está no SERVIDOR (não só no clique
+// do cliente), por isso é à prova de URL escrito à mão, e vale para a liga e para
+// a Copa. Não precisa de autenticar quem pede: o próprio jogador nunca lê a sua
+// própria equipa por aqui na ronda atual (usa a sessão dele, via loadSavedCloudFor);
+// esta rota serve só para VER equipas no modo visita, que deve respeitar o fecho.
+// Assim que o mercado fecha (competição a decorrer e, depois, encerrada), a
+// escalação fica visível normalmente.
+//
 // Uso: /api/equipa-na-rodada?user=<uuid>&comp=<id_competicao>
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { CALENDARIO_2026 } from "@/lib/calendario";
+import { CALENDARIO_2026, estadoMercado } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,6 +39,19 @@ export async function GET(req: Request) {
 
   if (!supabaseAdmin || !user || !comp) {
     return NextResponse.json({ ok: false, erro: "Faltam parâmetros." }, { status: 400 });
+  }
+
+  // PORTÃO ANTI-CÓPIA: mercado ainda aberto -> não revelamos a escalação.
+  // (Se a competição não estiver no calendário, não há "mercado" gerido aqui;
+  // nesse caso seguimos em frente — só os ids do calendário valem como rodadas.)
+  const semana = CALENDARIO_2026.find((c) => c.idCompeticao === comp);
+  if (semana && estadoMercado(semana).estado === "aberto") {
+    return NextResponse.json({
+      ok: true,
+      bloqueado: true,
+      mercado_aberto: true,
+      competicao: { id: comp, nome: nomeCompeticao(comp) },
+    });
   }
 
   // 1) A escalação fixa daquela competição.
