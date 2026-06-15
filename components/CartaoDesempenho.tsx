@@ -15,6 +15,15 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 const sobrenome = (nome: string) => (nome.split(" ").slice(-1)[0] || nome).toUpperCase();
+// Nome para o cartão: primeiro nome + último apelido (no máximo 2 palavras), para
+// quebrar de forma limpa entre linhas sem nunca partir uma palavra a meio. Ex:
+// "Lea Metrot" -> "LEA METROT"; "Movli Borchashvilli" -> "MOVLI BORCHASHVILLI".
+const nomeCartao = (nome: string) => {
+  const partes = (nome || "").trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return "—";
+  if (partes.length === 1) return partes[0].toUpperCase();
+  return `${partes[0]} ${partes[partes.length - 1]}`.toUpperCase();
+};
 const sinal = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
 
 type Belt = "branca" | "azul" | "amarela" | "verde" | "roxa" | "castanha" | "preta";
@@ -74,7 +83,7 @@ const CARD_CSS = `
 .dchip-card{flex:1;background:rgba(12,14,13,0.55);border:2px solid var(--card-border);border-radius:20px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:6px}
 .dchip-role{font-weight:700;font-size:24px;letter-spacing:3px;text-transform:uppercase;color:var(--role-color)}
 .dchip-flag{margin-top:4px;background:var(--accent);color:var(--chip-text);font-family:'Courier New',Courier,monospace;font-weight:700;font-size:26px;letter-spacing:1px;padding:4px 14px;border-radius:7px}
-.dchip-name{font-weight:700;font-size:32px;line-height:1.06;letter-spacing:0.3px;text-transform:uppercase;color:#f1ede2;max-width:100%;overflow-wrap:break-word;word-break:break-word;min-height:68px;display:flex;align-items:center;justify-content:center;text-align:center}
+.dchip-name{font-weight:700;font-size:30px;line-height:1.08;letter-spacing:0.3px;text-transform:uppercase;color:#f1ede2;max-width:100%;white-space:normal;overflow-wrap:normal;word-break:keep-all;hyphens:none;min-height:72px;display:flex;align-items:center;justify-content:center;text-align:center}
 .dchip-pts{font-family:'Courier New',Courier,monospace;font-weight:700;font-size:46px;color:var(--pts-color)}
 .dcard-foot{margin-top:14px;padding-top:26px;border-top:1.5px solid rgba(241,237,226,0.10);text-align:center}
 .dfoot-main{font-weight:700;font-size:46px;letter-spacing:8px;text-transform:uppercase;color:#d9a441;text-shadow:0 0 26px rgba(217,164,65,0.35)}
@@ -280,7 +289,7 @@ function DesempenhoNode({ innerRef, vars, pro, belt, beltName, accent, identity,
               <div className="dchip-card" style={{ ["--card-border" as string]: GOLD, ["--role-color" as string]: GOLD, ["--pts-color" as string]: dados.capitao.pontos >= 0 ? "#7fd1a3" : "#ef8d83" } as CSSProperties}>
                 <span className="dchip-role">★ Capitão</span>
                 <span className="dchip-flag">{code3(dados.capitao.atleta.countryIso)}</span>
-                <span className="dchip-name">{sobrenome(dados.capitao.atleta.name)}</span>
+                <span className="dchip-name">{nomeCartao(dados.capitao.atleta.name)}</span>
                 <span className="dchip-pts">{sinal(dados.capitao.pontos)}</span>
               </div>
             )}
@@ -288,7 +297,7 @@ function DesempenhoNode({ innerRef, vars, pro, belt, beltName, accent, identity,
               <div className="dchip-card" style={{ ["--card-border" as string]: "rgba(241,237,226,0.16)", ["--role-color" as string]: "#93a39a", ["--pts-color" as string]: dados.melhor.pontos >= 0 ? "#7fd1a3" : "#ef8d83" } as CSSProperties}>
                 <span className="dchip-role">Melhor atleta</span>
                 <span className="dchip-flag">{code3(dados.melhor.atleta.countryIso)}</span>
-                <span className="dchip-name">{sobrenome(dados.melhor.atleta.name)}</span>
+                <span className="dchip-name">{nomeCartao(dados.melhor.atleta.name)}</span>
                 <span className="dchip-pts">{sinal(dados.melhor.pontos)}</span>
               </div>
             )}
