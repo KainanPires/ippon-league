@@ -1,11 +1,15 @@
 // lib/desempenho.ts
 //
-// "O TEU DESEMPENHO NA RODADA" — lógica (Opção B: nada se guarda; recalcula-se).
+// "O TEU DESEMPENHO NA RODADA" — lógica.
 //
-// O desempenho aparece quando a competição em que a pessoa escalou JÁ TERMINOU
-// (tem resultados) e ela ainda não o viu. Os pontos vêm de /api/resultados
-// (sempre disponíveis para competições terminadas). O "visto" fica no Supabase
-// (user_metadata.desempenhos_vistos), como os tutoriais — sobrevive a dispositivos.
+// Há DUAS fontes de pontos:
+//   - AO VIVO (buscarResultados): durante a competição, de /api/resultados.
+//   - CONGELADA (buscarResultadosCongelados): depois da competição fechar, dos
+//     dados congelados em resultados_atletas (via /api/ranking-atletas). Persiste
+//     e nunca desaparece — é o que faz o resumo continuar disponível entre eventos.
+//
+// O "visto" fica no Supabase (user_metadata.desempenhos_vistos), como os
+// tutoriais — sobrevive a dispositivos.
 
 import { supabase } from "@/lib/supabase";
 import { resolve, type TeamState } from "@/lib/team";
@@ -18,6 +22,16 @@ export interface DesempenhoRodada {
   atletas: { atleta: Athlete; pontos: number; capitao: boolean }[];
   melhor: { atleta: Athlete; pontos: number } | null;
   capitao: { atleta: Athlete; pontos: number } | null; // pontos JÁ dobrados
+}
+
+// Números extra (bónus) que aparecem só no modal: comparação com os outros.
+export interface ResumoExtra {
+  media: number;
+  posicao: number;
+  totalJogadores: number;
+  acimaDaMedia: boolean;
+  patrimonio: number | null;
+  ganho: number;
 }
 
 // --- "Visto" no Supabase (uma chave por competição) ---
@@ -48,7 +62,8 @@ export async function marcarDesempenhoVisto(idCompeticao: string): Promise<void>
 
 /**
  * Constrói o desempenho de uma rodada a partir da equipa guardada e do mapa de
- * pontos de /api/resultados. Devolve null se a equipa não resolve (sem atletas).
+ * pontos (de /api/resultados OU dos dados congelados). Devolve null se a equipa
+ * não resolve (sem atletas).
  */
 export function construirDesempenho(
   idCompeticao: string,
@@ -88,8 +103,8 @@ export function construirDesempenho(
 }
 
 /**
- * Busca os pontos de uma competição terminada. Devolve null se ainda não há
- * resultados (a competição não terminou ou o JudoBase ainda não publicou).
+ * Busca os pontos de uma competição terminada (AO VIVO, de /api/resultados).
+ * Devolve null se ainda não há resultados.
  */
 export async function buscarResultados(idCompeticao: string): Promise<Record<string, number> | null> {
   try {
@@ -99,6 +114,50 @@ export async function buscarResultados(idCompeticao: string): Promise<Record<str
       return j.pontos as Record<string, number>;
     }
     return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Busca os pontos CONGELADOS de uma competição (de /api/ranking-atletas, que lê
+ * resultados_atletas). São os pontos SIMPLES por atleta — o construirDesempenho
+ * aplica o capitão a dobrar. Persiste mesmo depois da competição fechar.
+ * Devolve { mapa de pontos, idComp, nome } ou null.
+ */
+export async function buscarResultadosCongelados(
+  idCompeticao?: string
+): Promise<{ pontos: Record<string, number>; comp: string; nome: string } | null> {
+  try {
+    const url = idCompeticao ? `/api/ranking-atletas?comp=${idCompeticao}` : `/api/ranking-atletas`;
+    const r = await fetch(url);
+    const j = await r.json();
+    if (!j || !j.tem_resultados || !Array.isArray(j.atletas) || j.atletas.length === 0) return null;
+    const pontos: Record<string, number> = {};
+    for (const a of j.atletas) pontos[String(a.id)] = Number(a.pontos) || 0;
+    return { pontos, comp: String(j.comp), nome: String(j.nome || "") };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Busca os números extra (média, posição, património) de /api/resumo-rodada.
+ * Só para mostrar no modal. Devolve null se não houver resumo para o utilizador.
+ */
+export async function buscarResumoExtra(idCompeticao: string, userId: string): Promise<ResumoExtra | null> {
+  try {
+    const r = await fetch(`/api/resumo-rodada?comp=${idCompeticao}&user=${userId}`);
+    const j = await r.json();
+    if (!j || !j.tem_resumo) return null;
+    return {
+      media: Number(j.media) || 0,
+      posicao: Number(j.posicao) || 0,
+      totalJogadores: Number(j.total_jogadores) || 0,
+      acimaDaMedia: !!j.acima_da_media,
+      patrimonio: j.patrimonio != null ? Number(j.patrimonio) : null,
+      ganho: Number(j.ganho_patrimonio) || 0,
+    };
   } catch {
     return null;
   }
