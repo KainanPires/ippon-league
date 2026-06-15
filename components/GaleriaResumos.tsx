@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
+import { numeroDaRodada } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -52,9 +53,11 @@ export function GaleriaResumos({ userId, onAbrir, onClose }: { userId: string; o
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {rodadas.map((r) => {
               const negativo = r.pontos < 0;
+              const nRodada = numeroDaRodada(r.comp);
               return (
                 <button key={r.comp} onClick={() => onAbrir(r.comp)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "#141a17", border: "1px solid #243029", borderRadius: 14, padding: "12px 13px", cursor: "pointer", fontFamily: FB, textAlign: "left" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
+                    {nRodada && <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: GOLD, marginBottom: 2 }}>Rodada {nRodada}</div>}
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.nome}</div>
                     <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>
                       {r.posicao && r.total_jogadores ? `${r.posicao}º de ${r.total_jogadores}` : "—"}
