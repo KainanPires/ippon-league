@@ -61,12 +61,261 @@ type Modal =
   | null;
 
 // useSearchParams() exige um limite de Suspense no Next.js — o componente real
-// vive em MeuTimeInner, envolvido aqui.
+// vive em MeuTimeRouter, envolvido aqui.
 export default function MeuTime() {
   return (
     <Suspense fallback={<main style={{ minHeight: "100vh", background: "#0c0e0d" }} />}>
-      <MeuTimeInner />
+      <MeuTimeRouter />
     </Suspense>
+  );
+}
+
+// Decide entre o TEU próprio dojo (MeuTimeInner — editável / em competição) e o
+// MODO VISITA (ver o dojo de um rival a partir da liga, via ?ver=<user>&comp=<id>).
+// Só é visita quando ?ver existe, ?comp existe, e o alvo NÃO és tu. Se ?ver és
+// tu mesmo (clicaste no teu nome na liga), cai no fluxo normal.
+function MeuTimeRouter() {
+  const searchParams = useSearchParams();
+  const ver = searchParams.get("ver");
+  const comp = searchParams.get("comp");
+  // undefined = ainda não sabemos quem somos; null = sem sessão; string = uid.
+  const [meuId, setMeuId] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
+      if (!active) return;
+      const s = data.session as { user?: { id?: string } } | null;
+      setMeuId(s?.user?.id ?? null);
+    });
+    return () => { active = false; };
+  }, []);
+
+  if (ver && comp) {
+    // Ainda a descobrir quem sou: espera (evita piscar o dojo errado).
+    if (meuId === undefined) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
+    if (meuId !== ver) return <DojoVisita alvoUserId={ver} idComp={comp} />;
+    // ver === eu -> é o meu próprio dojo -> fluxo normal.
+  }
+  return <MeuTimeInner />;
+}
+
+// ===========================================================================
+// MODO VISITA — ver o dojo de um RIVAL (só-leitura), a partir da liga.
+// ---------------------------------------------------------------------------
+// A equipa do rival é lida pela rota de SERVIDOR /api/equipa-na-rodada, que usa
+// service-role e contorna a RLS de `equipas` (do cliente não conseguiríamos ler
+// a linha de outro user — viria vazio). Dela tiramos ids + capitão + nome +
+// escudo. Os atletas resolvem-se pela pool da competição (/api/atletas?id=comp,
+// para ter género/preço, igual ao próprio dojo) e os pontos ao vivo por
+// /api/resultados (mesma fonte do ranking da liga). NADA é editável: sem lixo,
+// sem partilhar, sem salvar, sem capitão/vender — só o detalhe luta-a-luta.
+// ===========================================================================
+function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string }) {
+  const router = useRouter();
+  const [fase, setFase] = useState<"carregando" | "sem-equipa" | "erro" | "ok">("carregando");
+  const [nomeTime, setNomeTime] = useState("Equipa");
+  const [escudoAlvo, setEscudoAlvo] = useState<Identity | null>(null);
+  const [ids, setIds] = useState<string[]>([]);
+  const [capitao, setCapitao] = useState<string | null>(null);
+  const [poolMap, setPoolMap] = useState<Map<string, Athlete>>(new Map());
+  const [pontos, setPontos] = useState<Record<string, number>>({});
+  const [temResultados, setTemResultados] = useState(false);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null);
+  const [modal, setModal] = useState<Athlete | null>(null);
+
+  const foco = focoMercado();
+  const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp;
+
+  // 1) Sessão (exige login) + equipa do rival (servidor) + pool da competição.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!active) return;
+      if (!(data as { session: unknown }).session) { window.location.href = "/entrar"; return; }
+
+      const poolP = fetch(`/api/atletas?id=${idComp}`).then((r) => r.json()).catch(() => null);
+      const eqP = fetch(`/api/equipa-na-rodada?user=${encodeURIComponent(alvoUserId)}&comp=${encodeURIComponent(idComp)}`).then((r) => r.json()).catch(() => null);
+      const [poolJson, eqJson] = await Promise.all([poolP, eqP]);
+      if (!active) return;
+
+      const m = new Map<string, Athlete>();
+      const lista: Athlete[] = Array.isArray(poolJson?.atletas) ? poolJson.atletas : [];
+      for (const a of lista) m.set(a.id, a);
+      setPoolMap(m);
+
+      if (!eqJson || !eqJson.ok) { setFase("erro"); return; }
+      if (!eqJson.tem_equipa) {
+        if (typeof eqJson.nome_time === "string") setNomeTime(eqJson.nome_time);
+        setFase("sem-equipa");
+        return;
+      }
+      const listaAtletas: { id: unknown }[] = Array.isArray(eqJson.atletas) ? eqJson.atletas : [];
+      setIds(listaAtletas.map((x) => String(x.id)));
+      setCapitao(eqJson.capitao ? String(eqJson.capitao) : null);
+      setNomeTime(String(eqJson.nome_time || "Equipa"));
+      setEscudoAlvo((eqJson.escudo as Identity) ?? null);
+      setFase("ok");
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alvoUserId, idComp]);
+
+  // 2) Pontos do rival (+ tick ao vivo se a competição decorre agora).
+  useEffect(() => {
+    if (fase !== "ok" || ids.length === 0) return;
+    let active = true;
+    const buscar = () => {
+      fetch(`/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (!active) return;
+          setPontos(j && j.pontos ? j.pontos : {});
+          setTemResultados(!!(j && j.tem_resultados));
+          setUltimaAtualizacao(Date.now());
+        })
+        .catch(() => {});
+    };
+    buscar();
+    if (!aDecorrerAgora) return () => { active = false; };
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      buscar();
+    }, TICK_AO_VIVO_MS);
+    const onVis = () => { if (typeof document !== "undefined" && !document.hidden) buscar(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase, ids, idComp, aDecorrerAgora]);
+
+  const resolvidos = ids.map((id) => poolMap.get(id)).filter(Boolean) as Athlete[];
+  const ausentes = ids.filter((id) => !poolMap.get(id));
+  const males = resolvidos.filter((a) => a.gender === "M");
+  const females = resolvidos.filter((a) => a.gender === "F");
+  const scoreOf = (a: Athlete) => { const b = pontos[a.id] ?? 0; return a.id === capitao ? b * 2 : b; };
+  const totalPts = Math.round(resolvidos.reduce((s, a) => s + scoreOf(a), 0) * 10) / 10;
+  const squadValue = fmt(resolvidos.reduce((s, a) => s + a.priceJc, 0));
+  const phase: MarketPhase = temResultados ? "ao-vivo" : "fechado";
+  const horaTick = ultimaAtualizacao
+    ? new Date(ultimaAtualizacao).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : null;
+
+  return (
+    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+      <style>{`@keyframes ilp{0%,100%{opacity:1}50%{opacity:.25}} .ilp{animation:ilp 1.1s ease-in-out infinite}`}</style>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 40px" }}>
+        <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
+          <button onClick={() => router.back()} aria-label="Voltar à liga" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", cursor: "pointer", flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          </button>
+          <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>Dojo do rival</h1>
+        </header>
+
+        {fase === "carregando" && (
+          <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
+            <div style={{ width: 80, height: 80, margin: "0 auto 8px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
+            <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>A abrir o dojo…</div>
+          </div>
+        )}
+
+        {fase === "erro" && (
+          <div style={{ textAlign: "center", padding: "30px 16px", background: "#1a1110", border: "1px solid #3a2420", borderRadius: 16 }}>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#ef8d83", marginBottom: 8 }}>Ups</div>
+            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Não foi possível abrir este dojo agora. Tenta de novo daqui a pouco.</p>
+          </div>
+        )}
+
+        {fase === "sem-equipa" && (
+          <div style={{ textAlign: "center", padding: "26px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
+            <div style={{ width: 90, height: 90, margin: "0 auto 6px" }}><Mascot belt={BELT_HEX} expression="indicando" /></div>
+            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Ainda sem equipa</h2>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>Este treinador ainda não escalou equipa para esta rodada.</p>
+          </div>
+        )}
+
+        {fase === "ok" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
+              <div style={{ flexShrink: 0 }}><Escudo config={escudoAlvo || DEFAULT_IDENTITY} size={40} /></div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.06em" }}>Dojo de</div>
+                <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeTime}</div>
+              </div>
+            </div>
+
+            <section style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
+              <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
+                <SectionLabel>Masculino</SectionLabel>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
+                  {males.map((a) => <Cell key={a.id} a={a} captain={a.id === capitao} score={scoreOf(a)} phase={phase} onClick={() => setModal(a)} />)}
+                </div>
+                <SectionLabel>Feminino</SectionLabel>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                  {females.map((a) => <Cell key={a.id} a={a} captain={a.id === capitao} score={scoreOf(a)} phase={phase} onClick={() => setModal(a)} />)}
+                </div>
+              </div>
+            </section>
+
+            {ausentes.length > 0 && (
+              <div style={{ marginTop: 14, background: "#121815", border: "1px solid #3a2422", borderRadius: 14, padding: "12px 14px" }}>
+                <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#ef8d83", marginBottom: 6 }}>
+                  {ausentes.length === 1 ? "1 atleta indisponível" : `${ausentes.length} atletas indisponíveis`}
+                </div>
+                <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>
+                  {ausentes.length === 1 ? "Um atleta desta equipa não está inscrito nesta competição." : "Alguns atletas desta equipa não estão inscritos nesta competição."}
+                </p>
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={BELT_HEX} expression={phase === "ao-vivo" ? "determinado" : "feliz"} /></div>
+                <div>
+                  <div style={{ fontSize: 12, color: "#93a39a" }}>{phase === "ao-vivo" ? "A rodada está a decorrer!" : "Pré-competição"}</div>
+                  <div style={{ fontSize: 12, color: "#7fd1a3", fontWeight: 700, marginTop: 2 }}>{`Valor da equipa: JC ${squadValue}`}</div>
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>{phase === "ao-vivo" ? totalPts : `JC ${squadValue}`}</div>
+                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{phase === "ao-vivo" ? "pts" : "valor"}</div>
+              </div>
+            </div>
+
+            {phase === "ao-vivo" && horaTick && (
+              <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 11, color: "#7fd1a3" }}>
+                  <span className="ilp" style={{ width: 7, height: 7, borderRadius: "50%", background: "#7fd1a3" }} />
+                  Ao vivo · atualizado às {horaTick}
+                </div>
+              </div>
+            )}
+
+            <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
+              Estás a ver o dojo de um rival. Toca num atleta para ver como pontuou.
+            </p>
+          </>
+        )}
+      </div>
+
+      {modal && (
+        <AthleteDetail
+          a={modal}
+          captain={modal.id === capitao}
+          score={scoreOf(modal)}
+          temResultados={temResultados}
+          editavel={false}
+          idComp={idComp}
+          onCaptain={() => {}}
+          onSell={() => {}}
+          onClose={() => setModal(null)}
+        />
+      )}
+    </main>
   );
 }
 
