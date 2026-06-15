@@ -279,7 +279,7 @@ function DesempenhoNode({ innerRef, vars, pro, belt, beltName, accent, identity,
         </header>
 
         <div className="dhero">
-          <div className="dhero-label">O meu desempenho</div>
+          <div className="dhero-label">{dados.numeroRodada ? `Rodada ${dados.numeroRodada}` : "O meu desempenho"}</div>
           <div className="dhero-pts">{sinal(total)}</div>
           <div className="dhero-unit">pontos na rodada</div>
           <div className="dhero-comp">{dados.nomeCompeticao}</div>
