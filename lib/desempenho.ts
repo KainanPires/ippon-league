@@ -77,16 +77,18 @@ export function construirDesempenho(
   const linhas = atletas.map((atleta) => {
     const base = pontosPorId[atleta.id] ?? 0;
     const capitao = team.captain === atleta.id;
-    const pontos = capitao ? base * 2 : base; // capitão dobra
+    const pontos = capitao ? base * 2 : base; // capitão dobra (valor para a EQUIPA)
     return { atleta, pontos, capitao, base };
   });
 
   const pontuacaoTotal = Math.round(linhas.reduce((s, l) => s + l.pontos, 0) * 10) / 10;
 
-  // Melhor atleta: maior pontuação (já com o capitão dobrado).
+  // Melhor atleta: pelos pontos CRUS (base), NÃO os dobrados do capitão. Senão o
+  // capitão apareceria sempre como "melhor" só por ter dobrado — dado enganador.
+  // O verdadeiro melhor é quem mais pontuou na luta, capitão ou não.
   let melhor: { atleta: Athlete; pontos: number } | null = null;
   for (const l of linhas) {
-    if (!melhor || l.pontos > melhor.pontos) melhor = { atleta: l.atleta, pontos: l.pontos };
+    if (!melhor || l.base > melhor.pontos) melhor = { atleta: l.atleta, pontos: l.base };
   }
 
   const capLinha = linhas.find((l) => l.capitao) ?? null;
