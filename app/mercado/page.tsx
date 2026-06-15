@@ -7,6 +7,7 @@ import { loadDraftFor, saveDraftFor, setAthletePool } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
 import { focoMercado } from "@/lib/calendario";
+import { supabase } from "@/lib/supabase";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -68,6 +69,7 @@ function MercadoInner() {
 
   const [pool, setPool] = useState<Athlete[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPro, setIsPro] = useState(false);
   const [loadErr, setLoadErr] = useState("");
   const [aoVivoIds, setAoVivoIds] = useState<Set<string>>(new Set());
   const [aoVivoNome, setAoVivoNome] = useState<string | null>(null);
@@ -130,6 +132,16 @@ function MercadoInner() {
         });
       }
     } catch {}
+
+    // Saber se o utilizador é Pro: desbloqueia a info "Mínimo para valorizar"
+    // nos cards e a ordenação por esse valor.
+    supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
+      if (!active) return;
+      try {
+        const meta = (data.session as { user?: { user_metadata?: { is_pro?: boolean } } } | null)?.user?.user_metadata;
+        setIsPro(!!meta?.is_pro);
+      } catch {}
+    });
 
     fetch(`/api/atletas?id=${COMPETICAO}`)
       .then((r) => r.json())
@@ -406,7 +418,7 @@ function MercadoInner() {
                       <div className={idx === 0 && focus === "scout" ? "glow" : undefined} style={{ fontSize: 11, color: "#7c8a82", marginTop: 2, display: "inline-block", padding: "2px 4px" }}>
                         Média {a.avg.toFixed(1)} · Última {a.last}
                       </div>
-                      {sort === "min-valorizar" && (
+                      {isPro && (
                         <div style={{ fontSize: 11, color: GOLD, marginTop: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
                           <LockIcon /> Mínimo p/ valorizar: {fmt(expEsperada(a))} pts
                         </div>
@@ -448,9 +460,10 @@ function MercadoInner() {
         <Sheet title="Ordenar" onClose={() => setSheet(null)}>
           {SORTS.map((o) => {
             const active = sort === o.id;
+            const bloqueada = o.pro && !isPro; // Pro pode usar; não-Pro vê bloqueada
             return (
-              <button key={o.id} onClick={() => { if (o.pro) return; setSort(o.id); setSheet(null); }}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", background: active ? "#16201b" : "#121815", border: `1.5px solid ${active ? GOLD : "#2a3a33"}`, borderRadius: 11, padding: "13px 14px", marginBottom: 8, color: o.pro ? "#cfd8d2" : "#f1ede2", fontSize: 14, fontFamily: FB, cursor: o.pro ? "default" : "pointer", opacity: o.pro ? 0.75 : 1 }}>
+              <button key={o.id} onClick={() => { if (bloqueada) return; setSort(o.id); setSheet(null); }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", background: active ? "#16201b" : "#121815", border: `1.5px solid ${active ? GOLD : "#2a3a33"}`, borderRadius: 11, padding: "13px 14px", marginBottom: 8, color: bloqueada ? "#cfd8d2" : "#f1ede2", fontSize: 14, fontFamily: FB, cursor: bloqueada ? "default" : "pointer", opacity: bloqueada ? 0.75 : 1 }}>
                 <span>{o.label}</span>
                 {o.pro && <span style={{ display: "flex", alignItems: "center", gap: 5, color: GOLD, fontSize: 11, fontWeight: 700 }}><LockIcon /> Pro</span>}
               </button>
