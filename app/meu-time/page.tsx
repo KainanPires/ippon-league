@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
@@ -60,7 +60,17 @@ type Modal =
   | { kind: "athlete"; a: Athlete }
   | null;
 
+// useSearchParams() exige um limite de Suspense no Next.js — o componente real
+// vive em MeuTimeInner, envolvido aqui.
 export default function MeuTime() {
+  return (
+    <Suspense fallback={<main style={{ minHeight: "100vh", background: "#0c0e0d" }} />}>
+      <MeuTimeInner />
+    </Suspense>
+  );
+}
+
+function MeuTimeInner() {
   const [team, setTeam] = useState<TeamState>({ ids: [], captain: null }); // rascunho (editável)
   const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null }); // guardado (referência p/ dirty)
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
@@ -85,6 +95,12 @@ export default function MeuTime() {
   const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const router = useRouter();
+  // Marca "montar" (?montar=1): ativada pelo lixo. Enquanto está no ciclo
+  // mercado<->meu-time, o meu-time mostra VAZIO (ignora a equipa salva) para a
+  // pessoa montar uma nova. Sair do ciclo (link sem o param) restaura a antiga;
+  // salvar uma nova substitui-a. (Fluxo pedido pelo Kainan.)
+  const searchParams = useSearchParams();
+  const montar = searchParams.get("montar") === "1";
 
   const foco = focoMercado();
   const atual = foco.atual;
@@ -102,6 +118,12 @@ export default function MeuTime() {
         setTeam(localDecorrer);
         setSaved(localDecorrer);
         setIdComp(aDecorrer.idCompeticao);
+      } else if (montar) {
+        // Marca "montar" ativa (veio do lixo): mostra VAZIO, não carrega a equipa
+        // salva. A pessoa está a montar uma nova no ciclo mercado<->meu-time.
+        setTeam({ ids: [], captain: null });
+        setSaved(loadSavedFor(alvo.idCompeticao)); // guarda a salva como referência (não a mostra)
+        setIdComp(alvo.idCompeticao);
       } else {
         // Mercado aberto. O "Meu Time" mostra a equipa guardada; o rascunho só
         // entra como ponto de edição se for MESMO uma edição em curso (diferente
@@ -155,6 +177,9 @@ export default function MeuTime() {
         const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
         if (!active || !naAlvo) return;
         setSaved(naAlvo);
+        // Marca "montar" ativa: NÃO repor o team a partir da nuvem — fica vazio
+        // (a pessoa está a montar uma nova). Só guardamos a salva como referência.
+        if (montar) return;
         // A equipa guardada na conta (nuvem) é a fonte de verdade. Para o "Meu Time"
         // não pensar que há alterações por guardar quando NÃO há (ex.: voltar do
         // mercado sem mexer), alinhamos TUDO à nuvem: o que se vê (team), a
@@ -321,7 +346,7 @@ export default function MeuTime() {
     // se salvar uma nova, esta substitui a antiga. (Fluxo pedido pelo Kainan.)
     update({ ids: [], captain: null });
     setModal(null);
-    router.push("/mercado");
+    router.push("/mercado?montar=1");
   }
   async function salvar(destino?: string | null) {
     if (!isComplete(team)) { setModal({ kind: "missing" }); return; }
@@ -392,7 +417,7 @@ export default function MeuTime() {
             <div style={{ width: 96, height: 96, margin: "0 auto 6px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Ainda não tens equipa</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 18px" }}>Monta 8 atletas com 100 Judocoins, escolhe o teu capitão e vê-os aqui prontos a competir.</p>
-            <a href="/criar-equipa" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px 22px", borderRadius: 12, fontSize: 15, textDecoration: "none" }}>Montar a minha equipa</a>
+            <a href={montar ? "/mercado?montar=1" : "/criar-equipa"} style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px 22px", borderRadius: 12, fontSize: 15, textDecoration: "none" }}>Montar a minha equipa</a>
           </div>
         ) : aCarregarAtletas ? (
           <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
@@ -444,12 +469,12 @@ export default function MeuTime() {
                 <SectionLabel>Masculino</SectionLabel>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
                   {males.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
-                  {editavel && Array.from({ length: vagasM }).map((_, i) => <EmptyCell key={"vm" + i} />)}
+                  {editavel && Array.from({ length: vagasM }).map((_, i) => <EmptyCell key={"vm" + i} montar={montar} />)}
                 </div>
                 <SectionLabel>Feminino</SectionLabel>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
                   {females.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
-                  {editavel && Array.from({ length: vagasF }).map((_, i) => <EmptyCell key={"vf" + i} />)}
+                  {editavel && Array.from({ length: vagasF }).map((_, i) => <EmptyCell key={"vf" + i} montar={montar} />)}
                 </div>
               </div>
             </section>
@@ -521,7 +546,7 @@ export default function MeuTime() {
                   <button onClick={() => setModal({ kind: "share" })} aria-label="Partilhar equipa" style={{ width: 46, borderRadius: 11, border: "1px solid #243029", background: "transparent", color: "#cfd8d2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
                     <ShareIcon />
                   </button>
-                  <a href="/mercado" onClick={(e) => { e.preventDefault(); tryLeave("/mercado"); }} style={{ flex: 1, textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>Ver mercado</a>
+                  <a href={montar ? "/mercado?montar=1" : "/mercado"} onClick={(e) => { e.preventDefault(); tryLeave(montar ? "/mercado?montar=1" : "/mercado"); }} style={{ flex: 1, textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>Ver mercado</a>
                 </div>
                 <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
                   Toca num atleta para o tornares capitão ou venderes. Toca num lugar vazio para ir ao Mercado.
@@ -903,9 +928,9 @@ function Cell({ a, captain, score, phase, onClick }: { a: Athlete; captain: bool
   );
 }
 
-function EmptyCell() {
+function EmptyCell({ montar }: { montar?: boolean }) {
   return (
-    <a href="/mercado" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 3px", borderRadius: 12, border: "1.5px dashed rgba(217,164,65,0.7)", background: "rgba(12,14,13,0.62)", textDecoration: "none", minHeight: 92 }}>
+    <a href={montar ? "/mercado?montar=1" : "/mercado"} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 3px", borderRadius: 12, border: "1.5px dashed rgba(217,164,65,0.7)", background: "rgba(12,14,13,0.62)", textDecoration: "none", minHeight: 92 }}>
       <div style={{ width: 26, height: 26, borderRadius: "50%", border: `2px solid ${GOLD}`, color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, lineHeight: 1 }}>+</div>
       <div style={{ fontSize: 9, color: GOLD, fontWeight: 700, textTransform: "uppercase" }}>Mercado</div>
     </a>
