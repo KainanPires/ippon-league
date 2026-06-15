@@ -60,16 +60,16 @@ const CARD_CSS = `
 .dcard-headglow{position:absolute;top:-120px;left:0;right:0;height:680px;z-index:0;background:radial-gradient(58% 70% at 50% 22%,color-mix(in srgb,var(--glow-accent) 30%,transparent) 0%,transparent 66%),radial-gradient(80% 60% at 80% 6%,color-mix(in srgb,#d9a441 10%,transparent) 0%,transparent 70%);pointer-events:none}
 .dcard-inner{position:relative;z-index:2;height:100%;padding:64px 60px 56px;display:flex;flex-direction:column;box-sizing:border-box}
 .pro-badge{align-self:center;margin-top:-14px;margin-bottom:26px;padding:13px 40px;border-radius:999px;background:linear-gradient(180deg,#f1c969 0%,#d9a441 55%,#b9842c 100%);color:#20160a;font-weight:700;font-size:31px;letter-spacing:5px;text-transform:uppercase;border:1.5px solid #f4d489;box-shadow:0 0 44px rgba(217,164,65,0.6),inset 0 1px 0 rgba(255,255,255,0.5)}
-.dcard-head{display:flex;align-items:center;gap:26px;padding-bottom:28px;margin-bottom:6px;border-bottom:1.5px solid rgba(241,237,226,0.10)}
-.dcrest{flex-shrink:0;width:120px;height:138px;display:grid;place-items:center;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.45))}
+.dcard-head{display:flex;align-items:center;gap:20px;padding-bottom:28px;margin-bottom:6px;border-bottom:1.5px solid rgba(241,237,226,0.10)}
+.dcrest{flex-shrink:0;width:96px;height:110px;display:grid;place-items:center;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.45))}
 .dhead-text{min-width:0;flex:1;display:flex;flex-direction:column;align-items:flex-start}
-.dteam-name{margin:0;font-weight:700;font-size:52px;line-height:1.02;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;word-break:break-word}
+.dteam-name{margin:0;font-weight:700;font-size:44px;line-height:1.04;letter-spacing:0.3px;text-transform:uppercase;color:#f1ede2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;overflow-wrap:break-word}
 .dbelt-pill{display:inline-block;margin-top:14px;padding:9px 26px;border-radius:9px;background:var(--accent);color:var(--chip-text);font-weight:600;font-size:26px;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap}
 .dhero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:0}
 .dhero-label{font-weight:500;font-size:34px;letter-spacing:6px;text-transform:uppercase;color:#93a39a;margin-bottom:30px}
 .dhero-pts{font-family:'Arial Black','Helvetica Neue',Helvetica,Arial,sans-serif;font-weight:900;font-size:230px;line-height:1.1;letter-spacing:-4px;color:var(--score-color);text-shadow:0 0 80px var(--score-glow);display:block;height:250px}
-.dhero-unit{font-weight:500;font-size:40px;letter-spacing:8px;text-transform:uppercase;color:#93a39a;margin-top:28px}
-.dhero-comp{margin-top:40px;font-weight:600;font-size:44px;line-height:1.2;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;max-width:90%}
+.dhero-unit{font-weight:500;font-size:38px;line-height:1.35;letter-spacing:5px;text-transform:uppercase;color:#93a39a;margin-top:30px}
+.dhero-comp{margin-top:52px;font-weight:700;font-size:42px;line-height:1.25;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;max-width:90%}
 .dcards{display:flex;gap:24px;margin:36px 0 8px}
 .dchip-card{flex:1;background:rgba(12,14,13,0.55);border:2px solid var(--card-border);border-radius:20px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:6px}
 .dchip-role{font-weight:700;font-size:24px;letter-spacing:3px;text-transform:uppercase;color:var(--role-color)}
@@ -258,7 +258,7 @@ function DesempenhoNode({ innerRef, vars, pro, belt, beltName, accent, identity,
         {pro && <div className="pro-badge">★&nbsp;&nbsp;IPPON&nbsp;PRO&nbsp;&nbsp;★</div>}
 
         <header className="dcard-head">
-          <div className="dcrest"><Escudo config={identity} size={120} /></div>
+          <div className="dcrest"><Escudo config={identity} size={96} /></div>
           <div className="dhead-text">
             <h1 className="dteam-name">{identity.name}</h1>
             <span className="dbelt-pill">{beltName}</span>
