@@ -2,52 +2,44 @@
 //
 // APURAMENTO DE RONDA DA COPA IPPON (servidor, chave secreta).
 //
-// Disparo "preguiçoso": a página da liga chama esta rota quando deteta que a
-// copa está sorteada/a decorrer e a competição da ronda atual já terminou.
-// IDEMPOTENTE: se a ronda atual ainda tem competição a decorrer, ou já está toda
-// decidida e a seguinte já existe, não duplica nada.
+// Disparado por: (1) o cron, após congelar as competições (automático), e
+// (2) a página da liga (disparo preguiçoso ao abrir). IDEMPOTENTE: se a ronda
+// atual ainda tem competição a decorrer, ou já está decidida e a seguinte já
+// existe, não duplica nada.
+//
+// FONTE DOS PONTOS (corrigido): lê de resultados_atletas (CONGELADO pelo motor
+// lib/congelar), NÃO de getCompetitionContests (que vinha incompleto durante e
+// após o evento — era a causa de o apurar nunca decidir, o bug do mata-mata).
 //
 // O que faz:
 //   1) encontra a ronda mais baixa com confrontos PENDENTES
-//   2) confirma que a competição dessa ronda já TERMINOU (regra das 60h —
-//      competicaoFechada — para não decidir a meio de uma competição de 2 dias)
-//   3) para cada confronto pendente: calcula os pontos de cada jogador
-//      (mesma lógica do ranking: equipa na competição, capitão a dobrar) e
-//      decide o vencedor com o desempate em cascata (pontos → capitão → sorteio)
-//   4) quando a ronda fica toda decidida, gera a ronda seguinte (final+bronze
-//      nas semifinais); se era a final, marca a copa como terminada
-//
-// Notificações (sino): em cada confronto real avisa o vencedor ("avançaste") e o
-// perdedor ("eliminado"); na final, campeão/vice; no bronze, 3º lugar. Tudo com o
-// nome da liga. As notificações nunca bloqueiam o apuramento (falham em silêncio).
+//   2) confirma que a competição dessa ronda já está CONGELADA (tem resultados
+//      em resultados_atletas) — se não, ainda não apura
+//   3) para cada confronto: calcula os pontos de cada jogador (equipa na
+//      competição, capitão a dobrar) e decide com o desempate em cascata
+//   4) quando a ronda fica toda decidida, gera a ronda seguinte
 //
 // Recebe (POST): { league_id }
 // Devolve: { ok, apurou, ronda, decididos, gerouProxima, terminada }
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getCompetitionContests, scoreContestSide } from "@/lib/ijf";
 import { decidirConfronto, gerarRondaSeguinte, idCompeticaoSeguinte, competicaoPorId, type PontosJogador, type ConfrontoDB } from "@/lib/copa";
-import { competicaoFechada } from "@/lib/calendario";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Pontos de cada atleta (id_person) numa competição — igual ao /api/resultados.
-async function pontuacaoDaCompeticao(comp: string): Promise<Record<string, number>> {
-  const contests = await getCompetitionContests(comp);
+// Pontos de cada atleta (id_person) numa competição — LÊ DO CONGELADO
+// (resultados_atletas). Devolve o mapa e o nº de atletas (para saber se já congelou).
+async function pontuacaoCongelada(comp: string): Promise<{ pontos: Record<string, number>; nAtletas: number }> {
+  if (!supabaseAdmin) return { pontos: {}, nAtletas: 0 };
+  const { data } = await supabaseAdmin
+    .from("resultados_atletas")
+    .select("id_person, pontos")
+    .eq("id_competicao", comp);
   const pontos: Record<string, number> = {};
-  for (const f of contests) {
-    const lados: ["b" | "w", string][] = [
-      ["b", String(f.id_person_blue ?? "")],
-      ["w", String(f.id_person_white ?? "")],
-    ];
-    for (const [side, id] of lados) {
-      if (!id) continue;
-      pontos[id] = (pontos[id] ?? 0) + scoreContestSide(f, side);
-    }
-  }
-  return { ...pontos, __n_lutas: contests.length } as Record<string, number>;
+  for (const r of data || []) pontos[String(r.id_person)] = Number(r.pontos) || 0;
+  return { pontos, nAtletas: (data || []).length };
 }
 
 export async function POST(req: Request) {
@@ -62,7 +54,6 @@ export async function POST(req: Request) {
   const league_id = (corpo.league_id || "").trim();
   if (!league_id) return NextResponse.json({ ok: false, erro: "Falta league_id." }, { status: 400 });
 
-  // Liga é copa e já sorteada? (name para personalizar as notificações.)
   const { data: liga } = await supabaseAdmin
     .from("leagues")
     .select("id, name, formato, copa_estado")
@@ -90,7 +81,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, erro: "Esta copa ainda não tem chave." }, { status: 400 });
   }
 
-  // A ronda mais baixa com algum confronto PENDENTE.
   const pendentes = confrontos.filter((c) => c.estado === "pendente");
   if (pendentes.length === 0) {
     return NextResponse.json({ ok: true, apurou: false, semPendentes: true, estado: liga.copa_estado });
@@ -99,27 +89,16 @@ export async function POST(req: Request) {
   const confrontosRonda = confrontos.filter((c) => c.ronda === rondaAtual);
   const pendentesRonda = confrontosRonda.filter((c) => c.estado === "pendente");
 
-  // A competição desta ronda (todos os confrontos da ronda têm a mesma).
   const comp = pendentesRonda[0].id_competicao;
   if (!comp) return NextResponse.json({ ok: false, erro: "Ronda sem competição definida." }, { status: 400 });
 
-  // 2a) A competição já TERMINOU? Regra das 60h (competicaoFechada). NÃO basta
-  //     ter lutas: uma competição de 2 dias pode ter o dia 1 já jogado mas o
-  //     dia 2 ainda por vir. Só apuramos depois de a competição fechar mesmo,
-  //     senão decidiríamos a ronda a meio (bug dos dias diferentes).
-  const semana = competicaoPorId(comp);
-  if (semana && !competicaoFechada(semana)) {
-    return NextResponse.json({ ok: true, apurou: false, aDecorrer: true, ronda: rondaAtual, motivo: "competicao_nao_terminou" });
-  }
-
-  // 2b) Salvaguarda adicional: a competição já tem lutas/resultados? Se não,
-  //     ainda não apura (mesmo que a janela de 60h tenha passado, sem dados não
-  //     há nada a calcular).
-  const pontosAtletaRaw = await pontuacaoDaCompeticao(comp);
-  const nLutas = (pontosAtletaRaw.__n_lutas as number) || 0;
-  delete (pontosAtletaRaw as Record<string, number>).__n_lutas;
-  if (nLutas === 0) {
-    return NextResponse.json({ ok: true, apurou: false, aDecorrer: true, ronda: rondaAtual });
+  // 2) A competição já está CONGELADA? (tem resultados em resultados_atletas).
+  // É a fonte fiável: o motor de congelamento já calculou os pontos corretos.
+  // Se ainda não congelou, não apuramos (a competição não terminou / não foi
+  // processada pelo cron ainda).
+  const { pontos: pontosAtleta, nAtletas } = await pontuacaoCongelada(comp);
+  if (nAtletas === 0) {
+    return NextResponse.json({ ok: true, apurou: false, aDecorrer: true, ronda: rondaAtual, motivo: "competicao_nao_congelada" });
   }
 
   // Marca como "a decorrer" assim que começamos a apurar a 1ª ronda.
@@ -127,20 +106,16 @@ export async function POST(req: Request) {
     await supabaseAdmin.from("leagues").update({ copa_estado: "a_decorrer" }).eq("id", league_id);
   }
 
-  // 3) Calcular os pontos de cada JOGADOR (equipa) envolvido nesta ronda.
+  // 3) Pontos de cada JOGADOR (equipa) envolvido nesta ronda.
   const jogadores = new Set<string>();
   for (const c of pendentesRonda) {
     if (c.jogador_a) jogadores.add(c.jogador_a);
     if (c.jogador_b) jogadores.add(c.jogador_b);
   }
-  const pontosJogador = await pontosPorJogador(Array.from(jogadores), comp, pontosAtletaRaw);
+  const pontosJogador = await pontosPorJogador(Array.from(jogadores), comp, pontosAtleta);
 
-  // Decide cada confronto pendente e grava. Guarda os resultados para notificar
-  // depois de toda a ronda decidida (assim sabemos se foi a final).
   let decididos = 0;
   for (const c of pendentesRonda) {
-    // Confronto com bye (jogador_b null) já deve estar decidido; salvaguarda.
-    // Bye não gera notificação (não houve luta).
     if (!c.jogador_b) {
       await supabaseAdmin.from("copa_confrontos").update({
         vencedor: c.jogador_a, decidido_por: "bye", estado: "decidido",
@@ -160,12 +135,10 @@ export async function POST(req: Request) {
     }).eq("id", c.id);
     decididos++;
 
-    // --- NOTIFICAÇÕES deste confronto ---
     const vencedor = r.vencedor;
     const perdedor = vencedor === c.jogador_a ? c.jogador_b : c.jogador_a;
     const fase = String(c.fase || "");
     if (fase === "final") {
-      // Campeão e vice.
       await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_campeao",
@@ -183,8 +156,6 @@ export async function POST(req: Request) {
         });
       }
     } else if (fase === "bronze") {
-      // 3º lugar (o vencedor do confronto de bronze). O perdedor já tinha sido
-      // notificado da eliminação na semifinal, por isso não repetimos.
       await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_avancou",
@@ -193,7 +164,6 @@ export async function POST(req: Request) {
         link: linkCopa,
       });
     } else {
-      // Ronda normal: avançaste / eliminado.
       await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_avancou",
@@ -213,8 +183,7 @@ export async function POST(req: Request) {
     }
   }
 
-  // 4) A ronda ficou toda decidida? Releio os vencedores reais da base de dados
-  // (mais seguro que reconstruir em memória) e, se sim, gero a ronda seguinte.
+  // 4) A ronda ficou toda decidida? Gera a ronda seguinte.
   const { data: rondaFinal } = await supabaseAdmin
     .from("copa_confrontos")
     .select("ronda, ordem, fase, jogador_a, jogador_b, vencedor, estado")
@@ -232,7 +201,6 @@ export async function POST(req: Request) {
       await supabaseAdmin.from("leagues").update({ copa_estado: "terminada" }).eq("id", league_id);
       terminada = true;
     } else {
-      // Gera a ronda seguinte na competição seguinte do calendário.
       const idProxima = idCompeticaoSeguinte(comp);
       if (idProxima) {
         const novos = gerarRondaSeguinte(rondaFinal as ConfrontoDB[], idProxima);
@@ -246,7 +214,6 @@ export async function POST(req: Request) {
             jogador_b: n.jogador_b,
             id_competicao: n.id_competicao,
             estado: "pendente",
-            // bye na ronda seguinte já fica decidido
             ...(n.jogador_b === null ? { vencedor: n.jogador_a, decidido_por: "bye", estado: "decidido" } : {}),
           }));
           await supabaseAdmin.from("copa_confrontos").insert(linhas);
@@ -301,8 +268,8 @@ async function pontosPorJogador(
       const p = pontosAtleta[aid] ?? 0;
       total += p;
       if (eq.capitao && aid === eq.capitao) {
-        total += p; // capitão a dobrar no total
-        pontosCapitao = p; // base, para o desempate
+        total += p;
+        pontosCapitao = p;
       }
     }
     out[uid] = {
