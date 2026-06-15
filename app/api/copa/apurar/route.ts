@@ -7,9 +7,9 @@
 // atual ainda tem competição a decorrer, ou já está decidida e a seguinte já
 // existe, não duplica nada.
 //
-// MOTOR (Fase 2): usa gerarRondaSeguinteComRepescagem (lib/copa) — eliminação +
-// repescagem em paralelo com as semis + bloco final com 2 bronzes cruzados.
-// A escalação de cada confronto continua a ser decidida pela cascata
+// MOTOR (Fase 2+3): usa gerarRondaSeguinteComRepescagem (lib/copa) — eliminação +
+// repescagem em paralelo com as semis + bloco final com 2 bronzes cruzados. A
+// FINAL decide-se por pontos ACUMULADOS (semifinal + bloco final). A escalação de cada confronto continua a ser decidida pela cascata
 // (pontos -> capitão -> sorteio) e os pontos vêm de resultados_atletas
 // (CONGELADO pelo motor lib/congelar). A `metade` (lado da chave) é lida e
 // propagada para a repescagem/cruzamento funcionarem; a `fase` aceita o novo
@@ -117,6 +117,35 @@ export async function POST(req: Request) {
   }
   const pontosJogador = await pontosPorJogador(Array.from(jogadores), comp, pontosAtleta);
 
+  // FINAL POR PONTOS ACUMULADOS (Fase 3): se esta ronda contém a final, os
+  // finalistas decidem-se pela SOMA dos pontos da semifinal (ronda anterior) com
+  // os do bloco final (ronda atual) — não só pela última competição, para o
+  // título não depender da sorte de uma única rodada. Os bronzes continuam a
+  // decidir-se apenas pela competição atual.
+  const finalistas = pendentesRonda
+    .filter((c) => String(c.fase) === "final")
+    .flatMap((c) => [c.jogador_a, c.jogador_b])
+    .filter((x): x is string => !!x);
+  const acumuladoFinal: Record<string, PontosJogador> = {};
+  if (finalistas.length > 0) {
+    // Todos os confrontos de uma ronda partilham a mesma competição; a da ronda
+    // anterior é, portanto, a competição da semifinal.
+    const compSemi = confrontos.find((c) => c.ronda === rondaAtual - 1)?.id_competicao || null;
+    if (compSemi) {
+      const { pontos: pontosAtletaSemi } = await pontuacaoCongelada(compSemi);
+      const pontosSemi = await pontosPorJogador(finalistas, compSemi, pontosAtletaSemi);
+      for (const f of finalistas) {
+        const atual = pontosJogador[f] ?? { total: 0, capitao: 0, escalou: false };
+        const semi = pontosSemi[f] ?? { total: 0, capitao: 0, escalou: false };
+        acumuladoFinal[f] = {
+          total: Math.round((atual.total + semi.total) * 10) / 10,
+          capitao: Math.round((atual.capitao + semi.capitao) * 10) / 10,
+          escalou: atual.escalou || semi.escalou,
+        };
+      }
+    }
+  }
+
   let decididos = 0;
   for (const c of pendentesRonda) {
     if (!c.jogador_b) {
@@ -126,8 +155,11 @@ export async function POST(req: Request) {
       decididos++;
       continue;
     }
-    const pa = pontosJogador[c.jogador_a] ?? { total: 0, capitao: 0, escalou: false };
-    const pb = pontosJogador[c.jogador_b] ?? { total: 0, capitao: 0, escalou: false };
+    // Na FINAL usa-se o acumulado (semi + bloco final); nas restantes fases, os
+    // pontos da competição atual.
+    const ehFinal = String(c.fase) === "final";
+    const pa = (ehFinal ? acumuladoFinal[c.jogador_a] : undefined) ?? pontosJogador[c.jogador_a] ?? { total: 0, capitao: 0, escalou: false };
+    const pb = (ehFinal ? acumuladoFinal[c.jogador_b] : undefined) ?? pontosJogador[c.jogador_b] ?? { total: 0, capitao: 0, escalou: false };
     const r = decidirConfronto(c.jogador_a, c.jogador_b, pa, pb);
     await supabaseAdmin.from("copa_confrontos").update({
       pontos_a: r.pontos_a,
