@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { focoMercado } from "@/lib/calendario";
@@ -49,8 +49,16 @@ function nomePrivacidade(p: string): string {
   return "Fechada";
 }
 
+// A copa já tem CHAVE? (sorteada / a decorrer / terminada). Nesse caso a página
+// intermédia não faz sentido — vai-se direto à chave. Só "inscricao" (a angariar)
+// é que mostra a sala de espera e o convite.
+function copaTemChave(estado: string | null | undefined): boolean {
+  return estado === "sorteada" || estado === "a_decorrer" || estado === "terminada";
+}
+
 export default function PaginaLiga() {
   const params = useParams();
+  const router = useRouter();
   const codigo = String(params?.codigo || "").toUpperCase();
 
   const [estado, setEstado] = useState<"a_entrar" | "pronto" | "erro" | "sem_sessao" | "pedido_enviado">("a_entrar");
@@ -59,6 +67,7 @@ export default function PaginaLiga() {
   const [membros, setMembros] = useState<Membro[]>([]);
   const [meuId, setMeuId] = useState<string | null>(null);
   const [horaTick, setHoraTick] = useState<string>("");
+  const [aRedirecionar, setARedirecionar] = useState(false);
 
   // Painel do dono: pedidos pendentes.
   const [souDono, setSouDono] = useState(false);
@@ -110,6 +119,14 @@ export default function PaginaLiga() {
           setEstado("pedido_enviado");
           return;
         }
+        // Se é uma COPA que já tem chave, vai DIRETO à chave (sem página
+        // intermédia). A entrada na liga já foi resolvida acima, por isso quem
+        // veio de um convite entra à mesma antes de ser reencaminhado.
+        if (j.liga && j.liga.formato === "copa" && copaTemChave(j.liga.copa_estado)) {
+          setARedirecionar(true);
+          router.replace(`/liga/${codigo}/chave`);
+          return;
+        }
         setLiga(j.liga);
         setEstado("pronto");
       } catch {
@@ -119,7 +136,7 @@ export default function PaginaLiga() {
       }
     })();
     return () => { vivo = false; };
-  }, [codigo]);
+  }, [codigo, router]);
 
   // 2) Quando a liga está pronta: busca o ranking (e mantém ao vivo com tick).
   useEffect(() => {
@@ -202,37 +219,16 @@ export default function PaginaLiga() {
         const j = await res.json();
         if (!vivo) return;
         if (j.ok && (j.sorteada || j.jaEstava)) {
+          // Acabou de sortear -> já tem chave -> vai direto à chave.
           setCopaEstado(j.estado || "sorteada");
+          setARedirecionar(true);
+          router.replace(`/liga/${codigo}/chave`);
         }
       } catch { /* tenta de novo na próxima abertura */ }
     })();
     return () => { vivo = false; };
-  }, [estado, liga]);
+  }, [estado, liga, codigo, router]);
 
-  // Gatilho "preguiçoso" do apuramento: se a copa está sorteada ou a decorrer,
-  // pedimos o apuramento da ronda atual (idempotente). A rota só apura se a
-  // competição da ronda já terminou; caso contrário não faz nada.
-  useEffect(() => {
-    if (estado !== "pronto" || !liga || liga.formato !== "copa") return;
-    const est = liga.copa_estado || "inscricao";
-    if (est !== "sorteada" && est !== "a_decorrer") return;
-    let vivo = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/copa/apurar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ league_id: liga.id }),
-        });
-        const j = await res.json();
-        if (!vivo) return;
-        // Se apurou algo ou terminou, reflete o novo estado no ecrã.
-        if (j.ok && j.terminada) setCopaEstado("terminada");
-        else if (j.ok && j.apurou) setCopaEstado("a_decorrer");
-      } catch { /* tenta de novo na próxima abertura */ }
-    })();
-    return () => { vivo = false; };
-  }, [estado, liga]);
   async function decidirPedido(p: Pedido, acao: "aprovar" | "recusar") {
     if (aDecidir || !meuId) return;
     setADecidir(p.request_id);
@@ -284,9 +280,9 @@ export default function PaginaLiga() {
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Liga</h1>
         </header>
 
-        {estado === "a_entrar" && <Aviso>A abrir a liga…</Aviso>}
+        {(estado === "a_entrar" || aRedirecionar) && <Aviso>{aRedirecionar ? "A abrir a chave…" : "A abrir a liga…"}</Aviso>}
 
-        {estado === "sem_sessao" && (
+        {!aRedirecionar && estado === "sem_sessao" && (
           <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
             <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Convite para uma liga</div>
             <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 16 }}>Entra na tua conta para te juntares a esta liga e disputar com o teu dojo.</p>
@@ -294,7 +290,7 @@ export default function PaginaLiga() {
           </div>
         )}
 
-        {estado === "pedido_enviado" && (
+        {!aRedirecionar && estado === "pedido_enviado" && (
           <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16 }}>
             <div style={{ fontSize: 34, marginBottom: 6 }}>✋</div>
             <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 8, color: GOLD }}>Pedido enviado</div>
@@ -306,7 +302,7 @@ export default function PaginaLiga() {
           </div>
         )}
 
-        {estado === "erro" && (
+        {!aRedirecionar && estado === "erro" && (
           <div style={{ textAlign: "center", padding: "30px 16px", background: "#1a1110", border: "1px solid #3a2420", borderRadius: 16 }}>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: erroMsg.includes("Pro") ? GOLD : "#ef8d83", marginBottom: 8 }}>{erroMsg.includes("Pro") ? "Limite atingido" : "Ups"}</div>
             <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{erroMsg}</p>
@@ -318,7 +314,7 @@ export default function PaginaLiga() {
           </div>
         )}
 
-        {estado === "pronto" && liga && (
+        {!aRedirecionar && estado === "pronto" && liga && (
           <>
             <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 16, padding: 14, display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
               <div style={{ flexShrink: 0 }}><Escudo config={liga.escudo || DEFAULT_IDENTITY} size={46} /></div>
@@ -428,9 +424,9 @@ function Aviso({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Cartão de estado da Copa Ippon (mata-mata). A chave visual chega na Fase D.
-// Em inscrição, mostra a "sala de espera": a lista de equipas inscritas (escudo
-// + nome) e a data de fecho.
+// Cartão de estado da Copa Ippon (mata-mata). Em INSCRIÇÃO mostra a "sala de
+// espera" (equipas inscritas + data de fecho). Os outros estados (sorteada/
+// a decorrer/terminada) já não passam por aqui — a página redireciona à chave.
 function CartaoCopa({ estado, fecho, inscritos, meuId, codigo }: { estado: string; fecho: string | null; inscritos: Membro[]; meuId: string | null; codigo: string }) {
   const fechoData = fecho ? new Date(fecho) : null;
   const prazoPassou = fechoData ? Date.now() >= fechoData.getTime() : false;
@@ -450,18 +446,12 @@ function CartaoCopa({ estado, fecho, inscritos, meuId, codigo }: { estado: strin
     icone = "⏳";
     titulo = "Inscrições fechadas";
     texto = "As inscrições fecharam. A chave vai ser sorteada — abre daqui a pouco para veres o teu primeiro confronto.";
-  } else if (estado === "sorteada") {
-    icone = "🥋";
-    titulo = "Copa sorteada!";
-    texto = "A chave está formada. A tela com os confrontos chega em breve — prepara-te para a tua primeira eliminatória.";
-  } else if (estado === "a_decorrer") {
+  } else {
+    // sorteada / a_decorrer / terminada: a página redireciona à chave; este
+    // cartão raramente é visto, mas mantemos um fallback com botão para a chave.
     icone = "⚔️";
-    titulo = "Copa a decorrer";
-    texto = "A chave está em jogo. Cada competição elimina metade — sobrevive e avança!";
-  } else if (estado === "terminada") {
-    icone = "🏆";
-    titulo = "Copa terminada";
-    texto = "Esta edição da Copa Ippon já terminou. Vê o pódio na chave.";
+    titulo = "Copa em jogo";
+    texto = "A chave está formada. A abrir os confrontos…";
   }
 
   return (
@@ -497,7 +487,8 @@ function CartaoCopa({ estado, fecho, inscritos, meuId, codigo }: { estado: strin
         </div>
       )}
 
-      {/* Botão para ver a chave — quando já há chave (sorteada/a decorrer/terminada). */}
+      {/* Fallback: se por algum motivo a copa já tem chave e não redirecionou,
+          oferece o botão para a chave. */}
       {estado !== "inscricao" && (
         <a href={`/liga/${codigo}/chave`} style={{ display: "block", textAlign: "center", marginTop: 12, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 11, textDecoration: "none" }}>
           {estado === "terminada" ? "Ver pódio e chave" : "Ver a chave"}
