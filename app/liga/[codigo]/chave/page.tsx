@@ -87,7 +87,9 @@ export default function PaginaChave() {
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 60px" }}>
         <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
-          <a href={`/liga/${codigo}`} aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+          {/* Voltar vai para /ligas (as competições). NÃO para /liga/[codigo],
+              porque essa página redireciona de volta para a chave (loop). */}
+          <a href="/ligas" aria-label="Voltar às competições" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           </a>
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>Chave da Copa</h1>
@@ -102,7 +104,7 @@ export default function PaginaChave() {
           <div style={{ textAlign: "center", padding: "40px 16px", background: "#1a1110", border: "1px solid #3a2420", borderRadius: 16 }}>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#ef8d83", marginBottom: 8 }}>Ups</div>
             <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{erro}</p>
-            <a href={`/liga/${codigo}`} style={{ display: "inline-block", marginTop: 12, color: GOLD, fontSize: 13, textDecoration: "none", fontFamily: FD, fontWeight: 700 }}>Voltar à liga</a>
+            <a href="/ligas" style={{ display: "inline-block", marginTop: 12, color: GOLD, fontSize: 13, textDecoration: "none", fontFamily: FD, fontWeight: 700 }}>Voltar às competições</a>
           </div>
         )}
 
