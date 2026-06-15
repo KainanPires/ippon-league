@@ -5,7 +5,7 @@ import { Mascot } from "@/components/Mascot";
 import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
 import { Desempenho } from "@/components/Desempenho";
-import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, mensagemDesempenho, type DesempenhoRodada } from "@/lib/desempenho";
+import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, textoFecho } from "@/lib/calendario";
 import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
@@ -54,40 +54,30 @@ export default function Inicio() {
   const [visitante, setVisitante] = useState(false);
   const [phase, setPhase] = useState<"tutorial" | null>(null);
   const [step, setStep] = useState(0);
-  // Nome arranca VAZIO (não "Campeão"): só mostramos quando a sessão resolve.
-  // Visitante => "Campeão"; com conta => nome real. Evita o flash de "Campeão".
   const [name, setName] = useState("");
   const [isPro, setIsPro] = useState(false);
-  // Faixa OFICIAL do jogo (users.belt, calculada por desempenho). "branca" por defeito.
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
-  // Guardamos a EQUIPA encontrada (ids); o teamInfo é calculado ao mostrar, para
-  // atualizar o Valor quando a lista de atletas chegar.
   const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
   const [minhasLigas, setMinhasLigas] = useState<{ id: string; name: string; membros: number }[] | null>(null);
   const [desempenho, setDesempenho] = useState<{ dados: DesempenhoRodada; team: TeamState } | null>(null);
-  const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
+  const [extra, setExtra] = useState<ResumoExtra | null>(null);
+  const [, bumpPool] = useState(0);
 
   const beltRef = useRef<HTMLAnchorElement | null>(null);
   const teamRef = useRef<HTMLDivElement | null>(null);
   const ligasRef = useRef<HTMLAnchorElement | null>(null);
   const tutTarget: TutTarget = phase === "tutorial" ? targetForStep(step) : null;
 
-  // Foco do mercado (regra única no calendário): competição-alvo, a que decorre, estado.
   const foco = focoMercado();
   const comp = foco.atual;
   const ehClassico = comp.classico;
-  const emAndamento = foco.aDecorrer !== null; // a competição da semana já fechou/decorre
-  const alvo = foco.alvo;            // competição de mercado aberto (onde se monta)
-  const aDecorrer = foco.aDecorrer;  // competição a decorrer (mercado fechado), se houver
+  const emAndamento = foco.aDecorrer !== null;
+  const alvo = foco.alvo;
+  const aDecorrer = foco.aDecorrer;
 
-  // teamInfo calculado a cada render (re-resolve quando a lista de atletas chega).
   const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
-  // Já tem equipa COMPLETA guardada? (8 atletas + capitão). Não depende da lista de
-  // atletas estar carregada — basta os ids guardados. Decide o destino do "Escalar":
-  // com equipa -> /meu-time (ver/gerir); sem equipa -> /criar-equipa (montar).
   const temEquipaCompleta = !!savedTeam && savedTeam.ids.length === 8 && !!savedTeam.captain;
   const destinoEscalar = temEquipaCompleta ? "/meu-time" : "/criar-equipa";
-  // Nome a mostrar: visitante => "Campeão"; com conta => nome real (ou vazio enquanto carrega).
   const nomeMostrado = visitante ? "Campeão" : name;
 
   useEffect(() => {
@@ -96,16 +86,13 @@ export default function Inicio() {
       if (!active) return;
 
       if (!data.session) {
-        // VISITANTE: sem sessão. Mostra "Campeão" + convite. NUNCA lê a equipa local.
         setVisitante(true);
         setSavedTeam(null);
         setReady(true);
         return;
       }
 
-      // LOGADO: a partir daqui podemos usar nome e equipa.
       setVisitante(false);
-      // As tuas ligas (reais): busca as ligas onde este utilizador é membro.
       const userId = data.session.user?.id;
       if (userId) {
         fetch(`/api/liga/minhas?user_id=${userId}`)
@@ -118,23 +105,17 @@ export default function Inicio() {
           .catch(() => { if (active) setMinhasLigas([]); });
       }
       try {
-        // Nome do utilizador: PRIMEIRO a conta (user_metadata.nome — sempre certo
-        // e isolado por sessão); só como recurso o localStorage, isolado por conta.
         const metaName = data.session.user?.user_metadata?.nome;
         const savedName = localStorage.getItem(`ippon_name__${uid()}`) ?? localStorage.getItem("ippon_name");
         if (metaName) setName(String(metaName).split(" ")[0]);
         else if (savedName) setName(savedName);
-        else setName("Campeão"); // conta sem nome definido: recurso final
-        // Estado Pro: controla as "duas saídas" do cartão Pro (vendas vs central).
+        else setName("Campeão");
         const meta = (data.session.user?.user_metadata ?? {}) as { is_pro?: boolean };
         setIsPro(Boolean(meta.is_pro));
-        // Faixa OFICIAL do jogo: lê de users.belt (calculada por desempenho mensal).
         if (userId) {
           supabase.from("users").select("belt").eq("id", userId).maybeSingle()
             .then(({ data: row }) => { if (active) setFaixaJogo(normalizarFaixa(row?.belt)); });
         }
-        // Onboarding: só auto-aparece a quem registou agora ("pending") E cuja conta
-        // ainda não o viu. Assim não volta em logins futuros nem noutro dispositivo.
         if (localStorage.getItem("ippon_onboarding") === "pending") {
           tutoriaisVistosConta().then((vistos) => {
             if (!active) return;
@@ -146,14 +127,11 @@ export default function Inicio() {
             }
           });
         }
-        // Cache local (instantâneo): tenta a competição a decorrer; senão a de mercado aberto (alvo).
         const localDecorrer = aDecorrer ? loadSavedFor(aDecorrer.idCompeticao) : { ids: [], captain: null };
         const localBase = localDecorrer.ids.length > 0 ? localDecorrer : loadSavedFor(alvo.idCompeticao);
         if (localBase.ids.length > 0) setSavedTeam(localBase);
       } catch {}
       setReady(true);
-      // Carrega a lista de atletas das competições relevantes (mesma fonte do Mercado),
-      // para o resolve() traduzir os ids da equipa e o Valor deixar de ser "—".
       const compsPool = aDecorrer ? [aDecorrer.idCompeticao, alvo.idCompeticao] : [alvo.idCompeticao];
       Promise.all(
         compsPool.map((id) => fetch(`/api/atletas?id=${id}`).then((r) => r.json()).catch(() => null))
@@ -165,12 +143,10 @@ export default function Inicio() {
           for (const a of list) merged.set(a.id, a);
         }
         if (merged.size > 0) {
-          // setAthletePool espera Athlete[]; a lista do servidor já vem nesse formato.
           setAthletePool(Array.from(merged.values()) as never);
           bumpPool((t) => t + 1);
         }
       });
-      // Equipa oficial da conta: a da competição a decorrer (se existir), senão a da competição de mercado aberto.
       (async () => {
         const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
         if (!active) return;
@@ -180,55 +156,59 @@ export default function Inicio() {
         }
         const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
         if (!active || !naAlvo || naAlvo.ids.length === 0) return;
-        setSavedTeam(naAlvo); // nunca apagar um estado bom (só atualiza se tiver equipa)
+        setSavedTeam(naAlvo);
       })();
 
-      // "O TEU DESEMPENHO NA RODADA": se a competição em que escalei já terminou
-      // (tem resultados) e ainda não a vi, prepara o popup. Espera o pool de atletas.
+      // "O TEU DESEMPENHO NA RODADA":
+      //  - Se há competição A DECORRER: usa os pontos AO VIVO (como antes).
+      //  - Senão: usa a ÚLTIMA competição CONGELADA não vista (persiste após fechar).
       (async () => {
-        // Candidata: a competição a decorrer/que decorreu esta semana (ex.: Tahiti).
-        // É a rodada mais recente em que a pessoa pode ter escalado.
-        const candidata = aDecorrer;
-        if (!active || !candidata) return;
-        // Já viu?
         const vistos = await desempenhosVistosConta();
-        if (!active || vistos[candidata.idCompeticao]) return;
-        // A equipa dessa competição.
-        const teamComp = await loadSavedCloudFor(candidata.idCompeticao);
+        if (!active) return;
+
+        // ---- Caso 1: competição a decorrer (ao vivo) ----
+        if (aDecorrer) {
+          if (vistos[aDecorrer.idCompeticao]) return;
+          const teamComp = await loadSavedCloudFor(aDecorrer.idCompeticao);
+          if (!active || !teamComp || teamComp.ids.length === 0) return;
+          const pontos = await buscarResultados(aDecorrer.idCompeticao);
+          if (!active || !pontos) return;
+          try {
+            const j = await fetch(`/api/atletas?id=${aDecorrer.idCompeticao}`).then((r) => r.json());
+            const list = Array.isArray(j?.atletas) ? j.atletas : [];
+            if (list.length > 0) setAthletePool(list as never);
+          } catch {}
+          if (!active) return;
+          const dados = construirDesempenho(aDecorrer.idCompeticao, aDecorrer.nome, teamComp, pontos);
+          if (dados) {
+            setDesempenho({ dados, team: teamComp });
+            await notificarResumo(aDecorrer.idCompeticao, aDecorrer.nome, dados);
+          }
+          return;
+        }
+
+        // ---- Caso 2: sem evento a decorrer -> última competição CONGELADA ----
+        const cong = await buscarResultadosCongelados(); // sem comp = última congelada
+        if (!active || !cong) return;
+        if (vistos[cong.comp]) return;
+        const teamComp = await loadSavedCloudFor(cong.comp);
         if (!active || !teamComp || teamComp.ids.length === 0) return;
-        // Há resultados? (só dispara quando a competição terminou e o JudoBase publicou)
-        const pontos = await buscarResultados(candidata.idCompeticao);
-        if (!active || !pontos) return;
-        // Garante o pool de atletas dessa competição para o resolve() funcionar.
+        // Garante o pool de atletas dessa competição (para resolver nomes/país).
         try {
-          const j = await fetch(`/api/atletas?id=${candidata.idCompeticao}`).then((r) => r.json());
+          const j = await fetch(`/api/atletas?id=${cong.comp}`).then((r) => r.json());
           const list = Array.isArray(j?.atletas) ? j.atletas : [];
           if (list.length > 0) setAthletePool(list as never);
         } catch {}
         if (!active) return;
-        const dados = construirDesempenho(candidata.idCompeticao, candidata.nome, teamComp, pontos);
-        if (dados) {
-          setDesempenho({ dados, team: teamComp });
-          // Notificação de RESUMO (guardada), personalizada com a pontuação real.
-          // Guarda anti-duplicação local: só uma vez por competição neste aparelho.
-          // (Princípio de ouro: a mensagem usa os dados reais do utilizador.)
-          try {
-            const chaveResumo = `ippon_notif_resumo_${candidata.idCompeticao}`;
-            if (!localStorage.getItem(chaveResumo)) {
-              const cap = dados.capitao;
-              const corpo = cap
-                ? `${mensagemDesempenho(dados.pontuacaoTotal, "")} Fizeste ${dados.pontuacaoTotal} pts — o teu capitão ${cap.atleta.name.split(" ").slice(-1)[0]} somou ${cap.pontos}.`
-                : `${mensagemDesempenho(dados.pontuacaoTotal, "")} Fizeste ${dados.pontuacaoTotal} pts nesta rodada.`;
-              await criarNotificacao({
-                tipo: "resumo_rodada",
-                titulo: `Resumo: ${candidata.nome}`,
-                corpo: corpo.trim(),
-                link: "/meu-time",
-              });
-              localStorage.setItem(chaveResumo, "1");
-            }
-          } catch {}
-        }
+        const dados = construirDesempenho(cong.comp, cong.nome, teamComp, cong.pontos);
+        if (!dados) return;
+        // Números extra (média, posição, património) para o modal.
+        let ex: ResumoExtra | null = null;
+        if (userId) ex = await buscarResumoExtra(cong.comp, userId);
+        if (!active) return;
+        setDesempenho({ dados, team: teamComp });
+        setExtra(ex);
+        await notificarResumo(cong.comp, cong.nome, dados);
       })();
     });
     return () => { active = false; };
@@ -245,7 +225,7 @@ export default function Inicio() {
   const glow = (n: TutTarget) => (tutTarget === n ? "iltut" : undefined);
 
   function finishOnboarding() {
-    marcarTutorialVisto("ippon_onboarding"); // local (este aparelho) + conta (todos)
+    marcarTutorialVisto("ippon_onboarding");
     setPhase(null);
   }
 
@@ -426,14 +406,35 @@ export default function Inicio() {
           nome={nomeMostrado || "Campeão"}
           faixa={nomeDaFaixa(faixaJogo)}
           pro={isPro}
+          extra={extra}
           onClose={() => {
             marcarDesempenhoVisto(desempenho.dados.idCompeticao);
             setDesempenho(null);
+            setExtra(null);
           }}
         />
       )}
     </main>
   );
+}
+
+// Cria a notificação de RESUMO (guardada), uma vez por competição neste aparelho.
+async function notificarResumo(idComp: string, nomeComp: string, dados: DesempenhoRodada) {
+  try {
+    const chaveResumo = `ippon_notif_resumo_${idComp}`;
+    if (localStorage.getItem(chaveResumo)) return;
+    const cap = dados.capitao;
+    const corpo = cap
+      ? `${mensagemDesempenho(dados.pontuacaoTotal, "")} Fizeste ${dados.pontuacaoTotal} pts — o teu capitão ${cap.atleta.name.split(" ").slice(-1)[0]} somou ${cap.pontos}.`
+      : `${mensagemDesempenho(dados.pontuacaoTotal, "")} Fizeste ${dados.pontuacaoTotal} pts nesta rodada.`;
+    await criarNotificacao({
+      tipo: "resumo_rodada",
+      titulo: `Resumo: ${nomeComp}`,
+      corpo: corpo.trim(),
+      link: "/meu-time",
+    });
+    localStorage.setItem(chaveResumo, "1");
+  } catch {}
 }
 
 const iconBtn: React.CSSProperties = {
@@ -481,7 +482,6 @@ function TeamBuilt({ info, fechoTexto, faixa }: { info: { name: string; value: s
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", textAlign: "center", marginBottom: 12 }}>
           {(() => {
-            // Património = o que sobra (100 − valor da equipa). Só real quando temos o valor.
             const temValor = info.value !== "—";
             const valorNum = temValor ? Number(info.value) : 0;
             const patrimonio = temValor ? `JC ${Math.round((100 - valorNum) * 10) / 10}` : "—";
