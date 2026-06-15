@@ -17,7 +17,7 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 
-// Uma linha do ranking: dados do atleta (nome/país/categoria) + pontos da rodada.
+// Uma linha do ranking. No modo CONGELADO traz também n_lutas/V/D/variação.
 type RankRow = {
   id: string;
   name: string;
@@ -25,10 +25,13 @@ type RankRow = {
   category: string;
   gender: "M" | "F" | "";
   pontos: number;
-  posicao: number; // 1 = primeiro; empates partilham posição
+  posicao: number;
+  nLutas?: number;
+  vitorias?: number;
+  derrotas?: number;
+  variacaoJc?: number;
 };
 
-// O componente real está dentro de Suspense porque usa useSearchParams.
 export default function AtletasPage() {
   return (
     <Suspense fallback={<Carregando />}>
@@ -39,99 +42,111 @@ export default function AtletasPage() {
 
 function Atletas() {
   const searchParams = useSearchParams();
-  // Competição: ?comp=XXXX tem prioridade (para testar); senão, a do calendário.
-  // A "competição da rodada" é a que está a decorrer, ou — se nenhuma decorre — a
-  // última de mercado aberto (assim, fora de competição, mostra o evento mais próximo).
   const foco = focoMercado();
   const compParam = searchParams.get("comp");
-  const compAtual = foco.aDecorrer ?? foco.atual;
-  const idComp = compParam || compAtual.idCompeticao;
-  const nomeComp = compParam ? `Competição ${compParam}` : compAtual.nome;
+  // Há competição a DECORRER? Então modo AO VIVO. Senão, modo CONGELADO.
+  const aDecorrer = foco.aDecorrer;
+  const aoVivo = aDecorrer !== null && !compParam;
 
   const [rows, setRows] = useState<RankRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [temResultados, setTemResultados] = useState(false);
+  const [nomeComp, setNomeComp] = useState<string>(aDecorrer ? aDecorrer.nome : "");
+  const [modo, setModo] = useState<"ao-vivo" | "congelado">(aoVivo ? "ao-vivo" : "congelado");
   const [sel, setSel] = useState<RankRow | null>(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
 
-    // FONTE CORRETA (igual ao Meu Time): pontuamos cada atleta por
-    // competitor.contests, que traz as lutas completas mesmo durante o evento.
-    // O competition.contests (modo antigo do /api/resultados) vinha incompleto
-    // e deixava categorias inteiras de fora do ranking.
-    //
-    // Estratégia: 1) buscar a lista de inscritos da competição (/api/atletas),
-    // que dá TODOS os atletas + a sua identidade; 2) pedir os pontos desses IDs
-    // ao /api/resultados no modo ?persons= (que usa competitor.contests).
-    //
-    // Sem tick ao vivo: estas chamadas acontecem 1x por abertura da página.
-    // NOTA p/ futuro: o querystring leva todos os IDs. Para competições muito
-    // grandes (centenas de inscritos) pode aproximar-se do limite de URL — nessa
-    // altura migrar para POST ou para um modo no servidor que pontua a lista de
-    // competidores diretamente. Para já (opens), o GET chega.
     (async () => {
-      // 1) Lista de atletas inscritos + identidade.
-      let lista: Athlete[] = [];
-      try {
-        const atl = await fetch(`/api/atletas?id=${idComp}`).then((r) => r.json()).catch(() => null);
-        lista = Array.isArray(atl?.atletas) ? atl.atletas : [];
-      } catch {}
-
-      if (!active) return;
-
-      const byId = new Map<string, Athlete>();
-      for (const a of lista) byId.set(a.id, a);
-      const ids = lista.map((a) => a.id).filter(Boolean);
-
-      // 2) Pontos desses atletas, pela fonte correta (competitor.contests).
-      let pontos: Record<string, number> = {};
-      let houveResultados = false;
-      if (ids.length > 0) {
+      // ----- MODO AO VIVO (competição a decorrer): cálculo por atleta -----
+      if (aoVivo && aDecorrer) {
+        const idComp = aDecorrer.idCompeticao;
+        let lista: Athlete[] = [];
         try {
-          const res = await fetch(
-            `/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`
-          ).then((r) => r.json()).catch(() => null);
-          pontos = res && res.pontos ? res.pontos : {};
-          houveResultados = !!(res && res.tem_resultados);
+          const atl = await fetch(`/api/atletas?id=${idComp}`).then((r) => r.json()).catch(() => null);
+          lista = Array.isArray(atl?.atletas) ? atl.atletas : [];
         } catch {}
+        if (!active) return;
+
+        const byId = new Map<string, Athlete>();
+        for (const a of lista) byId.set(a.id, a);
+        const ids = lista.map((a) => a.id).filter(Boolean);
+
+        let pontos: Record<string, number> = {};
+        let houve = false;
+        if (ids.length > 0) {
+          try {
+            const res = await fetch(`/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`)
+              .then((r) => r.json()).catch(() => null);
+            pontos = res && res.pontos ? res.pontos : {};
+            houve = !!(res && res.tem_resultados);
+          } catch {}
+        }
+        if (!active) return;
+        setTemResultados(houve);
+        setNomeComp(aDecorrer.nome);
+        setModo("ao-vivo");
+
+        const base = Object.entries(pontos)
+          .filter(([, pts]) => typeof pts === "number")
+          .map(([id, pts]) => {
+            const a = byId.get(id);
+            return {
+              id,
+              name: a?.name ?? `Atleta ${id}`,
+              countryIso: a?.countryIso ?? "—",
+              category: a?.category ?? "",
+              gender: (a?.gender ?? "") as "M" | "F" | "",
+              pontos: Math.round((pts as number) * 10) / 10,
+            };
+          });
+        base.sort((x, y) => (y.pontos - x.pontos) || x.name.localeCompare(y.name));
+        const ranked: RankRow[] = base.map((r) => {
+          const melhores = base.filter((o) => o.pontos > r.pontos).length;
+          return { ...r, posicao: melhores + 1 };
+        });
+        setRows(ranked);
+        setLoading(false);
+        return;
       }
 
+      // ----- MODO CONGELADO (sem nada a decorrer): lê resultados_atletas -----
+      const url = compParam ? `/api/ranking-atletas?comp=${compParam}` : `/api/ranking-atletas`;
+      let j: {
+        nome?: string; tem_resultados?: boolean;
+        atletas?: Array<{ id: string; nome: string; countryIso: string; category: string; gender: string; pontos: number; n_lutas: number; vitorias: number; derrotas: number; variacao_jc: number; posicao: number }>;
+      } | null = null;
+      try {
+        j = await fetch(url).then((r) => r.json()).catch(() => null);
+      } catch {}
       if (!active) return;
-      setTemResultados(houveResultados);
 
-      // Constrói as linhas só de QUEM JÁ PONTUOU (teve lutas). Atletas inscritos
-      // que ainda não lutaram não entram no ranking (entram quando lutarem).
-      const base = Object.entries(pontos)
-        .filter(([, pts]) => typeof pts === "number")
-        .map(([id, pts]) => {
-          const a = byId.get(id);
-          return {
-            id,
-            name: a?.name ?? `Atleta ${id}`,
-            countryIso: a?.countryIso ?? "—",
-            category: a?.category ?? "",
-            gender: (a?.gender ?? "") as "M" | "F" | "",
-            pontos: Math.round((pts as number) * 10) / 10,
-          };
-        });
-
-      // Ordena por pontos desc; em empate, por nome para ser estável.
-      base.sort((x, y) => (y.pontos - x.pontos) || x.name.localeCompare(y.name));
-
-      // Atribui posição com empates a partilhar lugar (1,2,2,4...).
-      const ranked: RankRow[] = base.map((r) => {
-        const melhores = base.filter((o) => o.pontos > r.pontos).length;
-        return { ...r, posicao: melhores + 1 };
-      });
-
+      setModo("congelado");
+      setNomeComp(j?.nome || "");
+      setTemResultados(!!(j && j.tem_resultados));
+      const ats = Array.isArray(j?.atletas) ? j!.atletas : [];
+      const ranked: RankRow[] = ats.map((a) => ({
+        id: a.id,
+        name: a.nome,
+        countryIso: a.countryIso,
+        category: a.category,
+        gender: (a.gender || "") as "M" | "F" | "",
+        pontos: a.pontos,
+        posicao: a.posicao,
+        nLutas: a.n_lutas,
+        vitorias: a.vitorias,
+        derrotas: a.derrotas,
+        variacaoJc: a.variacao_jc,
+      }));
       setRows(ranked);
       setLoading(false);
     })();
 
     return () => { active = false; };
-  }, [idComp]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compParam]);
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -142,8 +157,14 @@ function Atletas() {
           </a>
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Ranking de Atletas</h1>
         </header>
-        <div style={{ fontSize: 12, color: "#93a39a", marginBottom: 16, paddingLeft: 45 }}>
-          Os que mais pontuaram em <span style={{ color: GOLD, fontWeight: 700 }}>{nomeComp}</span>
+        <div style={{ fontSize: 12, color: "#93a39a", marginBottom: 16, paddingLeft: 45, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span>Os que mais pontuaram em <span style={{ color: GOLD, fontWeight: 700 }}>{nomeComp || "—"}</span></span>
+          {modo === "ao-vivo" && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "#7fd1a3" }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#7fd1a3" }} />
+              Ao vivo
+            </span>
+          )}
         </div>
 
         {loading ? (
@@ -153,7 +174,7 @@ function Atletas() {
             <div style={{ width: 84, height: 84, margin: "0 auto 8px" }}><Mascot belt="#efeadd" expression="feliz" /></div>
             <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Ainda sem pontos</div>
             <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>
-              Esta competição ainda não começou. Quando as lutas arrancarem, o ranking dos atletas que mais pontuam aparece aqui — atualizado durante a rodada.
+              Quando as lutas arrancarem, o ranking dos atletas que mais pontuam aparece aqui — e fica disponível até à próxima competição.
             </p>
           </div>
         ) : (
@@ -181,7 +202,6 @@ function Atletas() {
 }
 
 function Row({ r, onClick }: { r: RankRow; onClick: () => void }) {
-  // Medalhas para o pódio.
   const medal = r.posicao === 1 ? "#d9a441" : r.posicao === 2 ? "#c0c5cc" : r.posicao === 3 ? "#cd7f4d" : null;
   const negativo = r.pontos < 0;
   return (
@@ -203,7 +223,10 @@ function Row({ r, onClick }: { r: RankRow; onClick: () => void }) {
   );
 }
 
+// Popup do atleta — SIMPLIFICADO (#2): pontos + nº de lutas e V/D. Sem fases.
 function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClose: () => void }) {
+  const temLutas = typeof r.nLutas === "number";
+  const temVar = typeof r.variacaoJc === "number";
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.80)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 100 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "#10160f", borderTop: `2px solid ${GOLD}`, borderRadius: "18px 18px 0 0", padding: "16px 16px 28px", maxHeight: "86%", overflowY: "auto" }}>
@@ -218,7 +241,8 @@ function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClo
           <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {/* Cartões: Posição + Pontos */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "12px", textAlign: "center" }}>
             <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>Posição</div>
             <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: GOLD }}>{r.posicao}º</div>
@@ -229,11 +253,32 @@ function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClo
           </div>
         </div>
 
-        <div style={{ fontSize: 11.5, color: "#93a39a", textAlign: "center", lineHeight: 1.5, marginBottom: 4 }}>
-          Em <span style={{ color: "#cfd8d2" }}>{nomeComp}</span>.
-        </div>
-        <div style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "14px", textAlign: "center", fontSize: 12.5, color: "#93a39a" }}>
-          O detalhe luta a luta — ippons, waza-aris, shidos — liga-se em breve, para veres exatamente o que ele fez para chegar a estes pontos.
+        {/* Cartões: Lutas (V/D) + Valorização — só no modo congelado, que tem estes dados */}
+        {(temLutas || temVar) && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {temLutas && (
+              <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "12px", textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>Lutas</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 7, justifyContent: "center", marginTop: 3 }}>
+                  <span style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: "#f1ede2" }}>{r.nLutas}</span>
+                  <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#7fd1a3" }}>{r.vitorias}V</span>
+                  <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#ef8d83" }}>{r.derrotas}D</span>
+                </div>
+              </div>
+            )}
+            {temVar && (
+              <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "12px", textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>Valorização</div>
+                <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: (r.variacaoJc ?? 0) >= 0 ? "#7fd1a3" : "#ef8d83", marginTop: 3 }}>
+                  {(r.variacaoJc ?? 0) >= 0 ? "+" : ""}{r.variacaoJc} JC
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ fontSize: 11.5, color: "#93a39a", textAlign: "center", lineHeight: 1.5 }}>
+          Pontuação em <span style={{ color: "#cfd8d2" }}>{nomeComp}</span>, somada pelas ações nas lutas (ippons, waza-aris, shidos).
         </div>
       </div>
     </div>
@@ -262,7 +307,6 @@ function TrophyIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 6H5v2a3 3 0 0 0 3 3M16 6h3v2a3 3 0 0 1-3 3M10 17h4M9 21h6M12 13v4" /></svg>;
 }
 function AthletesIcon() {
-  // Dois judocas estilizados (silhueta simples).
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="6" r="3" /><circle cx="17" cy="7" r="2.5" /><path d="M3 20v-1a5 5 0 0 1 10 0v1M14 20v-1a4 4 0 0 1 7-2.6" /></svg>;
 }
 function BoltIcon() {
