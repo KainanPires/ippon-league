@@ -315,8 +315,13 @@ export default function MeuTime() {
     update({ ids: team.ids.filter((x) => x !== id), captain: team.captain === id ? null : team.captain });
   }
   function limparTudo() {
+    // Limpa só o RASCUNHO (não a equipa salva na nuvem) e vai direto ao mercado
+    // para montar de novo. A equipa antiga só é substituída quando o utilizador
+    // SALVAR uma nova: se for ao mercado e não mexer/não salvar, a antiga mantém-se;
+    // se salvar uma nova, esta substitui a antiga. (Fluxo pedido pelo Kainan.)
     update({ ids: [], captain: null });
     setModal(null);
+    router.push("/mercado");
   }
   async function salvar(destino?: string | null) {
     if (!isComplete(team)) { setModal({ kind: "missing" }); return; }
