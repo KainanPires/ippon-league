@@ -51,7 +51,7 @@ export async function GET(req: Request) {
   // Lê o ranking congelado dessa competição, ordenado por pontos.
   const { data: linhas } = await supabaseAdmin
     .from("resultados_atletas")
-    .select("id_person, nome, country_code, weight_category, gender, pontos, n_lutas, vitorias, derrotas, variacao_jc")
+    .select("id_person, nome, country_code, weight_category, gender, pontos, n_lutas, vitorias, derrotas, variacao_jc, acoes")
     .eq("id_competicao", comp)
     .order("pontos", { ascending: false });
 
@@ -71,6 +71,7 @@ export async function GET(req: Request) {
       vitorias: Number(r.vitorias) || 0,
       derrotas: Number(r.derrotas) || 0,
       variacao_jc: Math.round(Number(r.variacao_jc) * 10) / 10,
+      acoes: (r.acoes && typeof r.acoes === "object") ? r.acoes : {},
       posicao: melhores + 1,
     };
   });
