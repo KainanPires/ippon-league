@@ -5,6 +5,7 @@ import { Mascot } from "@/components/Mascot";
 import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
 import { loadIdentity } from "@/components/Escudo";
 import { Desempenho } from "@/components/Desempenho";
+import { GaleriaResumos } from "@/components/GaleriaResumos";
 import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, textoFecho } from "@/lib/calendario";
@@ -61,6 +62,9 @@ export default function Inicio() {
   const [minhasLigas, setMinhasLigas] = useState<{ id: string; name: string; membros: number }[] | null>(null);
   const [desempenho, setDesempenho] = useState<{ dados: DesempenhoRodada; team: TeamState } | null>(null);
   const [extra, setExtra] = useState<ResumoExtra | null>(null);
+  const [desempenhoDaGaleria, setDesempenhoDaGaleria] = useState(false);
+  const [galeriaAberta, setGaleriaAberta] = useState(false);
+  const [userIdState, setUserIdState] = useState<string | null>(null);
   const [, bumpPool] = useState(0);
 
   const beltRef = useRef<HTMLAnchorElement | null>(null);
@@ -94,6 +98,7 @@ export default function Inicio() {
 
       setVisitante(false);
       const userId = data.session.user?.id;
+      if (userId) setUserIdState(userId);
       if (userId) {
         fetch(`/api/liga/minhas?user_id=${userId}`)
           .then((r) => r.json())
@@ -234,6 +239,27 @@ export default function Inicio() {
     setPhase("tutorial");
   }
 
+  // Abre o resumo COMPLETO de uma competição escolhida na galeria.
+  async function abrirResumoDaGaleria(compEscolhida: string) {
+    const cong = await buscarResultadosCongelados(compEscolhida);
+    if (!cong) return;
+    const teamComp = await loadSavedCloudFor(compEscolhida);
+    if (!teamComp || teamComp.ids.length === 0) return;
+    try {
+      const j = await fetch(`/api/atletas?id=${compEscolhida}`).then((r) => r.json());
+      const list = Array.isArray(j?.atletas) ? j.atletas : [];
+      if (list.length > 0) setAthletePool(list as never);
+    } catch {}
+    const dados = construirDesempenho(cong.comp, cong.nome, teamComp, cong.pontos);
+    if (!dados) return;
+    let ex: ResumoExtra | null = null;
+    if (userIdState) ex = await buscarResumoExtra(cong.comp, userIdState);
+    setDesempenho({ dados, team: teamComp });
+    setExtra(ex);
+    setDesempenhoDaGaleria(true); // veio da galeria: só botão "Fechar"
+    setGaleriaAberta(false);
+  }
+
   if (!ready) {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#7c8a82", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -274,6 +300,22 @@ export default function Inicio() {
             <SinoNotificacoes calcOpts={{ temEquipa: temEquipaCompleta }} />
           </div>
         </header>
+
+        {/* Botão da galeria de resumos (todas as rodadas jogadas). Só para quem tem conta. */}
+        {!visitante && (
+          <button onClick={() => setGaleriaAberta(true)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 10, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "11px 14px", marginBottom: 14, cursor: "pointer", fontFamily: FB, color: "#f1ede2", textAlign: "left" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1c3a2e", flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aee9c9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>
+              </span>
+              <span>
+                <span style={{ display: "block", fontSize: 13.5, fontWeight: 700 }}>Os meus resumos</span>
+                <span style={{ display: "block", fontSize: 11, color: "#93a39a" }}>Revê e partilha cada rodada</span>
+              </span>
+            </span>
+            <span style={{ color: GOLD, fontSize: 18 }}>›</span>
+          </button>
+        )}
 
         {isPro ? (
           <a href="/pro" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "13px 14px", marginBottom: 14, textDecoration: "none" }}>
@@ -407,11 +449,29 @@ export default function Inicio() {
           faixa={nomeDaFaixa(faixaJogo)}
           pro={isPro}
           extra={extra}
-          onClose={() => {
+          daGaleria={desempenhoDaGaleria}
+          onFechar={() => {
+            // Só fecha. NÃO marca como visto -> volta a aparecer no próximo login.
+            setDesempenho(null);
+            setExtra(null);
+            setDesempenhoDaGaleria(false);
+          }}
+          onNaoMostrarMais={() => {
+            // Marca como visto na conta -> deixa de aparecer no automático.
+            // Fica guardado na galeria.
             marcarDesempenhoVisto(desempenho.dados.idCompeticao);
             setDesempenho(null);
             setExtra(null);
+            setDesempenhoDaGaleria(false);
           }}
+        />
+      )}
+
+      {galeriaAberta && userIdState && (
+        <GaleriaResumos
+          userId={userIdState}
+          onAbrir={(comp) => abrirResumoDaGaleria(comp)}
+          onClose={() => setGaleriaAberta(false)}
         />
       )}
     </main>
