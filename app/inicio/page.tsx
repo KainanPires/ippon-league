@@ -348,7 +348,7 @@ export default function Inicio() {
         )}
 
         <div ref={teamRef} className={glow("team")}>
-          {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo)} faixa={faixaJogo} /> : <TeamCreate />}
+          {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo)} faixa={faixaJogo} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} />}
         </div>
 
         <Card>
@@ -509,12 +509,12 @@ function CardTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>{children}</div>;
 }
 
-function TeamCreate() {
+function TeamCreate({ corDodo = "#efeadd" }: { corDodo?: string }) {
   return (
     <div style={{ border: "1px solid #2a4d3e", borderRadius: 16, overflow: "hidden", marginBottom: 14, background: "repeating-linear-gradient(45deg,#1c3a2e 0 16px,#1a352a 16px 32px)" }}>
       <div style={{ padding: "20px 16px", textAlign: "center" }}>
         <div style={{ width: 64, height: 64, margin: "0 auto 6px" }}>
-          <Mascot belt="#efeadd" expression="feliz" />
+          <Mascot belt={corDodo} expression="feliz" />
         </div>
         <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase" }}>Cria a tua equipa</div>
         <div style={{ fontSize: 12, color: "#cfe4d8", margin: "4px 0 14px" }}>Monta 8 atletas com 100 Judocoins e escolhe o teu capitão.</div>
