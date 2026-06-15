@@ -127,6 +127,35 @@ async function congelarRecentes(hoje: Date): Promise<{ comp: string; nome: strin
   return out;
 }
 
+// (C-bis) APURA as copas ativas (mata-mata). Depois de congelar as competições,
+// chama o /api/copa/apurar de cada liga que é copa e está a decorrer/sorteada.
+// O apurar lê de resultados_atletas (já congelado acima), por isso decide bem.
+// É o que torna o mata-mata AUTOMÁTICO (já não depende de alguém abrir a página).
+async function apurarCopasAtivas(base: string): Promise<{ league_id: string; nome: string; apurou: boolean }[]> {
+  if (!supabaseAdmin) return [];
+  const { data: copas } = await supabaseAdmin
+    .from("leagues")
+    .select("id, name, copa_estado")
+    .eq("formato", "copa")
+    .in("copa_estado", ["sorteada", "a_decorrer"]);
+
+  const out: { league_id: string; nome: string; apurou: boolean }[] = [];
+  for (const liga of copas || []) {
+    try {
+      const r = await fetch(`${base}/api/copa/apurar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ league_id: liga.id }),
+      });
+      const j = await r.json().catch(() => null);
+      out.push({ league_id: String(liga.id), nome: String(liga.name || ""), apurou: !!(j && j.apurou) });
+    } catch {
+      out.push({ league_id: String(liga.id), nome: String(liga.name || ""), apurou: false });
+    }
+  }
+  return out;
+}
+
 // (D) Recalcula as faixas de um mês por percentil e grava em users.belt.
 async function recalcularFaixas(mes: string): Promise<{ jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number> }> {
   if (!supabaseAdmin) return { jogadores: 0, percentilAtivo: false, distribuicao: {} };
@@ -183,6 +212,22 @@ export async function GET(req: Request) {
   const base = baseUrl(req);
   const t0 = Date.now();
   const hoje = new Date();
+
+  // Disparo manual de APURAR uma copa específica (teste): ?apurar=LEAGUE_ID
+  const apurarId = (searchParams.get("apurar") || "").trim();
+  if (apurarId) {
+    try {
+      const r = await fetch(`${base}/api/copa/apurar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ league_id: apurarId }),
+      });
+      const j = await r.json().catch(() => null);
+      return NextResponse.json({ feito: true, modo: "apurar_forcado", resultado: j, ms_total: Date.now() - t0 });
+    } catch (e) {
+      return NextResponse.json({ feito: false, modo: "apurar_forcado", erro: String((e as { message?: string })?.message || "falha") });
+    }
+  }
 
   // Disparo manual de RE-CONGELAMENTO (limpa e refaz do zero): ?recongelar=ID
   // Útil quando mudámos o motor e queremos refazer uma competição já congelada,
@@ -257,6 +302,12 @@ export async function GET(req: Request) {
     congelamentos = await congelarRecentes(hoje);
   } catch { /* não bloqueia o resto do cron */ }
 
+  // (C-bis) APURA as copas ativas (mata-mata) com os dados já congelados.
+  let copas: { league_id: string; nome: string; apurou: boolean }[] = [];
+  try {
+    copas = await apurarCopasAtivas(base);
+  } catch { /* não bloqueia */ }
+
   // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
   //     também forçar via ?faixas=AAAA-MM para teste manual.
   let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number> } | null = null;
@@ -282,6 +333,7 @@ export async function GET(req: Request) {
     categorias_ok: `${ok}/${CATS.length}`,
     total_atletas_atualizados: totalAtualizados,
     congelamentos,
+    copas,
     faixas,
     ms_total: Date.now() - t0,
     passos,
