@@ -58,8 +58,12 @@ function frameShadow(b: BeltTheme, pro: boolean): string {
 }
 
 // CSS do cartão (do Claude Design), injetado inline para não depender de ficheiro .css externo.
+// FONTES: usa SÓ fontes de SISTEMA (Arial Narrow / Courier New) — tal como o
+// CartaoDesempenho. As Google Fonts (Oswald/JetBrains) NÃO embebem na imagem
+// gerada pelo html-to-image (CORS), o que fazia o texto sair sobreposto/desalinhado
+// face à pré-visualização. Com fontes de sistema, a imagem = a pré-visualização.
 const CARD_CSS = `
-.jcard{position:relative;width:1080px;height:1350px;border-radius:34px;overflow:hidden;font-family:'Oswald',var(--font-geist-mono),sans-serif;color:#f1ede2;isolation:isolate;-webkit-font-smoothing:antialiased}
+.jcard{position:relative;width:1080px;height:1350px;border-radius:34px;overflow:hidden;font-family:'Arial Narrow','Helvetica Neue',Arial,sans-serif;color:#f1ede2;isolation:isolate;-webkit-font-smoothing:antialiased}
 .jcard-bg{position:absolute;inset:0;background:linear-gradient(180deg,#141a17 0%,#10130f 48%,#0c0e0d 100%);z-index:0}
 .jcard-headglow{position:absolute;top:-120px;left:0;right:0;height:620px;z-index:0;background:radial-gradient(58% 70% at 34% 24%,color-mix(in srgb,var(--glow-accent) 26%,transparent) 0%,transparent 68%),radial-gradient(80% 60% at 80% 6%,color-mix(in srgb,#d9a441 10%,transparent) 0%,transparent 70%);pointer-events:none}
 .jcard-inner{position:relative;z-index:2;height:100%;padding:64px 60px 56px;display:flex;flex-direction:column;box-sizing:border-box}
@@ -72,16 +76,16 @@ const CARD_CSS = `
 .roster{flex:1;display:flex;flex-direction:column;padding:6px 0}
 .row{flex:1 1 0;min-height:0;display:flex;align-items:center;gap:28px;padding:0 6px;border-bottom:1.5px solid rgba(241,237,226,0.07)}
 .row:last-child{border-bottom:0}
-.chip{flex-shrink:0;width:108px;height:62px;display:grid;place-items:center;border-radius:7px;background:var(--accent);color:var(--chip-text);font-family:'JetBrains Mono',var(--font-geist-mono),monospace;font-weight:700;font-size:33px;letter-spacing:1px}
+.chip{flex-shrink:0;width:108px;height:62px;display:grid;place-items:center;border-radius:7px;background:var(--accent);color:var(--chip-text);font-family:'Courier New',Courier,monospace;font-weight:700;font-size:33px;letter-spacing:1px}
 .surname{flex:1;min-width:0;font-weight:700;font-size:52px;line-height:1;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.weight{flex-shrink:0;font-family:'JetBrains Mono',var(--font-geist-mono),monospace;font-weight:500;font-size:32px;letter-spacing:0.5px;color:#93a39a}
+.weight{flex-shrink:0;font-family:'Courier New',Courier,monospace;font-weight:500;font-size:32px;letter-spacing:0.5px;color:#93a39a}
 .row.is-captain{border-bottom:0;background:linear-gradient(90deg,rgba(217,164,65,0.16) 0%,rgba(217,164,65,0.07) 100%);border:2px solid rgba(217,164,65,0.55);border-radius:14px;padding:0 18px;box-shadow:0 0 30px rgba(217,164,65,0.14)}
 .cap-badge{flex-shrink:0;width:58px;height:58px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(180deg,#f1c969 0%,#d9a441 60%,#b9842c 100%);color:#20160a;font-weight:700;font-size:36px;margin-left:6px;box-shadow:0 0 22px rgba(217,164,65,0.5),inset 0 1px 0 rgba(255,255,255,0.5)}
 .jcard-foot{margin-top:14px;padding-top:26px;border-top:1.5px solid rgba(241,237,226,0.10);text-align:center}
 .foot-main{font-weight:700;font-size:48px;letter-spacing:8px;text-transform:uppercase;color:#d9a441;text-shadow:0 0 26px rgba(217,164,65,0.35)}
 .foot-main.pro{font-size:39px;letter-spacing:2px;line-height:1.12}
 .foot-sub{margin-top:10px;font-weight:300;font-size:27px;letter-spacing:1px;color:#93a39a}
-.foot-link{margin-top:12px;font-family:'JetBrains Mono',var(--font-geist-mono),monospace;font-size:28px;letter-spacing:1px;color:#e8cf8f}
+.foot-link{margin-top:12px;font-family:'Courier New',Courier,monospace;font-size:28px;letter-spacing:1px;color:#e8cf8f}
 .dodo-medal{position:absolute;right:34px;bottom:40px;width:150px;height:150px;z-index:3;border-radius:50%;background:radial-gradient(circle at 50% 38%,#245446 0%,#1c3a2e 58%,#14271f 100%);border:3px solid color-mix(in srgb,var(--accent) 85%,#1c3a2e);box-shadow:0 0 0 6px rgba(12,14,13,0.55),0 14px 30px rgba(0,0,0,0.5),0 0 34px color-mix(in srgb,var(--glow-accent) 30%,transparent),inset 0 2px 10px rgba(0,0,0,0.4);display:grid;place-items:center;overflow:hidden}
 .dodo-fig{width:80%;height:80%;margin-top:8%;filter:drop-shadow(0 3px 5px rgba(0,0,0,0.35))}
 .jcard.is-pro .dodo-medal{border-color:#d9a441;border-width:4px;box-shadow:0 0 0 6px rgba(12,14,13,0.55),0 14px 30px rgba(0,0,0,0.5),0 0 44px rgba(217,164,65,0.5),inset 0 2px 10px rgba(0,0,0,0.4)}
@@ -114,16 +118,6 @@ function loadHtmlToImage(): Promise<any> {
   return _h2iPromise;
 }
 
-// Carrega as fontes Oswald + JetBrains Mono (uma vez).
-function ensureFonts() {
-  if (document.getElementById("ippon-card-fonts")) return;
-  const l = document.createElement("link");
-  l.id = "ippon-card-fonts";
-  l.rel = "stylesheet";
-  l.href = "https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap";
-  document.head.appendChild(l);
-}
-
 export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, onClose }: CartaoProps & { pro?: boolean; onClose: () => void }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
@@ -132,7 +126,6 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, o
   const [podePartilhar, setPodePartilhar] = useState(false);
 
   useEffect(() => {
-    ensureFonts();
     loadHtmlToImage().catch(() => {});
     try {
       const nav = navigator as Navigator & { share?: any };
@@ -155,7 +148,10 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, o
     if (!node) return null;
     try {
       const h2i = await loadHtmlToImage();
-      if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch {} }
+      // O cartão usa só fontes de SISTEMA (Arial Narrow / Courier New) — não
+      // depende de download do Google Fonts, por isso a imagem gerada fica
+      // idêntica à pré-visualização. Pequena pausa só para o layout assentar.
+      await new Promise((r) => setTimeout(r, 80));
       const blob: Blob = await h2i.toBlob(node, { width: 1080, height: 1350, pixelRatio: 1, cacheBust: true, backgroundColor: "#0c0e0d" });
       return blob;
     } catch { return null; }
