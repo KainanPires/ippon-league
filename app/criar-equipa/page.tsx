@@ -7,7 +7,7 @@ import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLe
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
-import { focoMercado, textoFecho } from "@/lib/calendario";
+import { focoMercado, textoFecho, numeroDaRodada } from "@/lib/calendario";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 import { supabase } from "@/lib/supabase";
@@ -56,6 +56,7 @@ export default function CriarEquipa() {
   const atual = foco.atual;
   const emAndamento = foco.aDecorrer !== null;
   const alvo = foco.alvo; // a competição para a qual se ESCALA agora
+  const rodadaAlvo = numeroDaRodada(alvo.idCompeticao); // nº da rodada no calendário (1..52) ou null
 
   useEffect(() => {
     let active = true;
@@ -285,7 +286,7 @@ export default function CriarEquipa() {
             <TrophyIcon />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>A escalar para{alvo.classico ? " · Clássico" : ""}</div>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>A escalar para{rodadaAlvo ? ` · Rodada ${rodadaAlvo}` : ""}{alvo.classico ? " · Clássico" : ""}</div>
             <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{alvo.nome}</div>
             <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{textoFecho(alvo)}</div>
           </div>
