@@ -55,7 +55,7 @@ function frameShadow(b: BeltTheme, pro: boolean): string {
 // CartaoEquipa (molduras, fontes, brilho Pro), mas o herói é a PONTUAÇÃO da
 // rodada — não a lista de atletas.
 const CARD_CSS = `
-.dcard{position:relative;width:1080px;height:1350px;border-radius:34px;overflow:hidden;font-family:'Oswald',var(--font-geist-mono),sans-serif;color:#f1ede2;isolation:isolate;-webkit-font-smoothing:antialiased}
+.dcard{position:relative;width:1080px;height:1350px;border-radius:34px;overflow:hidden;font-family:'Arial Narrow','Helvetica Neue',Arial,sans-serif;color:#f1ede2;isolation:isolate;-webkit-font-smoothing:antialiased}
 .dcard-bg{position:absolute;inset:0;background:linear-gradient(180deg,#141a17 0%,#10130f 48%,#0c0e0d 100%);z-index:0}
 .dcard-headglow{position:absolute;top:-120px;left:0;right:0;height:680px;z-index:0;background:radial-gradient(58% 70% at 50% 22%,color-mix(in srgb,var(--glow-accent) 30%,transparent) 0%,transparent 66%),radial-gradient(80% 60% at 80% 6%,color-mix(in srgb,#d9a441 10%,transparent) 0%,transparent 70%);pointer-events:none}
 .dcard-inner{position:relative;z-index:2;height:100%;padding:64px 60px 56px;display:flex;flex-direction:column;box-sizing:border-box}
@@ -63,7 +63,7 @@ const CARD_CSS = `
 .dcard-head{display:flex;align-items:center;gap:26px;padding-bottom:28px;margin-bottom:6px;border-bottom:1.5px solid rgba(241,237,226,0.10)}
 .dcrest{flex-shrink:0;width:120px;height:138px;display:grid;place-items:center;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.45))}
 .dhead-text{min-width:0;flex:1;display:flex;flex-direction:column;align-items:flex-start}
-.dteam-name{margin:0;font-weight:700;font-size:58px;line-height:0.98;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dteam-name{margin:0;font-weight:700;font-size:52px;line-height:1.02;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;word-break:break-word}
 .dbelt-pill{display:inline-block;margin-top:14px;padding:9px 26px;border-radius:9px;background:var(--accent);color:var(--chip-text);font-weight:600;font-size:26px;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap}
 .dhero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:0}
 .dhero-label{font-weight:500;font-size:34px;letter-spacing:6px;text-transform:uppercase;color:#93a39a;margin-bottom:30px}
@@ -73,14 +73,14 @@ const CARD_CSS = `
 .dcards{display:flex;gap:24px;margin:36px 0 8px}
 .dchip-card{flex:1;background:rgba(12,14,13,0.55);border:2px solid var(--card-border);border-radius:20px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:6px}
 .dchip-role{font-weight:700;font-size:24px;letter-spacing:3px;text-transform:uppercase;color:var(--role-color)}
-.dchip-flag{margin-top:4px;background:var(--accent);color:var(--chip-text);font-family:'JetBrains Mono',var(--font-geist-mono),monospace;font-weight:700;font-size:26px;letter-spacing:1px;padding:4px 14px;border-radius:7px}
+.dchip-flag{margin-top:4px;background:var(--accent);color:var(--chip-text);font-family:'Courier New',Courier,monospace;font-weight:700;font-size:26px;letter-spacing:1px;padding:4px 14px;border-radius:7px}
 .dchip-name{font-weight:700;font-size:40px;line-height:1;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.dchip-pts{font-family:'JetBrains Mono',var(--font-geist-mono),monospace;font-weight:700;font-size:46px;color:var(--pts-color)}
+.dchip-pts{font-family:'Courier New',Courier,monospace;font-weight:700;font-size:46px;color:var(--pts-color)}
 .dcard-foot{margin-top:14px;padding-top:26px;border-top:1.5px solid rgba(241,237,226,0.10);text-align:center}
 .dfoot-main{font-weight:700;font-size:46px;letter-spacing:8px;text-transform:uppercase;color:#d9a441;text-shadow:0 0 26px rgba(217,164,65,0.35)}
 .dfoot-main.pro{font-size:37px;letter-spacing:2px;line-height:1.12}
 .dfoot-sub{margin-top:10px;font-weight:300;font-size:26px;letter-spacing:1px;color:#93a39a}
-.dfoot-link{margin-top:12px;font-family:'JetBrains Mono',var(--font-geist-mono),monospace;font-size:27px;letter-spacing:1px;color:#e8cf8f}
+.dfoot-link{margin-top:12px;font-family:'Courier New',Courier,monospace;font-size:27px;letter-spacing:1px;color:#e8cf8f}
 .dcard.is-pro .dcard-bg{background:linear-gradient(180deg,#1c1810 0%,#15110a 50%,#0b0906 100%)}
 .dcard.is-pro .dteam-name{background:linear-gradient(176deg,#fbe7ad 0%,#e7c074 42%,#d9a441 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
 .dcard.is-pro .dfoot-main.pro{background:linear-gradient(180deg,#fbe7ad,#d9a441);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
@@ -158,24 +158,10 @@ export function CartaoDesempenho({
     if (!node) return null;
     try {
       const h2i = await loadHtmlToImage() as { toBlob: (n: HTMLElement, o: Record<string, unknown>) => Promise<Blob> };
-      // Garante que a fonte Oswald (a do cartão) está carregada ANTES de capturar.
-      // Sem isto, o html-to-image rasteriza com uma fonte de fallback de métricas
-      // diferentes -> o texto sai sobreposto na imagem (apesar de a pré-visualização
-      // estar bem). Pedimos explicitamente os pesos usados e esperamos.
-      try {
-        const docFonts = (document as unknown as { fonts?: { load: (f: string) => Promise<unknown>; ready: Promise<unknown> } }).fonts;
-        if (docFonts) {
-          await Promise.all([
-            docFonts.load("700 240px Oswald"),
-            docFonts.load("600 44px Oswald"),
-            docFonts.load("500 40px Oswald"),
-            docFonts.load("700 46px 'JetBrains Mono'"),
-          ]).catch(() => {});
-          await docFonts.ready;
-        }
-      } catch {}
-      // Pequena pausa extra para o layout assentar com a fonte já aplicada.
-      await new Promise((r) => setTimeout(r, 120));
+      // O cartão usa só fontes de SISTEMA (Arial/Courier) — não depende de
+      // download do Google Fonts, por isso a imagem gerada fica idêntica à
+      // pré-visualização. Pequena pausa só para o layout assentar.
+      await new Promise((r) => setTimeout(r, 80));
       return await h2i.toBlob(node, { width: 1080, height: 1350, pixelRatio: 1, cacheBust: true, backgroundColor: "#0c0e0d" });
     } catch { return null; }
   }
