@@ -133,6 +133,21 @@ export function competicoesReais(): SemanaCalendario[] {
   return CALENDARIO_2026.filter((s) => !s.classico);
 }
 
+// NÚMERO DA RODADA — cada competição do ano é uma rodada numerada, do início de
+// janeiro ao fim de dezembro. Como há uma competição por semana, o número da
+// rodada é o número da semana (1..52). Conta TODAS as competições, clássicos
+// incluídos. Devolve null se o id não estiver no calendário.
+export function numeroDaRodada(idCompeticao: string): number | null {
+  const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
+  return s ? s.semana : null;
+}
+
+// Texto pronto para mostrar: "Rodada 6" (ou "" se não houver número).
+export function rotuloRodada(idCompeticao: string): string {
+  const n = numeroDaRodada(idCompeticao);
+  return n ? `Rodada ${n}` : "";
+}
+
 // ---------------------------------------------------------------------------
 // FECHO DE MERCADO + CONTAGEM (Live Round, passos 1a + 1b)
 // ---------------------------------------------------------------------------
