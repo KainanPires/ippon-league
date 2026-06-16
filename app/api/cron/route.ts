@@ -3,6 +3,7 @@ import { competicaoDaSemana, competicaoFechada, focoMercado, CALENDARIO_2026, ty
 import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes } from "@/lib/ijf";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { congelarCompeticao } from "@/lib/congelar";
+import { notificarMercado } from "@/lib/notificarMercado";
 
 // CRON — prepara sozinho os preços/forma da competição que se aproxima.
 // Corre 1x/dia (vercel.json). Com Fluid Compute, uma função corre até 300s — as
@@ -328,6 +329,13 @@ export async function GET(req: Request) {
     }
   } catch { /* não bloqueia */ }
 
+  // (E) Notificações de MERCADO (aberto/fechado), idempotentes. Uma vez por
+  //     competição. Não bloqueia o resto do cron se falhar.
+  let mercado: { aberto: string | null; fechado: string | null } | null = null;
+  try {
+    mercado = await notificarMercado(hoje);
+  } catch { /* não bloqueia */ }
+
   return NextResponse.json({
     feito: true,
     comp,
@@ -340,6 +348,7 @@ export async function GET(req: Request) {
     congelamentos,
     copas,
     faixas,
+    mercado,
     ms_total: Date.now() - t0,
     passos,
   });
