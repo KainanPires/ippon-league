@@ -10,8 +10,13 @@
 //
 // PRINCÍPIO DE OURO (igual ao do sino): a mensagem é sempre personalizada com os
 // dados reais (nome de quem pediu, nome da liga, etc.) — nunca genérica.
-
+//
+// PUSH: ao gravar a notificação, dispara TAMBÉM a notificação push para o
+// telemóvel (lib/pushServer). Assim, tudo o que cria notificação no servidor
+// (Copa, pedidos de liga, etc.) chega automaticamente ao aparelho. O push falha
+// em silêncio — nunca parte a ação principal.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { enviarPushPara } from "@/lib/pushServer";
 
 export interface NotificacaoServidor {
   paraUserId: string;                 // destinatário
@@ -22,13 +27,14 @@ export interface NotificacaoServidor {
 }
 
 /**
- * Cria uma notificação para um utilizador. Falha em silêncio (devolve false) —
- * uma notificação que não grava NUNCA deve partir a ação principal (ex.: o
- * pedido de liga tem de funcionar mesmo que a notificação falhe).
+ * Cria uma notificação para um utilizador (sino + push). Falha em silêncio
+ * (devolve false) — uma notificação que não grava NUNCA deve partir a ação
+ * principal (ex.: o pedido de liga tem de funcionar mesmo que a notificação falhe).
  */
 export async function criarNotificacaoServidor(n: NotificacaoServidor): Promise<boolean> {
   if (!supabaseAdmin) return false;
   if (!n.paraUserId) return false;
+  let gravou = false;
   try {
     const { error } = await supabaseAdmin.from("notificacoes").insert({
       user_id: n.paraUserId,
@@ -37,10 +43,15 @@ export async function criarNotificacaoServidor(n: NotificacaoServidor): Promise<
       corpo: n.corpo ?? null,
       link: n.link ?? null,
     });
-    return !error;
+    gravou = !error;
   } catch {
-    return false;
+    gravou = false;
   }
+  // Dispara o push (não bloqueia nem parte se falhar).
+  try {
+    await enviarPushPara([n.paraUserId], { titulo: n.titulo, corpo: n.corpo, link: n.link });
+  } catch {}
+  return gravou;
 }
 
 /**
@@ -67,9 +78,6 @@ export async function nomeDoUtilizador(user_id: string): Promise<string> {
 export async function nomeDoTime(user_id: string): Promise<string | null> {
   if (!supabaseAdmin) return null;
   try {
-    // Busca o time deste utilizador. Pode haver mais do que uma linha (um time
-    // por competição); qualquer uma serve para o NOME, que é a identidade e é
-    // o mesmo em todas. limit(1) chega.
     const { data } = await supabaseAdmin
       .from("equipas")
       .select("nome")
@@ -77,7 +85,6 @@ export async function nomeDoTime(user_id: string): Promise<string | null> {
       .limit(1)
       .maybeSingle();
     const nome = String(data?.nome || "").trim();
-    // "A minha equipa" é o nome por defeito (sem identidade) — não o usamos.
     if (!nome || nome.toLowerCase() === "a minha equipa") return null;
     return nome;
   } catch {
