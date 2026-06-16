@@ -16,13 +16,14 @@ type Form = {
   name: string;
   email: string;
   senha: string;
+  dataNasc: string;
   contact: string;
   dialIso: string;
   belt: string;
   countryIso: string;
 };
 
-const EMPTY: Form = { name: "", email: "", senha: "", contact: "", dialIso: "PT", belt: "", countryIso: "" };
+const EMPTY: Form = { name: "", email: "", senha: "", dataNasc: "", contact: "", dialIso: "PT", belt: "", countryIso: "" };
 
 export default function Comecar() {
   const [form, setForm] = useState<Form>(EMPTY);
@@ -30,6 +31,8 @@ export default function Comecar() {
   const [saving, setSaving] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [confirmSent, setConfirmSent] = useState(false);
+  const [mostrarDeclaracao, setMostrarDeclaracao] = useState(false);
+  const maxData = new Date().toISOString().slice(0, 10);
 
   function update(field: keyof Form, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -43,6 +46,8 @@ export default function Comecar() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Esse email não parece válido.";
     if (!form.senha) e.senha = "Cria uma senha.";
     else if (form.senha.length < 6) e.senha = "A senha precisa de pelo menos 6 caracteres.";
+    if (!form.dataNasc) e.dataNasc = "Indica a tua data de nascimento.";
+    else if (form.dataNasc > maxData) e.dataNasc = "Essa data não pode ser no futuro.";
     // Telefone é opcional — sem validação.
     if (!form.belt) e.belt = "Escolhe a tua faixa.";
     if (!form.countryIso) e.countryIso = "Escolhe o teu país.";
@@ -50,13 +55,20 @@ export default function Comecar() {
     return Object.keys(e).length === 0;
   }
 
-  async function handleSubmit() {
+  // Botão principal: valida os campos e abre a janela de declaração.
+  function abrirDeclaracao() {
     if (saving) return;
     if (!validate()) return;
     if (!supabaseConfigured) {
       setErrors((e) => ({ ...e, email: "A ligação ao servidor não está configurada. Tenta mais tarde." }));
       return;
     }
+    setMostrarDeclaracao(true);
+  }
+
+  // Confirmada a declaração, cria a conta de facto.
+  async function confirmarCriacao() {
+    if (saving) return;
 
     setSaving(true);
     const country = COUNTRIES.find((c) => c.iso2 === form.countryIso);
@@ -70,6 +82,7 @@ export default function Comecar() {
         data: {
           nome: form.name.trim(),
           telefone,
+          data_nascimento: form.dataNasc,
           faixa: form.belt,
           pais: country?.name ?? "",
           pais_iso: form.countryIso,
@@ -153,6 +166,10 @@ export default function Comecar() {
             </div>
           </Field>
 
+          <Field label="Data de nascimento" error={errors.dataNasc}>
+            <input style={{ ...inputStyle(!!errors.dataNasc), colorScheme: "dark" }} type="date" max={maxData} value={form.dataNasc} onChange={(e) => update("dataNasc", e.target.value)} />
+          </Field>
+
           <Field label="Contacto (opcional)" error={errors.contact}>
             <div style={{ display: "flex", gap: 8 }}>
               <CountrySelect value={form.dialIso} onChange={(iso) => update("dialIso", iso)} />
@@ -173,8 +190,8 @@ export default function Comecar() {
             <CountryPicker value={form.countryIso} hasError={!!errors.countryIso} onChange={(iso) => update("countryIso", iso)} />
           </Field>
 
-          <button onClick={handleSubmit} disabled={saving} style={{ width: "100%", marginTop: 8, padding: "14px", borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
-            {saving ? "A criar conta..." : "Começar a jogar"}
+          <button onClick={abrirDeclaracao} disabled={saving} style={{ width: "100%", marginTop: 8, padding: "14px", borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            Começar a jogar
           </button>
 
           <p style={{ fontSize: 13, color: "#93a39a", textAlign: "center", marginTop: 14 }}>
@@ -185,6 +202,26 @@ export default function Comecar() {
           <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 10 }}>Ao continuar, aceitas receber novidades da Ippon League.</p>
         </div>
       </div>
+
+      {mostrarDeclaracao && (
+        <div onClick={() => !saving && setMostrarDeclaracao(false)} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 }}>
+          <div onClick={(ev) => ev.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "24px 20px" }}>
+            <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 700, textTransform: "uppercase", textAlign: "center", margin: "0 0 12px" }}>Confirma os teus dados</h2>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.6, margin: "0 0 12px" }}>
+              Declaras que todas as informações fornecidas, incluindo a tua <strong style={{ color: "#e6c97a" }}>data de nascimento</strong>, são <strong style={{ color: "#e6c97a" }}>verdadeiras e corretas</strong>.
+            </p>
+            <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.6, margin: "0 0 18px" }}>
+              Informações falsas podem levar ao encerramento da conta. Ao confirmar, aceitas os{" "}
+              <a href="/termos" target="_blank" style={{ color: GOLD, textDecoration: "none", fontWeight: 700 }}>Termos de Utilização</a> e a{" "}
+              <a href="/privacidade" target="_blank" style={{ color: GOLD, textDecoration: "none", fontWeight: 700 }}>Política de Privacidade</a>.
+            </p>
+            <button onClick={confirmarCriacao} disabled={saving} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 12, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+              {saving ? "A criar conta..." : "Confirmar e criar conta"}
+            </button>
+            <button onClick={() => setMostrarDeclaracao(false)} disabled={saving} style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: saving ? "default" : "pointer", fontFamily: FONT_BODY }}>Voltar e rever</button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
