@@ -297,6 +297,16 @@ export default function Inicio() {
           )}
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={openTutorial} aria-label="Como se joga" style={iconBtn}>?</button>
+            <a href="/ajuda" aria-label="Fale connosco" style={{ ...iconBtn, textDecoration: "none" }}>
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 11a7 7 0 0 1 14 0" />
+                <circle cx="12" cy="8.5" r="2.6" />
+                <rect x="3.5" y="10" width="3" height="6.5" rx="1.5" />
+                <rect x="17.5" y="10" width="3" height="6.5" rx="1.5" />
+                <path d="M19 16.5q0 4-4 4.6l-2.5.2" />
+                <circle cx="12.3" cy="21.3" r="1" fill="currentColor" stroke="none" />
+              </svg>
+            </a>
             <SinoNotificacoes calcOpts={{ temEquipa: temEquipaCompleta }} />
           </div>
         </header>
