@@ -107,8 +107,8 @@ export async function POST(req: NextRequest) {
   if (corpo.length < 5) {
     return NextResponse.json({ ok: false, erro: "Escreve a tua mensagem (um pouco mais longa)." }, { status: 400 });
   }
-  if (!userId && !email) {
-    return NextResponse.json({ ok: false, erro: "Deixa um email para te podermos responder." }, { status: 400 });
+  if (!userId) {
+    return NextResponse.json({ ok: false, erro: "Precisas de conta para enviar pela app." }, { status: 401 });
   }
 
   const isElogio = assunto === "Elogio";
