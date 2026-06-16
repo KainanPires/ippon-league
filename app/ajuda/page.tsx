@@ -114,7 +114,7 @@ export default function AjudaPage() {
             </p>
 
             {/* Assunto */}
-            <label style={{ display: "block", fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Assunto</label>
+            <label style={{ display: "block", fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Assunto <span style={{ color: GOLD }}>*</span></label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
               {ASSUNTOS.map((a) => (
                 <button key={a} onClick={() => setAssunto(a)} style={{ background: assunto === a ? GOLD : "#141a17", color: assunto === a ? "#1b211e" : "#cfd8d2", border: `1px solid ${assunto === a ? GOLD : "#243029"}`, borderRadius: 999, padding: "7px 13px", fontSize: 12.5, fontWeight: assunto === a ? 700 : 400, cursor: "pointer", fontFamily: FB }}>{a}</button>
@@ -150,9 +150,15 @@ export default function AjudaPage() {
 
             {erro && <div style={{ fontSize: 12.5, color: "#ef8d83", marginTop: 12 }}>{erro}</div>}
 
-            <button onClick={enviar} disabled={aEnviar} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "13px", borderRadius: 12, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar ? 0.7 : 1 }}>
-              {aEnviar ? "A enviar…" : "Enviar mensagem"}
-            </button>
+            {(() => {
+              const podeEnviar = !!assunto && corpo.trim().length >= 5 && (!!uid || !!email.trim());
+              const desativado = aEnviar || !podeEnviar;
+              return (
+                <button onClick={enviar} disabled={desativado} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "13px", borderRadius: 12, cursor: desativado ? "default" : "pointer", opacity: desativado ? 0.45 : 1 }}>
+                  {aEnviar ? "A enviar…" : !assunto ? "Escolhe um assunto" : "Enviar mensagem"}
+                </button>
+              );
+            })()}
           </>
         )}
       </div>
