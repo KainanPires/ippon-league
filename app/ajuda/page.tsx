@@ -116,15 +116,6 @@ export default function AjudaPage() {
               <a href={`mailto:${EMAIL_CONTACTO}`} style={{ color: GOLD, textDecoration: "none", fontWeight: 700 }}>{EMAIL_CONTACTO}</a>.
             </p>
 
-            <a href="/elogios" style={{ display: "flex", alignItems: "center", gap: 10, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "11px 13px", marginBottom: 16, textDecoration: "none" }}>
-              <div style={{ width: 30, height: 30, borderRadius: 8, background: "#1c2a20", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 15 }}>💬</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2" }}>Elogios da comunidade</div>
-                <div style={{ fontSize: 11, color: "#93a39a" }}>O que os jogadores dizem da Ippon League</div>
-              </div>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c8a82" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
-            </a>
-
             {/* Assunto */}
             <label style={{ display: "block", fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Assunto <span style={{ color: GOLD }}>*</span></label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
@@ -156,7 +147,7 @@ export default function AjudaPage() {
             {ehElogio && (
               <label style={{ display: "flex", alignItems: "flex-start", gap: 9, marginTop: 12, cursor: "pointer", background: "#181410", border: "1px solid #3a3320", borderRadius: 10, padding: "11px 12px" }}>
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 2, width: 16, height: 16, accentColor: GOLD, flexShrink: 0 }} />
-                <span style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5 }}>Autorizo a Ippon League a mostrar este elogio publicamente, com o meu <strong style={{ color: "#e6c97a" }}>nome de utilizador, nome de time e dados de perfil</strong> (como a faixa e o país). O meu <strong style={{ color: "#e6c97a" }}>email nunca é divulgado</strong>.</span>
+                <span style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5 }}>Autorizo a Ippon League a <strong style={{ color: "#e6c97a" }}>usar e divulgar</strong> este elogio, com o meu <strong style={{ color: "#e6c97a" }}>nome de utilizador, nome de time e dados de perfil</strong> (como a faixa e o país). O meu <strong style={{ color: "#e6c97a" }}>email nunca é divulgado</strong>.</span>
               </label>
             )}
 
