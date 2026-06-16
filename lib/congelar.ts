@@ -38,6 +38,7 @@ import {
 } from "@/lib/ijf";
 import { calcularForma } from "@/lib/forma";
 import { computeNewPrice } from "@/lib/engine";
+import { notificarFimDeCompeticao } from "@/lib/notificarCompeticao";
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 
@@ -356,6 +357,13 @@ export async function congelarCompeticao(idComp: string, mes: string, anoEpoca: 
 
   // 3) Recalcula os patrimónios da época (do zero, idempotente).
   await recalcularPatrimonios(anoEpoca);
+
+  // 4) Notifica o fim da competição (pódio + campeão Mundial/Continental).
+  // Idempotente por dentro (tabela eventos_notificados): o cron reprocessa tod
+  // os dias, mas a notificação sai uma só vez. Falha em silêncio.
+  try {
+    await notificarFimDeCompeticao(idComp);
+  } catch {}
 
   return {
     comp: idComp, jaCongelada: processados === 0, atletasProcessados: processados,
