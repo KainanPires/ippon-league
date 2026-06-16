@@ -18,32 +18,32 @@ const INFO: { label: string; href?: string; soon?: boolean }[] = [
   { label: "Ajuda e contacto", href: "/ajuda" },
 ];
 
-// Dados da conta lidos do Supabase (metadados do registo + email do Auth).
 type Conta = {
   nome: string;
   email: string;
   telefone: string;
   pais: string;
   paisIso: string;
-  faixaJudo: string;   // faixa declarada no registo (judô real) — informativa
+  faixaJudo: string;
   isPro: boolean;
 };
 
 export default function Perfil() {
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [conta, setConta] = useState<Conta | null>(null);
-  const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca"); // faixa OFICIAL do jogo (users.belt)
+  const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
   const [ready, setReady] = useState(false);
   const [saindo, setSaindo] = useState(false);
   const [abertoDados, setAbertoDados] = useState(false);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [avisoGuardar, setAvisoGuardar] = useState("");
-  // Campos editáveis (preenchidos ao entrar em modo edição).
   const [edNome, setEdNome] = useState("");
+  const [edEmail, setEdEmail] = useState("");
   const [edPaisIso, setEdPaisIso] = useState("PT");
   const [edDialIso, setEdDialIso] = useState("PT");
   const [edContacto, setEdContacto] = useState("");
+  const [emailPendente, setEmailPendente] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -53,8 +53,6 @@ export default function Perfil() {
       const u = data.session?.user;
       if (u) {
         const m = u.user_metadata || {};
-        // Nome em cascata: 1º os metadados; se vazios (contas antigas), cai para
-        // o localStorage (onde o /inicio guardou o primeiro nome); só depois "Campeão".
         let nomeLocal = "";
         try { nomeLocal = String(localStorage.getItem("ippon_name") || "").trim(); } catch {}
         const nomeFinal = (String(m.nome || "").trim() || nomeLocal || "Campeão");
@@ -67,7 +65,6 @@ export default function Perfil() {
           faixaJudo: String(m.faixa || "").trim() || "Branca",
           isPro: Boolean(m.is_pro),
         });
-        // Faixa OFICIAL do jogo: lê de users.belt (calculada por desempenho).
         try {
           const { data: row } = await supabase.from("users").select("belt").eq("id", u.id).maybeSingle();
           if (active) setFaixaJogo(normalizarFaixa(row?.belt));
@@ -85,12 +82,11 @@ export default function Perfil() {
     window.location.href = "/entrar";
   }
 
-  // Abre o modo edição com os valores atuais. Tenta separar o indicativo do número.
   function abrirEdicao() {
     if (!conta) return;
     setEdNome(conta.nome === "Campeão" ? "" : conta.nome);
+    setEdEmail(conta.email || "");
     setEdPaisIso(conta.paisIso || "PT");
-    // Separar "+351 912..." em indicativo + número, se possível.
     const tel = conta.telefone || "";
     const match = COUNTRIES
       .slice()
@@ -104,16 +100,20 @@ export default function Perfil() {
       setEdContacto(tel);
     }
     setAvisoGuardar("");
+    setEmailPendente("");
     setEditando(true);
   }
 
   async function guardar() {
-    if (guardando) return;
+    if (guardando || !conta) return;
     setGuardando(true);
     setAvisoGuardar("");
+    setEmailPendente("");
     const pais = COUNTRIES.find((c) => c.iso2 === edPaisIso);
     const dial = COUNTRIES.find((c) => c.iso2 === edDialIso)?.dial ?? "";
-    const telefone = `${dial} ${edContacto.trim()}`.trim();
+    const telefone = edContacto.trim() ? `${dial} ${edContacto.trim()}`.trim() : "";
+
+    // 1) Dados (nome, telefone, país) — guardam direto.
     const { error } = await supabase.auth.updateUser({
       data: {
         nome: edNome.trim(),
@@ -127,11 +127,32 @@ export default function Perfil() {
       setGuardando(false);
       return;
     }
-    // Atualiza o que está no ecrã sem recarregar.
+
+    // 2) Email — se mudou, exige confirmação no novo endereço (não muda no ecrã já).
+    const novoEmail = edEmail.trim();
+    const emailMudou = novoEmail && novoEmail.toLowerCase() !== conta.email.toLowerCase();
+    if (emailMudou) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(novoEmail)) {
+        setAvisoGuardar("Esse email não parece válido.");
+        setGuardando(false);
+        return;
+      }
+      const { error: errEmail } = await supabase.auth.updateUser({ email: novoEmail });
+      if (errEmail) {
+        const m = errEmail.message || "";
+        if (/already|registered|exists/i.test(m)) setAvisoGuardar("Já existe uma conta com esse email.");
+        else setAvisoGuardar("Não foi possível alterar o email. Tenta de novo.");
+        setGuardando(false);
+        return;
+      }
+      setEmailPendente(novoEmail);
+    }
+
     setConta((c) => c ? { ...c, nome: edNome.trim() || "Campeão", telefone, pais: pais?.name ?? "", paisIso: edPaisIso } : c);
     try { localStorage.setItem("ippon_name", (edNome.trim().split(" ")[0]) || ""); } catch {}
     setGuardando(false);
-    setEditando(false);
+    // Se houver email pendente, mantém o painel aberto para a pessoa ler o aviso.
+    if (!emailMudou) setEditando(false);
   }
 
   const nomeMostrado = conta?.nome || "Campeão";
@@ -148,7 +169,6 @@ export default function Perfil() {
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Perfil</h1>
         </header>
 
-        {/* Cartão do jogador — a FAIXA DO JOGO é a identidade (Mascot com a cor da faixa) */}
         <button onClick={() => setAbertoDados((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: abertoDados ? 10 : 22, cursor: "pointer", color: "#f1ede2", fontFamily: FB }}>
           <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0, border: `2px solid ${corFaixaJogo}` }}>
             <Mascot belt={corFaixaJogo} expression="feliz" />
@@ -166,7 +186,6 @@ export default function Perfil() {
           </span>
         </button>
 
-        {/* Os meus dados — só aparecem quando o cartão é tocado */}
         {abertoDados && (
           <div style={{ marginBottom: 22 }}>
             {!ready ? (
@@ -195,12 +214,18 @@ export default function Perfil() {
                 <input value={edNome} onChange={(e) => setEdNome(e.target.value)} placeholder="O teu nome" style={inputStyle} />
 
                 <EditLabel>Email</EditLabel>
-                <div style={{ ...inputStyle, opacity: 0.6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{conta.email}</span>
-                  <span style={{ fontSize: 10, color: "#7c8a82", flexShrink: 0, marginLeft: 8 }}>Em breve</span>
-                </div>
+                <input value={edEmail} onChange={(e) => { setEdEmail(e.target.value); setEmailPendente(""); }} type="email" inputMode="email" placeholder="email@exemplo.com" style={inputStyle} />
+                {emailPendente ? (
+                  <div style={{ fontSize: 11.5, color: "#7fd1a3", lineHeight: 1.5, margin: "6px 2px 0" }}>
+                    Enviámos um link para <strong>{emailPendente}</strong>. O email só muda depois de o confirmares aí.
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: "#5f6f67", lineHeight: 1.5, margin: "6px 2px 0" }}>
+                    Se mudares o email, enviamos um link de confirmação para o novo endereço.
+                  </div>
+                )}
 
-                <EditLabel>Telefone</EditLabel>
+                <EditLabel>Telefone (opcional)</EditLabel>
                 <div style={{ display: "flex", gap: 8 }}>
                   <DialSelect value={edDialIso} onChange={setEdDialIso} />
                   <input value={edContacto} onChange={(e) => setEdContacto(e.target.value)} inputMode="tel" placeholder="Número" style={inputStyle} />
@@ -212,13 +237,14 @@ export default function Perfil() {
                 {avisoGuardar && <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 10 }}>{avisoGuardar}</div>}
 
                 <button onClick={guardar} disabled={guardando} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 12, cursor: guardando ? "default" : "pointer", opacity: guardando ? 0.7 : 1 }}>{guardando ? "A guardar…" : "Guardar"}</button>
-                <button onClick={() => setEditando(false)} disabled={guardando} style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Cancelar</button>
+                <button onClick={() => setEditando(false)} disabled={guardando} style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Fechar</button>
               </div>
             )}
           </div>
         )}
 
-        {/* A minha assinatura — espaço pronto para o Ippon Pro (datas chegam com o Stripe) */}
+        {abertoDados && ready && conta && <AlterarSenha email={conta.email} />}
+
         {abertoDados && ready && conta && (
           <>
             <SectionTitle>A minha assinatura</SectionTitle>
@@ -245,7 +271,6 @@ export default function Perfil() {
           </>
         )}
 
-        {/* A minha equipa / escudo */}
         <SectionTitle>A minha equipa</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 14, background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 12 }}>
           <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={identity} size={52} /></div>
@@ -258,7 +283,6 @@ export default function Perfil() {
           Mudar escudo
         </a>
 
-        {/* Informações e políticas */}
         <SectionTitle>Informações e políticas</SectionTitle>
         <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
           {INFO.map((it, i) => {
@@ -278,7 +302,6 @@ export default function Perfil() {
           })}
         </div>
 
-        {/* Sair (logout) — último botão, ícone de porta aberta */}
         <button onClick={sair} disabled={saindo} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: "transparent", border: "1px solid #5a2f2c", color: "#ef8d83", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 12, cursor: saindo ? "default" : "pointer", opacity: saindo ? 0.7 : 1 }}>
           <DoorIcon />
           {saindo ? "A sair…" : "Sair da conta"}
@@ -287,6 +310,93 @@ export default function Perfil() {
         <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 22 }}>Ippon League · versão de testes</p>
       </div>
     </main>
+  );
+}
+
+// Bloco de alteração de senha (logado). Pede a senha atual (reautentica) e a nova.
+function AlterarSenha({ email }: { email: string }) {
+  const [aberto, setAberto] = useState(false);
+  const [atual, setAtual] = useState("");
+  const [nova, setNova] = useState("");
+  const [confirma, setConfirma] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [ok, setOk] = useState(false);
+
+  function limpar() {
+    setAtual(""); setNova(""); setConfirma(""); setErro("");
+  }
+
+  async function alterar() {
+    if (guardando) return;
+    setErro(""); setOk(false);
+    if (!atual) { setErro("Escreve a tua senha atual."); return; }
+    if (nova.length < 6) { setErro("A nova senha precisa de pelo menos 6 caracteres."); return; }
+    if (nova !== confirma) { setErro("As senhas novas não coincidem."); return; }
+    if (nova === atual) { setErro("A nova senha tem de ser diferente da atual."); return; }
+    setGuardando(true);
+    // 1) Reautentica para confirmar a senha atual (não faz logout).
+    const { error: errLogin } = await supabase.auth.signInWithPassword({ email, password: atual });
+    if (errLogin) {
+      setGuardando(false);
+      setErro("A senha atual está incorreta.");
+      return;
+    }
+    // 2) Define a nova senha.
+    const { error } = await supabase.auth.updateUser({ password: nova });
+    setGuardando(false);
+    if (error) {
+      const m = error.message || "";
+      if (/different from the old|should be different/i.test(m)) setErro("A nova senha tem de ser diferente da atual.");
+      else setErro("Não foi possível alterar a senha. Tenta de novo.");
+      return;
+    }
+    limpar();
+    setOk(true);
+    setAberto(false);
+  }
+
+  return (
+    <>
+      <SectionTitle>Segurança</SectionTitle>
+      <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
+        {!aberto ? (
+          <button onClick={() => { limpar(); setOk(false); setAberto(true); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "14px 16px", background: "transparent", border: "none", color: "#f1ede2", fontFamily: FB, fontSize: 14, cursor: "pointer" }}>
+            <span>Alterar senha</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {ok && <span style={{ fontSize: 11.5, color: "#7fd1a3" }}>Senha alterada</span>}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6f67" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+            </span>
+          </button>
+        ) : (
+          <div style={{ padding: 16 }}>
+            <EditLabel>Senha atual</EditLabel>
+            <div style={{ position: "relative" }}>
+              <input value={atual} onChange={(e) => { setAtual(e.target.value); setErro(""); }} type={showPw ? "text" : "password"} placeholder="A tua senha atual" style={{ ...inputStyle, paddingRight: 44 }} />
+              <button onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Esconder senha" : "Mostrar senha"} style={{ position: "absolute", right: 8, top: 7, width: 30, height: 30, background: "transparent", border: "none", color: "#93a39a", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  {showPw
+                    ? <><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.4 5.2A9 9 0 0 1 21 12a9.8 9.8 0 0 1-2.3 3M6.1 6.1A9.8 9.8 0 0 0 3 12a9 9 0 0 0 11.6 5.3" /></>
+                    : <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>}
+                </svg>
+              </button>
+            </div>
+
+            <EditLabel>Nova senha</EditLabel>
+            <input value={nova} onChange={(e) => { setNova(e.target.value); setErro(""); }} type={showPw ? "text" : "password"} placeholder="Mínimo 6 caracteres" style={inputStyle} />
+
+            <EditLabel>Confirmar nova senha</EditLabel>
+            <input value={confirma} onChange={(e) => { setConfirma(e.target.value); setErro(""); }} type={showPw ? "text" : "password"} placeholder="Repete a nova senha" style={inputStyle} />
+
+            {erro && <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 10 }}>{erro}</div>}
+
+            <button onClick={alterar} disabled={guardando} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 12, cursor: guardando ? "default" : "pointer", opacity: guardando ? 0.7 : 1 }}>{guardando ? "A alterar…" : "Alterar senha"}</button>
+            <button onClick={() => { setAberto(false); limpar(); }} disabled={guardando} style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Cancelar</button>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -326,7 +436,6 @@ const optStyle = (active: boolean): React.CSSProperties => ({
   color: "#f1ede2", fontSize: 14, cursor: "pointer", fontFamily: FB,
 });
 
-// Seletor de indicativo (bandeira + DDI) para o telefone.
 function DialSelect({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -364,7 +473,6 @@ function DialSelect({ value, onChange }: { value: string; onChange: (iso: string
   );
 }
 
-// Seletor de país (bandeira + nome).
 function CountryPicker({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
