@@ -25,15 +25,43 @@ export default function RedefinirSenha() {
 
   useEffect(() => {
     if (!supabaseConfigured) { setEstado("invalido"); return; }
-    // O Supabase processa o token do link e dispara PASSWORD_RECOVERY / cria sessão.
+    let cancelado = false;
+
+    // Rede de segurança: se o cliente processar o link sozinho, apanhamos aqui.
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) setEstado("pronto");
+      if (session && !cancelado) setEstado("pronto");
     });
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setEstado("pronto");
-      else setTimeout(() => setEstado((e) => (e === "validando" ? "invalido" : e)), 2500);
-    });
-    return () => sub.subscription.unsubscribe();
+
+    (async () => {
+      try {
+        // Já existe sessão? (o cliente pode já ter processado o link.)
+        const { data: s0 } = await supabase.auth.getSession();
+        if (s0.session) { if (!cancelado) setEstado("pronto"); return; }
+
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get("code");
+        const tokenHash = url.searchParams.get("token_hash");
+
+        // Fluxo PKCE: ?code=...
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!cancelado) setEstado(error ? "invalido" : "pronto");
+          return;
+        }
+        // Fluxo token_hash: ?token_hash=...&type=recovery
+        if (tokenHash) {
+          const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+          if (!cancelado) setEstado(error ? "invalido" : "pronto");
+          return;
+        }
+        // Fluxo por hash (#access_token=...): aguarda o onAuthStateChange / timeout.
+      } catch {
+        if (!cancelado) setEstado("invalido");
+      }
+    })();
+
+    const t = setTimeout(() => { if (!cancelado) setEstado((e) => (e === "validando" ? "invalido" : e)); }, 5000);
+    return () => { cancelado = true; sub.subscription.unsubscribe(); clearTimeout(t); };
   }, []);
 
   async function guardar() {
@@ -42,10 +70,22 @@ export default function RedefinirSenha() {
     if (senha.length < 6) { setErro("A senha precisa de pelo menos 6 caracteres."); return; }
     if (senha !== confirmar) { setErro("As senhas não coincidem."); return; }
     setSaving(true);
+    // Confirma que a sessão de recuperação está mesmo ativa antes de gravar.
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) {
+      setSaving(false);
+      setEstado("invalido");
+      return;
+    }
     const { error } = await supabase.auth.updateUser({ password: senha });
     setSaving(false);
     if (error) {
-      setErro("Não foi possível guardar. O link pode ter expirado — pede um novo no login.");
+      const m = error.message || "";
+      if (/different from the old|should be different/i.test(m)) {
+        setErro("A nova senha tem de ser diferente da anterior.");
+      } else {
+        setErro("Não foi possível guardar. Volta a abrir o link de recuperação e tenta de novo.");
+      }
       return;
     }
     setOk(true);
