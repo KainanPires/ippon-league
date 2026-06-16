@@ -14,6 +14,7 @@ import { PRECO } from "@/lib/precos";
 import { SinoNotificacoes } from "@/components/SinoNotificacoes";
 import { criarNotificacao } from "@/lib/notificacoes";
 import { normalizarFaixa, corDaFaixa, nomeDaFaixa, type Faixa } from "@/lib/faixas";
+import { CartaoInstalarApp } from "@/components/InstalarApp";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -38,11 +39,8 @@ function targetForStep(step: number): TutTarget {
   return null;
 }
 
-// "Tem equipa?" depende SÓ de haver ids guardados — não de conseguirmos resolver
-// os atletas. A lista de atletas (pool) vem do Mercado/servidor e pode não estar
-// carregada ainda. Quando não está, mostramos a equipa na mesma, com o Valor em "—".
 function computeTeamInfo(saved: TeamState): { name: string; value: string; last: number } | null {
-  if (saved.ids.length === 0) return null; // só sem ids é que NÃO há equipa
+  if (saved.ids.length === 0) return null;
   const athletes = resolve(saved.ids);
   const resolvido = athletes.length > 0;
   const value = Math.round(athletes.reduce((s, a) => s + a.priceJc, 0) * 10) / 10;
@@ -164,14 +162,10 @@ export default function Inicio() {
         setSavedTeam(naAlvo);
       })();
 
-      // "O TEU DESEMPENHO NA RODADA":
-      //  - Se há competição A DECORRER: usa os pontos AO VIVO (como antes).
-      //  - Senão: usa a ÚLTIMA competição CONGELADA não vista (persiste após fechar).
       (async () => {
         const vistos = await desempenhosVistosConta();
         if (!active) return;
 
-        // ---- Caso 1: competição a decorrer (ao vivo) ----
         if (aDecorrer) {
           if (vistos[aDecorrer.idCompeticao]) return;
           const teamComp = await loadSavedCloudFor(aDecorrer.idCompeticao);
@@ -192,13 +186,11 @@ export default function Inicio() {
           return;
         }
 
-        // ---- Caso 2: sem evento a decorrer -> última competição CONGELADA ----
-        const cong = await buscarResultadosCongelados(); // sem comp = última congelada
+        const cong = await buscarResultadosCongelados();
         if (!active || !cong) return;
         if (vistos[cong.comp]) return;
         const teamComp = await loadSavedCloudFor(cong.comp);
         if (!active || !teamComp || teamComp.ids.length === 0) return;
-        // Garante o pool de atletas dessa competição (para resolver nomes/país).
         try {
           const j = await fetch(`/api/atletas?id=${cong.comp}`).then((r) => r.json());
           const list = Array.isArray(j?.atletas) ? j.atletas : [];
@@ -207,7 +199,6 @@ export default function Inicio() {
         if (!active) return;
         const dados = construirDesempenho(cong.comp, cong.nome, teamComp, cong.pontos);
         if (!dados) return;
-        // Números extra (média, posição, património) para o modal.
         let ex: ResumoExtra | null = null;
         if (userId) ex = await buscarResumoExtra(cong.comp, userId);
         if (!active) return;
@@ -239,7 +230,6 @@ export default function Inicio() {
     setPhase("tutorial");
   }
 
-  // Abre o resumo COMPLETO de uma competição escolhida na galeria.
   async function abrirResumoDaGaleria(compEscolhida: string) {
     const cong = await buscarResultadosCongelados(compEscolhida);
     if (!cong) return;
@@ -256,7 +246,7 @@ export default function Inicio() {
     if (userIdState) ex = await buscarResumoExtra(cong.comp, userIdState);
     setDesempenho({ dados, team: teamComp });
     setExtra(ex);
-    setDesempenhoDaGaleria(true); // veio da galeria: só botão "Fechar"
+    setDesempenhoDaGaleria(true);
     setGaleriaAberta(false);
   }
 
@@ -310,6 +300,9 @@ export default function Inicio() {
             <SinoNotificacoes calcOpts={{ temEquipa: temEquipaCompleta }} />
           </div>
         </header>
+
+        {/* Convite para instalar a app (PWA). Só aparece a quem ainda não instalou. */}
+        <CartaoInstalarApp />
 
         {/* Botão da galeria de resumos (todas as rodadas jogadas). Só para quem tem conta. */}
         {!visitante && (
@@ -393,8 +386,6 @@ export default function Inicio() {
           </div>
         </Card>
 
-        {/* Janela "ao vivo" — só aparece quando há mesmo uma competição a decorrer.
-            Fora de competição não mostra nada (não faz sentido um "ao vivo" vazio). */}
         {emAndamento && (
           <Card>
             <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}>
@@ -453,14 +444,11 @@ export default function Inicio() {
           extra={extra}
           daGaleria={desempenhoDaGaleria}
           onFechar={() => {
-            // Só fecha. NÃO marca como visto -> volta a aparecer no próximo login.
             setDesempenho(null);
             setExtra(null);
             setDesempenhoDaGaleria(false);
           }}
           onNaoMostrarMais={() => {
-            // Marca como visto na conta -> deixa de aparecer no automático.
-            // Fica guardado na galeria.
             marcarDesempenhoVisto(desempenho.dados.idCompeticao);
             setDesempenho(null);
             setExtra(null);
@@ -480,7 +468,6 @@ export default function Inicio() {
   );
 }
 
-// Cria a notificação de RESUMO (guardada), uma vez por competição neste aparelho.
 async function notificarResumo(idComp: string, nomeComp: string, dados: DesempenhoRodada) {
   try {
     const chaveResumo = `ippon_notif_resumo_${idComp}`;
