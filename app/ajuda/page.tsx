@@ -38,6 +38,7 @@ export default function AjudaPage() {
   const [aEnviar, setAEnviar] = useState(false);
   const [erro, setErro] = useState("");
   const [enviado, setEnviado] = useState(false);
+  const [precisaConta, setPrecisaConta] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -48,6 +49,17 @@ export default function AjudaPage() {
       setUid(u?.id ?? null);
       setEmailSessao(u?.email ?? "");
       setMeta((u?.user_metadata as typeof meta) ?? {});
+      // Restaura um rascunho deixado antes de ir criar conta (e limpa-o).
+      try {
+        const raw = localStorage.getItem("ippon_ajuda_rascunho");
+        if (raw) {
+          const d = JSON.parse(raw) as { assunto?: string; corpo?: string; consent?: boolean };
+          if (d.assunto) setAssunto(d.assunto);
+          if (d.corpo) setCorpo(d.corpo);
+          if (d.consent) setConsent(d.consent);
+          localStorage.removeItem("ippon_ajuda_rascunho");
+        }
+      } catch {}
     })();
     return () => { vivo = false; };
   }, []);
@@ -56,9 +68,14 @@ export default function AjudaPage() {
 
   async function enviar() {
     setErro("");
-    if (!uid) { setErro("Precisas de entrar na tua conta para enviar."); return; }
     if (!assunto) { setErro("Escolhe um assunto."); return; }
     if (corpo.trim().length < 5) { setErro("Escreve a tua mensagem."); return; }
+    // Sem conta: guarda o que escreveu e pede para criar conta (não perde o texto).
+    if (!uid) {
+      try { localStorage.setItem("ippon_ajuda_rascunho", JSON.stringify({ assunto, corpo, consent })); } catch {}
+      setPrecisaConta(true);
+      return;
+    }
 
     setAEnviar(true);
     const nomeTime = (() => { try { return loadIdentity().name || ""; } catch { return ""; } })();
@@ -107,21 +124,6 @@ export default function AjudaPage() {
             </p>
             <a href="/inicio" style={{ display: "inline-block", marginTop: 16, background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 13, padding: "10px 20px", borderRadius: 10, textDecoration: "none" }}>Voltar ao início</a>
           </div>
-        ) : !uid ? (
-          /* Sem conta: não se envia pela app. Convida a entrar, ou a escrever
-             diretamente do email da própria pessoa. */
-          <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: "22px 18px", textAlign: "center" }}>
-            <div style={{ fontSize: 30, marginBottom: 8 }}>🔒</div>
-            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Entra para nos escrever</div>
-            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 16px" }}>
-              Para nos escreveres aqui, entra na tua conta. Sem conta, podes na mesma escrever-nos diretamente para{" "}
-              <a href={`mailto:${EMAIL_CONTACTO}`} style={{ color: GOLD, textDecoration: "none", fontWeight: 700 }}>{EMAIL_CONTACTO}</a>.
-            </p>
-            <a href="/entrar?voltar=/ajuda" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 13, padding: "11px 22px", borderRadius: 10, textDecoration: "none" }}>Entrar / Criar conta</a>
-            <div style={{ marginTop: 12 }}>
-              <a href={`mailto:${EMAIL_CONTACTO}`} style={{ color: "#93a39a", fontSize: 12.5, textDecoration: "none" }}>ou escreve para {EMAIL_CONTACTO}</a>
-            </div>
-          </div>
         ) : (
           <>
             <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 14px" }}>
@@ -136,9 +138,15 @@ export default function AjudaPage() {
               ))}
             </div>
 
-            <div style={{ fontSize: 12, color: "#7c8a82", marginBottom: 14 }}>
-              A enviar como <span style={{ color: "#cfd8d2" }}>{emailSessao || "a tua conta"}</span>.
-            </div>
+            {uid ? (
+              <div style={{ fontSize: 12, color: "#7c8a82", marginBottom: 14 }}>
+                A enviar como <span style={{ color: "#cfd8d2" }}>{emailSessao || "a tua conta"}</span>.
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: "#93a39a", marginBottom: 14, background: "#181410", border: "1px solid #3a3320", borderRadius: 10, padding: "9px 11px", lineHeight: 1.45 }}>
+                Escreve à vontade. Para enviar vais precisar de uma conta (é rápido) — guardamos o que escreveste.
+              </div>
+            )}
 
             {/* Mensagem */}
             <label style={{ display: "block", fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 7px" }}>Mensagem</label>
@@ -166,6 +174,23 @@ export default function AjudaPage() {
           </>
         )}
       </div>
+
+      {precisaConta && (
+        <div onClick={() => setPrecisaConta(false)} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.8)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 340, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "22px 18px", textAlign: "center" }}>
+            <div style={{ fontSize: 30, marginBottom: 8 }}>🔒</div>
+            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Precisas de conta</div>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 16px" }}>
+              Para enviar a tua mensagem, precisas de uma conta — é rápido. Guardámos o que escreveste; quando voltares, está aqui à tua espera.
+            </p>
+            <a href="/entrar?voltar=/ajuda" style={{ display: "block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "12px", borderRadius: 11, textDecoration: "none" }}>Criar conta / Entrar</a>
+            <button onClick={() => setPrecisaConta(false)} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12.5, cursor: "pointer", fontFamily: FB }}>Voltar</button>
+            <div style={{ marginTop: 8, fontSize: 11.5 }}>
+              <a href={`mailto:${EMAIL_CONTACTO}`} style={{ color: "#7c8a82", textDecoration: "none" }}>ou escreve direto para {EMAIL_CONTACTO}</a>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
