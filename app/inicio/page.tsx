@@ -15,6 +15,7 @@ import { SinoNotificacoes } from "@/components/SinoNotificacoes";
 import { criarNotificacao } from "@/lib/notificacoes";
 import { normalizarFaixa, corDaFaixa, nomeDaFaixa, type Faixa } from "@/lib/faixas";
 import { CartaoInstalarApp } from "@/components/InstalarApp";
+import { LembreteNotificacoes } from "@/components/NotificacoesPush";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -353,6 +354,9 @@ export default function Inicio() {
         <div ref={teamRef} className={glow("team")}>
           {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo)} faixa={faixaJogo} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} />}
         </div>
+
+        {/* Lembrete de notificações: aparece depois de ter equipa montada. */}
+        {!visitante && teamInfo && userIdState && <LembreteNotificacoes userId={userIdState} />}
 
         <Card>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
