@@ -238,6 +238,18 @@ export default function Ligas() {
           ))}
         </div>
 
+        {/* Atalho para o Calendário 2026 — visível em qualquer aba. */}
+        <a href="/calendario" style={{ display: "flex", alignItems: "center", gap: 11, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px", marginBottom: 16, textDecoration: "none" }}>
+          <div style={{ width: 34, height: 34, borderRadius: 9, background: "#1c2a20", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2" }}>Calendário 2026</div>
+            <div style={{ fontSize: 11, color: "#93a39a" }}>Todas as competições do ano · clássicos por revelar</div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c8a82" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M9 18l6-6-6-6" /></svg>
+        </a>
+
         {tab === "ativas" && (
           <>
             <Section>Ligas oficiais · prémios</Section>
