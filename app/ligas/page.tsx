@@ -5,6 +5,7 @@ import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
 import { nomeContinenteDoPais } from "@/lib/continentes";
+import { CalendarioConteudo } from "@/components/CalendarioConteudo";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -14,7 +15,7 @@ const GOLD = "#d9a441";
 const LIM_CRIAR_FREE = 1, LIM_CRIAR_PRO = 5;
 const LIM_PART_FREE = 2, LIM_PART_PRO = 5;
 
-type Tab = "ativas" | "mercado" | "resultados";
+type Tab = "ativas" | "mercado" | "calendario" | "resultados";
 
 function esc(p: Partial<Identity>): Identity { return { ...DEFAULT_IDENTITY, ...p }; }
 
@@ -230,25 +231,13 @@ export default function Ligas() {
           </a>
         </header>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: "1px solid #1a221d" }}>
-          {(["ativas", "mercado", "resultados"] as Tab[]).map((t) => (
-            <button key={t} onClick={() => mudarTab(t)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${tab === t ? GOLD : "transparent"}`, color: tab === t ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>
-              {t === "ativas" ? "Ativas" : t === "mercado" ? "Mercado" : "Resultados"}
+        <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #1a221d" }}>
+          {(["ativas", "mercado", "calendario", "resultados"] as Tab[]).map((t) => (
+            <button key={t} onClick={() => mudarTab(t)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${tab === t ? GOLD : "transparent"}`, color: tab === t ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>
+              {t === "ativas" ? "Ativas" : t === "mercado" ? "Mercado" : t === "calendario" ? "Calendário" : "Resultados"}
             </button>
           ))}
         </div>
-
-        {/* Atalho para o Calendário 2026 — visível em qualquer aba. */}
-        <a href="/calendario" style={{ display: "flex", alignItems: "center", gap: 11, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px", marginBottom: 16, textDecoration: "none" }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: "#1c2a20", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2" }}>Calendário 2026</div>
-            <div style={{ fontSize: 11, color: "#93a39a" }}>Todas as competições do ano · clássicos por revelar</div>
-          </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c8a82" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M9 18l6-6-6-6" /></svg>
-        </a>
 
         {tab === "ativas" && (
           <>
@@ -381,6 +370,8 @@ export default function Ligas() {
             )}
           </>
         )}
+
+        {tab === "calendario" && <CalendarioConteudo />}
 
         {tab === "resultados" && (
           <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82" }}>
