@@ -5,11 +5,12 @@
 // políticas, por isso o cliente nunca lhe acede diretamente.
 //
 // Funciona com OU sem conta:
-//   - com conta: associa user_id e o contexto (faixa/país/pro) da sessão;
+//   - com conta: associa user_id e o contexto (faixa/país/pro/nome de time);
 //   - sem conta: exige um email para podermos responder.
 //
 // Elogio: quando o assunto é "Elogio" e o utilizador autoriza, fica marcado
-// is_elogio + consentimento_publico (é o que alimenta a Aba de Elogios).
+// is_elogio + consentimento_publico (é o que alimenta a Aba de Elogios). Nesse
+// caso gravamos também o nome de time, para o elogio público o poder mostrar.
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
   const corpo = String(body.corpo ?? "").trim().slice(0, MAX_CORPO);
   const email = String(body.email ?? "").trim();
   const nome = String(body.nome ?? "").trim();
+  const nomeTime = String(body.nome_time ?? "").trim();
   const userId = body.user_id ? String(body.user_id) : null;
 
   if (!ASSUNTOS.includes(assunto)) {
@@ -60,6 +62,7 @@ export async function POST(req: NextRequest) {
   const { error } = await supabaseAdmin.from("mensagens").insert({
     user_id: userId,
     nome: nome || null,
+    nome_time: nomeTime || null,
     email: email || null,
     assunto,
     corpo,
