@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
   const { data: liga } = await supabaseAdmin
     .from("leagues")
-    .select("id, name, formato, copa_estado")
+    .select("*")
     .eq("id", league_id)
     .maybeSingle();
   if (!liga) return NextResponse.json({ ok: false, erro: "Liga não encontrada." }, { status: 404 });
@@ -69,7 +69,15 @@ export async function POST(req: Request) {
   }
 
   const nomeLiga = String(liga.name || "a tua liga");
-  const linkCopa = "/ligas";
+  // Link DIRETO para a copa: a página abre em /liga/[codigo]/chave. O apurar só
+  // tem o league_id (uuid), por isso buscamos o código da liga sem depender do
+  // nome exato da coluna (codigo / code / invite_code / slug). Se não houver,
+  // cai no /ligas de sempre (nunca fica pior do que estava).
+  const ligaRec = liga as Record<string, unknown>;
+  const codigoLiga = String(
+    ligaRec.codigo ?? ligaRec.code ?? ligaRec.invite_code ?? ligaRec.slug ?? ""
+  ).trim();
+  const linkCopa = codigoLiga ? `/liga/${codigoLiga}/chave` : "/ligas";
 
   // 1) Todos os confrontos da liga (inclui `metade`, necessária à repescagem).
   const { data: todos } = await supabaseAdmin
