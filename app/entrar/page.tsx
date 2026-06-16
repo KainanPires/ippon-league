@@ -26,6 +26,7 @@ export default function Entrar() {
   const [showPw, setShowPw] = useState(false);
   const [erro, setErro] = useState("");
   const [saving, setSaving] = useState(false);
+  const [recEnviado, setRecEnviado] = useState(false);
 
   async function entrar() {
     if (saving) return;
@@ -43,6 +44,7 @@ export default function Entrar() {
     }
 
     setErro("");
+    setRecEnviado(false);
     setSaving(true);
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
@@ -64,6 +66,34 @@ export default function Entrar() {
 
     // Volta ao sítio de onde a pessoa veio (ou /inicio por defeito).
     window.location.href = destinoVolta();
+  }
+
+  // Recuperar senha: envia um link por email que leva a /redefinir-senha.
+  async function recuperar() {
+    if (saving) return;
+    setRecEnviado(false);
+    if (!email.trim()) {
+      setErro("Escreve o teu email primeiro, para te enviarmos o link de recuperação.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErro("Esse email não parece válido.");
+      return;
+    }
+    if (!supabaseConfigured) {
+      setErro("A ligação ao servidor não está configurada. Tenta mais tarde.");
+      return;
+    }
+    setErro("");
+    setSaving(true);
+    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/redefinir-senha` : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+    setSaving(false);
+    if (error) {
+      setErro("Não foi possível enviar o link. Tenta novamente.");
+      return;
+    }
+    setRecEnviado(true);
   }
 
   function onEnter(e: { key: string }) {
@@ -113,12 +143,13 @@ export default function Entrar() {
           </div>
 
           <div style={{ textAlign: "right", margin: "8px 0 4px" }}>
-            <span style={{ fontSize: 12, color: "#7c8a82" }}>Esqueceste a senha?</span>
+            <button onClick={recuperar} disabled={saving} style={{ background: "transparent", border: "none", fontSize: 12, color: GOLD, cursor: saving ? "default" : "pointer", fontFamily: FB, padding: 0 }}>Esqueceste a senha?</button>
           </div>
 
+          {recEnviado && <div style={{ fontSize: 12, color: "#7fd1a3", margin: "4px 0 8px", lineHeight: 1.45 }}>Enviámos um link para <strong>{email.trim()}</strong>. Abre-o para definires uma nova senha.</div>}
           {erro && <div style={{ fontSize: 12, color: "#ef8d83", margin: "4px 0 8px" }}>{erro}</div>}
 
-          <button onClick={entrar} disabled={saving} style={{ width: "100%", marginTop: 8, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 14, borderRadius: 12, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>{saving ? "A entrar..." : "Entrar"}</button>
+          <button onClick={entrar} disabled={saving} style={{ width: "100%", marginTop: 8, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 14, borderRadius: 12, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>{saving ? "A processar..." : "Entrar"}</button>
         </div>
 
         <div style={{ textAlign: "center", fontSize: 13, color: "#93a39a", marginTop: 18 }}>
