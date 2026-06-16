@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { LinhaInstalarApp } from "@/components/InstalarApp";
+import { BotaoNotificacoes } from "@/components/NotificacoesPush";
 import { supabase } from "@/lib/supabase";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import { PRECO } from "@/lib/precos";
@@ -20,6 +21,7 @@ const INFO: { label: string; href?: string; soon?: boolean }[] = [
 ];
 
 type Conta = {
+  id: string;
   nome: string;
   email: string;
   telefone: string;
@@ -58,6 +60,7 @@ export default function Perfil() {
         try { nomeLocal = String(localStorage.getItem("ippon_name") || "").trim(); } catch {}
         const nomeFinal = (String(m.nome || "").trim() || nomeLocal || "Campeão");
         setConta({
+          id: u.id,
           nome: nomeFinal,
           email: String(u.email || "").trim(),
           telefone: String(m.telefone || "").trim(),
@@ -245,6 +248,15 @@ export default function Perfil() {
         )}
 
         {abertoDados && ready && conta && <AlterarSenha email={conta.email} />}
+
+        {ready && conta && (
+          <>
+            <SectionTitle>Notificações</SectionTitle>
+            <div style={{ marginBottom: 26 }}>
+              <BotaoNotificacoes userId={conta.id} />
+            </div>
+          </>
+        )}
 
         {abertoDados && ready && conta && (
           <>
