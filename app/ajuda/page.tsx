@@ -33,8 +33,6 @@ export default function AjudaPage() {
 
   const [assunto, setAssunto] = useState<string>("");
   const [corpo, setCorpo] = useState("");
-  const [nome, setNome] = useState("");
-  const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
 
   const [aEnviar, setAEnviar] = useState(false);
@@ -58,9 +56,9 @@ export default function AjudaPage() {
 
   async function enviar() {
     setErro("");
+    if (!uid) { setErro("Precisas de entrar na tua conta para enviar."); return; }
     if (!assunto) { setErro("Escolhe um assunto."); return; }
     if (corpo.trim().length < 5) { setErro("Escreve a tua mensagem."); return; }
-    if (!uid && !email.trim()) { setErro("Deixa um email para te podermos responder."); return; }
 
     setAEnviar(true);
     const nomeTime = (() => { try { return loadIdentity().name || ""; } catch { return ""; } })();
@@ -70,9 +68,9 @@ export default function AjudaPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: uid,
-          nome: uid ? (meta.nome ?? "") : nome,
+          nome: meta.nome ?? "",
           nome_time: nomeTime,
-          email: uid ? emailSessao : email,
+          email: emailSessao,
           assunto,
           corpo,
           faixa: meta.faixa ?? null,
@@ -109,11 +107,25 @@ export default function AjudaPage() {
             </p>
             <a href="/inicio" style={{ display: "inline-block", marginTop: 16, background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 13, padding: "10px 20px", borderRadius: 10, textDecoration: "none" }}>Voltar ao início</a>
           </div>
+        ) : !uid ? (
+          /* Sem conta: não se envia pela app. Convida a entrar, ou a escrever
+             diretamente do email da própria pessoa. */
+          <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: "22px 18px", textAlign: "center" }}>
+            <div style={{ fontSize: 30, marginBottom: 8 }}>🔒</div>
+            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>Entra para nos escrever</div>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 16px" }}>
+              Para nos escreveres aqui, entra na tua conta. Sem conta, podes na mesma escrever-nos diretamente para{" "}
+              <a href={`mailto:${EMAIL_CONTACTO}`} style={{ color: GOLD, textDecoration: "none", fontWeight: 700 }}>{EMAIL_CONTACTO}</a>.
+            </p>
+            <a href="/entrar?voltar=/ajuda" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 13, padding: "11px 22px", borderRadius: 10, textDecoration: "none" }}>Entrar / Criar conta</a>
+            <div style={{ marginTop: 12 }}>
+              <a href={`mailto:${EMAIL_CONTACTO}`} style={{ color: "#93a39a", fontSize: 12.5, textDecoration: "none" }}>ou escreve para {EMAIL_CONTACTO}</a>
+            </div>
+          </div>
         ) : (
           <>
             <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 14px" }}>
-              Dúvida, problema, sugestão ou só um elogio? Escreve-nos. Também podes enviar diretamente para{" "}
-              <a href={`mailto:${EMAIL_CONTACTO}`} style={{ color: GOLD, textDecoration: "none", fontWeight: 700 }}>{EMAIL_CONTACTO}</a>.
+              Dúvida, problema, sugestão ou só um elogio? Escreve-nos — respondemos pelo email da tua conta.
             </p>
 
             {/* Assunto */}
@@ -124,23 +136,12 @@ export default function AjudaPage() {
               ))}
             </div>
 
-            {/* Sem conta: nome (opcional) + email */}
-            {!uid && (
-              <>
-                <label style={{ display: "block", fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Nome (opcional)</label>
-                <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="O teu nome" style={inputStyle} />
-                <label style={{ display: "block", fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em", margin: "14px 0 7px" }}>Email</label>
-                <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="para te respondermos" type="email" style={inputStyle} />
-              </>
-            )}
-            {uid && (
-              <div style={{ fontSize: 12, color: "#7c8a82", marginBottom: 14 }}>
-                A enviar como <span style={{ color: "#cfd8d2" }}>{emailSessao || "a tua conta"}</span>.
-              </div>
-            )}
+            <div style={{ fontSize: 12, color: "#7c8a82", marginBottom: 14 }}>
+              A enviar como <span style={{ color: "#cfd8d2" }}>{emailSessao || "a tua conta"}</span>.
+            </div>
 
             {/* Mensagem */}
-            <label style={{ display: "block", fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em", margin: uid ? "0 0 7px" : "14px 0 7px" }}>Mensagem</label>
+            <label style={{ display: "block", fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 7px" }}>Mensagem</label>
             <textarea value={corpo} onChange={(e) => setCorpo(e.target.value)} placeholder="Conta-nos com algum detalhe…" rows={6} maxLength={4000} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, fontFamily: FB }} />
 
             {/* Consentimento — só para elogios */}
@@ -154,7 +155,7 @@ export default function AjudaPage() {
             {erro && <div style={{ fontSize: 12.5, color: "#ef8d83", marginTop: 12 }}>{erro}</div>}
 
             {(() => {
-              const podeEnviar = !!assunto && corpo.trim().length >= 5 && (!!uid || !!email.trim());
+              const podeEnviar = !!assunto && corpo.trim().length >= 5;
               const desativado = aEnviar || !podeEnviar;
               return (
                 <button onClick={enviar} disabled={desativado} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "13px", borderRadius: 12, cursor: desativado ? "default" : "pointer", opacity: desativado ? 0.45 : 1 }}>
