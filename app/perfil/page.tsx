@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+import { LinhaInstalarApp } from "@/components/InstalarApp";
 import { supabase } from "@/lib/supabase";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import { PRECO } from "@/lib/precos";
@@ -285,6 +286,7 @@ export default function Perfil() {
 
         <SectionTitle>Informações e políticas</SectionTitle>
         <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
+          <LinhaInstalarApp />
           {INFO.map((it, i) => {
             const inner = (
               <>
@@ -295,7 +297,7 @@ export default function Perfil() {
                 </span>
               </>
             );
-            const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderTop: i === 0 ? "none" : "1px solid #1a221d", textDecoration: "none", color: "#f1ede2" };
+            const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderTop: "1px solid #1a221d", textDecoration: "none", color: "#f1ede2" };
             return it.href
               ? <a key={it.label} href={it.href} style={rowStyle}>{inner}</a>
               : <div key={it.label} style={{ ...rowStyle, opacity: 0.85, cursor: "default" }}>{inner}</div>;
