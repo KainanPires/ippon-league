@@ -43,7 +43,7 @@ export default function Comecar() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Esse email não parece válido.";
     if (!form.senha) e.senha = "Cria uma senha.";
     else if (form.senha.length < 6) e.senha = "A senha precisa de pelo menos 6 caracteres.";
-    if (!form.contact.trim()) e.contact = "Deixa um contacto.";
+    // Telefone é opcional — sem validação.
     if (!form.belt) e.belt = "Escolhe a tua faixa.";
     if (!form.countryIso) e.countryIso = "Escolhe o teu país.";
     setErrors(e);
@@ -61,7 +61,7 @@ export default function Comecar() {
     setSaving(true);
     const country = COUNTRIES.find((c) => c.iso2 === form.countryIso);
     const dial = COUNTRIES.find((c) => c.iso2 === form.dialIso)?.dial ?? "";
-    const telefone = `${dial} ${form.contact.trim()}`.trim();
+    const telefone = form.contact.trim() ? `${dial} ${form.contact.trim()}`.trim() : "";
 
     const { data, error } = await supabase.auth.signUp({
       email: form.email.trim(),
@@ -91,17 +91,14 @@ export default function Comecar() {
       return;
     }
 
-    // Compatibilidade com telas que ainda leem o localStorage (substituído pelo Supabase a seguir).
     try {
       localStorage.setItem("ippon_onboarding", "pending");
       localStorage.setItem("ippon_name", form.name.trim().split(" ")[0] || "");
     } catch {}
 
     if (data.session) {
-      // Conta criada e sessão iniciada (confirmação de email desligada) → entra direto.
       window.location.href = "/inicio";
     } else {
-      // Confirmação de email ligada → conta criada, falta confirmar.
       setSaving(false);
       setConfirmSent(true);
     }
@@ -156,7 +153,7 @@ export default function Comecar() {
             </div>
           </Field>
 
-          <Field label="Contacto" error={errors.contact}>
+          <Field label="Contacto (opcional)" error={errors.contact}>
             <div style={{ display: "flex", gap: 8 }}>
               <CountrySelect value={form.dialIso} onChange={(iso) => update("dialIso", iso)} />
               <input style={inputStyle(!!errors.contact)} inputMode="tel" value={form.contact} onChange={(e) => update("contact", e.target.value)} placeholder="Número de telemóvel" />
