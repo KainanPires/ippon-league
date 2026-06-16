@@ -18,7 +18,7 @@ const FAIXAS: { nome: string; cor: string }[] = [
   { nome: "Verde", cor: "#3f9f5a" },
   { nome: "Roxa", cor: "#9b6cc9" },
   { nome: "Castanha", cor: "#a06a3a" },
-  { nome: "Preta", cor: GOLD },
+  { nome: "Preta", cor: "#141110" },
 ];
 
 const PONTOS: { acao: string; aplica: string; sofre: string }[] = [
@@ -140,13 +140,16 @@ export default function ComoJogar() {
           <p style={pStyle}>Começas na <strong>branca</strong>. A tua faixa reflete o teu desempenho face aos outros jogadores e muda o visual do jogo. Há 7 faixas:</p>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, margin: "14px 0" }}>
-            {FAIXAS.map((f) => (
-              <div key={f.nome} style={{ textAlign: "center" }}>
-                <div style={{ width: 48, height: 48, margin: "0 auto" }}><Mascot belt={f.cor} expression="feliz" /></div>
-                <div style={{ height: 5, background: f.cor, borderRadius: 3, margin: "3px 8px" }} />
-                <div style={{ fontSize: 10, color: "#93a39a" }}>{f.nome}</div>
-              </div>
-            ))}
+            {FAIXAS.map((f) => {
+              const ehPreta = f.nome === "Preta";
+              return (
+                <div key={f.nome} style={{ textAlign: "center" }}>
+                  <div style={{ width: 48, height: 48, margin: "0 auto" }}><Mascot belt={f.cor} expression="feliz" /></div>
+                  <div style={{ height: 5, background: f.cor, borderRadius: 3, margin: "3px 8px", border: ehPreta ? "1px solid #4a5550" : "none", boxSizing: "border-box" }} />
+                  <div style={{ fontSize: 10, color: "#93a39a" }}>{f.nome}</div>
+                </div>
+              );
+            })}
           </div>
 
           <div style={{ display: "flex", gap: 10 }}>
