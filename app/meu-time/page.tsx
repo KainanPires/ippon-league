@@ -149,6 +149,10 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   const [temResultados, setTemResultados] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null);
   const [modal, setModal] = useState<Athlete | null>(null);
+  // Partilha da equipa desta rodada (só quando o dojo é meu). A faixa mostrada no
+  // cartão é a minha atual; "Branca" enquanto não a carregamos (ou se não houver).
+  const [partilhar, setPartilhar] = useState(false);
+  const [minhaFaixa, setMinhaFaixa] = useState<string>("Branca");
 
   const foco = focoMercado();
   const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp;
@@ -174,7 +178,17 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
       if (!active) return;
       const sess = (data as { session: { user?: { id?: string } } | null }).session;
       if (!sess) { window.location.href = "/entrar"; return; }
-      setSouEu((sess.user?.id ?? "") === alvoUserId);
+      const meuId = sess.user?.id ?? "";
+      const euMesmo = meuId === alvoUserId;
+      setSouEu(euMesmo);
+      // Se o dojo é meu, vou buscar a minha faixa atual (para o cartão de partilha).
+      if (euMesmo && meuId) {
+        supabase.from("users").select("belt").eq("id", meuId).maybeSingle()
+          .then(({ data: row }) => {
+            const b = (row as { belt?: unknown } | null)?.belt;
+            if (active && typeof b === "string" && b.trim()) setMinhaFaixa(b.trim());
+          });
+      }
 
       const poolP = fetch(`/api/atletas?id=${idComp}`).then((r) => r.json()).catch(() => null);
       const eqP = fetch(`/api/equipa-na-rodada?user=${encodeURIComponent(alvoUserId)}&comp=${encodeURIComponent(idComp)}`).then((r) => r.json()).catch(() => null);
@@ -396,6 +410,15 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
                 ? (souEu ? "A tua equipa nesta rodada. Toca num atleta para ver como pontuou." : "Estás a ver o dojo de um rival. Toca num atleta para ver como pontuou.")
                 : "Pontos de cada atleta nesta competição. O capitão (CAP) conta a dobrar no total."}
             </p>
+
+            {/* Partilhar a minha equipa desta rodada. Só quando o dojo é meu —
+                partilhar a equipa de um rival como se fosse minha não faz sentido. */}
+            {souEu && itens.length > 0 && (
+              <button onClick={() => setPartilhar(true)} style={{ width: "100%", marginTop: 8, padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+                Partilhar a minha equipa
+              </button>
+            )}
           </>
         )}
       </div>
@@ -411,6 +434,16 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
           onCaptain={() => {}}
           onSell={() => {}}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {partilhar && (
+        <CartaoEquipa
+          identity={escudoAlvo || DEFAULT_IDENTITY}
+          faixa={minhaFaixa}
+          atletas={itens.map((i) => i.athlete || ({ id: i.id, name: i.nome, countryIso: i.pais, category: i.categoria } as Athlete))}
+          capitao={capitao}
+          onClose={() => setPartilhar(false)}
         />
       )}
     </main>
