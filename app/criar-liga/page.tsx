@@ -134,7 +134,7 @@ export default function CriarLiga() {
     }
   }
 
-  const inviteLink = created ? `https://ippon-league.vercel.app/liga/${created.invite_code}` : "";
+  const inviteLink = created ? `https://www.ipponleague.com/liga/${created.invite_code}` : "";
   function copy() {
     try { navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch {}
   }
@@ -269,7 +269,7 @@ export default function CriarLiga() {
             <textarea
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Regras, premiação e informações da liga — opcional. Ex.: O campeão do mês ganha o jantar. Vale tudo menos escalar lesionado! 🥋"
+              placeholder="Regras e informações da liga — opcional. Ex.: Vale tudo menos escalar lesionado! 🥋"
               maxLength={400}
               rows={4}
               style={{ ...inputStyle, marginBottom: 6, resize: "vertical", lineHeight: 1.5, fontFamily: FB }}
