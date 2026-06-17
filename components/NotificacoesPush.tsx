@@ -7,7 +7,7 @@
 //    tiver sido dispensado.
 
 import { useState, useEffect } from "react";
-import { suportaPush, estadoPush, ativarPush, desativarPush, notificacaoTesteLocal, type EstadoPush } from "@/lib/push";
+import { suportaPush, estadoPush, ativarPush, desativarPush, type EstadoPush } from "@/lib/push";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -98,10 +98,7 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
       </div>
 
       {estado === "concedido" ? (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => notificacaoTesteLocal()} style={btnSec}>Enviar teste</button>
-          <button onClick={desativar} disabled={aFazer} style={btnGhost}>Desativar</button>
-        </div>
+        <button onClick={desativar} disabled={aFazer} style={{ ...btnGhost, width: "100%" }}>Desativar notificações</button>
       ) : estado === "negado" ? (
         <div style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.5 }}>
           As notificações estão bloqueadas. Para ativar, vai às definições do navegador (ou do site) e permite notificações para a Ippon League.
@@ -161,10 +158,6 @@ export function LembreteNotificacoes({ userId }: { userId: string }) {
 const btnPri: React.CSSProperties = {
   background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 13.5, fontWeight: 700,
   textTransform: "uppercase", letterSpacing: "0.03em", padding: "11px 16px", borderRadius: 10, cursor: "pointer",
-};
-const btnSec: React.CSSProperties = {
-  background: "#1c3a2e", color: "#aee9c9", border: "none", fontFamily: FB, fontSize: 13, fontWeight: 700,
-  padding: "10px 14px", borderRadius: 10, cursor: "pointer", flex: 1,
 };
 const btnGhost: React.CSSProperties = {
   background: "transparent", color: "#93a39a", border: "1px solid #2a3a33", fontFamily: FB, fontSize: 13,
