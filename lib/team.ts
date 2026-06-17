@@ -395,6 +395,54 @@ export async function loadSavedCloudFor(idComp: string): Promise<TeamState | nul
   }
 }
 
+// ---------------------------------------------------------------------------
+// IDENTIDADE NA NUVEM (nome + escudo) — fonte de verdade ligada à CONTA.
+// ---------------------------------------------------------------------------
+// O nome/escudo é guardado na tabela `equipas` (pelo commitSavedCloudFor e pelo
+// atualizarIdentidadeCloud). Esta função LÊ-O de volta, para o ecrã poder
+// mostrar o nome certo vindo da conta — e não do localStorage, que se perde ao
+// limpar o browser ou ao mudar de endereço/aparelho. Procura primeiro na linha
+// da competição pedida; se não houver, aceita a identidade de QUALQUER equipa da
+// conta (o nome/escudo é o mesmo em todas as linhas). Devolve null se não houver
+// nada — nesse caso o chamador mantém o que já tem (default/local).
+export type IdentidadeCloud = { name?: string; escudo?: Record<string, unknown> | null };
+export async function loadIdentityCloudFor(idComp: string): Promise<IdentidadeCloud | null> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id as string | undefined;
+    if (!userId) return null;
+
+    // 1) A linha desta competição (a mais relevante).
+    const r1 = await supabase
+      .from("equipas")
+      .select("nome, escudo")
+      .eq("user_id", userId)
+      .eq("id_competicao", idComp)
+      .maybeSingle();
+    let nome = (r1.data as { nome?: unknown } | null)?.nome;
+    let escudo = (r1.data as { escudo?: unknown } | null)?.escudo;
+
+    // 2) Se esta linha não trouxe identidade, aceita a de qualquer equipa da conta.
+    if (!nome && !escudo) {
+      const r2 = await supabase
+        .from("equipas")
+        .select("nome, escudo")
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+      nome = (r2.data as { nome?: unknown } | null)?.nome;
+      escudo = (r2.data as { escudo?: unknown } | null)?.escudo;
+    }
+
+    const out: IdentidadeCloud = {};
+    if (typeof nome === "string" && nome.trim()) out.name = nome.trim();
+    if (escudo && typeof escudo === "object") out.escudo = escudo as Record<string, unknown>;
+    return (out.name || out.escudo) ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---- Cloud antigas (compatibilidade — assumem a competição atual) ----------
 // Mantidas para as páginas ainda não migradas não partirem. Internamente já não
 // devem ser a via principal; preferir as versões "...For".
