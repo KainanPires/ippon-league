@@ -14,21 +14,27 @@ const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
 // Reúne o que o aparelho reporta, para diagnosticar quando "não suporta".
-function diagnostico(): { texto: string; standalone: boolean; ios: string } {
-  if (typeof window === "undefined") return { texto: "", standalone: false, ios: "" };
+function diagnostico(): { texto: string; standalone: boolean; ios: string; sw: boolean; pm: boolean; nt: boolean } {
+  if (typeof window === "undefined") return { texto: "", standalone: false, ios: "", sw: false, pm: false, nt: false };
   const ua = navigator.userAgent || "";
   const m = ua.match(/OS (\d+)[._](\d+)/);
   const ios = m ? `${m[1]}.${m[2]}` : "";
   const standalone = !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || (navigator as unknown as { standalone?: boolean }).standalone === true;
+  const sw = "serviceWorker" in navigator;
+  const pm = "PushManager" in window;
+  const nt = "Notification" in window;
   let texto = "";
   if (!standalone) {
     texto = "Estás a abrir pelo navegador. No iPhone, as notificações só funcionam dentro da app: abre pelo ícone no ecrã principal.";
   } else if (ios && parseFloat(ios) < 16.4) {
     texto = `O iOS deste iPhone (${ios}) é anterior ao 16.4. A Apple só permite notificações a partir do 16.4 — atualiza em Definições → Geral → Atualização de Software.`;
+  } else if (!sw || !pm || !nt) {
+    const faltam = [!sw ? "Service Worker" : null, !pm ? "PushManager" : null, !nt ? "Notification" : null].filter(Boolean).join(", ");
+    texto = `A app está aberta, mas falta(m): ${faltam}. Tira um print desta caixa para resolvermos.`;
   } else {
-    texto = "A app está aberta corretamente, mas o aparelho não disponibiliza notificações. Confirma que o iOS está atualizado.";
+    texto = "A app está aberta corretamente. Tira um print desta caixa para resolvermos.";
   }
-  return { texto, standalone, ios };
+  return { texto, standalone, ios, sw, pm, nt };
 }
 
 function IconeSino({ cor = GOLD }: { cor?: string }) {
@@ -69,8 +75,11 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
           {d.texto}
         </div>
         <div style={{ fontSize: 11, color: "#5f6f67", lineHeight: 1.6, borderTop: "1px solid #1a221d", paddingTop: 8 }}>
-          Diagnóstico: aberta como app: <strong style={{ color: d.standalone ? "#7fd1a3" : "#ef8d83" }}>{d.standalone ? "sim" : "não"}</strong>
+          Diagnóstico: app: <strong style={{ color: d.standalone ? "#7fd1a3" : "#ef8d83" }}>{d.standalone ? "sim" : "não"}</strong>
           {d.ios ? <> · iOS: <strong style={{ color: parseFloat(d.ios) >= 16.4 ? "#7fd1a3" : "#ef8d83" }}>{d.ios}</strong></> : null}
+          {" · "}SW: <strong style={{ color: d.sw ? "#7fd1a3" : "#ef8d83" }}>{d.sw ? "sim" : "não"}</strong>
+          {" · "}Push: <strong style={{ color: d.pm ? "#7fd1a3" : "#ef8d83" }}>{d.pm ? "sim" : "não"}</strong>
+          {" · "}Notif: <strong style={{ color: d.nt ? "#7fd1a3" : "#ef8d83" }}>{d.nt ? "sim" : "não"}</strong>
         </div>
       </div>
     );
