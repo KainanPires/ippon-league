@@ -7,7 +7,7 @@ import { temSessao } from "@/lib/auth";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-const APP_URL = "https://ippon-league.vercel.app";
+const APP_URL = "https://www.ipponleague.com/inicio";
 
 export default function Sobre() {
   const [logado, setLogado] = useState(false);
