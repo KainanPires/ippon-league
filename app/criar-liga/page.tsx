@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Escudo, SymbolGlyph, SHAPES, PATTERNS, LEAGUE_SYMBOLS, COLORS, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { DEFAULT_LEAGUE_SHIELD, type LeagueFormat, type LeaguePrivacy } from "@/lib/leagues";
 import { supabase } from "@/lib/supabase";
-import { focoMercado, proximaDepoisDe, type SemanaCalendario } from "@/lib/calendario";
+import { focoMercado, proximaDepoisDe, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -22,6 +22,59 @@ const COLOR_SLOTS: { key: keyof Identity; label: string }[] = [
 ];
 
 const rnd = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+// "AAAA/MM/DD" (formato do calendário) -> Date local. Devolve null se inválido.
+function dataDe(s: string): Date | null {
+  const p = (s || "").split("/");
+  if (p.length !== 3) return null;
+  const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Competições REAIS (sem clássicos), ordenadas por data, a partir de HOJE e até
+// 1 ANO depois. É a "janela" de onde se escolhe o início e o fim por competição.
+// NÃO uso proximaDepoisDe em ciclo porque essa função "dá a volta" ao calendário
+// (repetia competições do início do ano). Aqui filtro por data, sem repetições.
+function janelaCompeticoes(): SemanaCalendario[] {
+  const hoje = new Date();
+  const limite = new Date(hoje.getFullYear() + 1, hoje.getMonth(), hoje.getDate());
+  return CALENDARIO_2026
+    .filter((s) => !s.classico && s.de)
+    .map((s) => ({ s, d: dataDe(s.de) }))
+    .filter((x): x is { s: SemanaCalendario; d: Date } => x.d !== null && x.d >= startOfDay(hoje) && x.d <= limite)
+    .sort((a, b) => a.d.getTime() - b.d.getTime())
+    .map((x) => x.s);
+}
+
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+// Lista de meses possíveis para o "fim por mês": do mês a seguir ao mês de início
+// (ou ao mês atual, se ainda não há início) até, no máximo, o mesmo mês de hoje no
+// ANO SEGUINTE (teto de 1 ano). Devolve { valor: "AAAA-MM", rotulo: "Mês de AAAA" }.
+function mesesDeFim(dataInicio: Date | null): { valor: string; rotulo: string }[] {
+  const hoje = new Date();
+  const base = dataInicio || hoje;
+  // começa no mês a seguir ao início
+  let ano = base.getFullYear();
+  let mes = base.getMonth() + 1; // 0-based +1 = mês seguinte (ainda 0-based no fim)
+  if (mes > 11) { mes = 0; ano += 1; }
+  const tetoAno = hoje.getFullYear() + 1;
+  const tetoMes = hoje.getMonth(); // mesmo mês de hoje, ano seguinte
+  const out: { valor: string; rotulo: string }[] = [];
+  let guardas = 0;
+  while (guardas < 24) {
+    if (ano > tetoAno || (ano === tetoAno && mes > tetoMes)) break;
+    out.push({ valor: `${ano}-${String(mes + 1).padStart(2, "0")}`, rotulo: `${MESES_PT[mes]} de ${ano}` });
+    mes += 1;
+    if (mes > 11) { mes = 0; ano += 1; }
+    guardas += 1;
+  }
+  return out;
+}
 
 interface LigaCriada {
   id: string;
@@ -47,6 +100,13 @@ export default function CriarLiga() {
     return lista;
   })();
   const [copaCompInicial, setCopaCompInicial] = useState<string>(proximasComps[0]?.idCompeticao || "");
+  // --- Ligas de PONTOS CORRIDOS: início e fim escolhidos pelo dono ---
+  // A janela (a partir de hoje, até 1 ano) é fixa; calcula-se uma vez.
+  const janela: SemanaCalendario[] = (() => janelaCompeticoes())();
+  const [ligaCompInicial, setLigaCompInicial] = useState<string>(janela[0]?.idCompeticao || "");
+  const [fimTipo, setFimTipo] = useState<"competicao" | "mes">("competicao");
+  const [fimComp, setFimComp] = useState<string>("");   // id da competição de fim
+  const [fimMes, setFimMes] = useState<string>("");      // "AAAA-MM"
   const [privacy, setPrivacy] = useState<LeaguePrivacy>("fechada");
   const [activeColor, setActiveColor] = useState<keyof Identity>("bg1");
   const [created, setCreated] = useState<LigaCriada | null>(null);
@@ -93,7 +153,32 @@ export default function CriarLiga() {
     setCfg((p) => ({ ...p, shape: rnd(SHAPES), pattern: rnd(PATTERNS).id, symbol: rnd(LEAGUE_SYMBOLS).id, bg1: rnd(COLORS), bg2: rnd(COLORS), stamp1: rnd(COLORS), stamp2: rnd(COLORS), border: rnd(COLORS) }));
   }
 
-  const canCreate = name.trim().length >= 2 && !a_criar;
+  // --- Derivados das escolhas (ligas de pontos corridos) ---
+  const compInicialObj = janela.find((c) => c.idCompeticao === ligaCompInicial) || null;
+  const dataInicio = compInicialObj ? dataDe(compInicialObj.de) : null;
+  // Competições de fim possíveis: as da janela que começam DEPOIS do início.
+  const compsFim = janela.filter((c) => {
+    if (!dataInicio) return false;
+    const d = dataDe(c.de);
+    return d != null && d > dataInicio && c.idCompeticao !== ligaCompInicial;
+  });
+  const mesesFim = mesesDeFim(dataInicio);
+  // Texto informativo (pré-visualização do que será mostrado a quem entra).
+  const compFimObj = compsFim.find((c) => c.idCompeticao === fimComp) || null;
+  const mesFimObj = mesesFim.find((m) => m.valor === fimMes) || null;
+  const informativo = (() => {
+    if (!compInicialObj) return "";
+    const ini = compInicialObj.nome;
+    if (fimTipo === "competicao" && compFimObj) return `Esta liga vai de ${ini} até ${compFimObj.nome}.`;
+    if (fimTipo === "mes" && mesFimObj) return `Esta liga começa em ${ini} e termina em ${mesFimObj.rotulo}.`;
+    return "";
+  })();
+  // O fim está escolhido e válido?
+  const fimValido = fimTipo === "competicao" ? !!compFimObj : !!mesFimObj;
+  // Liga de pontos corridos exige início + fim; copa usa a sua própria validação.
+  const pontosOk = format !== "pontos" || (!!compInicialObj && fimValido);
+
+  const canCreate = name.trim().length >= 2 && pontosOk && !a_criar;
 
   async function criar() {
     if (!canCreate) return;
@@ -118,6 +203,9 @@ export default function CriarLiga() {
           privacidade: privacy,
           escudo: { ...cfg, name: name.trim() },
           copa_competicao_inicial: format === "copa" ? copaCompInicial : null,
+          liga_competicao_inicial: format === "pontos" ? ligaCompInicial : null,
+          fim_tipo: format === "pontos" ? fimTipo : null,
+          fim_valor: format === "pontos" ? (fimTipo === "competicao" ? fimComp : fimMes) : null,
         }),
       });
       const j = await res.json();
@@ -265,6 +353,81 @@ export default function CriarLiga() {
               </>
             )}
 
+            {format === "pontos" && (
+              <>
+                <Label>Competição de arranque</Label>
+                <p style={{ fontSize: 11.5, color: "#7c8a82", margin: "-2px 0 9px", lineHeight: 1.5 }}>
+                  A liga começa a contar pontos nesta competição. Esta escolha fica fixa quando abrires as inscrições.
+                </p>
+                {janela.length === 0 ? (
+                  <div style={{ background: "#2a1a18", border: "1px solid #5a2a24", color: "#ef8d83", fontSize: 12.5, padding: "10px 12px", borderRadius: 10, marginBottom: 22 }}>
+                    Não há competições disponíveis no calendário neste momento. Tenta mais tarde.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 22 }}>
+                    {janela.slice(0, 12).map((c) => (
+                      <button key={c.idCompeticao} type="button" onClick={() => { setLigaCompInicial(c.idCompeticao); setFimComp(""); setFimMes(""); }} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", background: ligaCompInicial === c.idCompeticao ? "#16201b" : "#121815", border: `1.5px solid ${ligaCompInicial === c.idCompeticao ? GOLD : "#243029"}`, borderRadius: 12, padding: "11px 13px", cursor: "pointer", color: "#f1ede2" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.nome}</div>
+                          <div style={{ fontSize: 11, color: "#93a39a", marginTop: 1 }}>{c.nivel} · {c.de.replace(/\//g, "-")}</div>
+                        </div>
+                        <div style={{ flexShrink: 0, width: 18, height: 18, borderRadius: "50%", border: `2px solid ${ligaCompInicial === c.idCompeticao ? GOLD : "#3a4a42"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {ligaCompInicial === c.idCompeticao && <div style={{ width: 8, height: 8, borderRadius: "50%", background: GOLD }} />}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <Label>Fim da liga</Label>
+                <p style={{ fontSize: 11.5, color: "#7c8a82", margin: "-2px 0 9px", lineHeight: 1.5 }}>
+                  A liga dura no máximo 1 ano. Escolhe terminar numa competição, ou num mês (útil quando o calendário ainda não chega lá).
+                </p>
+                {/* Abas: por competição | por mês */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                  <button type="button" onClick={() => setFimTipo("competicao")} style={{ flex: 1, background: fimTipo === "competicao" ? "#16201b" : "#121815", border: `1.5px solid ${fimTipo === "competicao" ? GOLD : "#243029"}`, borderRadius: 10, padding: "9px 8px", cursor: "pointer", color: fimTipo === "competicao" ? "#f1ede2" : "#93a39a", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>Por competição</button>
+                  <button type="button" onClick={() => setFimTipo("mes")} style={{ flex: 1, background: fimTipo === "mes" ? "#16201b" : "#121815", border: `1.5px solid ${fimTipo === "mes" ? GOLD : "#243029"}`, borderRadius: 10, padding: "9px 8px", cursor: "pointer", color: fimTipo === "mes" ? "#f1ede2" : "#93a39a", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>Por mês</button>
+                </div>
+
+                {fimTipo === "competicao" ? (
+                  compsFim.length === 0 ? (
+                    <div style={{ background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontSize: 12.5, padding: "10px 12px", borderRadius: 10, marginBottom: 22, lineHeight: 1.45 }}>
+                      Não há competições no calendário depois do arranque (dentro de 1 ano). Escolhe o fim <strong>por mês</strong>.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 22 }}>
+                      {compsFim.slice(0, 16).map((c) => (
+                        <button key={c.idCompeticao} type="button" onClick={() => setFimComp(c.idCompeticao)} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", textAlign: "left", background: fimComp === c.idCompeticao ? "#16201b" : "#121815", border: `1.5px solid ${fimComp === c.idCompeticao ? GOLD : "#243029"}`, borderRadius: 12, padding: "11px 13px", cursor: "pointer", color: "#f1ede2" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.nome}</div>
+                            <div style={{ fontSize: 11, color: "#93a39a", marginTop: 1 }}>{c.nivel} · {c.de.replace(/\//g, "-")}</div>
+                          </div>
+                          <div style={{ flexShrink: 0, width: 18, height: 18, borderRadius: "50%", border: `2px solid ${fimComp === c.idCompeticao ? GOLD : "#3a4a42"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {fimComp === c.idCompeticao && <div style={{ width: 8, height: 8, borderRadius: "50%", background: GOLD }} />}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  <select value={fimMes} onChange={(e) => setFimMes(e.target.value)} aria-label="Mês de fim" style={{ ...inputStyle, marginBottom: 22, cursor: "pointer", color: fimMes ? "#f1ede2" : "#93a39a" }}>
+                    <option value="">Escolhe o mês de fim…</option>
+                    {mesesFim.map((m) => (
+                      <option key={m.valor} value={m.valor}>{m.rotulo}</option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Pré-visualização do informativo que quem entra vai ver. */}
+                {informativo && (
+                  <div style={{ background: "#121815", border: "1px solid #2a4d3e", borderRadius: 12, padding: "11px 13px", marginBottom: 22, display: "flex", gap: 9, alignItems: "flex-start" }}>
+                    <span aria-hidden="true" style={{ fontSize: 15, flexShrink: 0 }}>📅</span>
+                    <span style={{ fontSize: 12.5, color: "#aee9c9", lineHeight: 1.45 }}>{informativo}</span>
+                  </div>
+                )}
+              </>
+            )}
+
             <Label>Descrição da liga</Label>
             <textarea
               value={descricao}
@@ -292,7 +455,17 @@ export default function CriarLiga() {
             )}
 
             <button onClick={criar} disabled={!canCreate} style={{ width: "100%", background: canCreate ? GOLD : "#23291f", color: canCreate ? "#1b211e" : "#5f6f67", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 15, borderRadius: 12, fontSize: 16, cursor: canCreate ? "pointer" : "default" }}>{a_criar ? "A criar…" : "Criar liga"}</button>
-            {!canCreate && !a_criar && <div style={{ textAlign: "center", fontSize: 11, color: "#7c8a82", marginTop: 8 }}>Dá um nome à tua liga para continuar.</div>}
+            {!canCreate && !a_criar && (
+              <div style={{ textAlign: "center", fontSize: 11, color: "#7c8a82", marginTop: 8 }}>
+                {name.trim().length < 2
+                  ? "Dá um nome à tua liga para continuar."
+                  : format === "pontos" && !compInicialObj
+                  ? "Escolhe a competição de arranque."
+                  : format === "pontos" && !fimValido
+                  ? "Escolhe quando a liga termina."
+                  : "Dá um nome à tua liga para continuar."}
+              </div>
+            )}
           </>
         ) : (
           created && (
