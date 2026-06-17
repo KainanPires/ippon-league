@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { focoMercado } from "@/lib/calendario";
+import { competicaoPorId } from "@/lib/copa";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -47,6 +48,10 @@ interface LigaInfo {
   copa_estado?: string | null;
   copa_fecho_inscricao?: string | null;
   copa_competicao_inicial?: string | null;
+  liga_competicao_inicial?: string | null;
+  fim_tipo?: string | null;
+  fim_valor?: string | null;
+  estado?: string | null;
 }
 interface Pedido {
   request_id: string;
@@ -68,6 +73,37 @@ function nomePrivacidade(p: string): string {
 // é que mostra a sala de espera e o convite.
 function copaTemChave(estado: string | null | undefined): boolean {
   return estado === "sorteada" || estado === "a_decorrer" || estado === "terminada";
+}
+
+const MESES_PT_INFO = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+// Frase informativa da ÉPOCA de uma liga de pontos corridos, gerada por nós a
+// partir do início + fim escolhidos pelo dono. À parte da descrição livre dele.
+// Devolve "" se a liga não tem janela definida (ligas antigas) — aí não mostra.
+function infoEpoca(liga: { liga_competicao_inicial?: string | null; fim_tipo?: string | null; fim_valor?: string | null; estado?: string | null }): string {
+  const compIni = competicaoPorId(String(liga.liga_competicao_inicial || ""));
+  if (!compIni) return "";
+  const terminada = String(liga.estado || "") === "terminada";
+  const prefixo = terminada ? "Esta liga decorreu" : "Esta liga vai";
+
+  if (liga.fim_tipo === "competicao") {
+    const compFim = competicaoPorId(String(liga.fim_valor || ""));
+    if (!compFim) return "";
+    return terminada
+      ? `Esta liga decorreu de ${compIni.nome} até ${compFim.nome}.`
+      : `${prefixo} de ${compIni.nome} até ${compFim.nome}.`;
+  }
+  if (liga.fim_tipo === "mes") {
+    const m = /^(\d{4})-(\d{2})$/.exec(String(liga.fim_valor || ""));
+    if (!m) return "";
+    const ano = Number(m[1]);
+    const mesNome = MESES_PT_INFO[Number(m[2]) - 1] || "";
+    if (!mesNome) return "";
+    return terminada
+      ? `Esta liga começou em ${compIni.nome} e terminou em ${mesNome} de ${ano}.`
+      : `Esta liga começa em ${compIni.nome} e termina em ${mesNome} de ${ano}.`;
+  }
+  return "";
 }
 
 export default function PaginaLiga() {
@@ -408,6 +444,14 @@ export default function PaginaLiga() {
 
             {liga.formato === "copa" && (
               <CartaoCopa estado={copaEstado || liga.copa_estado || "inscricao"} fecho={liga.copa_fecho_inscricao || null} inscritos={membros} meuId={meuId} codigo={codigo} />
+            )}
+
+            {/* Informativo automático da época (só ligas de pontos corridos com janela). */}
+            {liga.formato !== "copa" && infoEpoca(liga) && (
+              <div style={{ background: "#0f1411", border: "1px solid #2a4d3e", borderRadius: 12, padding: "11px 13px", marginBottom: 14, display: "flex", gap: 9, alignItems: "flex-start" }}>
+                <span aria-hidden="true" style={{ fontSize: 15, flexShrink: 0 }}>📅</span>
+                <span style={{ fontSize: 12.5, color: "#aee9c9", lineHeight: 1.45 }}>{infoEpoca(liga)}</span>
+              </div>
             )}
 
             {liga.descricao && (
