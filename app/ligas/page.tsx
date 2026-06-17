@@ -28,6 +28,15 @@ interface MinhaLiga {
   invite_code: string;
   membros: number;
   sou_dono: boolean;
+  estado?: string | null;
+  copa_estado?: string | null;
+}
+
+// Uma liga/copa está terminada? Pontos corridos: estado='terminada'.
+// Copa: copa_estado='terminada'. As restantes contam como ativas.
+function ligaTerminada(l: MinhaLiga): boolean {
+  if (l.formato === "copa") return l.copa_estado === "terminada";
+  return l.estado === "terminada";
 }
 
 interface LigaMercado {
@@ -204,9 +213,14 @@ export default function Ligas() {
     }
   }
 
+  // Separa as minhas ligas em ativas (lista principal) e terminadas (aba Resultados).
+  const ativas = mine.filter((l) => !ligaTerminada(l));
+  const terminadas = mine.filter((l) => ligaTerminada(l));
+
   // Contagens para os avisos de limite (só ligas de amigos; mine já é só amigos).
-  const nCriadas = mine.filter((l) => l.sou_dono).length;
-  const nParticipa = mine.length;
+  // Conta SÓ as ativas — as terminadas já não ocupam lugar prático.
+  const nCriadas = ativas.filter((l) => l.sou_dono).length;
+  const nParticipa = ativas.length;
   const limCriar = souPro ? LIM_CRIAR_PRO : LIM_CRIAR_FREE;
   const limPart = souPro ? LIM_PART_PRO : LIM_PART_FREE;
   const noLimiteCriar = nCriadas >= limCriar;
@@ -275,9 +289,9 @@ export default function Ligas() {
             </div>
             {aCarregar ? (
               <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
-            ) : mine.length > 0 ? (
+            ) : ativas.length > 0 ? (
               <>
-                {mine.map((l) => (
+                {ativas.map((l) => (
                   <a key={l.id} href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}>
                     <LeagueRow cfg={l.escudo || DEFAULT_IDENTITY} name={l.name} sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`} right={<ActionBtn kind="ver">Abrir</ActionBtn>} />
                   </a>
@@ -374,11 +388,34 @@ export default function Ligas() {
         {tab === "calendario" && <CalendarioConteudo />}
 
         {tab === "resultados" && (
-          <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82" }}>
-            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#cfd8d2", marginBottom: 6 }}>Resultados</div>
-            <div style={{ fontSize: 13, lineHeight: 1.5 }}>As classificações de cada rodada aparecem aqui depois de cada competição.</div>
-            <div style={{ marginTop: 12, fontSize: 11, color: "#5f6f67", border: "1px solid #2a3a33", borderRadius: 999, padding: "4px 12px", display: "inline-block" }}>Em breve</div>
-          </div>
+          <>
+            <Section>Ligas e copas terminadas</Section>
+            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>As tuas ligas e copas que já acabaram. Abre cada uma para veres a classificação final e o pódio.</p>
+            {aCarregar ? (
+              <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
+            ) : terminadas.length === 0 ? (
+              <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
+                <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Ainda não tens ligas ou copas terminadas.<br />Quando uma acabar, aparece aqui — com a classificação final guardada.</div>
+              </div>
+            ) : (
+              <>
+                {terminadas.map((l) => {
+                  const ehCopa = l.formato === "copa";
+                  const href = ehCopa ? `/liga/${l.invite_code}/chave` : `/liga/${l.invite_code}`;
+                  return (
+                    <a key={l.id} href={href} style={{ textDecoration: "none" }}>
+                      <LeagueRow
+                        cfg={l.escudo || DEFAULT_IDENTITY}
+                        name={l.name}
+                        sub={`${ehCopa ? "Copa Ippon" : "Pontos corridos"} · terminada · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`}
+                        right={<ActionBtn kind="ver">{ehCopa ? "Ver pódio" : "Ver final"}</ActionBtn>}
+                      />
+                    </a>
+                  );
+                })}
+              </>
+            )}
+          </>
         )}
       </div>
 
