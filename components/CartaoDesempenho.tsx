@@ -189,9 +189,9 @@ export function CartaoDesempenho({
     setBusy(false);
     if (!blob) return;
     const file = new File([blob], "ippon-desempenho.png", { type: "image/png" });
-    // Link para a app: a raiz encaminha conforme a sessão (com conta -> início;
-    // sem conta -> entrada/cadastro).
-    const link = "https://ippon-league.vercel.app";
+    // Link para a app: aponta para /inicio para que quem ainda não tem conta veja
+    // primeiro a página inicial (e não bata de frente no criar conta).
+    const link = "https://www.ipponleague.com/inicio";
     const texto = `Fiz ${sinal(dados.pontuacaoTotal)} pts em ${dados.nomeCompeticao} na Ippon League! Joga também: ${link}`;
     const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean; share?: (d: unknown) => Promise<void> };
     try {
@@ -308,7 +308,7 @@ function DesempenhoNode({ innerRef, vars, pro, belt, beltName, accent, identity,
           {pro ? (
             <>
               <div className="dfoot-main pro">JOGA COM VANTAGEM.<br />SÊ IPPON PRO.</div>
-              <div className="dfoot-link">ippon-league.vercel.app</div>
+              <div className="dfoot-link">www.ipponleague.com</div>
             </>
           ) : (
             <>
