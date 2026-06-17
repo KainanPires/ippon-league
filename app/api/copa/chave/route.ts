@@ -76,6 +76,12 @@ export async function GET(req: Request) {
   const tamanho = nInscritos >= 2 ? tamanhoChave(nInscritos) : 0;
   const totalRondas = tamanho >= 2 ? numeroDeRondas(tamanho) : 0;
 
+  // Nº de PARTICIPANTES que REALMENTE jogaram (escalaram em alguma ronda da copa).
+  // Para o certificado anti-boicote: "Campeão entre N participantes". Conta
+  // jogadores DISTINTOS com equipa guardada (tabela equipas) em qualquer das
+  // competições desta copa. Quem entrou mas nunca escalou NÃO conta.
+  const nParticiparam = await contarParticipantes(lista);
+
   // Pódio (só quando terminada).
   let podio: { campeao?: string; vice?: string; terceiro?: string } = {};
   if (liga.copa_estado === "terminada") {
@@ -93,9 +99,26 @@ export async function GET(req: Request) {
     confrontos: lista,
     identidades,        // { user_id: { nome_time, escudo } }
     nInscritos,
+    nParticiparam,
     totalRondas,
     podio,
   });
+}
+
+// Conta jogadores DISTINTOS que escalaram (têm equipa na tabela equipas) em
+// alguma das competições desta copa. As competições são as dos confrontos.
+async function contarParticipantes(
+  confrontos: { id_competicao: string }[]
+): Promise<number> {
+  if (!supabaseAdmin) return 0;
+  const comps = Array.from(new Set(confrontos.map((c) => c.id_competicao).filter(Boolean)));
+  if (comps.length === 0) return 0;
+  const { data: eqs } = await supabaseAdmin
+    .from("equipas")
+    .select("user_id")
+    .in("id_competicao", comps);
+  const distintos = new Set<string>((eqs || []).map((e) => String(e.user_id)));
+  return distintos.size;
 }
 
 // Lê o nome do time + escudo de cada jogador. Tenta a equipa na competição
