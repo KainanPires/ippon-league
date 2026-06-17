@@ -100,6 +100,22 @@ const GRUPOS: Grupo[] = [
         ),
       },
       {
+        p: "Como ganho Judocoins e como evito perdê-los?",
+        r: (
+          <>
+            <P>Atenção: os <B>pontos</B> (a tua pontuação na rodada) são uma coisa; os <B>Judocoins</B> (o teu património) são outra. Começas com <B>100 JC</B> e esse valor sobe ou desce conforme os atletas que escalaste <B>valorizam ou desvalorizam</B>.</P>
+            <P>Um atleta <B>valoriza</B> quando supera a expectativa de desempenho dele, e <B>desvaloriza</B> quando fica abaixo. Se escalaste um atleta que valorizou, o teu património aumenta; se desvalorizou, diminui.</P>
+            <P>Para ganhar JC e evitar perder:</P>
+            <Passos>
+              <Li>Procura atletas <B>subvalorizados</B> ou em boa fase, que podem render acima do esperado.</Li>
+              <Li>Cuidado com atletas <B>muito caros</B>: já é esperado muito deles, por isso é mais fácil desvalorizarem.</Li>
+              <Li>Equilibra a equipa — não gastes tudo em nomes caros.</Li>
+            </Passos>
+            <P>Para o mercado não disparar, aplicamos sempre <B>metade</B> da valorização calculada — funciona como um travão que mantém os preços estáveis.</P>
+          </>
+        ),
+      },
+      {
         p: "O que são as faixas e como subo ou desço?",
         r: (
           <>
@@ -119,6 +135,29 @@ const GRUPOS: Grupo[] = [
               <Li>Acompanhamento mais completo no dia da competição.</Li>
             </Passos>
             <P>Vês os detalhes em <B>Perfil → Ippon Pro</B>.</P>
+          </>
+        ),
+      },
+    ],
+  },
+  {
+    titulo: "Clássicos",
+    itens: [
+      {
+        p: "O que são os Clássicos?",
+        r: (
+          <>
+            <P>Os <B>Clássicos</B> são competições marcantes do passado do judô (de anos anteriores) que trazemos de volta para jogar. Aparecem sempre <B>identificados como “Clássico”</B> no nome, para nunca os confundires com uma competição atual.</P>
+            <P>Servem para que haja <B>sempre uma rodada para jogar</B>, mesmo nas semanas em que não há nenhuma competição internacional no calendário (como nas pausas de inverno e de verão).</P>
+          </>
+        ),
+      },
+      {
+        p: "Como funcionam os Clássicos?",
+        r: (
+          <>
+            <P>Jogas exatamente como numa competição normal: montas a tua equipa com os <B>8 atletas</B>, escolhes o <B>capitão</B> e pontuas pelas <B>ações</B> dos atletas nessa competição (ippon, waza-ari, etc.).</P>
+            <P>A diferença é só a origem: em vez de uma competição a decorrer agora, é uma competição que já aconteceu e que reativámos. As regras de pontuação, valorização e faixas são as mesmas de sempre.</P>
           </>
         ),
       },
