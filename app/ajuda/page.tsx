@@ -109,8 +109,10 @@ export default function AjudaPage() {
 
   async function enviar() {
     setErro("");
-    if (!assunto) { setErro("Escolhe um assunto."); return; }
-    if (corpo.trim().length < 15) { setErro("Descreve o problema com algum detalhe (pelo menos uma frase)."); return; }
+    if (!assunto) { setErro("Escolhe primeiro um assunto, no topo."); return; }
+    const n = corpo.trim().length;
+    if (n === 0) { setErro("Escreve a tua mensagem com o contexto do problema (mínimo 15 caracteres)."); return; }
+    if (n < 15) { setErro(`A mensagem está muito curta (${n}/15). Acrescenta mais contexto: o que aconteceu, onde, e o que esperavas.`); return; }
     // Sem conta: guarda o que escreveu e pede para criar conta (não perde o texto).
     if (!uid) {
       try { localStorage.setItem("ippon_ajuda_rascunho", JSON.stringify({ assunto, corpo, consent })); } catch {}
@@ -193,7 +195,10 @@ export default function AjudaPage() {
             {/* Mensagem */}
             <label style={{ display: "block", fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 7px" }}>Mensagem <span style={{ color: GOLD }}>*</span></label>
             <textarea value={corpo} onChange={(e) => setCorpo(e.target.value)} placeholder="Descreve com detalhe: o que aconteceu, em que ecrã, e o que esperavas que acontecesse." rows={6} maxLength={4000} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, fontFamily: FB }} />
-            <div style={{ fontSize: 11, color: "#5f6f67", marginTop: 6, lineHeight: 1.45 }}>Quanto mais contexto deres (o que aconteceu, onde, e o que esperavas), mais depressa conseguimos ajudar-te.</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 6 }}>
+              <span style={{ fontSize: 11, color: "#5f6f67", lineHeight: 1.45, flex: 1 }}>Quanto mais contexto deres (o que aconteceu, onde, e o que esperavas), mais depressa conseguimos ajudar-te.</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: corpo.trim().length >= 15 ? "#7fd1a3" : "#93a39a", whiteSpace: "nowrap" }}>{Math.min(corpo.trim().length, 999)}/15</span>
+            </div>
 
             {/* Anexo (print) — ajuda-nos a ver o teu ecrã */}
             <div style={{ marginTop: 12 }}>
@@ -226,16 +231,9 @@ export default function AjudaPage() {
 
             {erro && <div style={{ fontSize: 12.5, color: "#ef8d83", marginTop: 12 }}>{erro}</div>}
 
-            {(() => {
-              const podeEnviar = !!assunto && corpo.trim().length >= 15;
-              const desativado = aEnviar || !podeEnviar;
-              const rotulo = aEnviar ? "A enviar…" : !assunto ? "Escolhe um assunto" : corpo.trim().length < 15 ? "Escreve a tua mensagem" : "Enviar mensagem";
-              return (
-                <button onClick={enviar} disabled={desativado} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "13px", borderRadius: 12, cursor: desativado ? "default" : "pointer", opacity: desativado ? 0.45 : 1 }}>
-                  {rotulo}
-                </button>
-              );
-            })()}
+            <button onClick={enviar} disabled={aEnviar} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "13px", borderRadius: 12, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar ? 0.55 : 1 }}>
+              {aEnviar ? "A enviar…" : "Enviar mensagem"}
+            </button>
           </>
         )}
       </div>
