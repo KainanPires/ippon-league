@@ -99,6 +99,9 @@ export async function POST(req: Request) {
     privacidade?: string;
     escudo?: unknown;
     copa_competicao_inicial?: string | null;
+    liga_competicao_inicial?: string | null;
+    fim_tipo?: string | null;
+    fim_valor?: string | null;
   };
   try {
     corpo = await req.json();
@@ -113,6 +116,9 @@ export async function POST(req: Request) {
   const privacidade = (corpo.privacidade || "fechada").trim();
   const escudo = corpo.escudo ?? null;
   const copaCompInicial = (corpo.copa_competicao_inicial || "").trim();
+  const ligaCompInicial = (corpo.liga_competicao_inicial || "").trim();
+  const fimTipo = (corpo.fim_tipo || "").trim();
+  const fimValor = (corpo.fim_valor || "").trim();
 
   // Validações mínimas.
   if (!user_id) return NextResponse.json({ ok: false, erro: "Sessão em falta. Entra para criar uma liga." }, { status: 401 });
@@ -177,6 +183,60 @@ export async function POST(req: Request) {
     };
   }
 
+  // Campos de início/fim: só quando formato="pontos". O dono escolheu a competição
+  // de arranque e um fim (por competição OU por mês), com teto de 1 ano. Esta rota
+  // é a BARREIRA real: recusa se faltar ou for inválido. Calcula fim_data (a data-
+  // limite que o motor de encerramento vai usar).
+  let ligaCampos: Record<string, unknown> = {};
+  if (formato === "pontos") {
+    const compIni = competicaoPorId(ligaCompInicial);
+    if (!compIni) {
+      return NextResponse.json({ ok: false, erro: "Escolhe uma competição de arranque válida." }, { status: 400 });
+    }
+    const dataIni = new Date(compIni.de.replace(/\//g, "-") + "T00:00:00");
+    const agora = new Date();
+    // Teto de 1 ano a partir de HOJE (data de criação).
+    const limiteAno = new Date(agora.getFullYear() + 1, agora.getMonth(), agora.getDate(), 23, 59, 59);
+
+    let fimData: Date | null = null;
+
+    if (fimTipo === "competicao") {
+      const compFim = competicaoPorId(fimValor);
+      if (!compFim) {
+        return NextResponse.json({ ok: false, erro: "Escolhe uma competição de fim válida." }, { status: 400 });
+      }
+      fimData = new Date(compFim.de.replace(/\//g, "-") + "T00:00:00");
+      if (fimData <= dataIni) {
+        return NextResponse.json({ ok: false, erro: "O fim da liga tem de ser depois do arranque." }, { status: 400 });
+      }
+    } else if (fimTipo === "mes") {
+      // fimValor = "AAAA-MM" → 1º dia desse mês.
+      const m = /^(\d{4})-(\d{2})$/.exec(fimValor);
+      if (!m) {
+        return NextResponse.json({ ok: false, erro: "Escolhe um mês de fim válido." }, { status: 400 });
+      }
+      const ano = Number(m[1]);
+      const mesIdx = Number(m[2]) - 1;
+      fimData = new Date(ano, mesIdx, 1, 0, 0, 0);
+      if (fimData <= dataIni) {
+        return NextResponse.json({ ok: false, erro: "O mês de fim tem de ser depois do arranque." }, { status: 400 });
+      }
+    } else {
+      return NextResponse.json({ ok: false, erro: "Escolhe quando a liga termina." }, { status: 400 });
+    }
+
+    if (fimData > limiteAno) {
+      return NextResponse.json({ ok: false, erro: "A liga pode durar no máximo 1 ano." }, { status: 400 });
+    }
+
+    ligaCampos = {
+      liga_competicao_inicial: ligaCompInicial,
+      fim_tipo: fimTipo,
+      fim_valor: fimValor,
+      fim_data: fimData.toISOString(),
+    };
+  }
+
   // 1) Cria a liga. type="amigos" distingue das oficiais (type="oficial").
   const { data: liga, error: erroLiga } = await supabaseAdmin
     .from("leagues")
@@ -191,6 +251,7 @@ export async function POST(req: Request) {
       privacidade,
       escudo,
       ...copaCampos,
+      ...ligaCampos,
     })
     .select()
     .single();
