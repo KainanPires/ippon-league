@@ -14,6 +14,11 @@
 //   { ok:true, jaEra:true, liga }        quando já era membro
 //   { ok:true, jaPediu:true }            quando já tinha pedido pendente
 //   { ok:false, erro }                   caso contrário
+//
+// COPA — INSCRIÇÕES FECHADAS: tal como em /entrar, numa Copa Ippon depois de as
+// inscrições fecharem (estado deixa de ser "inscricao" OU passou o prazo
+// copa_fecho_inscricao), ninguém novo se inscreve/pede — nem em copa aberta nem
+// "por aprovação". Quem JÁ é membro passa antes (passo 2) e continua a ver tudo.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
@@ -55,6 +60,18 @@ async function ehPro(user_id: string): Promise<boolean> {
   }
 }
 
+// As inscrições desta COPA já fecharam? (mesma regra de /entrar)
+// Fechado = estado já não é "inscricao" OU o prazo de fecho já passou.
+// Para ligas de pontos corridos devolve sempre false.
+function copaInscricoesFechadas(liga: { formato?: unknown; copa_estado?: unknown; copa_fecho_inscricao?: unknown }): boolean {
+  if (String(liga.formato) !== "copa") return false;
+  const estado = String(liga.copa_estado ?? "inscricao");
+  if (estado !== "inscricao") return true;
+  const fecho = liga.copa_fecho_inscricao ? new Date(String(liga.copa_fecho_inscricao)).getTime() : null;
+  if (fecho && Date.now() >= fecho) return true;
+  return false;
+}
+
 // Verifica o limite de PARTICIPAÇÃO em ligas de amigos (2 free / 5 pro).
 // Devolve uma mensagem de erro se bateu no limite, ou null se pode avançar.
 async function bloqueioPorLimite(user_id: string): Promise<string | null> {
@@ -86,17 +103,19 @@ export async function POST(req: Request) {
   if (!user_id) return NextResponse.json({ ok: false, erro: "Entra para te juntares a uma liga." }, { status: 401 });
   if (codigo.length < 4) return NextResponse.json({ ok: false, erro: "Código inválido." }, { status: 400 });
 
-  // 1) Encontra a liga pelo código. (created_by para podermos notificar o dono.)
+  // 1) Encontra a liga pelo código. (created_by para notificar o dono;
+  //    copa_estado + copa_fecho_inscricao para o portão da copa fechada.)
   const { data: liga, error: erroLiga } = await supabaseAdmin
     .from("leagues")
-    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code, created_by")
+    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code, created_by, copa_estado, copa_fecho_inscricao")
     .eq("invite_code", codigo)
     .maybeSingle();
   if (erroLiga || !liga) {
     return NextResponse.json({ ok: false, erro: "Não encontrámos nenhuma liga com esse código." }, { status: 404 });
   }
 
-  // 2) Já é membro? Não duplica.
+  // 2) Já é membro? Não duplica. (Vem ANTES do portão da copa, para que quem já
+  //    se inscreveu a tempo continue a entrar/ver mesmo depois de fechar.)
   const { data: jaMembro } = await supabaseAdmin
     .from("league_members")
     .select("id")
@@ -105,6 +124,16 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (jaMembro) {
     return NextResponse.json({ ok: true, jaEra: true, liga });
+  }
+
+  // 2-bis) COPA com inscrições FECHADAS: barra quem chega tarde (não é membro),
+  //    seja a copa "aberta" ou "por aprovação". Mesma regra de /entrar.
+  if (copaInscricoesFechadas(liga)) {
+    return NextResponse.json({
+      ok: false,
+      copaFechada: true,
+      erro: "As inscrições desta Copa já fecharam — não dá para entrar a meio. Fica atento à próxima!",
+    }, { status: 403 });
   }
 
   // 3) Decide conforme a privacidade.
