@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { focoMercado } from "@/lib/calendario";
+import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -31,6 +32,7 @@ interface RespostaChave {
   confrontos: ConfrontoAPI[];
   identidades: Record<string, Identidade>;
   nInscritos: number;
+  nParticiparam: number;
   totalRondas: number;
   podio: { campeao?: string; vice?: string; terceiro?: string };
 }
@@ -78,10 +80,18 @@ export default function PaginaChave() {
   const [estado, setEstado] = useState<"carregando" | "ok" | "erro">("carregando");
   const [erro, setErro] = useState("");
   const [tutorial, setTutorial] = useState(false);
+  const [meuId, setMeuId] = useState<string | null>(null);
 
   useEffect(() => {
     let vivo = true;
     (async () => {
+      // Quem sou eu? (para mostrar o botão de certificado só ao próprio do pódio)
+      try {
+        const { supabase } = await import("@/lib/supabase");
+        const { data: sess } = await supabase.auth.getSession();
+        if (vivo) setMeuId(sess.session?.user?.id ?? null);
+      } catch { /* sem sessão: ninguém é "eu" */ }
+
       try {
         const res = await fetch(`/api/copa/chave?codigo=${encodeURIComponent(codigo)}`);
         const j = await res.json();
@@ -131,7 +141,7 @@ export default function PaginaChave() {
         )}
 
         {estado === "ok" && dados && (
-          <ChaveConteudo dados={dados} nome={nome} escudoDe={escudoDe} onAbrirTutorial={() => setTutorial(true)} onVerEquipa={abrirDojo} />
+          <ChaveConteudo dados={dados} nome={nome} escudoDe={escudoDe} meuId={meuId} onAbrirTutorial={() => setTutorial(true)} onVerEquipa={abrirDojo} />
         )}
       </div>
 
@@ -140,14 +150,15 @@ export default function PaginaChave() {
   );
 }
 
-function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial, onVerEquipa }: {
+function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEquipa }: {
   dados: RespostaChave;
   nome: (uid: string | null) => string;
   escudoDe: (uid: string | null) => Identity;
+  meuId: string | null;
   onAbrirTutorial: () => void;
   onVerEquipa: (uid: string, comp: string) => void;
 }) {
-  const { confrontos, totalRondas, podio, liga, nInscritos } = dados;
+  const { confrontos, totalRondas, podio, liga, nInscritos, nParticiparam } = dados;
   const terminada = liga.copa_estado === "terminada";
   const chaveGrande = nInscritos >= 8; // repescagem em cadeia só com 8+
   // Já existem confrontos de repescagem gerados pelo motor? Se sim, mostram-se
@@ -165,7 +176,7 @@ function ChaveConteudo({ dados, nome, escudoDe, onAbrirTutorial, onVerEquipa }: 
     <>
       {/* Pódio (no topo) quando a copa terminou. */}
       {terminada && (podio.campeao || podio.vice || podio.terceiro) && (
-        <Podio podio={podio} nome={nome} escudoDe={escudoDe} />
+        <Podio podio={podio} nome={nome} escudoDe={escudoDe} meuId={meuId} nomeCopa={liga.name} nParticipantes={nParticiparam} />
       )}
 
       {/* Cabeçalho da liga + nº de inscritos. */}
@@ -341,30 +352,65 @@ function LinhaJogador({ uid, pontos, venceu, perdeu, trancado, nome, escudoDe, o
   );
 }
 
-function Podio({ podio, nome, escudoDe }: {
+function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
   podio: { campeao?: string; vice?: string; terceiro?: string };
   nome: (uid: string | null) => string;
   escudoDe: (uid: string | null) => Identity;
+  meuId: string | null;
+  nomeCopa: string;
+  nParticipantes: number;
 }) {
-  const linha = (uid: string | undefined, medalha: string, label: string, cor: string) => {
+  // Certificado aberto (a posição que o utilizador clicou para partilhar).
+  const [certificado, setCertificado] = useState<PosicaoPodio | null>(null);
+
+  const linha = (uid: string | undefined, medalha: string, label: string, cor: string, pos: PosicaoPodio) => {
     if (!uid) return null;
+    const souEu = !!meuId && uid === meuId;
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 11, background: "#121815", border: `1px solid ${cor}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
-        <span style={{ fontSize: 22, flexShrink: 0 }}>{medalha}</span>
-        <div style={{ flexShrink: 0 }}><Escudo config={escudoDe(uid)} size={32} /></div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nome(uid)}</div>
-          <div style={{ fontSize: 10.5, color: cor, fontFamily: FD, fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ background: "#121815", border: `1px solid ${cor}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          <span style={{ fontSize: 22, flexShrink: 0 }}>{medalha}</span>
+          <div style={{ flexShrink: 0 }}><Escudo config={escudoDe(uid)} size={32} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nome(uid)}</div>
+            <div style={{ fontSize: 10.5, color: cor, fontFamily: FD, fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
+          </div>
         </div>
+        {/* Só o próprio (cada um do pódio) vê o botão de partilhar o SEU título. */}
+        {souEu && (
+          <button onClick={() => setCertificado(pos)} style={{ width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: cor, color: pos === "vice" ? "#14181a" : "#1b1208", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+            Partilhar o meu título
+          </button>
+        )}
       </div>
     );
   };
+
+  // Identidade do utilizador para o certificado (nome do time + escudo do pódio).
+  const idDe = (uid: string | undefined): Identity => {
+    const base = escudoDe(uid ?? null);
+    return { ...base, name: nome(uid ?? null) };
+  };
+  const uidDaPos = (pos: PosicaoPodio): string | undefined =>
+    pos === "campeao" ? podio.campeao : pos === "vice" ? podio.vice : podio.terceiro;
+
   return (
     <div style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "16px 15px", marginBottom: 16 }}>
       <div style={{ textAlign: "center", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: GOLD, marginBottom: 12 }}>🏆 Pódio da Copa</div>
-      {linha(podio.campeao, "🥇", "Campeão", GOLD)}
-      {linha(podio.vice, "🥈", "Vice-campeão", "#c0c0c0")}
-      {linha(podio.terceiro, "🥉", "3º lugar", "#c87f43")}
+      {linha(podio.campeao, "🥇", "Campeão", GOLD, "campeao")}
+      {linha(podio.vice, "🥈", "Vice-campeão", "#c0c0c0", "vice")}
+      {linha(podio.terceiro, "🥉", "3º lugar", "#c87f43", "terceiro")}
+
+      {certificado && (
+        <CartaoCertificado
+          posicao={certificado}
+          identity={idDe(uidDaPos(certificado))}
+          nomeCopa={nomeCopa}
+          nParticipantes={nParticipantes}
+          onClose={() => setCertificado(null)}
+        />
+      )}
     </div>
   );
 }
