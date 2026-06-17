@@ -13,6 +13,12 @@
 //   { ok:true, pedido:true }       ficou um pedido pendente (mediante_pedido)
 //   { ok:true, jaPediu:true }      já tinha pedido pendente
 //   { ok:false, erro }             caso contrário
+//
+// COPA — INSCRIÇÕES FECHADAS: numa Copa Ippon (formato "copa"), assim que as
+// inscrições fecham (estado deixa de ser "inscricao", OU passou o prazo
+// copa_fecho_inscricao), NINGUÉM novo se inscreve — nem em copa aberta nem
+// fechada. Quem JÁ é membro passa antes (passo 2) e continua a ver tudo; só
+// barramos quem chega tarde a tentar entrar a meio. (Regra do Kainan.)
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const dynamic = "force-dynamic";
@@ -47,6 +53,19 @@ async function ehPro(user_id: string): Promise<boolean> {
     return false;
   }
 }
+
+// As inscrições desta COPA já fecharam? Fechado = estado já não é "inscricao"
+// (já foi sorteada / a decorrer / terminada) OU o prazo de fecho já passou.
+// Para ligas de pontos corridos devolve sempre false (não há fecho de inscrição).
+function copaInscricoesFechadas(liga: { formato?: unknown; copa_estado?: unknown; copa_fecho_inscricao?: unknown }): boolean {
+  if (String(liga.formato) !== "copa") return false;
+  const estado = String(liga.copa_estado ?? "inscricao");
+  if (estado !== "inscricao") return true; // já sorteada / a decorrer / terminada
+  const fecho = liga.copa_fecho_inscricao ? new Date(String(liga.copa_fecho_inscricao)).getTime() : null;
+  if (fecho && Date.now() >= fecho) return true; // prazo passou
+  return false;
+}
+
 const LIMITE_PARTICIPAR_FREE = 2;
 const LIMITE_PARTICIPAR_PRO = 5;
 
@@ -79,6 +98,8 @@ export async function POST(req: Request) {
   }
 
   // 2) Já é membro? Então não duplica — devolve sucesso na mesma.
+  //    (IMPORTANTE: vem ANTES do portão da copa, para que quem já se inscreveu a
+  //    tempo continue a entrar/ver a copa mesmo depois de as inscrições fecharem.)
   const { data: jaMembro } = await supabaseAdmin
     .from("league_members")
     .select("id")
@@ -87,6 +108,17 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (jaMembro) {
     return NextResponse.json({ ok: true, jaEra: true, liga });
+  }
+
+  // 2-bis) COPA com inscrições FECHADAS: barra quem chega tarde (não é membro).
+  //    Vale para copa aberta E fechada — depois de fechar, ninguém novo entra.
+  //    Quem já era membro nunca chega aqui (passou no passo 2).
+  if (copaInscricoesFechadas(liga)) {
+    return NextResponse.json({
+      ok: false,
+      copaFechada: true,
+      erro: "As inscrições desta Copa já fecharam — não dá para entrar a meio. Fica atento à próxima!",
+    }, { status: 403 });
   }
 
   // 3) Se a liga é MEDIANTE PEDIDO, não entra direto: cria um pedido pendente.
