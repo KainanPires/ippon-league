@@ -1,83 +1,163 @@
 "use client";
 
-// Página de diagnóstico de notificações push. Aberta num aparelho, mostra
-// exatamente o que ele reporta — para sabermos PORQUÊ as notificações não estão
-// disponíveis (Safari vs app instalada, versão do iOS, etc.). Interna.
+// Notificações push:
+//  - BotaoNotificacoes: controlo no perfil (ativar/desativar + teste).
+//  - LembreteNotificacoes: banner no dashboard, depois de ter equipa, a pedir
+//    permissão com justificação. Só aparece se ainda estiver por ativar e não
+//    tiver sido dispensado.
+
 import { useState, useEffect } from "react";
+import { suportaPush, estadoPush, ativarPush, desativarPush, notificacaoTesteLocal, type EstadoPush } from "@/lib/push";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
-type Linha = { rotulo: string; valor: string; bom: boolean | null };
+// Reúne o que o aparelho reporta, para diagnosticar quando "não suporta".
+function diagnostico(): { texto: string; standalone: boolean; ios: string } {
+  if (typeof window === "undefined") return { texto: "", standalone: false, ios: "" };
+  const ua = navigator.userAgent || "";
+  const m = ua.match(/OS (\d+)[._](\d+)/);
+  const ios = m ? `${m[1]}.${m[2]}` : "";
+  const standalone = !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || (navigator as unknown as { standalone?: boolean }).standalone === true;
+  let texto = "";
+  if (!standalone) {
+    texto = "Estás a abrir pelo navegador. No iPhone, as notificações só funcionam dentro da app: abre pelo ícone no ecrã principal.";
+  } else if (ios && parseFloat(ios) < 16.4) {
+    texto = `O iOS deste iPhone (${ios}) é anterior ao 16.4. A Apple só permite notificações a partir do 16.4 — atualiza em Definições → Geral → Atualização de Software.`;
+  } else {
+    texto = "A app está aberta corretamente, mas o aparelho não disponibiliza notificações. Confirma que o iOS está atualizado.";
+  }
+  return { texto, standalone, ios };
+}
 
-export default function DiagPush() {
-  const [linhas, setLinhas] = useState<Linha[]>([]);
-  const [veredito, setVeredito] = useState<{ texto: string; cor: string } | null>(null);
-
-  useEffect(() => {
-    const temSW = "serviceWorker" in navigator;
-    const temPM = "PushManager" in window;
-    const temN = "Notification" in window;
-    const permissao = temN ? Notification.permission : "n/a";
-    const standaloneMM = !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
-    const standaloneIOS = (navigator as unknown as { standalone?: boolean }).standalone;
-    const ua = navigator.userAgent || "";
-
-    // Tenta extrair a versão do iOS do userAgent (ex.: "OS 16_4" -> 16.4).
-    let iosVersao = "";
-    const m = ua.match(/OS (\d+)[._](\d+)/);
-    if (m) iosVersao = `${m[1]}.${m[2]}`;
-
-    const ls: Linha[] = [
-      { rotulo: "Aberto como app (standalone)", valor: standaloneMM ? "SIM (app)" : "NÃO (navegador)", bom: standaloneMM },
-      { rotulo: "standalone iOS", valor: standaloneIOS === true ? "SIM" : standaloneIOS === false ? "NÃO" : "n/a", bom: standaloneIOS === true ? true : standaloneIOS === false ? false : null },
-      { rotulo: "Versão iOS detetada", valor: iosVersao || "(não-iOS ou desconhecida)", bom: iosVersao ? parseFloat(iosVersao) >= 16.4 : null },
-      { rotulo: "Service Worker disponível", valor: temSW ? "SIM" : "NÃO", bom: temSW },
-      { rotulo: "PushManager disponível", valor: temPM ? "SIM" : "NÃO", bom: temPM },
-      { rotulo: "Notification disponível", valor: temN ? "SIM" : "NÃO", bom: temN },
-      { rotulo: "Permissão de notificações", valor: String(permissao), bom: permissao === "granted" ? true : permissao === "denied" ? false : null },
-    ];
-    setLinhas(ls);
-
-    // Veredito.
-    const suporta = temSW && temPM && temN;
-    if (suporta) {
-      setVeredito({ texto: "✅ Este aparelho SUPORTA notificações. Se o botão dizia 'não suporta', estavas no Safari — abre pela APP (ícone) e funciona.", cor: "#7fd1a3" });
-    } else if (!standaloneMM && standaloneIOS !== true) {
-      setVeredito({ texto: "⚠️ Estás no NAVEGADOR (Safari), não na app. No iPhone, as notificações só existem dentro da app: fecha isto, abre pelo ÍCONE do Dodô no ecrã, e tenta de novo.", cor: "#e6c97a" });
-    } else if (iosVersao && parseFloat(iosVersao) < 16.4) {
-      setVeredito({ texto: `❌ O iOS deste aparelho (${iosVersao}) é anterior ao 16.4 — a Apple só permite notificações web a partir do 16.4. É preciso atualizar o iPhone (Definições → Geral → Atualização de Software).`, cor: "#ef8d83" });
-    } else {
-      setVeredito({ texto: "❓ Está na app, mas falta uma capacidade. Tira um print desta página e mostra — vemos o que é.", cor: "#e6c97a" });
-    }
-  }, []);
-
+function IconeSino({ cor = GOLD }: { cor?: string }) {
   return (
-    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB, padding: "24px 16px" }}>
-      <div style={{ maxWidth: 460, margin: "0 auto" }}>
-        <h1 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Diagnóstico de notificações</h1>
-
-        {veredito && (
-          <div style={{ background: "#121815", border: `1px solid ${veredito.cor}`, borderRadius: 14, padding: 14, marginBottom: 16, fontSize: 14, lineHeight: 1.5, color: "#f1ede2" }}>
-            {veredito.texto}
-          </div>
-        )}
-
-        <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, overflow: "hidden" }}>
-          {linhas.map((l, i) => (
-            <div key={l.rotulo} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "11px 14px", borderTop: i === 0 ? "none" : "1px solid #1a221d" }}>
-              <span style={{ fontSize: 12.5, color: "#b6c0b9" }}>{l.rotulo}</span>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: l.bom === true ? "#7fd1a3" : l.bom === false ? "#ef8d83" : "#93a39a", whiteSpace: "nowrap" }}>{l.valor}</span>
-            </div>
-          ))}
-        </div>
-
-        <p style={{ fontSize: 11, color: "#5f6f67", marginTop: 16, lineHeight: 1.5 }}>
-          Página interna de teste. Tira um print e mostra para resolvermos. Abre esta página
-          <strong> pela app (ícone)</strong> e também <strong>pelo Safari</strong>, para comparar.
-        </p>
-      </div>
-    </main>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" />
+    </svg>
   );
 }
+
+export function BotaoNotificacoes({ userId }: { userId: string }) {
+  const [estado, setEstado] = useState<EstadoPush>("pendente");
+  const [aFazer, setAFazer] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { setEstado(estadoPush()); }, []);
+
+  async function ativar() {
+    setAFazer(true); setMsg("");
+    const r = await ativarPush(userId);
+    setAFazer(false);
+    setEstado(estadoPush());
+    setMsg(r.ok ? "Notificações ativadas! 🥋" : (r.erro || "Não foi possível ativar."));
+  }
+  async function desativar() {
+    setAFazer(true); setMsg("");
+    await desativarPush();
+    setAFazer(false);
+    setEstado(estadoPush());
+    setMsg("Notificações desativadas neste aparelho.");
+  }
+
+  if (estado === "indisponivel") {
+    const d = diagnostico();
+    return (
+      <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 14 }}>
+        <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 10 }}>
+          {d.texto}
+        </div>
+        <div style={{ fontSize: 11, color: "#5f6f67", lineHeight: 1.6, borderTop: "1px solid #1a221d", paddingTop: 8 }}>
+          Diagnóstico: aberta como app: <strong style={{ color: d.standalone ? "#7fd1a3" : "#ef8d83" }}>{d.standalone ? "sim" : "não"}</strong>
+          {d.ios ? <> · iOS: <strong style={{ color: parseFloat(d.ios) >= 16.4 ? "#7fd1a3" : "#ef8d83" }}>{d.ios}</strong></> : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <span style={{ width: 38, height: 38, borderRadius: 10, background: "#1c2a20", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><IconeSino /></span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>Notificações</div>
+          <div style={{ fontSize: 11.5, color: "#93a39a" }}>
+            {estado === "concedido" ? "Ativas neste aparelho" : estado === "negado" ? "Bloqueadas no navegador" : "Recebe avisos das tuas competições"}
+          </div>
+        </div>
+      </div>
+
+      {estado === "concedido" ? (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => notificacaoTesteLocal()} style={btnSec}>Enviar teste</button>
+          <button onClick={desativar} disabled={aFazer} style={btnGhost}>Desativar</button>
+        </div>
+      ) : estado === "negado" ? (
+        <div style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.5 }}>
+          As notificações estão bloqueadas. Para ativar, vai às definições do navegador (ou do site) e permite notificações para a Ippon League.
+        </div>
+      ) : (
+        <button onClick={ativar} disabled={aFazer} style={btnPri}>{aFazer ? "A ativar..." : "Ativar notificações"}</button>
+      )}
+
+      {msg && <div style={{ fontSize: 11.5, color: "#7fd1a3", marginTop: 9 }}>{msg}</div>}
+    </div>
+  );
+}
+
+export function LembreteNotificacoes({ userId }: { userId: string }) {
+  const [mostrar, setMostrar] = useState(false);
+  const [aFazer, setAFazer] = useState(false);
+
+  useEffect(() => {
+    if (!suportaPush()) return;
+    if (estadoPush() !== "pendente") return;
+    try { if (localStorage.getItem("ippon_push_lembrete_dispensado") === "1") return; } catch {}
+    setMostrar(true);
+  }, []);
+
+  async function ativar() {
+    setAFazer(true);
+    await ativarPush(userId);
+    setAFazer(false);
+    setMostrar(false);
+  }
+  function agoraNao() {
+    try { localStorage.setItem("ippon_push_lembrete_dispensado", "1"); } catch {}
+    setMostrar(false);
+  }
+
+  if (!mostrar) return null;
+
+  return (
+    <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
+        <span style={{ width: 40, height: 40, borderRadius: 11, background: "#1c2a20", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><IconeSino /></span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>Quer ser avisado?</div>
+          <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5, margin: "4px 0 0" }}>
+            Ativa as notificações e avisamos-te quando uma competição começar, quando faltar montar a equipa e quando houver novidades importantes.
+          </p>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button onClick={ativar} disabled={aFazer} style={{ ...btnPri, flex: 1 }}>{aFazer ? "A ativar..." : "Ativar"}</button>
+        <button onClick={agoraNao} disabled={aFazer} style={btnGhost}>Agora não</button>
+      </div>
+    </div>
+  );
+}
+
+const btnPri: React.CSSProperties = {
+  background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 13.5, fontWeight: 700,
+  textTransform: "uppercase", letterSpacing: "0.03em", padding: "11px 16px", borderRadius: 10, cursor: "pointer",
+};
+const btnSec: React.CSSProperties = {
+  background: "#1c3a2e", color: "#aee9c9", border: "none", fontFamily: FB, fontSize: 13, fontWeight: 700,
+  padding: "10px 14px", borderRadius: 10, cursor: "pointer", flex: 1,
+};
+const btnGhost: React.CSSProperties = {
+  background: "transparent", color: "#93a39a", border: "1px solid #2a3a33", fontFamily: FB, fontSize: 13,
+  fontWeight: 700, padding: "10px 14px", borderRadius: 10, cursor: "pointer",
+};
