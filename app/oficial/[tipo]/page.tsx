@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
@@ -9,6 +9,9 @@ import { focoMercado } from "@/lib/calendario";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
+
+// Atualização ao vivo do ranking enquanto a competição decorre.
+const TICK_AO_VIVO_MS = 15000;
 
 type Vista = "rodada" | "geral";
 
@@ -21,15 +24,29 @@ interface MembroRank {
   posicao: number;
   is_pro: boolean;
 }
+// Linha do ranking GERAL (vem de /api/liga/geral).
+interface MembroGeral {
+  user_id: string;
+  nome_time: string;
+  escudo: Identity | null;
+  pontos_geral: number;
+  pontos_rodada: number;
+  patrimonio: number;
+  escalou: boolean;
+  posicao: number;
+  is_pro: boolean;
+}
 
 export default function PaginaOficial() {
   const params = useParams();
   const tipo = String(params?.tipo || "").toLowerCase(); // "mundial" | "continental"
   const ehMundial = tipo === "mundial";
 
-  const [vista, setVista] = useState<Vista>("rodada");
+  const [vista, setVista] = useState<Vista>("geral"); // o GERAL é a vista principal
   const [estado, setEstado] = useState<"a_carregar" | "pronto" | "sem_sessao" | "sem_continente">("a_carregar");
   const [membros, setMembros] = useState<MembroRank[]>([]);
+  const [geral, setGeral] = useState<MembroGeral[]>([]);
+  const [geralCarregado, setGeralCarregado] = useState(false);
   const [nomeContinente, setNomeContinente] = useState<string | null>(null);
   const [meuId, setMeuId] = useState<string | null>(null);
   const [souPro, setSouPro] = useState(false);
@@ -43,17 +60,22 @@ export default function PaginaOficial() {
 
   const titulo = ehMundial ? "Liga Mundial" : (nomeContinente ? `Liga ${nomeContinente}` : "Liga Continental");
 
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Filtragem da lista pela pesquisa: aceita nome do time OU número de posição.
-  // Mantém a posição real de cada membro (só esconde os que não correspondem).
   const termo = pesquisa.trim().toLowerCase();
   const ehNumero = termo !== "" && /^\d+$/.test(termo);
-  const membrosVisiveis = termo === ""
-    ? membros
-    : membros.filter((m) => {
-        if (ehNumero) return m.escalou && m.posicao === Number(termo);
-        return (m.nome_time || "").toLowerCase().includes(termo);
-      });
+  function filtrar<T extends { nome_time: string; posicao: number; escalou?: boolean }>(lista: T[]): T[] {
+    if (termo === "") return lista;
+    return lista.filter((m) => {
+      if (ehNumero) return m.posicao === Number(termo);
+      return (m.nome_time || "").toLowerCase().includes(termo);
+    });
+  }
+  const membrosVisiveis = filtrar(membros);
+  const geralVisivel = filtrar(geral);
 
+  // 1) Ranking da RODADA (ao vivo do IJF, via /api/liga/oficial).
   useEffect(() => {
     let vivo = true;
     (async () => {
@@ -65,21 +87,17 @@ export default function PaginaOficial() {
       setSouPro(!!meta?.is_pro);
 
       if (!uid && !ehMundial) {
-        // Continental precisa do utilizador para saber o continente.
         setEstado("sem_sessao");
         return;
       }
 
       try {
-        const params = new URLSearchParams({ tipo: ehMundial ? "mundial" : "continental", comp: idComp });
-        if (uid) params.set("user_id", uid);
-        const res = await fetch(`/api/liga/oficial?${params.toString()}`);
+        const p = new URLSearchParams({ tipo: ehMundial ? "mundial" : "continental", comp: idComp });
+        if (uid) p.set("user_id", uid);
+        const res = await fetch(`/api/liga/oficial?${p.toString()}`);
         const j = await res.json();
         if (!vivo) return;
-        if (j.semContinente) {
-          setEstado("sem_continente");
-          return;
-        }
+        if (j.semContinente) { setEstado("sem_continente"); return; }
         if (j.ok) {
           setMembros(Array.isArray(j.membros) ? j.membros : []);
           setNomeContinente(j.nomeContinente ?? null);
@@ -94,6 +112,40 @@ export default function PaginaOficial() {
     })();
     return () => { vivo = false; };
   }, [tipo, ehMundial, idComp]);
+
+  // 2) Ranking GERAL (acumulado ao vivo, via /api/liga/geral). Atualiza sozinho
+  //    enquanto a competição decorre.
+  useEffect(() => {
+    if (estado !== "pronto") return;
+    let vivo = true;
+
+    async function buscarGeral() {
+      try {
+        const p = new URLSearchParams({ tipo: ehMundial ? "mundial" : "continental", comp: idComp });
+        if (meuId) p.set("user_id", meuId);
+        const res = await fetch(`/api/liga/geral?${p.toString()}`);
+        const j = await res.json();
+        if (!vivo) return;
+        if (j.ok && Array.isArray(j.membros)) setGeral(j.membros);
+        setGeralCarregado(true);
+      } catch {
+        if (vivo) setGeralCarregado(true);
+      }
+    }
+
+    buscarGeral();
+    if (tickRef.current) clearInterval(tickRef.current);
+    if (emAndamento) {
+      tickRef.current = setInterval(() => { if (!document.hidden) buscarGeral(); }, TICK_AO_VIVO_MS);
+    }
+    const onVis = () => { if (!document.hidden) buscarGeral(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      vivo = false;
+      if (tickRef.current) clearInterval(tickRef.current);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [estado, ehMundial, idComp, meuId, emAndamento]);
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -127,11 +179,11 @@ export default function PaginaOficial() {
           </a>
         )}
 
-        {/* Seletor Rodada / Geral */}
+        {/* Seletor Geral / Rodada (Geral é a vista principal) */}
         <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: "1px solid #1a221d" }}>
-          {(["rodada", "geral"] as Vista[]).map((v) => (
+          {(["geral", "rodada"] as Vista[]).map((v) => (
             <button key={v} onClick={() => setVista(v)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${vista === v ? GOLD : "transparent"}`, color: vista === v ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", padding: "9px 0", cursor: "pointer" }}>
-              {v === "rodada" ? "Líderes da Rodada" : "Ranking Geral"}
+              {v === "geral" ? "Ranking Geral" : "Líderes da Rodada"}
             </button>
           ))}
         </div>
@@ -152,7 +204,70 @@ export default function PaginaOficial() {
           </div>
         )}
 
-        {/* Vista RODADA: o ranking real */}
+        {/* Barra de pesquisa partilhada pelas duas vistas */}
+        {estado === "pronto" && (membros.length > 0 || geral.length > 0) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "9px 12px", marginBottom: 11 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c8a82" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
+            <input
+              value={pesquisa}
+              onChange={(e) => setPesquisa(e.target.value)}
+              placeholder="Procurar por time ou posição"
+              inputMode="text"
+              style={{ flex: 1, background: "transparent", border: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB, outline: "none" }}
+            />
+            {pesquisa && (
+              <button onClick={() => setPesquisa("")} aria-label="Limpar" style={{ background: "transparent", border: "none", color: "#7c8a82", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+            )}
+          </div>
+        )}
+
+        {/* Vista GERAL: acumulado ao vivo */}
+        {estado === "pronto" && vista === "geral" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>Ranking geral · época</span>
+              {emAndamento && (
+                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo
+                </span>
+              )}
+            </div>
+            {!geralCarregado ? (
+              <Aviso>A somar a época…</Aviso>
+            ) : geral.length === 0 ? (
+              <Aviso>Ainda sem pontos acumulados.</Aviso>
+            ) : geralVisivel.length === 0 ? (
+              <Aviso>Sem resultados para &quot;{pesquisa}&quot;.</Aviso>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                {geralVisivel.map((m) => {
+                  const euMesmo = m.user_id === meuId;
+                  const ouro = m.posicao === 1 && m.pontos_geral > 0;
+                  return (
+                    <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : (ouro ? GOLD : "#243029")}`, borderRadius: 12, padding: "11px 12px" }}>
+                      <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: ouro ? GOLD : "#7c8a82" }}>{m.posicao}</div>
+                      <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
+                          <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>
+                          {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#93a39a" }}>{m.escalou ? <span style={{ color: "#7fd1a3" }}>+{m.pontos_rodada} nesta rodada</span> : "Sem escalação nesta rodada"}</div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: GOLD }}>{m.pontos_geral}</div>
+                        <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>total</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Vista RODADA: o ranking só da rodada atual */}
         {estado === "pronto" && vista === "rodada" && (
           <>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -168,28 +283,11 @@ export default function PaginaOficial() {
 
             {membros.length === 0 ? (
               <Aviso>Ainda sem membros Pro nesta rodada.</Aviso>
+            ) : membrosVisiveis.length === 0 ? (
+              <Aviso>Sem resultados para &quot;{pesquisa}&quot;.</Aviso>
             ) : (
-              <>
-                {/* Barra de pesquisa: nome do time ou número de posição. */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "9px 12px", marginBottom: 11 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c8a82" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-                  <input
-                    value={pesquisa}
-                    onChange={(e) => setPesquisa(e.target.value)}
-                    placeholder="Procurar por time ou posição (ex: 3165)"
-                    inputMode="text"
-                    style={{ flex: 1, background: "transparent", border: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB, outline: "none" }}
-                  />
-                  {pesquisa && (
-                    <button onClick={() => setPesquisa("")} aria-label="Limpar" style={{ background: "transparent", border: "none", color: "#7c8a82", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
-                  )}
-                </div>
-
-                {membrosVisiveis.length === 0 ? (
-                  <Aviso>Sem resultados para "{pesquisa}".</Aviso>
-                ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  {membrosVisiveis.map((m) => {
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                {membrosVisiveis.map((m) => {
                   const euMesmo = m.user_id === meuId;
                   const ouro = m.posicao === 1 && m.escalou;
                   return (
@@ -211,21 +309,9 @@ export default function PaginaOficial() {
                     </div>
                   );
                 })}
-                </div>
-                )}
-              </>
+              </div>
             )}
           </>
-        )}
-
-        {/* Vista GERAL: ainda por construir (precisa de histórico acumulado) */}
-        {estado === "pronto" && vista === "geral" && (
-          <div style={{ textAlign: "center", padding: "44px 16px", color: "#7c8a82" }}>
-            <div style={{ fontSize: 30, marginBottom: 8 }}>🏆</div>
-            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#cfd8d2", marginBottom: 6 }}>Ranking Geral</div>
-            <div style={{ fontSize: 13, lineHeight: 1.5, maxWidth: 320, margin: "0 auto" }}>A classificação acumulada de todas as rodadas do ano aparece aqui. Vai somando os pontos a cada competição.</div>
-            <div style={{ marginTop: 12, fontSize: 11, color: "#5f6f67", border: "1px solid #2a3a33", borderRadius: 999, padding: "4px 12px", display: "inline-block" }}>Em breve</div>
-          </div>
         )}
       </div>
     </main>
