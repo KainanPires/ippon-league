@@ -33,6 +33,7 @@ const ASSUNTOS = [
 ];
 
 const MAX_CORPO = 4000;
+const MIN_CORPO = 15; // exige uma mensagem com algum contexto, não só "teste"
 // Limite do anexo: ~4 MB já em base64 (um print normal fica bem abaixo disto).
 const MAX_ANEXO_B64 = 4 * 1024 * 1024;
 const TIPOS_IMAGEM = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/heic"];
@@ -144,8 +145,8 @@ export async function POST(req: NextRequest) {
   if (!ASSUNTOS.includes(assunto)) {
     return NextResponse.json({ ok: false, erro: "Escolhe um assunto." }, { status: 400 });
   }
-  if (corpo.length < 5) {
-    return NextResponse.json({ ok: false, erro: "Escreve a tua mensagem (um pouco mais longa)." }, { status: 400 });
+  if (corpo.length < MIN_CORPO) {
+    return NextResponse.json({ ok: false, erro: "Descreve o problema com algum detalhe (pelo menos uma frase)." }, { status: 400 });
   }
   if (!userId) {
     return NextResponse.json({ ok: false, erro: "Precisas de conta para enviar pela app." }, { status: 401 });
@@ -166,7 +167,6 @@ export async function POST(req: NextRequest) {
     is_pro: isPro,
     is_elogio: isElogio,
     consentimento_publico: consentimento,
-    tem_anexo: !!anexo,
     estado: "novo",
   });
 
