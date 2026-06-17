@@ -187,7 +187,7 @@ export async function POST(req: Request) {
         paraUserId: vencedor,
         tipo: "copa_campeao",
         titulo: "És o CAMPEÃO da Copa Ippon! 🏆",
-        corpo: `Venceste a final e és o campeão da Copa da liga "${nomeLiga}". Que conquista!`,
+        corpo: `Venceste a final e és o campeão da Copa "${nomeLiga}". Que conquista!`,
         link: linkCopa,
       });
       if (perdedor) {
@@ -195,7 +195,7 @@ export async function POST(req: Request) {
           paraUserId: perdedor,
           tipo: "copa_eliminado",
           titulo: "Vice-campeão da Copa Ippon 🥈",
-          corpo: `Chegaste à final da Copa da liga "${nomeLiga}" e ficaste em 2º. Grande campanha!`,
+          corpo: `Chegaste à final da Copa "${nomeLiga}" e ficaste em 2º. Grande campanha!`,
           link: linkCopa,
         });
       }
@@ -205,7 +205,7 @@ export async function POST(req: Request) {
         paraUserId: vencedor,
         tipo: "copa_avancou",
         titulo: "3º lugar na Copa Ippon 🥉",
-        corpo: `Venceste a disputa do bronze na Copa da liga "${nomeLiga}". Subiste ao pódio!`,
+        corpo: `Venceste a disputa do bronze na Copa "${nomeLiga}". Subiste ao pódio!`,
         link: linkCopa,
       });
       if (perdedor) {
@@ -213,7 +213,7 @@ export async function POST(req: Request) {
           paraUserId: perdedor,
           tipo: "copa_eliminado",
           titulo: "Às portas do pódio",
-          corpo: `Perdeste a disputa do bronze na Copa da liga "${nomeLiga}", mas chegaste muito longe. Que campanha!`,
+          corpo: `Perdeste a disputa do bronze na Copa "${nomeLiga}", mas chegaste muito longe. Que campanha!`,
           link: linkCopa,
         });
       }
@@ -224,7 +224,7 @@ export async function POST(req: Request) {
         paraUserId: vencedor,
         tipo: "copa_avancou",
         titulo: "Venceste na repescagem! 🔁",
-        corpo: `Ganhaste o teu confronto de repescagem na Copa da liga "${nomeLiga}" e segues para a disputa do bronze. A segunda chance é tua!`,
+        corpo: `Ganhaste o teu confronto de repescagem na Copa "${nomeLiga}" e segues para a disputa do bronze. A segunda chance é tua!`,
         link: linkCopa,
       });
       if (perdedor) {
@@ -232,7 +232,7 @@ export async function POST(req: Request) {
           paraUserId: perdedor,
           tipo: "copa_eliminado",
           titulo: "Eliminado na repescagem",
-          corpo: `Perdeste o confronto de repescagem na Copa da liga "${nomeLiga}". Foi uma boa campanha — para a próxima, a revanche é tua!`,
+          corpo: `Perdeste o confronto de repescagem na Copa "${nomeLiga}". Foi uma boa campanha — para a próxima, a revanche é tua!`,
           link: linkCopa,
         });
       }
@@ -246,7 +246,7 @@ export async function POST(req: Request) {
         paraUserId: vencedor,
         tipo: "copa_avancou",
         titulo: "Avançaste na Copa! ⚔️",
-        corpo: `Venceste o teu confronto na Copa da liga "${nomeLiga}". Segues em frente — prepara a próxima ronda!`,
+        corpo: `Venceste o teu confronto na Copa "${nomeLiga}". Segues em frente — prepara a próxima ronda!`,
         link: linkCopa,
       });
     }
@@ -288,6 +288,45 @@ export async function POST(req: Request) {
           }));
           await supabaseAdmin.from("copa_confrontos").insert(linhas);
           gerouProxima = true;
+        }
+
+        // NOTIFICAÇÃO AO PERDEDOR de confronto NORMAL (opção B, validada com o
+        // Kainan): usamos os confrontos REALMENTE gerados (`novos`) como fonte da
+        // verdade — quem ficou numa repescagem ou bronze TEM segunda chance; quem
+        // perdeu e não aparece em lado nenhum foi ELIMINADO. Assim nunca prometemos
+        // uma repescagem que não existe (ex.: rondas cedo de chaves grandes).
+        const continuam = new Set<string>();
+        for (const n of novos) {
+          if (n.fase === "repescagem" || n.fase === "bronze") {
+            if (n.jogador_a) continuam.add(n.jogador_a);
+            if (n.jogador_b) continuam.add(n.jogador_b);
+          }
+        }
+        // Perdedores dos confrontos NORMAIS desta ronda (com adversário real).
+        const normaisDaRonda = (rondaFinal || []).filter((c) => String(c.fase) === "normal");
+        for (const c of normaisDaRonda) {
+          if (!c.jogador_b) continue; // bye não tem perdedor
+          const perdedorN = c.vencedor === c.jogador_a ? c.jogador_b : c.jogador_a;
+          if (!perdedorN) continue;
+          if (continuam.has(perdedorN)) {
+            // Ainda tem campanha: vai à repescagem ou ao bronze.
+            await criarNotificacaoServidor({
+              paraUserId: perdedorN,
+              tipo: "copa_eliminado",
+              titulo: "Perdeste este confronto — mas não acabou! 🔁",
+              corpo: `Foste eliminado deste confronto na Copa "${nomeLiga}", mas a tua campanha continua: ainda podes lutar pelo 3º lugar. Não desanimes — vamos a essa repescagem!`,
+              link: linkCopa,
+            });
+          } else {
+            // Sem segunda chance: eliminado da Copa.
+            await criarNotificacaoServidor({
+              paraUserId: perdedorN,
+              tipo: "copa_eliminado",
+              titulo: "Eliminado da Copa",
+              corpo: `Foste eliminado da Copa "${nomeLiga}". Foi uma boa campanha — para a próxima, a revanche é tua!`,
+              link: linkCopa,
+            });
+          }
         }
       }
     }
