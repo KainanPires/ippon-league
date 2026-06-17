@@ -22,6 +22,20 @@ interface Membro {
   posicao: number;
   is_pro: boolean;
 }
+// Linha do ranking GERAL / Judocoins (vem de /api/liga/geral).
+interface MembroGeral {
+  user_id: string;
+  nome_time: string;
+  escudo: Identity | null;
+  pontos_geral: number;
+  pontos_rodada: number;
+  patrimonio: number;
+  escalou: boolean;
+  posicao: number;
+  is_pro: boolean;
+}
+// As três vistas das ligas de amigos de pontos corridos.
+type VistaLiga = "geral" | "rodada" | "jc";
 interface LigaInfo {
   id: string;
   name: string;
@@ -68,6 +82,11 @@ export default function PaginaLiga() {
   const [meuId, setMeuId] = useState<string | null>(null);
   const [horaTick, setHoraTick] = useState<string>("");
   const [aRedirecionar, setARedirecionar] = useState(false);
+
+  // Ligas de amigos (pontos corridos): vista atual + ranking geral/JC ao vivo.
+  const [vista, setVista] = useState<VistaLiga>("geral");
+  const [geral, setGeral] = useState<MembroGeral[]>([]);
+  const [geralCarregado, setGeralCarregado] = useState(false);
 
   // Painel do dono: pedidos pendentes.
   const [souDono, setSouDono] = useState(false);
@@ -176,6 +195,39 @@ export default function PaginaLiga() {
     };
   }, [estado, liga, idComp, emAndamento]);
 
+  // 2-bis) Ranking GERAL (acumulado ao vivo) + Judocoins — só para ligas de
+  // pontos corridos. Uma só chamada a /api/liga/geral alimenta as vistas "Geral"
+  // e "Judocoins" (a página ordena por pontos_geral ou por património).
+  useEffect(() => {
+    if (estado !== "pronto" || !liga || liga.formato === "copa") return;
+    let vivo = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    async function buscarGeral() {
+      try {
+        const res = await fetch(`/api/liga/geral?league=${liga!.id}&comp=${idComp}`);
+        const j = await res.json();
+        if (!vivo) return;
+        if (j.ok && Array.isArray(j.membros)) setGeral(j.membros);
+        setGeralCarregado(true);
+      } catch {
+        if (vivo) setGeralCarregado(true);
+      }
+    }
+
+    buscarGeral();
+    if (emAndamento) {
+      timer = setInterval(() => { if (!document.hidden) buscarGeral(); }, TICK_AO_VIVO_MS);
+    }
+    const onVis = () => { if (!document.hidden) buscarGeral(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      vivo = false;
+      if (timer) clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [estado, liga, idComp, emAndamento]);
+
   // 3) Quando a liga está pronta: descobre se sou o dono e carrega os pedidos.
   //    A rota /api/liga/pedidos só devolve ok:true a quem é o dono (valida lá).
   useEffect(() => {
@@ -251,7 +303,7 @@ export default function PaginaLiga() {
 
   function partilhar() {
     if (!liga) return;
-    const link = `https://ippon-league.vercel.app/liga/${liga.invite_code}`;
+    const link = `https://www.ipponleague.com/liga/${liga.invite_code}`;
     const texto = `Entra na minha liga "${liga.name}" na Ippon League! Código: ${liga.invite_code}`;
     const navAny = navigator as unknown as { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
     if (navAny.share) {
@@ -364,48 +416,131 @@ export default function PaginaLiga() {
 
             {liga.formato !== "copa" && (
             <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-              <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>Ranking · {compAtual.nome}</span>
-              {emAndamento ? (
-                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo {horaTick && `· ${horaTick}`}
-                </span>
-              ) : (
-                <span style={{ fontSize: 11, color: "#7fd1a3" }}>Pré-competição</span>
-              )}
+            {/* Seletor das três vistas: Geral (principal), Rodada, Judocoins. */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 14, borderBottom: "1px solid #1a221d" }}>
+              {([["geral", "Geral"], ["rodada", "Rodada"], ["jc", "Judocoins"]] as [VistaLiga, string][]).map(([v, label]) => (
+                <button key={v} onClick={() => setVista(v)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${vista === v ? GOLD : "transparent"}`, color: vista === v ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>{label}</button>
+              ))}
             </div>
 
-            {membros.length === 0 ? (
-              <Aviso>Ainda sem pontos nesta rodada.</Aviso>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {membros.map((m) => {
-                  const euMesmo = m.user_id === meuId;
-                  const medal = m.posicao === 1 && m.escalou ? GOLD : "#243029";
-                  return (
-                    <button key={m.user_id} onClick={() => verDojo(m)} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : medal}`, borderRadius: 12, padding: "11px 12px", cursor: "pointer", textAlign: "left", fontFamily: FB }}>
-                      <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: m.posicao === 1 && m.escalou ? GOLD : "#7c8a82" }}>{m.escalou ? m.posicao : "—"}</div>
-                      <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
-                          {m.is_pro && <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>}
-                          {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
+            {/* Cabeçalho da vista + estado ao vivo */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>
+                {vista === "geral" ? "Ranking geral · época" : vista === "rodada" ? `Rodada · ${compAtual.nome}` : "Judocoins · património"}
+              </span>
+              {emAndamento && vista !== "jc" ? (
+                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo {horaTick && vista === "rodada" && `· ${horaTick}`}
+                </span>
+              ) : vista === "rodada" ? (
+                <span style={{ fontSize: 11, color: "#7fd1a3" }}>Pré-competição</span>
+              ) : null}
+            </div>
+
+            {/* VISTA RODADA: a tabela original (clicável para ver o dojo). */}
+            {vista === "rodada" && (
+              membros.length === 0 ? (
+                <Aviso>Ainda sem pontos nesta rodada.</Aviso>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {membros.map((m) => {
+                    const euMesmo = m.user_id === meuId;
+                    const medal = m.posicao === 1 && m.escalou ? GOLD : "#243029";
+                    return (
+                      <button key={m.user_id} onClick={() => verDojo(m)} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : medal}`, borderRadius: 12, padding: "11px 12px", cursor: "pointer", textAlign: "left", fontFamily: FB }}>
+                        <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: m.posicao === 1 && m.escalou ? GOLD : "#7c8a82" }}>{m.escalou ? m.posicao : "—"}</div>
+                        <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
+                            {m.is_pro && <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>}
+                            {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
+                          </div>
+                          <div style={{ fontSize: 11, color: m.escalou ? "#7fd1a3" : "#e0894f" }}>{m.escalou ? "Escalou" : "Não escalou"}</div>
                         </div>
-                        <div style={{ fontSize: 11, color: m.escalou ? "#7fd1a3" : "#e0894f" }}>{m.escalou ? "Escalou" : "Não escalou"}</div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: "#f1ede2" }}>{m.escalou ? (m.pontos >= 0 ? "+" : "") + m.pontos : "—"}</div>
+                          <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )
+            )}
+
+            {/* VISTA GERAL: acumulado ao vivo (histórico + rodada atual). */}
+            {vista === "geral" && (
+              !geralCarregado ? (
+                <Aviso>A somar a época…</Aviso>
+              ) : geral.length === 0 ? (
+                <Aviso>Ainda sem pontos acumulados.</Aviso>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {geral.map((m) => {
+                    const euMesmo = m.user_id === meuId;
+                    const ouro = m.posicao === 1 && m.pontos_geral > 0;
+                    return (
+                      <button key={m.user_id} onClick={() => verDojo({ ...m, pontos: m.pontos_rodada } as Membro)} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : (ouro ? GOLD : "#243029")}`, borderRadius: 12, padding: "11px 12px", cursor: "pointer", textAlign: "left", fontFamily: FB }}>
+                        <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: ouro ? GOLD : "#7c8a82" }}>{m.posicao}</div>
+                        <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
+                            {m.is_pro && <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>}
+                            {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#93a39a" }}>{m.escalou ? <span style={{ color: "#7fd1a3" }}>+{m.pontos_rodada} nesta rodada</span> : "Sem escalação nesta rodada"}</div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: GOLD }}>{m.pontos_geral}</div>
+                          <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>total</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )
+            )}
+
+            {/* VISTA JUDOCOINS: mesma lista, ordenada por património (JC). */}
+            {vista === "jc" && (
+              !geralCarregado ? (
+                <Aviso>A carregar os Judocoins…</Aviso>
+              ) : geral.length === 0 ? (
+                <Aviso>Ainda sem dados de Judocoins.</Aviso>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {[...geral].sort((a, b) => b.patrimonio - a.patrimonio).map((m, i) => {
+                    const euMesmo = m.user_id === meuId;
+                    const ouro = i === 0;
+                    return (
+                      <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : (ouro ? GOLD : "#243029")}`, borderRadius: 12, padding: "11px 12px" }}>
+                        <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: ouro ? GOLD : "#7c8a82" }}>{i + 1}</div>
+                        <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
+                            {m.is_pro && <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>}
+                            {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#93a39a" }}>Património total</div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: GOLD }}>JC {m.patrimonio}</div>
+                          <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>saldo</div>
+                        </div>
                       </div>
-                      <div style={{ textAlign: "right", flexShrink: 0 }}>
-                        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: "#f1ede2" }}>{m.escalou ? (m.pontos >= 0 ? "+" : "") + m.pontos : "—"}</div>
-                        <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )
             )}
 
             <div style={{ marginTop: 12, fontSize: 11, color: "#5f6f67", textAlign: "center" }}>
-              {mercadoFechado ? "Toca num membro para ver o dojo dele." : "Os dojos dos rivais abrem quando o mercado fechar. 🔒"}
+              {vista === "jc"
+                ? "Quem mais valorizou a equipa ao longo da época lidera os Judocoins."
+                : mercadoFechado ? "Toca num membro para ver o dojo dele." : "Os dojos dos rivais abrem quando o mercado fechar. 🔒"}
             </div>
             </>
             )}
