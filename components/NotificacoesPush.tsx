@@ -13,6 +13,24 @@ const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
+// Reúne o que o aparelho reporta, para diagnosticar quando "não suporta".
+function diagnostico(): { texto: string; standalone: boolean; ios: string } {
+  if (typeof window === "undefined") return { texto: "", standalone: false, ios: "" };
+  const ua = navigator.userAgent || "";
+  const m = ua.match(/OS (\d+)[._](\d+)/);
+  const ios = m ? `${m[1]}.${m[2]}` : "";
+  const standalone = !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || (navigator as unknown as { standalone?: boolean }).standalone === true;
+  let texto = "";
+  if (!standalone) {
+    texto = "Estás a abrir pelo navegador. No iPhone, as notificações só funcionam dentro da app: abre pelo ícone no ecrã principal.";
+  } else if (ios && parseFloat(ios) < 16.4) {
+    texto = `O iOS deste iPhone (${ios}) é anterior ao 16.4. A Apple só permite notificações a partir do 16.4 — atualiza em Definições → Geral → Atualização de Software.`;
+  } else {
+    texto = "A app está aberta corretamente, mas o aparelho não disponibiliza notificações. Confirma que o iOS está atualizado.";
+  }
+  return { texto, standalone, ios };
+}
+
 function IconeSino({ cor = GOLD }: { cor?: string }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -44,10 +62,15 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
   }
 
   if (estado === "indisponivel") {
+    const d = diagnostico();
     return (
       <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 14 }}>
-        <div style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.5 }}>
-          Este aparelho não suporta notificações. No iPhone, instala primeiro a app no ecrã principal e abre por aí.
+        <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 10 }}>
+          {d.texto}
+        </div>
+        <div style={{ fontSize: 11, color: "#5f6f67", lineHeight: 1.6, borderTop: "1px solid #1a221d", paddingTop: 8 }}>
+          Diagnóstico: aberta como app: <strong style={{ color: d.standalone ? "#7fd1a3" : "#ef8d83" }}>{d.standalone ? "sim" : "não"}</strong>
+          {d.ios ? <> · iOS: <strong style={{ color: parseFloat(d.ios) >= 16.4 ? "#7fd1a3" : "#ef8d83" }}>{d.ios}</strong></> : null}
         </div>
       </div>
     );
