@@ -2,6 +2,8 @@
 //
 // Notificações de MERCADO (Grupo B), chamadas pelo cron 1x/dia.
 //  - ABERTO: uma vez por competição, a todos, a convidar a montar (com prazo).
+//  - VÉSPERA DO FECHO: uma vez por competição, SÓ a quem JÁ montou, a lembrar
+//    que ainda dá para conferir/ajustar a equipa antes de fechar (~1 dia antes).
 //  - FECHADO: uma vez por competição, personalizado — quem montou ("está em
 //    jogo") vs quem não montou ("ficaste de fora, prepara a próxima").
 //
@@ -9,7 +11,13 @@
 // aviso sai UMA vez por competição. USAR APENAS NO SERVIDOR.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { enviarPushPara } from "@/lib/pushServer";
-import { focoMercado, textoFecho } from "@/lib/calendario";
+import { focoMercado, estadoMercado, textoFecho, formatarContagem } from "@/lib/calendario";
+
+// Janela do lembrete de véspera: dispara quando falta ISTO ou menos para o
+// fecho (e ainda há tempo > 0). 28h (e não 24h) dá folga: como o cron corre
+// 1x/dia, garante que apanhamos o dia anterior mesmo que a hora do cron e a
+// hora do fecho não estejam perfeitamente alinhadas.
+const VESPERA_MS = 28 * 60 * 60 * 1000;
 
 // Reserva um evento (idempotência). true = ainda não tinha sido notificado.
 async function reservarEvento(chave: string): Promise<boolean> {
@@ -60,13 +68,14 @@ async function notificarMuitos(
 }
 
 /**
- * Verifica o estado do mercado e envia as notificações de aberto/fechado.
+ * Verifica o estado do mercado e envia as notificações de aberto/véspera/fechado.
  * Idempotente: cada aviso sai uma vez por competição.
  */
-export async function notificarMercado(hoje: Date = new Date()): Promise<{ aberto: string | null; fechado: string | null }> {
-  if (!supabaseAdmin) return { aberto: null, fechado: null };
+export async function notificarMercado(hoje: Date = new Date()): Promise<{ aberto: string | null; vespera: string | null; fechado: string | null }> {
+  if (!supabaseAdmin) return { aberto: null, vespera: null, fechado: null };
   const foco = focoMercado(hoje);
   let aberto: string | null = null;
+  let vespera: string | null = null;
   let fechado: string | null = null;
 
   // --- MERCADO ABERTO (competição alvo) ---
@@ -80,6 +89,36 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
       link: "/inicio",
     });
     aberto = foco.alvo.idCompeticao;
+  }
+
+  // --- VÉSPERA DO FECHO (competição alvo, mercado ainda aberto) ---
+  // Dispara quando falta ~1 dia para o mercado fechar e SÓ para quem JÁ montou —
+  // um empurrão para conferir/ajustar a equipa antes do fecho. Quem ainda não
+  // montou NÃO recebe este (a regra pedida foi só para quem montou). Uma vez por
+  // competição (chave mercado_vespera:<id>).
+  if (foco.alvo) {
+    const est = estadoMercado(foco.alvo, hoje);
+    // "Falta cerca de 1 dia": com hora oficial usamos msAteFecho; sem hora,
+    // calculamos os ms até à meia-noite do dia de início (quando o mercado fecha).
+    let msAteFecho: number | null = est.msAteFecho;
+    if (msAteFecho === null) {
+      const inicioDia = new Date(foco.alvo.de.replace(/\//g, "-") + "T00:00:00").getTime();
+      msAteFecho = inicioDia - hoje.getTime();
+    }
+    const naJanela = msAteFecho !== null && msAteFecho > 0 && msAteFecho <= VESPERA_MS;
+    if (naJanela && (await reservarEvento(`mercado_vespera:${foco.alvo.idCompeticao}`))) {
+      const montaram = await quemMontou(foco.alvo.idCompeticao);
+      if (montaram.length > 0) {
+        const restante = formatarContagem(msAteFecho); // ex.: "23h 10min" ou "1d 0h"
+        await notificarMuitos(montaram, {
+          tipo: "mercado",
+          titulo: `⏰ Última chance para ajustar: ${foco.alvo.nome}`,
+          corpo: `O mercado do ${foco.alvo.nome} fecha em ${restante}. Ainda dá para trocar atletas ou mudar o capitão — confere a tua equipa antes de fechar!`,
+          link: "/meu-time",
+        });
+      }
+      vespera = foco.alvo.idCompeticao;
+    }
   }
 
   // --- MERCADO FECHADO (competição a decorrer) ---
@@ -109,5 +148,5 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
     fechado = comp.idCompeticao;
   }
 
-  return { aberto, fechado };
+  return { aberto, vespera, fechado };
 }
