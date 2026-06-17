@@ -166,7 +166,7 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, o
     const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean; share?: any };
     try {
       if (nav.canShare && nav.canShare({ files: [file] })) {
-        await nav.share({ files: [file], title: "A minha equipa Ippon League", text: "Vê a minha equipa na Ippon League!" });
+        await nav.share({ files: [file], title: "A minha equipa Ippon League", text: "Vê a minha equipa na Ippon League! Joga também: https://www.ipponleague.com/inicio" });
         return;
       }
     } catch { /* cancelado */ }
@@ -265,7 +265,7 @@ function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capit
           {pro ? (
             <>
               <div className="foot-main pro">JOGA COM VANTAGEM.<br />SÊ IPPON PRO.</div>
-              <div className="foot-link">ippon-league.vercel.app</div>
+              <div className="foot-link">www.ipponleague.com</div>
             </>
           ) : (
             <>
