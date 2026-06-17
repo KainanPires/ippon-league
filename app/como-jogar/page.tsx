@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-const APP_URL = "https://ippon-league.vercel.app";
+const APP_URL = "https://www.ipponleague.com/inicio";
 
 const FAIXAS: { nome: string; cor: string }[] = [
   { nome: "Branca", cor: "#d7dcd6" },
@@ -200,7 +200,7 @@ export default function ComoJogar() {
               Partilhar este guia
             </button>
           )}
-          <div style={{ fontSize: 11, color: "#5f6f67", marginTop: 10 }}>ippon-league.vercel.app</div>
+          <div style={{ fontSize: 11, color: "#5f6f67", marginTop: 10 }}>www.ipponleague.com</div>
         </section>
       </div>
     </main>
