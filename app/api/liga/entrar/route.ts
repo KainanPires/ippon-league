@@ -90,7 +90,7 @@ export async function POST(req: Request) {
   //    e o sorteio automático nunca dispara.
   const { data: liga, error: erroLiga } = await supabaseAdmin
     .from("leagues")
-    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code, copa_estado, copa_fecho_inscricao, copa_competicao_inicial")
+    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code, copa_estado, copa_fecho_inscricao, copa_competicao_inicial, liga_competicao_inicial, fim_tipo, fim_valor, estado")
     .eq("invite_code", codigo)
     .maybeSingle();
   if (erroLiga || !liga) {
