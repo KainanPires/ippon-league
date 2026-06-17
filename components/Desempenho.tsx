@@ -23,6 +23,7 @@ export function Desempenho({
   pro = false,
   extra,
   daGaleria = false,
+  userId,
   onFechar,
   onNaoMostrarMais,
 }: {
@@ -34,12 +35,23 @@ export function Desempenho({
   pro?: boolean;
   extra?: ResumoExtra | null;
   daGaleria?: boolean;
+  userId?: string | null;
   onFechar: () => void;
   onNaoMostrarMais?: () => void;
 }) {
   const [partilhar, setPartilhar] = useState(false);
   const total = dados.pontuacaoTotal;
   const positivo = total >= 0;
+
+  // Link para rever a MINHA equipa desta rodada (modo visita, só-leitura). Abre o
+  // dojo com ?ver=<o meu próprio id>&comp=<competição da rodada>: o meu-time mostra
+  // a escalação FIXA daquele dia (grelha de tatame, pontos, detalhe luta-a-luta).
+  // Só faz sentido quando sabemos quem sou (userId) e qual a competição.
+  const podeVerEquipa = !!userId && !!dados.idCompeticao;
+  function verEquipaDaRodada() {
+    if (!podeVerEquipa) return;
+    window.location.href = `/meu-time?ver=${encodeURIComponent(userId!)}&comp=${encodeURIComponent(dados.idCompeticao)}`;
+  }
 
   return (
     <>
@@ -124,6 +136,14 @@ export function Desempenho({
           <button onClick={() => setPartilhar(true)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>
             Partilhar desempenho
           </button>
+
+          {/* Rever a equipa que escalei nesta rodada (só-leitura). */}
+          {podeVerEquipa && (
+            <button onClick={verEquipaDaRodada} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: "1px solid #2a4d3e", background: "transparent", color: "#aee9c9", fontFamily: FD, fontSize: 13.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer" }}>
+              Ver a minha equipa desta rodada
+            </button>
+          )}
+
           {/* Da galeria: só "Fechar". Do popup automático: "Não mostrar mais" (esconde
               o popup automático) + "Fechar" (só fecha, volta a aparecer no próximo login). */}
           {daGaleria ? (
