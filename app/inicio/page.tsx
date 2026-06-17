@@ -447,6 +447,7 @@ export default function Inicio() {
           pro={isPro}
           extra={extra}
           daGaleria={desempenhoDaGaleria}
+          userId={userIdState}
           onFechar={() => {
             setDesempenho(null);
             setExtra(null);
