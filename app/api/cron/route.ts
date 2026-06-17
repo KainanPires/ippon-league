@@ -3,6 +3,7 @@ import { competicaoDaSemana, competicaoFechada, focoMercado, CALENDARIO_2026, ty
 import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes } from "@/lib/ijf";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { congelarCompeticao } from "@/lib/congelar";
+import { competicaoPorId } from "@/lib/copa";
 import { notificarMercado } from "@/lib/notificarMercado";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
@@ -156,6 +157,57 @@ async function apurarCopasAtivas(base: string): Promise<{ league_id: string; nom
     }
   }
   return out;
+}
+
+// (C-ter) ENCERRA as ligas de PONTOS CORRIDOS cuja janela início→fim já acabou.
+// Marca estado='terminada'. Critério: hoje já passou o FIM EFETIVO da janela
+// (para fim por mês, o fim do mês; para fim por competição, a data dessa
+// competição). Não notifica (decidido: só marcar). Só toca em ligas 'ativa' com
+// fim definido — ligas antigas (sem fim) e copas ficam de fora.
+async function encerrarLigasTerminadas(hoje: Date): Promise<{ encerradas: number; ids: string[] }> {
+  if (!supabaseAdmin) return { encerradas: 0, ids: [] };
+  const { data: ligas } = await supabaseAdmin
+    .from("leagues")
+    .select("id, fim_tipo, fim_valor, fim_data, estado, formato")
+    .eq("formato", "pontos")
+    .eq("estado", "ativa");
+
+  const idsParaEncerrar: string[] = [];
+  for (const liga of ligas || []) {
+    const fimEfetivo = fimEfetivoDaLiga(liga);
+    if (!fimEfetivo) continue;          // sem fim definido (liga antiga): não toca
+    if (hoje > fimEfetivo) idsParaEncerrar.push(String(liga.id));
+  }
+
+  for (const id of idsParaEncerrar) {
+    await supabaseAdmin.from("leagues").update({ estado: "terminada" }).eq("id", id);
+  }
+  return { encerradas: idsParaEncerrar.length, ids: idsParaEncerrar };
+}
+
+// FIM EFETIVO de uma liga de pontos corridos (mesma regra da Peça 4 / liga-geral):
+//  • fim por mês        → último instante do mês de fim (a competição do mês conta);
+//  • fim por competição → a data dessa competição (fim do dia);
+//  • recurso            → a fim_data crua, se nada acima resolver.
+// Devolve null se a liga não tem fim definido.
+function fimEfetivoDaLiga(liga: { fim_tipo?: unknown; fim_valor?: unknown; fim_data?: unknown }): Date | null {
+  const fimTipo = String(liga.fim_tipo || "");
+  if (fimTipo === "mes") {
+    const m = /^(\d{4})-(\d{2})$/.exec(String(liga.fim_valor || ""));
+    if (m) {
+      const ano = Number(m[1]);
+      const mesIdx = Number(m[2]) - 1;
+      return new Date(ano, mesIdx + 1, 0, 23, 59, 59); // último dia do mês de fim
+    }
+  } else if (fimTipo === "competicao") {
+    const c = competicaoPorId(String(liga.fim_valor || ""));
+    if (c) return new Date(c.de.replace(/\//g, "-") + "T23:59:59");
+  }
+  if (liga.fim_data) {
+    const d = new Date(String(liga.fim_data));
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
 }
 
 // (D) Recalcula as faixas de um mês por percentil e grava em users.belt.
@@ -327,6 +379,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ feito: true, modo: "mercado_forcado", mercado: r, ms_total: Date.now() - t0 });
   }
 
+  // Disparo manual SÓ do encerramento de ligas terminadas (teste): ?encerrar=1
+  const soEncerrar = (searchParams.get("encerrar") || "").trim();
+  if (soEncerrar) {
+    let r: { encerradas: number; ids: string[] } = { encerradas: 0, ids: [] };
+    try { r = await encerrarLigasTerminadas(hoje); } catch { /* não bloqueia */ }
+    return NextResponse.json({ feito: true, modo: "encerrar_forcado", ligas_encerradas: r, ms_total: Date.now() - t0 });
+  }
+
   // (A) Atualiza a lista de "a competir agora" (para o aviso no Mercado).
   let aoVivo: { ao_vivo: string | null; atletas_ao_vivo: number } = { ao_vivo: null, atletas_ao_vivo: 0 };
   try {
@@ -384,6 +444,12 @@ export async function GET(req: Request) {
     copas = await apurarCopasAtivas(base);
   } catch { /* não bloqueia */ }
 
+  // (C-ter) ENCERRA as ligas de pontos corridos cuja janela início→fim acabou.
+  let ligasEncerradas: { encerradas: number; ids: string[] } = { encerradas: 0, ids: [] };
+  try {
+    ligasEncerradas = await encerrarLigasTerminadas(hoje);
+  } catch { /* não bloqueia */ }
+
   // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
   //     também forçar via ?faixas=AAAA-MM para teste manual.
   let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number> } | null = null;
@@ -417,6 +483,7 @@ export async function GET(req: Request) {
     total_atletas_atualizados: totalAtualizados,
     congelamentos,
     copas,
+    ligas_encerradas: ligasEncerradas,
     faixas,
     mercado,
     ms_total: Date.now() - t0,
