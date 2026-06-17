@@ -31,6 +31,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitionContests, scoreContestSide } from "@/lib/ijf";
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
+import { competicaoPorId } from "@/lib/copa";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -70,6 +71,14 @@ export async function GET(req: Request) {
   let nomeContinente: string | null = null;
   let continente: Continente | null = null;
 
+  // Janela início→fim da liga de amigos (Peça 4). Só as ligas de pontos corridos
+  // com início/fim definidos a têm; oficiais e ligas antigas (campos NULL) ficam
+  // sem janela e contam tudo, como antes. `limiteEfetivo`: para fim por mês é o
+  // FIM do mês de fim (a competição desse mês ainda conta), para fim por competição
+  // é a data dessa competição.
+  let janelaIni: Date | null = null;
+  let janelaFim: Date | null = null;
+
   if (league_id) {
     // LIGA DE AMIGOS: membros da liga.
     const { data: membros } = await supabaseAdmin
@@ -77,6 +86,36 @@ export async function GET(req: Request) {
       .select("user_id")
       .eq("league_id", league_id);
     userIds = (membros || []).map((m) => String(m.user_id));
+
+    // Lê a janela desta liga (se tiver).
+    const { data: ligaRow } = await supabaseAdmin
+      .from("leagues")
+      .select("liga_competicao_inicial, fim_tipo, fim_valor, fim_data")
+      .eq("id", league_id)
+      .maybeSingle();
+    if (ligaRow) {
+      const compIni = competicaoPorId(String(ligaRow.liga_competicao_inicial || ""));
+      if (compIni) janelaIni = new Date(compIni.de.replace(/\//g, "-") + "T00:00:00");
+      const fimTipo = String(ligaRow.fim_tipo || "");
+      if (fimTipo === "mes") {
+        // fim_valor = "AAAA-MM" → último instante desse mês (a competição do mês conta).
+        const m = /^(\d{4})-(\d{2})$/.exec(String(ligaRow.fim_valor || ""));
+        if (m) {
+          const ano = Number(m[1]);
+          const mesIdx = Number(m[2]) - 1;
+          // dia 0 do mês seguinte = último dia deste mês.
+          janelaFim = new Date(ano, mesIdx + 1, 0, 23, 59, 59);
+        }
+      } else if (fimTipo === "competicao") {
+        const compFim = competicaoPorId(String(ligaRow.fim_valor || ""));
+        if (compFim) janelaFim = new Date(compFim.de.replace(/\//g, "-") + "T23:59:59");
+      }
+      // Recurso: se não deu para derivar pela intenção, usa a fim_data crua.
+      if (!janelaFim && ligaRow.fim_data) {
+        const d = new Date(String(ligaRow.fim_data));
+        if (!isNaN(d.getTime())) janelaFim = d;
+      }
+    }
   } else if (tipo === "mundial" || tipo === "continental") {
     // OFICIAL: utilizadores Pro (filtrados por continente na continental).
     if (tipo === "continental") {
@@ -109,6 +148,20 @@ export async function GET(req: Request) {
   //    rodadas já congeladas. EXCLUI a competição que decorre agora (comp), para
   //    não a contar duas vezes (ela entra ao vivo no passo 4).
   // -------------------------------------------------------------------------
+  // Uma competição conta para esta liga? Fora da janela início→fim → não conta.
+  // Sem janela (oficiais / ligas antigas) → conta sempre. Competições que não
+  // estão no calendário (data desconhecida) contam, para não perder pontos.
+  function dentroDaJanela(idComp: string): boolean {
+    if (!janelaIni && !janelaFim) return true;
+    const c = competicaoPorId(idComp);
+    if (!c) return true;
+    const d = new Date(c.de.replace(/\//g, "-") + "T12:00:00");
+    if (isNaN(d.getTime())) return true;
+    if (janelaIni && d < janelaIni) return false;
+    if (janelaFim && d > janelaFim) return false;
+    return true;
+  }
+
   const { data: rodadas } = await supabaseAdmin
     .from("resultados_rodada")
     .select("user_id, pontos_rodada, id_competicao")
@@ -118,6 +171,7 @@ export async function GET(req: Request) {
   for (const r of rodadas || []) {
     const u = String(r.user_id);
     if (String(r.id_competicao) === comp) continue; // a atual entra ao vivo
+    if (!dentroDaJanela(String(r.id_competicao))) continue; // fora da janela da liga
     geralPorUser.set(u, (geralPorUser.get(u) ?? 0) + Number(r.pontos_rodada ?? 0));
   }
 
@@ -174,12 +228,16 @@ export async function GET(req: Request) {
   // -------------------------------------------------------------------------
   // 6) Monta cada linha: geral = histórico + rodada ao vivo.
   // -------------------------------------------------------------------------
+  // A competição atual conta para esta liga? (Se já é depois do fim da liga, ou
+  // antes do início, a rodada ao vivo não entra no geral desta liga.)
+  const atualNaJanela = dentroDaJanela(comp);
+
   const linhas: MembroGeral[] = userIds.map((uid) => {
     const eq = equipaDe.get(uid);
-    // Rodada ao vivo (só se escalou nesta competição).
+    // Rodada ao vivo (só se escalou nesta competição E ela está na janela da liga).
     let pontosRodada = 0;
     let escalou = false;
-    if (eq && eq.atletas.length > 0) {
+    if (eq && eq.atletas.length > 0 && atualNaJanela) {
       escalou = true;
       for (const aid of eq.atletas) {
         const p = pontosPorAtleta[aid] ?? 0;
