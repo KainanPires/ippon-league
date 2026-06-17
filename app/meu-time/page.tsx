@@ -7,7 +7,7 @@ import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/compone
 import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
-import { focoMercado } from "@/lib/calendario";
+import { focoMercado, numeroDaRodada, CALENDARIO_2026 } from "@/lib/calendario";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, type TutKey } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
@@ -152,6 +152,19 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
 
   const foco = focoMercado();
   const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp;
+
+  // Rodada + data desta competição, tiradas do calendário local pelo idComp
+  // (mais robusto do que depender da API). A data vem no formato AAAA/MM/DD e
+  // mostramo-la como DD/MM/AAAA. rodadaNum é o nº da rodada (1..52) ou null.
+  const rodadaNum = numeroDaRodada(idComp);
+  const dataRodada = (() => {
+    const ent = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
+    if (!ent || !ent.de) return "";
+    const partes = ent.de.split("/"); // [AAAA, MM, DD]
+    if (partes.length !== 3) return "";
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
+  })();
+  const linhaRodada = [rodadaNum ? `Rodada ${rodadaNum}` : "", dataRodada].filter(Boolean).join(" · ");
 
   // 1) Sessão (exige login) + equipa do alvo (servidor) + pool da competição.
   useEffect(() => {
@@ -310,6 +323,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
                 <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.06em" }}>Dojo de</div>
                 <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeTime}</div>
                 {nomeComp && <div style={{ fontSize: 11, color: "#7fd1a3", marginTop: 1 }}>{nomeComp}</div>}
+                {linhaRodada && <div style={{ fontSize: 11, color: "#93a39a", marginTop: 1 }}>{linhaRodada}</div>}
               </div>
             </div>
 
