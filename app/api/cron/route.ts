@@ -4,6 +4,7 @@ import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes } from "@/lib/ij
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { congelarCompeticao } from "@/lib/congelar";
 import { notificarMercado } from "@/lib/notificarMercado";
+import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
 // CRON — prepara sozinho os preços/forma da competição que se aproxima.
 // Corre 1x/dia (vercel.json). Com Fluid Compute, uma função corre até 300s — as
@@ -189,10 +190,70 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
     }
   }
 
+  // Faixas ANTIGAS (antes de gravar), para sabermos quem mudou e em que sentido.
+  // Só precisamos disto se o percentil estiver ativo (senão está toda a gente na
+  // branca e não há mudança real a celebrar).
+  const faixaAntiga = new Map<string, string>();
+  if (percentilAtivo) {
+    const ids = atualizacoes.map((a) => a.user_id);
+    // Lê em lotes para não estourar o limite do .in().
+    for (let i = 0; i < ids.length; i += 500) {
+      const lote = ids.slice(i, i + 500);
+      const { data } = await supabaseAdmin.from("users").select("id, belt").in("id", lote);
+      for (const u of data || []) faixaAntiga.set(String(u.id), String(u.belt ?? "branca"));
+    }
+  }
+
   for (const a of atualizacoes) {
     await supabaseAdmin.from("users").update({ belt: a.faixa }).eq("id", a.user_id);
   }
+
+  // Notificação de SUBIDA / DESCIDA de faixa. Só quando o percentil está ativo
+  // (≥ MIN_JOGADORES) e só a quem REALMENTE mudou de faixa. Subida = festa;
+  // descida = motivação sem desânimo. (Decidido com o Kainan.)
+  if (percentilAtivo) {
+    for (const a of atualizacoes) {
+      const antes = faixaAntiga.get(a.user_id) ?? "branca";
+      if (antes === a.faixa) continue; // não mudou: não notifica
+      const subiu = ordemFaixa(a.faixa) > ordemFaixa(antes);
+      if (subiu) {
+        await criarNotificacaoServidor({
+          paraUserId: a.user_id,
+          tipo: "faixa_subiu",
+          titulo: `🥋 Subiste para a faixa ${nomeFaixa(a.faixa)}!`,
+          corpo: `Parabéns! O teu desempenho levou-te à faixa ${nomeFaixa(a.faixa)}. Estás entre os melhores — continua assim e vai mais longe!`,
+          link: "/inicio",
+        });
+      } else {
+        await criarNotificacaoServidor({
+          paraUserId: a.user_id,
+          tipo: "faixa_desceu",
+          titulo: `Faixa ${nomeFaixa(a.faixa)} — a próxima é tua`,
+          corpo: `Desta vez desceste para a faixa ${nomeFaixa(a.faixa)}, mas isto faz parte do jogo. Monta uma boa equipa na próxima rodada e recupera o teu lugar — acreditamos em ti!`,
+          link: "/inicio",
+        });
+      }
+    }
+  }
+
   return { jogadores: n, percentilAtivo, distribuicao };
+}
+
+// Ordem das faixas (maior nº = melhor). Para distinguir subida de descida.
+function ordemFaixa(faixa: string): number {
+  const ordem: Record<string, number> = {
+    branca: 0, azul: 1, amarela: 2, verde: 3, roxa: 4, marrom: 5, preta: 6,
+  };
+  return ordem[faixa] ?? 0;
+}
+
+// Nome bonito da faixa para mostrar nas notificações.
+function nomeFaixa(faixa: string): string {
+  const nomes: Record<string, string> = {
+    branca: "Branca", azul: "Azul", amarela: "Amarela", verde: "Verde",
+    roxa: "Roxa", marrom: "Marrom", preta: "Preta",
+  };
+  return nomes[faixa] ?? faixa;
 }
 
 // Mês anterior ao da data dada, "AAAA-MM".
