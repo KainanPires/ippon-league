@@ -8,6 +8,11 @@
 // O email NÃO faz falhar o pedido: se o envio falhar, a mensagem já está
 // guardada e devolvemos ok:true na mesma.
 //
+// ANEXO (print): a página pode mandar uma imagem (campo `anexo`: { nome, tipo,
+// dados_base64 }). Essa imagem NÃO é guardada na tabela — vai apenas ANEXADA ao
+// email de aviso, para o suporte ver o mesmo ecrã que o utilizador. Limites:
+// só imagens, até ~4 MB.
+//
 // Configuração do email (variáveis de ambiente na Vercel):
 //   RESEND_API_KEY  -> chave da conta Resend (obrigatória para enviar email)
 //   MAIL_TO         -> destino dos avisos (por omissão: support@ipponleague.com)
@@ -28,6 +33,9 @@ const ASSUNTOS = [
 ];
 
 const MAX_CORPO = 4000;
+// Limite do anexo: ~4 MB já em base64 (um print normal fica bem abaixo disto).
+const MAX_ANEXO_B64 = 4 * 1024 * 1024;
+const TIPOS_IMAGEM = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/heic"];
 
 const MAIL_TO = process.env.MAIL_TO || "support@ipponleague.com";
 const MAIL_FROM = process.env.MAIL_FROM || "Ippon League <support@ipponleague.com>";
@@ -36,10 +44,13 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+type AnexoLimpo = { nome: string; conteudo_b64: string } | null;
+
 // Envia o email de aviso via Resend. Devolve true/false; nunca lança.
 async function enviarAviso(dados: {
   assunto: string; corpo: string; nome: string; email: string;
   nomeTime: string; faixa: string; pais: string; isPro: boolean; isElogio: boolean;
+  anexo: AnexoLimpo;
 }): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return false;
@@ -53,6 +64,7 @@ async function enviarAviso(dados: {
     dados.faixa ? `<p style="margin:0 0 4px"><strong>Faixa:</strong> ${escapeHtml(dados.faixa)}</p>` : "",
     dados.pais ? `<p style="margin:0 0 4px"><strong>País:</strong> ${escapeHtml(dados.pais)}</p>` : "",
     `<p style="margin:0 0 4px"><strong>Pro:</strong> ${dados.isPro ? "sim" : "não"}</p>`,
+    dados.anexo ? `<p style="margin:0 0 4px"><strong>Anexo:</strong> ${escapeHtml(dados.anexo.nome)} (em anexo)</p>` : "",
     `<hr style="border:none;border-top:1px solid #ddd;margin:12px 0" />`,
     `<p style="white-space:pre-wrap;margin:0">${escapeHtml(dados.corpo)}</p>`,
   ].filter(Boolean);
@@ -66,6 +78,10 @@ async function enviarAviso(dados: {
   };
   // Responder ao email do remetente cai diretamente no utilizador.
   if (dados.email) payload.reply_to = dados.email;
+  // Anexo (print): o Resend aceita anexos com conteúdo em base64.
+  if (dados.anexo) {
+    payload.attachments = [{ filename: dados.anexo.nome, content: dados.anexo.conteudo_b64 }];
+  }
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -77,6 +93,29 @@ async function enviarAviso(dados: {
   } catch {
     return false;
   }
+}
+
+// Valida e limpa o anexo recebido. Devolve null se não houver, ou se for
+// inválido (tipo não-imagem ou demasiado grande) — nunca lança.
+function limparAnexo(bruto: unknown): AnexoLimpo {
+  if (!bruto || typeof bruto !== "object") return null;
+  const a = bruto as { nome?: unknown; tipo?: unknown; dados_base64?: unknown };
+  const tipo = String(a.tipo ?? "").toLowerCase();
+  let dados = String(a.dados_base64 ?? "");
+  if (!dados) return null;
+  // Aceita também "data:image/png;base64,XXXX" — fica só com o XXXX.
+  const virgula = dados.indexOf(",");
+  if (dados.startsWith("data:") && virgula !== -1) dados = dados.slice(virgula + 1);
+  if (!TIPOS_IMAGEM.includes(tipo)) return null;
+  if (dados.length > MAX_ANEXO_B64) return null;
+
+  // Nome seguro com a extensão certa.
+  const ext = tipo === "image/jpeg" || tipo === "image/jpg" ? "jpg" : tipo.split("/")[1] || "png";
+  let nome = String(a.nome ?? "").trim().replace(/[^\w.\-]/g, "_").slice(0, 60);
+  if (!nome) nome = `print.${ext}`;
+  else if (!nome.includes(".")) nome = `${nome}.${ext}`;
+
+  return { nome, conteudo_b64: dados };
 }
 
 export async function POST(req: NextRequest) {
@@ -100,6 +139,7 @@ export async function POST(req: NextRequest) {
   const pais = body.pais ? String(body.pais) : "";
   const isPro = !!body.is_pro;
   const userId = body.user_id ? String(body.user_id) : null;
+  const anexo = limparAnexo(body.anexo);
 
   if (!ASSUNTOS.includes(assunto)) {
     return NextResponse.json({ ok: false, erro: "Escolhe um assunto." }, { status: 400 });
@@ -126,6 +166,7 @@ export async function POST(req: NextRequest) {
     is_pro: isPro,
     is_elogio: isElogio,
     consentimento_publico: consentimento,
+    tem_anexo: !!anexo,
     estado: "novo",
   });
 
@@ -133,8 +174,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, erro: "Não foi possível enviar. Tenta de novo." }, { status: 500 });
   }
 
-  // Aviso por email (não bloqueia: a mensagem já está guardada).
-  await enviarAviso({ assunto, corpo, nome, email, nomeTime, faixa, pais, isPro, isElogio });
+  // Aviso por email (não bloqueia: a mensagem já está guardada). O print, se
+  // houver, vai anexado a este email.
+  await enviarAviso({ assunto, corpo, nome, email, nomeTime, faixa, pais, isPro, isElogio, anexo });
 
   return NextResponse.json({ ok: true });
 }
