@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
+import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
@@ -425,6 +425,10 @@ function MeuTimeInner() {
   // gravar podiam usar chaves diferentes (edição vs competição) num instante de
   // carregamento, e o tutorial reaparecia sempre. (Bug corrigido.)
   const [tutKeyAberta, setTutKeyAberta] = useState<TutKey | null>(null);
+  // Tutoriais já vistos NA CONTA — carregados uma vez quando a sessão entra.
+  // null = ainda não sabemos (não decidir o tutorial antes disto chegar, senão
+  // reaparece sempre por causa do timing). {} = já sabemos e não há nenhum visto.
+  const [vistosConta, setVistosConta] = useState<Record<string, boolean> | null>(null);
   const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const router = useRouter();
@@ -501,7 +505,23 @@ function MeuTimeInner() {
         const meta = (data.session as { user?: { user_metadata?: { is_pro?: boolean } } } | null)?.user?.user_metadata;
         setIsPro(!!meta?.is_pro);
       } catch {}
+      // Tutoriais já vistos na CONTA — buscar uma vez (decide o tutorial só
+      // depois disto chegar, para não reaparecer por causa do timing).
+      tutoriaisVistosConta().then((v) => { if (active) setVistosConta(v || {}); }).catch(() => { if (active) setVistosConta({}); });
       (async () => {
+        // IDENTIDADE da CONTA é a fonte de verdade do nome/escudo. Lemos da nuvem
+        // e aplicamos por cima do que veio do localStorage — assim o nome
+        // ("Relâmpago Marquinhos") não se perde ao limpar o browser ou ao mudar
+        // de endereço/aparelho. Só sobrepomos o que a nuvem traz (nome e/ou escudo).
+        loadIdentityCloudFor(alvo.idCompeticao).then((idc) => {
+          if (!active || !idc) return;
+          setIdentity((prev) => ({
+            ...prev,
+            ...(idc.escudo ? (idc.escudo as Partial<Identity>) : {}),
+            ...(idc.name ? { name: idc.name } : {}),
+          }));
+        }).catch(() => {});
+
         const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
         if (!active) return;
         if (naDecorrer && naDecorrer.ids.length > 0 && aDecorrer) {
@@ -596,26 +616,24 @@ function MeuTimeInner() {
   // aqui (antes do return) para o efeito de "primeira vez" poder usá-lo.
   const emCompeticaoNow = emAndamento && idComp === atual.idCompeticao && team.ids.length > 0;
 
-  // TUTORIAL — primeira vez: abre automaticamente uma vez por modo. Se a pessoa
-  // pula ou escolhe "não ver mais", fica marcado e só reabre pelo "?".
+  // TUTORIAL — primeira vez: abre automaticamente uma vez por modo. Só decide
+  // DEPOIS de sabermos o que já foi visto na CONTA (vistosConta !== null). Sem
+  // isto, o efeito corria antes da conta responder e o tutorial reaparecia mesmo
+  // tendo sido pulado. Verifica as DUAS fontes: cache local E conta.
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || vistosConta === null) return;
     const chave = emCompeticaoNow ? TUT_COMP_KEY : TUT_EDICAO_KEY;
-    let active = true;
-    if (!tutorialVistoLocal(chave)) {
-      tutoriaisVistosConta().then((vistos) => {
-        if (!active) return;
-        if (vistos[chave]) {
-          try { localStorage.setItem(chave, "done"); } catch {}
-        } else {
-          setTutKeyAberta(chave); // regista QUAL tutorial abriu (para o pular gravar a certa)
-          setGuide(0);
-        }
-      });
+    const jaVisto = tutorialVistoLocal(chave) || !!vistosConta[chave];
+    if (jaVisto) {
+      // Se a conta já o tem mas o local não (ex.: novo endereço/aparelho),
+      // alinha a cache local para não voltar a verificar à rede da próxima vez.
+      if (vistosConta[chave]) { try { localStorage.setItem(chave, "done"); } catch {} }
+      return;
     }
-    return () => { active = false; };
+    setTutKeyAberta(chave); // regista QUAL tutorial abriu (para o pular gravar a certa)
+    setGuide(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, emCompeticaoNow]);
+  }, [ready, vistosConta, emCompeticaoNow]);
 
   if (!ready) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
 
@@ -1028,7 +1046,11 @@ function MeuTimeInner() {
             // Marca como visto EXATAMENTE a chave que abriu este tutorial.
             // (Usar tutKeyAberta — não recalcular por emCompeticao — evita o bug
             // de abrir um tutorial e gravar outro, que o fazia reaparecer sempre.)
-            marcarTutorialVisto(tutKeyAberta ?? (emCompeticao ? TUT_COMP_KEY : TUT_EDICAO_KEY));
+            const chave = tutKeyAberta ?? (emCompeticao ? TUT_COMP_KEY : TUT_EDICAO_KEY);
+            marcarTutorialVisto(chave);
+            // Atualiza também o estado local em memória, para o efeito de "primeira
+            // vez" não reabrir o tutorial enquanto esta sessão continua aberta.
+            setVistosConta((prev) => ({ ...(prev ?? {}), [chave]: true }));
             setGuide(null);
             setTutKeyAberta(null);
           }}
