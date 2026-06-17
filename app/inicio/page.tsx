@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
-import { loadSavedFor, resolve, loadSavedCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
-import { loadIdentity } from "@/components/Escudo";
+import { loadSavedFor, resolve, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
+import { loadIdentity, type Identity } from "@/components/Escudo";
 import { Desempenho } from "@/components/Desempenho";
 import { GaleriaResumos } from "@/components/GaleriaResumos";
 import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
@@ -64,6 +64,11 @@ export default function Inicio() {
   const [desempenhoDaGaleria, setDesempenhoDaGaleria] = useState(false);
   const [galeriaAberta, setGaleriaAberta] = useState(false);
   const [userIdState, setUserIdState] = useState<string | null>(null);
+  // Identidade (nome + escudo) a usar no cartão de resumo. Arranca da identidade
+  // local (rápida), mas ao abrir um resumo é substituída pela identidade REAL da
+  // conta vinda da cloud (loadIdentityCloudFor) — senão o cartão saía com "A minha
+  // equipa" + escudo cinza quando o localStorage não tinha a identidade carregada.
+  const [identityResumo, setIdentityResumo] = useState<Identity>(loadIdentity());
   const [, bumpPool] = useState(0);
 
   const beltRef = useRef<HTMLAnchorElement | null>(null);
@@ -181,6 +186,8 @@ export default function Inicio() {
           if (!active) return;
           const dados = construirDesempenho(aDecorrer.idCompeticao, aDecorrer.nome, teamComp, pontos);
           if (dados) {
+            await carregarIdentidadeResumo(aDecorrer.idCompeticao);
+            if (!active) return;
             setDesempenho({ dados, team: teamComp });
             await notificarResumo(aDecorrer.idCompeticao, aDecorrer.nome, dados);
           }
@@ -202,6 +209,8 @@ export default function Inicio() {
         if (!dados) return;
         let ex: ResumoExtra | null = null;
         if (userId) ex = await buscarResumoExtra(cong.comp, userId);
+        if (!active) return;
+        await carregarIdentidadeResumo(cong.comp);
         if (!active) return;
         setDesempenho({ dados, team: teamComp });
         setExtra(ex);
@@ -245,10 +254,30 @@ export default function Inicio() {
     if (!dados) return;
     let ex: ResumoExtra | null = null;
     if (userIdState) ex = await buscarResumoExtra(cong.comp, userIdState);
+    await carregarIdentidadeResumo(cong.comp);
     setDesempenho({ dados, team: teamComp });
     setExtra(ex);
     setDesempenhoDaGaleria(true);
     setGaleriaAberta(false);
+  }
+
+  // Carrega a identidade REAL da conta para a competição do resumo (nome + escudo
+  // gravados na tabela `equipas`). Faz merge sobre a identidade local: começa de
+  // loadIdentity() e sobrepõe só o que a cloud trouxer, para nenhum campo do tipo
+  // Identity ficar em falta. Assim o cartão mostra o nome/escudo certos.
+  async function carregarIdentidadeResumo(idComp: string) {
+    const base = loadIdentity();
+    try {
+      const cloud = await loadIdentityCloudFor(idComp);
+      if (cloud && (cloud.name || cloud.escudo)) {
+        const doEscudo = (cloud.escudo && typeof cloud.escudo === "object") ? (cloud.escudo as Partial<Identity>) : {};
+        const merged: Identity = { ...base, ...doEscudo } as Identity;
+        if (cloud.name) merged.name = cloud.name;
+        setIdentityResumo(merged);
+        return;
+      }
+    } catch {}
+    setIdentityResumo(base);
   }
 
   if (!ready) {
@@ -440,7 +469,7 @@ export default function Inicio() {
       {desempenho && (
         <Desempenho
           dados={desempenho.dados}
-          identity={loadIdentity()}
+          identity={identityResumo}
           team={desempenho.team}
           nome={nomeMostrado || "Campeão"}
           faixa={nomeDaFaixa(faixaJogo)}
