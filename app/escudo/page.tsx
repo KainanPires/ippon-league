@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Escudo, SymbolGlyph, loadIdentity, saveIdentity, SHAPES, PATTERNS, SYMBOLS, COLORS, type Identity, type ShapeId, type PatternId, type SymbolId } from "@/components/Escudo";
 import { atualizarIdentidadeCloud } from "@/lib/team";
+import { supabase } from "@/lib/supabase";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -34,6 +35,9 @@ export default function EscudoEditorPage() {
   const [slot, setSlot] = useState<Slot>("bg1");
   const [erro, setErro] = useState("");
   const [aGuardar, setAGuardar] = useState(false);
+  // Nome único: sugestões livres quando o nome escolhido já existe.
+  const [sugestoes, setSugestoes] = useState<string[]>([]);
+  const [aVerificarNome, setAVerificarNome] = useState(false);
 
   useEffect(() => {
     const carregado = loadIdentity();
@@ -49,11 +53,19 @@ export default function EscudoEditorPage() {
 
   function set<K extends keyof Identity>(key: K, value: Identity[K]) {
     setId((prev) => (prev ? { ...prev, [key]: value } : prev));
-    if (key === "name") setErro("");
+    // Mexer no nome limpa o erro e as sugestões (vai ter de re-verificar).
+    if (key === "name") { setErro(""); setSugestoes([]); }
   }
   function rnd<T>(a: T[]): T { return a[Math.floor(Math.random() * a.length)]; }
   function sortear() {
     setId((p) => p ? { ...p, shape: rnd(SHAPES), pattern: rnd(PATTERNS).id, symbol: rnd(SYMBOLS).id, bg1: rnd(COLORS), bg2: rnd(COLORS), stamp1: rnd(COLORS), stamp2: rnd(COLORS), border: rnd(COLORS) } : p);
+  }
+
+  // Aplica uma sugestão clicada: preenche o campo e limpa o aviso.
+  function escolherSugestao(s: string) {
+    setId((prev) => (prev ? { ...prev, name: s } : prev));
+    setErro("");
+    setSugestoes([]);
   }
 
   async function guardar() {
@@ -61,10 +73,37 @@ export default function EscudoEditorPage() {
     // NOME OBRIGATÓRIO: sem nome, não avança.
     if (nome.length < 2) {
       setErro("Dá um nome ao teu time para continuar.");
-      // leva o foco/scroll ao topo onde está o campo
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+
+    // NOME ÚNICO: antes de guardar, confirma que ninguém mais usa este nome.
+    // Se estiver ocupado, mostramos o aviso + sugestões livres e NÃO guardamos.
+    setAVerificarNome(true);
+    setErro("");
+    setSugestoes([]);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id ?? "";
+      const params = new URLSearchParams({ nome });
+      if (uid) params.set("user_id", uid);
+      const res = await fetch(`/api/nome-disponivel?${params.toString()}`);
+      const j = await res.json();
+      if (j && j.ok && j.livre === false) {
+        setErro("Esse nome de time já está em uso. Escolhe outro:");
+        setSugestoes(Array.isArray(j.sugestoes) ? j.sugestoes : []);
+        setAVerificarNome(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      // Se a verificação falhar (erro de rede/servidor), não bloqueamos o
+      // utilizador — deixamos guardar (a unicidade é "best effort" no cliente;
+      // o objetivo é evitar colisões óbvias, não trancar quem quer jogar).
+    } catch {
+      // rede falhou: segue para guardar (não prende a pessoa).
+    }
+    setAVerificarNome(false);
+
     setAGuardar(true);
     const identidade = { ...id!, name: nome };
     // 1) Local (rápido, para o resto da app ver já).
@@ -80,6 +119,7 @@ export default function EscudoEditorPage() {
   }
 
   const nomeVazio = (id.name || "").trim().length < 2;
+  const ocupado = (aGuardar || aVerificarNome) ? false : sugestoes.length > 0;
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -119,8 +159,19 @@ export default function EscudoEditorPage() {
         <div style={{ padding: "18px 16px 0" }}>
           <Label>Nome do time <span style={{ color: GOLD }}>*</span></Label>
           <input value={id.name} onChange={(e) => set("name", e.target.value.slice(0, 24))} placeholder="Escreve o nome da tua equipa"
-            style={{ width: "100%", boxSizing: "border-box", background: "#141a17", border: `1px solid ${erro ? "#c0392b" : "#243029"}`, borderRadius: 12, padding: "12px 14px", color: "#f1ede2", fontSize: 15, fontFamily: FB, outline: "none", marginBottom: erro ? 8 : 24 }} />
-          {erro && <div style={{ fontSize: 12.5, color: "#ef8d83", marginBottom: 20, fontWeight: 700 }}>{erro}</div>}
+            style={{ width: "100%", boxSizing: "border-box", background: "#141a17", border: `1px solid ${erro ? "#c0392b" : "#243029"}`, borderRadius: 12, padding: "12px 14px", color: "#f1ede2", fontSize: 15, fontFamily: FB, outline: "none", marginBottom: (erro || ocupado) ? 8 : 24 }} />
+          {erro && <div style={{ fontSize: 12.5, color: "#ef8d83", marginBottom: ocupado ? 10 : 20, fontWeight: 700 }}>{erro}</div>}
+
+          {/* Sugestões de nomes LIVRES quando o escolhido já existe. */}
+          {ocupado && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 22 }}>
+              {sugestoes.map((s) => (
+                <button key={s} onClick={() => escolherSugestao(s)} style={{ background: "#16201b", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontSize: 13, fontWeight: 700, padding: "8px 13px", borderRadius: 999, cursor: "pointer" }}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
 
           <CenterLabel>Escolher forma</CenterLabel>
           <ScrollRow>
@@ -169,8 +220,8 @@ export default function EscudoEditorPage() {
 
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "12px 16px", zIndex: 50 }}>
         <div style={{ maxWidth: 460, margin: "0 auto" }}>
-          <button onClick={guardar} disabled={aGuardar} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: nomeVazio ? "#3a2f12" : ORANGE, color: nomeVazio ? GOLD : "#1b0f06", fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", cursor: aGuardar ? "default" : "pointer" }}>
-            {aGuardar ? "A guardar…" : nomeVazio ? "Dá um nome para salvar" : "Salvar escudo"}
+          <button onClick={guardar} disabled={aGuardar || aVerificarNome} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: nomeVazio ? "#3a2f12" : ORANGE, color: nomeVazio ? GOLD : "#1b0f06", fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", cursor: (aGuardar || aVerificarNome) ? "default" : "pointer" }}>
+            {aVerificarNome ? "A verificar o nome…" : aGuardar ? "A guardar…" : nomeVazio ? "Dá um nome para salvar" : "Salvar escudo"}
           </button>
         </div>
       </div>
