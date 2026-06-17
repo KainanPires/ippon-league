@@ -257,6 +257,15 @@ export async function GET(req: Request) {
     return NextResponse.json({ feito: true, modo: "congelar_forcado", resultado: r, ms_total: Date.now() - t0 });
   }
 
+  // Disparo manual SÓ das notificações de mercado (teste rápido): ?mercado=1
+  // Corre apenas a etapa (E) e responde de imediato, sem as 14 categorias.
+  const soMercado = (searchParams.get("mercado") || "").trim();
+  if (soMercado) {
+    let r: { aberto: string | null; fechado: string | null } | null = null;
+    try { r = await notificarMercado(hoje); } catch { /* não bloqueia */ }
+    return NextResponse.json({ feito: true, modo: "mercado_forcado", mercado: r, ms_total: Date.now() - t0 });
+  }
+
   // (A) Atualiza a lista de "a competir agora" (para o aviso no Mercado).
   let aoVivo: { ao_vivo: string | null; atletas_ao_vivo: number } = { ao_vivo: null, atletas_ao_vivo: 0 };
   try {
@@ -331,7 +340,7 @@ export async function GET(req: Request) {
 
   // (E) Notificações de MERCADO (aberto/fechado), idempotentes. Uma vez por
   //     competição. Não bloqueia o resto do cron se falhar.
-  let mercado: { aberto: string | null; fechado: string | null } | null = null;
+  let mercado: { aberto: string | null; vespera: string | null; fechado: string | null } | null = null;
   try {
     mercado = await notificarMercado(hoje);
   } catch { /* não bloqueia */ }
