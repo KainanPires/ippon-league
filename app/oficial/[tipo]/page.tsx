@@ -75,6 +75,15 @@ export default function PaginaOficial() {
   const membrosVisiveis = filtrar(membros);
   const geralVisivel = filtrar(geral);
 
+  // A MINHA posição em cada vista (para o destaque fixo no topo). Procuro-me na
+  // lista completa (não na filtrada), para o destaque não desaparecer ao pesquisar.
+  const euGeral = meuId ? geral.find((m) => m.user_id === meuId) : undefined;
+  const euRodada = meuId ? membros.find((m) => m.user_id === meuId) : undefined;
+  const minhaPosGeral = euGeral && euGeral.pontos_geral > 0 ? euGeral.posicao : null;
+  const minhaPosRodada = euRodada && euRodada.escalou ? euRodada.posicao : null;
+  const totalGeral = geral.length;
+  const totalRodada = membros.filter((m) => m.escalou).length;
+
   // 1) Ranking da RODADA (ao vivo do IJF, via /api/liga/oficial).
   useEffect(() => {
     let vivo = true;
@@ -147,6 +156,10 @@ export default function PaginaOficial() {
     };
   }, [estado, ehMundial, idComp, meuId, emAndamento]);
 
+  // Dados do destaque conforme a vista ativa.
+  const minhaPos = vista === "geral" ? minhaPosGeral : minhaPosRodada;
+  const totalVista = vista === "geral" ? totalGeral : totalRodada;
+
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 40px" }}>
@@ -187,6 +200,29 @@ export default function PaginaOficial() {
             </button>
           ))}
         </div>
+
+        {/* Destaque FIXO da minha posição (na vista ativa). Sempre visível, para
+            saber onde estou sem ter de procurar na lista. Só Pro e se estou no
+            ranking; senão, um convite suave a escalar / ser Pro. */}
+        {estado === "pronto" && souPro && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "11px 14px", marginBottom: 13 }}>
+            <div style={{ flexShrink: 0, width: 40, textAlign: "center" }}>
+              {minhaPos !== null ? (
+                <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: GOLD, lineHeight: 1 }}>{`${minhaPos}º`}</div>
+              ) : (
+                <div style={{ fontFamily: FD, fontSize: 20, color: "#7c8a82", lineHeight: 1 }}>—</div>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#aee9c9" }}>A tua posição</div>
+              <div style={{ fontSize: 12, color: "#c7d0c9", marginTop: 2 }}>
+                {minhaPos !== null
+                  ? <>{vista === "geral" ? "Ranking do ano" : "Nesta rodada"} · entre {totalVista} {totalVista === 1 ? "jogador" : "jogadores"}</>
+                  : (vista === "geral" ? "Ainda sem pontos no ano. Escala e começa a pontuar!" : "Não escalaste nesta rodada.")}
+              </div>
+            </div>
+          </div>
+        )}
 
         {estado === "a_carregar" && <Aviso>A carregar o ranking…</Aviso>}
 
