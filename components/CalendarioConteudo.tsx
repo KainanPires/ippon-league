@@ -1,3 +1,5 @@
+"use client";
+
 // Miolo do Calendário 2026 — usado como aba dentro de /ligas.
 // Só o conteúdo (explicação + lista das 52 semanas); sem header nem navegação,
 // para encaixar em qualquer ecrã. Regra do "clássico cego":
@@ -5,7 +7,12 @@
 //  - Clássico com mercado ABERTO: "Clássico Nº {rodada}" + nível e ano (sem dizer
 //    qual). No DIA (mercado fechado), revela o nome completo com a cidade.
 // Estados: passada (cinza), a decorrer (verde), próxima (dourado a pulsar), futura.
+//
+// Ao ABRIR a aba, leva o scroll até à competição atual/próxima (o primeiro cartão
+// que ainda não terminou). A lista e a ordem ficam iguais; subindo o scroll vêem-se
+// as competições antigas.
 
+import { useEffect, useRef } from "react";
 import {
   CALENDARIO_2026,
   estadoMercado,
@@ -33,6 +40,25 @@ export function CalendarioConteudo() {
   const alvoId = foco.alvo.idCompeticao;
   const lista = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
 
+  // Cartão-alvo do scroll: o PRIMEIRO que ainda não terminou (em ordem
+  // cronológica = o que está a decorrer ou o próximo). Pela própria lista, para
+  // a ref estar sempre num cartão real. Se já tudo terminou, fica no último.
+  let idxAlvo = lista.findIndex((s) => !competicaoFechada(s));
+  if (idxAlvo < 0) idxAlvo = lista.length - 1;
+
+  const alvoRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Ao abrir a aba, salta até ao cartão-alvo. Duas tentativas curtas chegam:
+    // a lista é renderizada já, e não há navegação a repor o scroll.
+    let cancelado = false;
+    const timers = [40, 160].map((ms) => window.setTimeout(() => {
+      if (cancelado) return;
+      alvoRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    }, ms));
+    return () => { cancelado = true; timers.forEach((t) => clearTimeout(t)); };
+  }, [idxAlvo]);
+
   return (
     <div>
       <style>{`@keyframes pulsoOuro {
@@ -52,15 +78,20 @@ export function CalendarioConteudo() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-        {lista.map((s) => (
-          <CartaoSemana key={s.semana} s={s} alvoId={alvoId} />
+        {lista.map((s, i) => (
+          <CartaoSemana
+            key={s.semana}
+            s={s}
+            alvoId={alvoId}
+            alvoRef={i === idxAlvo ? alvoRef : undefined}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function CartaoSemana({ s, alvoId }: { s: SemanaCalendario; alvoId: string }) {
+function CartaoSemana({ s, alvoId, alvoRef }: { s: SemanaCalendario; alvoId: string; alvoRef?: React.RefObject<HTMLDivElement | null> }) {
   const mkt = estadoMercado(s);
   const estado: Estado = competicaoFechada(s)
     ? "passada"
@@ -87,11 +118,12 @@ function CartaoSemana({ s, alvoId }: { s: SemanaCalendario; alvoId: string }) {
   const corTitulo = estado === "passada" ? "#7c8a82" : cego ? "#e6c97a" : "#f1ede2";
 
   return (
-    <div style={{
+    <div ref={alvoRef} style={{
       background: estado === "proxima" ? "#15170f" : "#121815",
       border: `1px solid ${corBorda}`,
       borderRadius: 14, display: "flex", alignItems: "center", gap: 12, padding: "12px 13px",
       opacity: opacidade,
+      scrollMarginTop: 12,
       animation: estado === "proxima" ? "pulsoOuro 2.2s ease-in-out infinite" : undefined,
     }}>
       <div style={{ width: 42, flexShrink: 0, textAlign: "center" }}>
