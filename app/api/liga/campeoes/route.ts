@@ -50,8 +50,13 @@ export async function GET(req: Request) {
       .eq("tipo", tipo)
       .order("ano", { ascending: false })
       .limit(1);
-    // No mundial guardamos continente=''; na continental, o código do continente.
-    qAno = qAno.eq("continente", tipo === "mundial" ? "" : continente);
+    // No mundial o continente foi guardado como '' (ou null em dados antigos);
+    // aceitamos os dois. Na continental, o código do continente.
+    if (tipo === "mundial") {
+      qAno = qAno.or("continente.eq.,continente.is.null");
+    } else {
+      qAno = qAno.eq("continente", continente);
+    }
     const { data: ultimo } = await qAno;
     ano = ultimo && ultimo.length > 0 ? Number(ultimo[0].ano) : null;
   }
@@ -66,7 +71,11 @@ export async function GET(req: Request) {
     .eq("tipo", tipo)
     .eq("ano", ano)
     .order("posicao", { ascending: true });
-  q = q.eq("continente", tipo === "mundial" ? "" : continente);
+  if (tipo === "mundial") {
+    q = q.or("continente.eq.,continente.is.null");
+  } else {
+    q = q.eq("continente", continente);
+  }
   const { data: linhas } = await q;
 
   const podio = (linhas || []).map((l) => ({
