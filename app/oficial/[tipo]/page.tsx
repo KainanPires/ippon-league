@@ -58,6 +58,19 @@ interface CampeaoAno {
   pontos: number;
 }
 
+// Vencedor da rodada (vem de /api/liga/melhores-rodada).
+interface MelhorRodada {
+  user_id: string;
+  nome_time: string;
+  escudo: Identity | null;
+  pontos: number;
+  escopo: string;
+  continente: string;
+  combinado: boolean;
+  n_participantes: number;
+  rotulo: string;
+}
+
 export default function PaginaOficial() {
   const params = useParams();
   const tipo = String(params?.tipo || "").toLowerCase(); // "mundial" | "continental"
@@ -77,6 +90,11 @@ export default function PaginaOficial() {
   const [campeoes, setCampeoes] = useState<CampeaoAno[]>([]);
   const [anoCampeoes, setAnoCampeoes] = useState<number | null>(null);
   const [certificado, setCertificado] = useState<PosicaoPodio | null>(null);
+
+  // Melhor(es) da Rodada (última competição congelada) + certificado de rodada aberto.
+  const [melhoresRodada, setMelhoresRodada] = useState<MelhorRodada[]>([]);
+  const [nomeCompMelhor, setNomeCompMelhor] = useState<string | null>(null);
+  const [certRodada, setCertRodada] = useState<{ rotulo: string; ident: Identity; nomeComp: string; nPart: number } | null>(null);
 
   // A competição da rodada atual (mesma fonte do resto da app).
   const foco = focoMercado();
@@ -208,6 +226,27 @@ export default function PaginaOficial() {
     return () => { vivo = false; };
   }, [estado, ehMundial, meuId]);
 
+  // 4) Melhor(es) da Rodada (última competição congelada, via /api/liga/melhores-rodada).
+  //    Visível a todos; o vencedor que seja "eu" vê o botão de partilhar o certificado.
+  useEffect(() => {
+    if (estado !== "pronto") return;
+    let vivo = true;
+    (async () => {
+      try {
+        const p = new URLSearchParams({ tipo: ehMundial ? "mundial" : "continental" });
+        if (meuId) p.set("user_id", meuId);
+        const res = await fetch(`/api/liga/melhores-rodada?${p.toString()}`);
+        const j = await res.json();
+        if (!vivo) return;
+        if (j.ok && Array.isArray(j.melhores)) {
+          setMelhoresRodada(j.melhores);
+          setNomeCompMelhor(j.nomeComp ?? null);
+        }
+      } catch { /* sem vencedores ainda: secção não aparece */ }
+    })();
+    return () => { vivo = false; };
+  }, [estado, ehMundial, meuId]);
+
   // Dados do destaque conforme a vista ativa.
   const minhaPos = vista === "geral" ? minhaPosGeral : minhaPosRodada;
   const totalVista = vista === "geral" ? totalGeral : totalRodada;
@@ -248,6 +287,40 @@ export default function PaginaOficial() {
                 ? <>Esta é a <strong>última competição de {anoCorrente}</strong>! O ranking fecha aqui e os campeões do ano serão definidos. Em {anoCorrente + 1} recomeça uma época nova, do zero.</>
                 : <>Esta liga é <strong>anual</strong>. A época de {anoCorrente} vai até à última competição do ano, em dezembro. No ano seguinte começa uma época nova — o ranking recomeça do zero.</>}
             </span>
+          </div>
+        )}
+
+        {/* Melhor(es) da Rodada (última competição congelada). Visível a todos; o
+            vencedor que seja "eu" vê o botão de partilhar o seu certificado. */}
+        {estado === "pronto" && melhoresRodada.length > 0 && (
+          <div style={{ background: "linear-gradient(160deg,#1e2a16,#10130d)", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "14px 14px", marginBottom: 14 }}>
+            <div style={{ textAlign: "center", fontFamily: FD, fontSize: 13.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: GOLD, marginBottom: 3 }}>🥇 Melhor da Rodada</div>
+            {nomeCompMelhor && <div style={{ textAlign: "center", fontSize: 11, color: "#93a39a", marginBottom: 10 }}>{nomeCompMelhor}</div>}
+            {melhoresRodada.map((m) => {
+              const souEu = !!meuId && m.user_id === meuId;
+              return (
+                <div key={m.user_id + m.escopo + m.continente} style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                    <span style={{ fontSize: 22, flexShrink: 0 }}>🥇</span>
+                    <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={32} /></div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</div>
+                      <div style={{ fontSize: 10.5, color: GOLD, fontFamily: FD, fontWeight: 700, textTransform: "uppercase" }}>{m.rotulo}</div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: GOLD }}>{m.pontos}</div>
+                      <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
+                    </div>
+                  </div>
+                  {souEu && (
+                    <button onClick={() => setCertRodada({ rotulo: m.rotulo, ident: { ...(m.escudo || DEFAULT_IDENTITY), name: m.nome_time }, nomeComp: nomeCompMelhor || compAtual.nome, nPart: m.n_participantes })} style={{ width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: GOLD, color: "#1b1208", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+                      Partilhar o meu certificado
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -474,6 +547,19 @@ export default function PaginaOficial() {
           />
         );
       })()}
+
+      {/* Modal do certificado de MELHOR DA RODADA. */}
+      {certRodada && (
+        <CartaoCertificado
+          posicao="campeao"
+          variante="rodada"
+          tituloRodada={certRodada.rotulo}
+          identity={certRodada.ident}
+          nomeCopa={certRodada.nomeComp}
+          nParticipantes={certRodada.nPart}
+          onClose={() => setCertRodada(null)}
+        />
+      )}
     </main>
   );
 }
