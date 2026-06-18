@@ -522,6 +522,28 @@ function MeuTimeInner() {
   // Quem sou eu (para o lembrete "esqueceste de salvar"). Guardado quando a
   // sessão é confirmada; usado para agendar/cancelar o lembrete no servidor.
   const [userId, setUserId] = useState<string | null>(null);
+  // Ref com o "dirty" (alterações por salvar) atual, para o gatilho de
+  // visibilidade do lembrete o ler sem depender da ordem de cálculo. É
+  // atualizada mais abaixo, depois de o dirty ser calculado.
+  const dirtyRef = useRef(false);
+
+  // LEMBRETE "esqueceste de salvar o teu time". Gatilho de visibilidade: quando
+  // o utilizador SAI do ecrã (troca de aba → página escondida) com alterações
+  // por salvar, avisa o servidor para agendar o lembrete (3 min). Se voltar ao
+  // ecrã sem nada por salvar, cancela. Lê o dirty atual via dirtyRef. Colocado
+  // aqui (antes de qualquer return condicional) para respeitar a ordem dos hooks.
+  useEffect(() => {
+    if (!userId || !idComp) return;
+    function aoMudarVisibilidadeLembrete() {
+      if (document.hidden) {
+        if (dirtyRef.current) agendarLembreteSalvar(userId, idComp);
+      } else {
+        if (!dirtyRef.current) cancelarLembreteSalvar(userId, idComp);
+      }
+    }
+    document.addEventListener("visibilitychange", aoMudarVisibilidadeLembrete);
+    return () => document.removeEventListener("visibilitychange", aoMudarVisibilidadeLembrete);
+  }, [userId, idComp]);
 
   useEffect(() => {
     let active = true;
@@ -748,29 +770,14 @@ function MeuTimeInner() {
   // EDITÁVEL só quando NÃO está em competição (mercado aberto).
   const editavel = !emCompeticao;
   const dirty = editavel && !sameTeam(team, saved);
+  // Mantém a ref do dirty sincronizada (lida pelo gatilho de visibilidade do
+  // lembrete, que vive num useEffect mais acima).
+  dirtyRef.current = dirty;
 
-  // LEMBRETE "esqueceste de salvar o teu time". Quando o utilizador SAI do ecrã
-  // (troca de aba/app → a página fica escondida) com alterações por salvar
-  // (dirty) e o mercado aberto (editavel), avisamos o servidor para agendar um
-  // lembrete (push) para daqui a 3 min. Se voltar e salvar, a função salvar()
-  // cancela; se voltar ao time original (dirty=false) com a página visível,
-  // cancelamos aqui (defensivo). keepalive: o pedido sobrevive à página a
-  // adormecer. (Frente pedida para quem monta o time e troca de aba sem salvar.)
-  useEffect(() => {
-    if (!userId || !idComp) return;
-    function aoMudarVisibilidadeLembrete() {
-      if (document.hidden) {
-        // Saiu do ecrã: se há alterações por salvar e o mercado está aberto,
-        // agenda o lembrete. O servidor revalida o mercado de qualquer forma.
-        if (dirty) agendarLembreteSalvar(userId, idComp);
-      } else {
-        // Voltou ao ecrã sem nada por salvar: cancela qualquer lembrete pendente.
-        if (!dirty) cancelarLembreteSalvar(userId, idComp);
-      }
-    }
-    document.addEventListener("visibilitychange", aoMudarVisibilidadeLembrete);
-    return () => document.removeEventListener("visibilitychange", aoMudarVisibilidadeLembrete);
-  }, [userId, idComp, dirty]);
+  // LEMBRETE "esqueceste de salvar": o gatilho de visibilidade vive num
+  // useEffect colocado ANTES do return condicional (junto aos outros hooks),
+  // para não violar a ordem dos hooks. Ele lê o "dirty" atual através de uma ref
+  // (dirtyRef), atualizada mais abaixo. Aqui não há hook nenhum.
 
   // Tutorial ativo conforme o momento + qual elemento destacar agora.
   const passos = emCompeticao ? STEPS_COMPETICAO : STEPS_EDICAO;
