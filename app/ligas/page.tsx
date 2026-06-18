@@ -217,9 +217,9 @@ export default function Ligas() {
     }
   }
 
-  // Separa as minhas ligas em ativas (lista principal) e terminadas (aba Resultados).
+  // Separa as minhas ligas em ativas (lista principal). As terminadas e os
+  // certificados vivem agora na aba Resultados (componente ResultadosConteudo).
   const ativas = mine.filter((l) => !ligaTerminada(l));
-  const terminadas = mine.filter((l) => ligaTerminada(l));
 
   // Contagens para os avisos de limite (só ligas de amigos; mine já é só amigos).
   // Conta SÓ as ativas — as terminadas já não ocupam lugar prático.
@@ -391,36 +391,7 @@ export default function Ligas() {
 
         {tab === "calendario" && <CalendarioConteudo />}
 
-        {tab === "resultados" && (
-          <>
-            <Section>Ligas e copas terminadas</Section>
-            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>As tuas ligas e copas que já acabaram. Abre cada uma para veres a classificação final e o pódio.</p>
-            {aCarregar ? (
-              <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
-            ) : terminadas.length === 0 ? (
-              <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
-                <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Ainda não tens ligas ou copas terminadas.<br />Quando uma acabar, aparece aqui — com a classificação final guardada.</div>
-              </div>
-            ) : (
-              <>
-                {terminadas.map((l) => {
-                  const ehCopa = l.formato === "copa";
-                  const href = ehCopa ? `/liga/${l.invite_code}/chave` : `/liga/${l.invite_code}`;
-                  return (
-                    <a key={l.id} href={href} style={{ textDecoration: "none" }}>
-                      <LeagueRow
-                        cfg={l.escudo || DEFAULT_IDENTITY}
-                        name={l.name}
-                        sub={`${ehCopa ? "Copa Ippon" : "Pontos corridos"} · terminada · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`}
-                        right={<ActionBtn kind="ver">{ehCopa ? "Ver pódio" : "Ver final"}</ActionBtn>}
-                      />
-                    </a>
-                  );
-                })}
-              </>
-            )}
-          </>
-        )}
+        {tab === "resultados" && <ResultadosConteudo />}
       </div>
 
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around", zIndex: 50 }}>
