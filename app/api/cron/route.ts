@@ -7,6 +7,7 @@ import { competicaoPorId } from "@/lib/copa";
 import { notificarMercado } from "@/lib/notificarMercado";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { mensagensModaisDeHoje } from "@/lib/mensagensEspeciais";
+import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 
 // CRON — prepara sozinho os preços/forma da competição que se aproxima.
 // Corre 1x/dia (vercel.json). Com Fluid Compute, uma função corre até 300s — as
@@ -442,6 +443,130 @@ async function userIdsComAniversario(hoje: Date): Promise<{ id: string; dataNasc
   return out;
 }
 
+// Nome PT do continente para rótulos/mensagens. Defensivo (aceita string solta).
+function nomeContinentePT(cont: string): string {
+  return NOME_CONTINENTE[cont as Continente] ?? cont;
+}
+
+// ---------------------------------------------------------------------------
+// MELHORES DA RODADA. Para uma competição JÁ CONGELADA e COMPLETA, calcula o
+// vencedor da rodada (só Pro, como na liga oficial) e grava em melhores_rodada:
+//   • mundial      → o nº1 do mundo. Como o nº1 do mundo é sempre também o nº1 do
+//                    seu continente, este certificado é COMBINADO (Mundial + esse
+//                    continente). Guardamos o continente dele para o rótulo.
+//   • continental  → o nº1 de cada continente cujo melhor NÃO seja o nº1 do mundo
+//                    (esse já está coberto pelo combinado).
+// Só conta quem pontuou (> 0). Empates no topo: todos os empatados ganham.
+// Idempotente: se já há linhas para esta competição, não repete (nem push).
+// ---------------------------------------------------------------------------
+async function registrarMelhoresRodada(comp: string, nomeComp: string): Promise<{ gravados: number; jaExistia: boolean; push: number }> {
+  const out = { gravados: 0, jaExistia: false, push: 0 };
+  if (!supabaseAdmin) return out;
+
+  // Idempotência: já calculado para esta competição? Não repete.
+  const { data: ja } = await supabaseAdmin.from("melhores_rodada").select("id").eq("id_competicao", comp).limit(1);
+  if (ja && ja.length > 0) { out.jaExistia = true; return out; }
+
+  // 1) Pontos da rodada por utilizador (já congelado em resultados_rodada).
+  const { data: rod } = await supabaseAdmin.from("resultados_rodada").select("user_id, pontos_rodada").eq("id_competicao", comp);
+  const pts = new Map<string, number>();
+  for (const r of rod || []) pts.set(String(r.user_id), Number(r.pontos_rodada ?? 0));
+  if (pts.size === 0) return out;
+
+  const ids = [...pts.keys()];
+
+  // 2) Só Pro entram (consistente com a liga oficial). Lê is_pro + continente em lotes.
+  const proCont = new Map<string, string>(); // user_id -> continente ("" se desconhecido)
+  for (let i = 0; i < ids.length; i += 500) {
+    const lote = ids.slice(i, i + 500);
+    const { data } = await supabaseAdmin.from("users").select("id, is_pro, continente").in("id", lote);
+    for (const u of data || []) if (u.is_pro) proCont.set(String(u.id), u.continente ? String(u.continente) : "");
+  }
+  if (proCont.size === 0) return out;
+
+  // Nº de participantes (Pro que escalaram) por âmbito — para o "entre N participantes".
+  const nMundial = proCont.size;
+  const nPorCont = new Map<string, number>();
+  for (const c of proCont.values()) if (c) nPorCont.set(c, (nPorCont.get(c) ?? 0) + 1);
+
+  // Candidatos a vencedor: Pro com pontos > 0.
+  const cand = [...proCont.entries()]
+    .map(([user_id, continente]) => ({ user_id, continente, pontos: pts.get(user_id) ?? 0 }))
+    .filter((c) => c.pontos > 0);
+  if (cand.length === 0) return out;
+
+  // 3) Identidade (nome + escudo) da equipa nesta competição.
+  const identDe = new Map<string, { nome: string; escudo: unknown }>();
+  for (let i = 0; i < ids.length; i += 500) {
+    const lote = ids.slice(i, i + 500);
+    const { data } = await supabaseAdmin.from("equipas").select("user_id, nome, escudo").eq("id_competicao", comp).in("user_id", lote);
+    for (const e of data || []) identDe.set(String(e.user_id), { nome: e.nome ?? "Equipa", escudo: e.escudo ?? null });
+  }
+
+  // 4) Vencedor(es) MUNDIAL = máximo global (com empates).
+  const maxGlobal = Math.max(...cand.map((c) => c.pontos));
+  const mundialWinners = cand.filter((c) => c.pontos === maxGlobal);
+  const mundialIds = new Set(mundialWinners.map((c) => c.user_id));
+
+  // 5) Vencedor(es) CONTINENTAIS = máximo de cada continente, EXCLUINDO os
+  //    vencedores mundiais (cobertos pelo certificado combinado).
+  const porCont = new Map<string, typeof cand>();
+  for (const c of cand) {
+    if (!c.continente) continue;
+    if (!porCont.has(c.continente)) porCont.set(c.continente, []);
+    porCont.get(c.continente)!.push(c);
+  }
+
+  type Linha = { escopo: "mundial" | "continental"; continente: string; combinado: boolean; user_id: string; pontos: number; nPart: number };
+  const linhas: Linha[] = [];
+  for (const w of mundialWinners) {
+    linhas.push({ escopo: "mundial", continente: w.continente, combinado: true, user_id: w.user_id, pontos: w.pontos, nPart: nMundial });
+  }
+  for (const [cont, lista] of porCont.entries()) {
+    const maxK = Math.max(...lista.map((c) => c.pontos));
+    const venc = lista.filter((c) => c.pontos === maxK && !mundialIds.has(c.user_id));
+    for (const v of venc) {
+      linhas.push({ escopo: "continental", continente: cont, combinado: false, user_id: v.user_id, pontos: v.pontos, nPart: nPorCont.get(cont) ?? lista.length });
+    }
+  }
+
+  // 6) Grava (upsert idempotente) e notifica cada vencedor (sino + push).
+  for (const l of linhas) {
+    const ident = identDe.get(l.user_id) || { nome: "Equipa", escudo: null };
+    const { error } = await supabaseAdmin.from("melhores_rodada").upsert({
+      id_competicao: comp,
+      nome_competicao: nomeComp,
+      escopo: l.escopo,
+      continente: l.continente,
+      combinado: l.combinado,
+      user_id: l.user_id,
+      nome_time: ident.nome,
+      escudo: ident.escudo,
+      pontos: Math.round(l.pontos * 10) / 10,
+      n_participantes: l.nPart,
+    }, { onConflict: "id_competicao,escopo,continente,user_id" });
+    if (error) continue;
+    out.gravados++;
+
+    const rotulo = l.escopo === "mundial"
+      ? `Mundial${l.continente ? ` + ${nomeContinentePT(l.continente)}` : ""}`
+      : nomeContinentePT(l.continente);
+    const ondeFoi = l.escopo === "mundial" ? "do mundo" : `de ${nomeContinentePT(l.continente)}`;
+    try {
+      await criarNotificacaoServidor({
+        paraUserId: l.user_id,
+        tipo: "melhor_rodada",
+        titulo: `🥇 És o Melhor da Rodada — ${rotulo}!`,
+        corpo: `Parabéns! Foste o nº1 ${ondeFoi} em ${nomeComp}. Vê e partilha o teu certificado na liga oficial.`,
+        link: l.escopo === "mundial" ? "/oficial/mundial" : "/oficial/continental",
+      });
+      out.push++;
+    } catch { /* push de um vencedor não bloqueia os outros */ }
+  }
+
+  return out;
+}
+
 // FECHO DA ÉPOCA OFICIAL (anual). Calcula o pódio do ANO indicado — Mundial e
 // cada Continental — e grava em campeoes_oficiais (livro de campeões). Só Pro
 // entram (como no ranking ao vivo). Idempotente: upsert pela chave única, por
@@ -615,6 +740,22 @@ export async function GET(req: Request) {
     return NextResponse.json({ feito: true, modo: "datas_forcado", datas: r, ms_total: Date.now() - t0 });
   }
 
+  // Disparo manual dos MELHORES DA RODADA de uma competição (teste): ?melhores=ID
+  // Com &refazer=1 apaga primeiro as linhas dessa competição, para recalcular do
+  // zero (útil ao afinar). Sem refazer, respeita a idempotência (não repete).
+  const soMelhores = (searchParams.get("melhores") || "").trim();
+  if (soMelhores) {
+    const refazer = (searchParams.get("refazer") || "").trim() === "1";
+    if (refazer && supabaseAdmin) {
+      await supabaseAdmin.from("melhores_rodada").delete().eq("id_competicao", soMelhores);
+    }
+    const s = CALENDARIO_2026.find((c) => c.idCompeticao === soMelhores);
+    const nome = s ? s.nome : soMelhores;
+    let r: { gravados: number; jaExistia: boolean; push: number } = { gravados: 0, jaExistia: false, push: 0 };
+    try { r = await registrarMelhoresRodada(soMelhores, nome); } catch { /* não bloqueia */ }
+    return NextResponse.json({ feito: true, modo: "melhores_forcado", comp: soMelhores, refez: refazer, resultado: r, ms_total: Date.now() - t0 });
+  }
+
   // Disparo manual SÓ do encerramento de ligas terminadas (teste): ?encerrar=1
   const soEncerrar = (searchParams.get("encerrar") || "").trim();
   if (soEncerrar) {
@@ -696,6 +837,19 @@ export async function GET(req: Request) {
     congelamentos = await congelarRecentes(hoje);
   } catch { /* não bloqueia o resto do cron */ }
 
+  // (C-quater) MELHORES DA RODADA: para cada competição recém-congelada e COMPLETA,
+  // grava o(s) vencedor(es) da rodada (mundial combinado + continentais) e notifica.
+  // Uma vez por competição (idempotente). Só quando o congelamento está completo,
+  // para não premiar com dados parciais.
+  const melhoresRodada: { comp: string; nome: string; gravados: number; jaExistia: boolean; push: number }[] = [];
+  try {
+    for (const c of congelamentos) {
+      if (!c.completa) continue;
+      const r = await registrarMelhoresRodada(c.comp, c.nome);
+      melhoresRodada.push({ comp: c.comp, nome: c.nome, ...r });
+    }
+  } catch { /* não bloqueia */ }
+
   // (C-bis) APURA as copas ativas (mata-mata) com os dados já congelados.
   let copas: { league_id: string; nome: string; apurou: boolean }[] = [];
   try {
@@ -756,6 +910,7 @@ export async function GET(req: Request) {
     categorias_ok: `${ok}/${CATS.length}`,
     total_atletas_atualizados: totalAtualizados,
     congelamentos,
+    melhores_rodada: melhoresRodada,
     copas,
     ligas_encerradas: ligasEncerradas,
     faixas,
