@@ -4,7 +4,7 @@ import { uid } from "@/lib/team";
 
 export type ShapeId = "classic" | "round" | "circle" | "hex" | "diamond";
 export type PatternId = "solido" | "listras-v" | "listras-h" | "xadrez" | "cruz" | "diagonal" | "metade";
-export type SymbolId = "none" | "estrela" | "montanha" | "torii" | "chama" | "raio" | "punho" | "trofeu" | "taca" | "medalha" | "bandeirola" | "flamula" | "mundo" | "mapa-americas" | "mapa-europa" | "mapa-africa" | "mapa-asia" | "mapa-oceania";
+export type SymbolId = "none" | "estrela" | "montanha" | "torii" | "chama" | "raio" | "punho" | "faixa" | "kimono" | "ippon" | "sol-nascente" | "fuji" | "sakura" | "saudacao" | "dragao" | "trofeu" | "taca" | "medalha" | "bandeirola" | "flamula" | "mundo" | "mapa-americas" | "mapa-europa" | "mapa-africa" | "mapa-asia" | "mapa-oceania";
 
 export type Identity = {
   name: string;
@@ -76,6 +76,14 @@ export const SYMBOLS: { id: SymbolId; label: string }[] = [
   { id: "chama", label: "Chama" },
   { id: "raio", label: "Raio" },
   { id: "punho", label: "Punho" },
+  { id: "faixa", label: "Faixa" },
+  { id: "kimono", label: "Kimono" },
+  { id: "ippon", label: "Ippon" },
+  { id: "sol-nascente", label: "Sol nascente" },
+  { id: "fuji", label: "Fuji" },
+  { id: "sakura", label: "Sakura" },
+  { id: "saudacao", label: "Saudação" },
+  { id: "dragao", label: "Dragão" },
 ];
 export const LEAGUE_SYMBOLS: { id: SymbolId; label: string }[] = [
   { id: "trofeu", label: "Troféu" },
@@ -148,6 +156,75 @@ export function SymbolGlyph({ id, color }: { id: SymbolId; color: string }) {
     case "chama": return <path d="M12 1 C16 6 18 10 18 14 A6 6 0 0 1 6 14 C6 11 8.5 9 9 6 C10.5 7.5 12 9.5 12 11.5 C13 9.5 13 4.5 12 1 Z" fill={color} />;
     case "raio": return <path d="M13 1 L4 13 H10.5 L9 23 L20 9 H13 Z" fill={color} />;
     case "punho": return <path d="M5 10 V8 a2 2 0 0 1 4 0 V7 a2 2 0 0 1 4 0 V7 a2 2 0 0 1 4 0 V8 a2 2 0 0 1 4 0 V15 a7 7 0 0 1 -7 7 H11 a6 6 0 0 1 -6 -6 Z" fill={color} />;
+    case "faixa": return (
+      // Faixa de judô atada com o nó ao centro e as duas pontas a cair.
+      <g fill={color}>
+        <rect x="1" y="9" width="9" height="4.5" rx="1" />
+        <rect x="14" y="9" width="9" height="4.5" rx="1" />
+        <path d="M9 8 H15 V14.5 H9 Z" />
+        <path d="M9.5 14 L7.5 22 L10.5 20.5 L11.8 14 Z" />
+        <path d="M14.5 14 L16.5 22 L13.5 20.5 L12.2 14 Z" />
+      </g>
+    );
+    case "kimono": return (
+      // Gi de judô visto de frente: a gola cruzada em V é o traço mais icónico.
+      <g fill={color}>
+        <path d="M8 2 L12 5 L16 2 L21 5 L18 9 L17 8 L17 22 L7 22 L7 8 L6 9 L3 5 Z" />
+        <path d="M12 5 L12 22" stroke={color} strokeWidth="0.6" />
+      </g>
+    );
+    case "ippon": return (
+      // Projeção (ippon): silhueta de um judoca a arremessar outro por cima.
+      <g fill={color}>
+        <circle cx="7" cy="5" r="2.4" />
+        <path d="M5 8 C4 11 4 15 6 18 L8.5 17 C7.2 14.5 7.2 11.5 8.5 9.5 Z" />
+        <path d="M6 18 L4 23 L6.5 23 L8 19 Z" />
+        <path d="M8.5 17 L11 18.5 L9.7 21 L7.5 19 Z" />
+        <circle cx="18" cy="6.5" r="2.2" />
+        <path d="M9 9 C13 6 17 6 20 9 L19 11.5 C16 9.5 13 9.5 10.5 11 Z" />
+        <path d="M20 9 L22 12 L20 13.5 L18.5 11 Z" />
+      </g>
+    );
+    case "sol-nascente": return (
+      // Hinomaru/sol nascente: disco com raios a abrir para baixo.
+      <g fill={color}>
+        <circle cx="12" cy="9" r="5" />
+        <path d="M12 14 L8 23 L10.6 23 L12 16.5 L13.4 23 L16 23 Z" />
+        <path d="M12 14 L3 21 L5 22.5 L12 17 Z" />
+        <path d="M12 14 L21 21 L19 22.5 L12 17 Z" />
+      </g>
+    );
+    case "fuji": return (
+      // Monte Fuji com o cume nevado.
+      <g fill={color}>
+        <path d="M2 21 L9 8 C10.5 5.5 13.5 5.5 15 8 L22 21 Z" />
+        <path d="M8.4 9 C10 6.6 14 6.6 15.6 9 L13.7 11 L12 9.6 L10.3 11 Z" fill="#ffffff" fillOpacity="0.9" />
+      </g>
+    );
+    case "sakura": return (
+      // Flor de cerejeira: 5 pétalas com entalhe na ponta.
+      <g fill={color}>
+        {[0, 72, 144, 216, 288].map((a) => (
+          <path key={a} d="M12 12 C9.5 10 9.5 5 11 2.5 C11.5 3.6 12.5 3.6 13 2.5 C14.5 5 14.5 10 12 12 Z" transform={`rotate(${a} 12 12)`} />
+        ))}
+        <circle cx="12" cy="12" r="1.6" fill="#ffffff" fillOpacity="0.85" />
+      </g>
+    );
+    case "saudacao": return (
+      // Saudação marcial: punho de uma mão contra a palma da outra.
+      <g fill={color}>
+        <path d="M3 9 H9 a2 2 0 0 1 2 2 V17 a2 2 0 0 1 -2 2 H3 a3 3 0 0 1 -3 -3 V12 a3 3 0 0 1 3 -3 Z" />
+        <path d="M21 7 a3 3 0 0 1 3 3 V18 a3 3 0 0 1 -3 3 H14 a2 2 0 0 1 -2 -2 V14 L18 14 V11 a2 2 0 0 1 2 -2 Z" />
+      </g>
+    );
+    case "dragao": return (
+      // Cabeça de dragão estilizada (estilo marcial oriental), de perfil.
+      <g fill={color}>
+        <path d="M3 14 C3 9 7 5 12 5 C14 5 15 3 14 1 C17 2 18 5 17 7 C20 8 22 11 21 15 L18 14 C18.5 12 17 10.5 15 10.5 C16 12 15 14 13 14 C14 15.5 13 17.5 11 17 L12 20 L8 18 C5.5 17.5 3.5 16 3 14 Z" />
+        <circle cx="9" cy="9.5" r="1.3" fill="#ffffff" fillOpacity="0.85" />
+        <path d="M15 1 C16.5 0 18.5 0.5 19 2 C17.8 1.8 16.5 2 16 3 Z" />
+      </g>
+    );
     case "trofeu": return (
       <g fill={color}>
         <path d="M6 3 H18 V6 C18 11 15.5 14 12 14 C8.5 14 6 11 6 6 Z" />
