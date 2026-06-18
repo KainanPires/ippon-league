@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { focoMercado } from "@/lib/calendario";
 import { competicaoPorId } from "@/lib/copa";
+import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -129,6 +130,9 @@ export default function PaginaLiga() {
   const [copaEstado, setCopaEstado] = useState<string | null>(null); // estado da copa, atualizável
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [aDecidir, setADecidir] = useState<string | null>(null);
+
+  // Certificado da liga terminada (a posição que o utilizador clicou).
+  const [certificado, setCertificado] = useState<PosicaoPodio | null>(null);
 
   // Foco do mercado: a competição que decorre (mercado fechado) ou a de mercado aberto.
   const foco = focoMercado();
@@ -358,6 +362,13 @@ export default function PaginaLiga() {
     window.location.href = `/meu-time?ver=${m.user_id}&comp=${idComp}`;
   }
 
+  // Liga de pontos corridos terminada? (mostra o pódio da época + certificado)
+  const ligaTerminada = !!liga && liga.formato !== "copa" && String(liga.estado || "") === "terminada";
+  // Os 3 primeiros da classificação final (só conta quem pontuou na época).
+  const podioFinal = ligaTerminada ? geral.filter((m) => m.pontos_geral > 0).slice(0, 3) : [];
+  // Quantos participaram da época (pontuaram). Para o "entre N participantes".
+  const nParticipantesEpoca = geral.filter((m) => m.pontos_geral > 0).length;
+
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 40px" }}>
@@ -419,6 +430,16 @@ export default function PaginaLiga() {
                 <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>Convidar</span>
               </button>
             </div>
+
+            {/* PÓDIO DA ÉPOCA — só liga de pontos corridos TERMINADA. Os 3 primeiros
+                por pontos; cada um vê o botão para partilhar o SEU certificado. */}
+            {ligaTerminada && podioFinal.length > 0 && (
+              <PodioLiga
+                podio={podioFinal}
+                meuId={meuId}
+                onPartilhar={(pos) => setCertificado(pos)}
+              />
+            )}
 
             {/* Painel do dono: pedidos de entrada pendentes (só liga "por aprovação"). */}
             {souDono && pedidos.length > 0 && (
@@ -591,6 +612,24 @@ export default function PaginaLiga() {
           </>
         )}
       </div>
+
+      {/* Modal do certificado (liga terminada). A identidade e a contagem saem do
+          pódio final acima. */}
+      {certificado && (() => {
+        const idx = certificado === "campeao" ? 0 : certificado === "vice" ? 1 : 2;
+        const m = podioFinal[idx];
+        if (!m) return null;
+        const ident: Identity = { ...(m.escudo || DEFAULT_IDENTITY), name: m.nome_time };
+        return (
+          <CartaoCertificado
+            posicao={certificado}
+            identity={ident}
+            nomeCopa={liga?.name || "Liga"}
+            nParticipantes={nParticipantesEpoca}
+            onClose={() => setCertificado(null)}
+          />
+        );
+      })()}
     </main>
   );
 }
@@ -599,6 +638,53 @@ function Aviso({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ textAlign: "center", padding: "40px 16px", color: "#7c8a82" }}>
       <div style={{ fontFamily: FD, fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase" }}>{children}</div>
+    </div>
+  );
+}
+
+// PÓDIO DA ÉPOCA (liga de pontos corridos terminada). Os 3 primeiros por pontos.
+// Cada um que seja "eu" vê o botão para partilhar o seu certificado.
+function PodioLiga({ podio, meuId, onPartilhar }: {
+  podio: MembroGeral[];
+  meuId: string | null;
+  onPartilhar: (pos: PosicaoPodio) => void;
+}) {
+  const META: { medalha: string; label: string; cor: string; pos: PosicaoPodio }[] = [
+    { medalha: "🥇", label: "Campeão da época", cor: GOLD, pos: "campeao" },
+    { medalha: "🥈", label: "Vice-campeão", cor: "#c0c0c0", pos: "vice" },
+    { medalha: "🥉", label: "3º lugar", cor: "#c87f43", pos: "terceiro" },
+  ];
+  return (
+    <div style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "16px 15px", marginBottom: 16 }}>
+      <div style={{ textAlign: "center", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: GOLD, marginBottom: 4 }}>🏆 Classificação final</div>
+      <div style={{ textAlign: "center", fontSize: 11, color: "#cdb86a", marginBottom: 12 }}>A liga terminou. Eis o pódio da época.</div>
+      {podio.map((m, i) => {
+        const meta = META[i];
+        if (!meta) return null;
+        const souEu = !!meuId && m.user_id === meuId;
+        return (
+          <div key={m.user_id} style={{ background: "#121815", border: `1px solid ${meta.cor}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+              <span style={{ fontSize: 22, flexShrink: 0 }}>{meta.medalha}</span>
+              <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={32} /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</div>
+                <div style={{ fontSize: 10.5, color: meta.cor, fontFamily: FD, fontWeight: 700, textTransform: "uppercase" }}>{meta.label}</div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: meta.cor }}>{m.pontos_geral}</div>
+                <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
+              </div>
+            </div>
+            {souEu && (
+              <button onClick={() => onPartilhar(meta.pos)} style={{ width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: meta.cor, color: meta.pos === "vice" ? "#14181a" : "#1b1208", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+                Partilhar o meu título
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
