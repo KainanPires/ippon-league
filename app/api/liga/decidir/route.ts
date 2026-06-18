@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
+import { focoMercado } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -71,6 +72,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, acao: "recusar" });
   }
   // 4b) APROVAR → mete na league_members (se ainda não estiver) e marca aprovado.
+  //     entrou_competicao = a competição-alvo de agora (momento da aprovação): o
+  //     membro só conta pontos a partir daqui, não herda as rodadas anteriores.
   const { data: jaMembro } = await supabaseAdmin
     .from("league_members")
     .select("id")
@@ -78,9 +81,10 @@ export async function POST(req: Request) {
     .eq("user_id", pedido.user_id)
     .maybeSingle();
   if (!jaMembro) {
+    const entrouCompeticao = focoMercado().alvo.idCompeticao;
     const { error: erroMembro } = await supabaseAdmin
       .from("league_members")
-      .insert({ league_id: pedido.league_id, user_id: pedido.user_id, score: 0, position: 0 });
+      .insert({ league_id: pedido.league_id, user_id: pedido.user_id, score: 0, position: 0, entrou_competicao: entrouCompeticao });
     if (erroMembro) {
       return NextResponse.json({ ok: false, erro: "Não foi possível adicionar o membro." }, { status: 500 });
     }
