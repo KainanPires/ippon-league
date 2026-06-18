@@ -209,11 +209,11 @@ export default function EscudoEditorPage() {
               aparecem quando há um padrão escolhido. */}
           <CenterLabel>Escolher cores</CenterLabel>
 
-          {/* 1) Que camada estou a pintar */}
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10, marginBottom: 16 }}>
+          {/* 1) Que camada estou a pintar — numa única linha que desliza. */}
+          <ScrollRow>
             {slotsVisiveis.map((s) => (
               <button key={s.id} onClick={() => setSlot(s.id)} aria-label={s.label}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "transparent", border: "none", cursor: "pointer", padding: 0, width: 64 }}>
                 <span style={{ position: "relative", width: 46, height: 46, borderRadius: "50%", background: ((id[s.id] as string | undefined) || "") || "transparent", border: `2px solid ${slot === s.id ? GOLD : "rgba(255,255,255,0.25)"}`, boxShadow: slot === s.id ? `0 0 0 3px rgba(217,164,65,0.35)` : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {/* Slot vazio (borda do ícone "nenhuma"): risca diagonal a indicar "sem cor". */}
                   {!((id[s.id] as string | undefined) || "") && (
@@ -222,10 +222,10 @@ export default function EscudoEditorPage() {
                     </svg>
                   )}
                 </span>
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: slot === s.id ? GOLD : "#93a39a", textAlign: "center", maxWidth: 64, lineHeight: 1.2 }}>{s.label}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: slot === s.id ? GOLD : "#93a39a", textAlign: "center", lineHeight: 1.2 }}>{s.label}</span>
               </button>
             ))}
-          </div>
+          </ScrollRow>
 
           {/* 2) Paleta para a camada selecionada */}
           <div style={{ fontSize: 11, color: "#93a39a", textAlign: "center", marginBottom: 10 }}>
