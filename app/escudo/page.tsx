@@ -10,13 +10,19 @@ const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const ORANGE = "#e67e22";
 
-type Slot = "bg1" | "bg2" | "stamp1" | "stamp2" | "border";
-const SLOTS: { id: Slot; label: string }[] = [
+// Slots de cor. Os cinco PRINCIPAIS são sempre visíveis; os dois da estampa só
+// aparecem quando há um padrão escolhido (deixa de fazer sentido no "Sólido").
+type Slot = "bg1" | "bg2" | "border" | "icon" | "iconBorder" | "stamp1" | "stamp2";
+const SLOTS_PRINCIPAIS: { id: Slot; label: string }[] = [
   { id: "bg1", label: "Fundo 1" },
   { id: "bg2", label: "Fundo 2" },
+  { id: "border", label: "Borda do fundo" },
+  { id: "icon", label: "Ícone" },
+  { id: "iconBorder", label: "Borda do ícone" },
+];
+const SLOTS_ESTAMPA: { id: Slot; label: string }[] = [
   { id: "stamp1", label: "Estampa 1" },
   { id: "stamp2", label: "Estampa 2" },
-  { id: "border", label: "Borda" },
 ];
 
 export default function EscudoEditorPage() {
@@ -51,6 +57,11 @@ export default function EscudoEditorPage() {
 
   if (!id) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
 
+  // A estampa só importa quando há um padrão (não "Sólido"). Aí mostramos também
+  // os dois slots de cor da estampa.
+  const temEstampa = id.pattern !== "solido";
+  const slotsVisiveis = temEstampa ? [...SLOTS_PRINCIPAIS, ...SLOTS_ESTAMPA] : SLOTS_PRINCIPAIS;
+
   function set<K extends keyof Identity>(key: K, value: Identity[K]) {
     setId((prev) => (prev ? { ...prev, [key]: value } : prev));
     // Mexer no nome limpa o erro e as sugestões (vai ter de re-verificar).
@@ -58,7 +69,7 @@ export default function EscudoEditorPage() {
   }
   function rnd<T>(a: T[]): T { return a[Math.floor(Math.random() * a.length)]; }
   function sortear() {
-    setId((p) => p ? { ...p, shape: rnd(SHAPES), pattern: rnd(PATTERNS).id, symbol: rnd(SYMBOLS).id, bg1: rnd(COLORS), bg2: rnd(COLORS), stamp1: rnd(COLORS), stamp2: rnd(COLORS), border: rnd(COLORS) } : p);
+    setId((p) => p ? { ...p, shape: rnd(SHAPES), pattern: rnd(PATTERNS).id, symbol: rnd(SYMBOLS).id, bg1: rnd(COLORS), bg2: rnd(COLORS), stamp1: rnd(COLORS), stamp2: rnd(COLORS), border: rnd(COLORS), icon: rnd(COLORS), iconBorder: rnd(COLORS) } : p);
   }
 
   // Aplica uma sugestão clicada: preenche o campo e limpa o aviso.
@@ -120,6 +131,8 @@ export default function EscudoEditorPage() {
 
   const nomeVazio = (id.name || "").trim().length < 2;
   const ocupado = (aGuardar || aVerificarNome) ? false : sugestoes.length > 0;
+  // Valor atual do slot selecionado (a "Borda do ícone" pode estar vazia = nenhuma).
+  const valorSlot = (id[slot] as string | undefined) || "";
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -191,18 +204,45 @@ export default function EscudoEditorPage() {
             ))}
           </ScrollRow>
 
+          {/* CORES — cada camada do escudo tem o seu controlo. A "Borda do ícone"
+              pode ficar em "Nenhuma" (sem contorno). As cores da estampa só
+              aparecem quando há um padrão escolhido. */}
           <CenterLabel>Escolher cores</CenterLabel>
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 14, marginBottom: 14 }}>
-            {SLOTS.map((s) => (
-              <div key={s.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                <div style={{ fontSize: 10.5, color: slot === s.id ? GOLD : "#93a39a", fontWeight: 700 }}>{s.label}</div>
-                <button onClick={() => setSlot(s.id)} aria-label={s.label} style={{ width: 42, height: 42, borderRadius: "50%", background: id[s.id], border: `2px solid ${slot === s.id ? GOLD : "rgba(255,255,255,0.25)"}`, boxShadow: slot === s.id ? `0 0 0 3px rgba(217,164,65,0.35)` : "none", cursor: "pointer" }} />
-              </div>
+
+          {/* 1) Que camada estou a pintar */}
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10, marginBottom: 16 }}>
+            {slotsVisiveis.map((s) => (
+              <button key={s.id} onClick={() => setSlot(s.id)} aria-label={s.label}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                <span style={{ position: "relative", width: 46, height: 46, borderRadius: "50%", background: ((id[s.id] as string | undefined) || "") || "transparent", border: `2px solid ${slot === s.id ? GOLD : "rgba(255,255,255,0.25)"}`, boxShadow: slot === s.id ? `0 0 0 3px rgba(217,164,65,0.35)` : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {/* Slot vazio (borda do ícone "nenhuma"): risca diagonal a indicar "sem cor". */}
+                  {!((id[s.id] as string | undefined) || "") && (
+                    <svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
+                      <line x1="10" y1="36" x2="36" y2="10" stroke="#7c8a82" strokeWidth="2" />
+                    </svg>
+                  )}
+                </span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: slot === s.id ? GOLD : "#93a39a", textAlign: "center", maxWidth: 64, lineHeight: 1.2 }}>{s.label}</span>
+              </button>
             ))}
           </div>
+
+          {/* 2) Paleta para a camada selecionada */}
+          <div style={{ fontSize: 11, color: "#93a39a", textAlign: "center", marginBottom: 10 }}>
+            A pintar: <span style={{ color: GOLD, fontWeight: 700 }}>{slotsVisiveis.find((s) => s.id === slot)?.label}</span>
+          </div>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10, marginBottom: 24 }}>
+            {/* A "Borda do ícone" pode ser NENHUMA (sem contorno). */}
+            {slot === "iconBorder" && (
+              <button onClick={() => set("iconBorder", "")} aria-label="Sem borda do ícone"
+                style={{ position: "relative", width: 34, height: 34, borderRadius: "50%", background: "#0c0e0d", border: `2px solid ${valorSlot === "" ? "#f1ede2" : "rgba(255,255,255,0.18)"}`, boxShadow: valorSlot === "" ? `0 0 0 2px ${GOLD}` : "none", cursor: "pointer" }}>
+                <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
+                  <line x1="7" y1="23" x2="23" y2="7" stroke="#ef8d83" strokeWidth="2.2" />
+                </svg>
+              </button>
+            )}
             {COLORS.map((c) => {
-              const on = id[slot].toLowerCase() === c.toLowerCase();
+              const on = valorSlot.toLowerCase() === c.toLowerCase();
               return <button key={c} onClick={() => set(slot, c)} aria-label={c} style={{ width: 34, height: 34, borderRadius: "50%", background: c, border: `2px solid ${on ? "#f1ede2" : "rgba(255,255,255,0.18)"}`, boxShadow: on ? `0 0 0 2px ${GOLD}` : "none", cursor: "pointer" }} />;
             })}
           </div>
