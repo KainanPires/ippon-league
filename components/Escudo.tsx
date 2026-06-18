@@ -14,8 +14,14 @@ export type Identity = {
   bg2: string;
   stamp1: string;
   stamp2: string;
-  border: string;
+  border: string;     // borda do FUNDO (contorno da forma)
   symbol: SymbolId;
+  // Cores do ÍCONE — opcionais para retrocompatibilidade. Escudos antigos sem
+  // estes campos desenham-se como antes: o ícone usa a cor da borda do fundo e
+  // não tem contorno próprio. Os novos (e os editados) ganham cor e contorno
+  // próprios, separados da borda do fundo.
+  icon?: string;        // cor de preenchimento do ícone
+  iconBorder?: string;  // contorno do ícone ("" / ausente = sem contorno)
 };
 
 export const DEFAULT_IDENTITY: Identity = {
@@ -28,6 +34,8 @@ export const DEFAULT_IDENTITY: Identity = {
   stamp2: "#efeadd",
   border: "#d9a441",
   symbol: "estrela",
+  icon: "#d9a441",      // cor do ícone (igual à antiga, para não mudar o aspeto base)
+  iconBorder: "#141110", // contorno escuro tipo autocolante (destaca o ícone)
 };
 
 // Chave da identidade, ISOLADA POR CONTA: "ippon_identity__<uid>".
@@ -191,6 +199,11 @@ export function Escudo({ config, size = 48 }: { config: Identity; size?: number 
   const u = Math.random().toString(36).slice(2, 9);
   const cid = "clip-" + u;
   const gid = "grad-" + u;
+  // Cores do ícone com recurso retrocompatível: se não houver `icon`, usa a
+  // borda do fundo (comportamento antigo). O contorno só existe se houver
+  // `iconBorder` com cor — escudos antigos (sem o campo) não ganham contorno.
+  const corIcone = config.icon || config.border;
+  const corBordaIcone = config.iconBorder || "";
   return (
     <svg viewBox="0 0 56 64" width={size} height={(size * 64) / 56} aria-hidden="true">
       <defs>
@@ -205,7 +218,18 @@ export function Escudo({ config, size = 48 }: { config: Identity; size?: number 
         <PatternNode pattern={config.pattern} c1={config.stamp1} c2={config.stamp2} />
       </g>
       {config.symbol !== "none" && (
-        <g transform="translate(16,20)"><SymbolGlyph id={config.symbol} color={config.border} /></g>
+        <g transform="translate(16,20)">
+          {corBordaIcone ? (
+            // Contorno "autocolante": o traço é pintado ATRÁS do preenchimento
+            // (paint-order: stroke). Os glifos do time são preenchidos, por isso
+            // herdam o stroke do grupo e ganham um contorno limpo à volta.
+            <g stroke={corBordaIcone} strokeWidth={2.6} strokeLinejoin="round" strokeLinecap="round" style={{ paintOrder: "stroke" }}>
+              <SymbolGlyph id={config.symbol} color={corIcone} />
+            </g>
+          ) : (
+            <SymbolGlyph id={config.symbol} color={corIcone} />
+          )}
+        </g>
       )}
       {shapeNode(config.shape, { fill: "none", stroke: config.border, strokeWidth: 3, strokeLinejoin: "round" })}
     </svg>
