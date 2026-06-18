@@ -487,12 +487,25 @@ export async function GET(req: Request) {
     return NextResponse.json({ feito: true, modo: "encerrar_forcado", ligas_encerradas: r, ms_total: Date.now() - t0 });
   }
 
-  // Disparo manual do FECHO DA ÉPOCA OFICIAL de um ano (teste): ?fecharano=AAAA
+  // Disparo manual do FECHO DA ÉPOCA OFICIAL de um ano: ?fecharano=AAAA
   // Calcula e grava o pódio anual (mundial + continentais) no livro de campeões.
+  // PROTEÇÃO: só se pode fechar um ano JÁ TERMINADO (AAAA < ano atual). Fechar o
+  // ano em curso gravaria um campeão prematuro. O fecho automático de 1/jan trata
+  // sempre do ano anterior (já terminado), por isso não é afetado por esta regra.
   const fecharAno = (searchParams.get("fecharano") || "").trim();
   if (fecharAno && /^\d{4}$/.test(fecharAno)) {
+    const anoPedido = parseInt(fecharAno, 10);
+    const anoAtual = hoje.getFullYear();
+    if (anoPedido >= anoAtual) {
+      return NextResponse.json({
+        feito: false,
+        modo: "fechar_ano_recusado",
+        erro: `Só é possível fechar um ano já terminado. ${anoPedido} ${anoPedido === anoAtual ? "ainda está a decorrer" : "ainda não chegou"}. O ano em curso fecha-se sozinho a 1 de janeiro.`,
+        ms_total: Date.now() - t0,
+      }, { status: 400 });
+    }
     let r: { ano: number; mundial: number; continentais: Record<string, number> } | null = null;
-    try { r = await fecharAnoOficial(parseInt(fecharAno, 10)); } catch { /* não bloqueia */ }
+    try { r = await fecharAnoOficial(anoPedido); } catch { /* não bloqueia */ }
     return NextResponse.json({ feito: true, modo: "fechar_ano_forcado", fecho: r, ms_total: Date.now() - t0 });
   }
 
