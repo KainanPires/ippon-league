@@ -40,32 +40,33 @@ type Estado = "passada" | "aDecorrer" | "proxima" | "futura";
 export default function CalendarioPage() {
   const foco = focoMercado();
   const alvoId = foco.alvo.idCompeticao;
-  // Para onde levar o scroll ao abrir: a competição A DECORRER se houver uma;
-  // senão, a próxima (alvo). O destaque visual "próxima" continua a usar alvoId.
-  const scrollId = foco.aDecorrer?.idCompeticao ?? alvoId;
   const lista = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
 
-  // Cartão para onde levar o scroll ao abrir (a decorrer / próxima).
+  // Cartão-alvo do scroll: o PRIMEIRO que ainda não terminou (em ordem
+  // cronológica = o que está a decorrer ou o próximo). Determinado pela própria
+  // lista (não por ids a baterem certo), para a ref estar sempre num cartão real.
+  // Se já tudo terminou (fim do ano), fica no último.
+  let idxAlvo = lista.findIndex((s) => !competicaoFechada(s));
+  if (idxAlvo < 0) idxAlvo = lista.length - 1;
+
+  // Cartão para onde levar o scroll ao abrir.
   const alvoRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // Leva o scroll até à competição atual/próxima ao ABRIR.
-    // Porquê com atraso e repetido: o Next.js faz o seu próprio "scroll para o
-    // topo" ao montar a página, e às vezes DEPOIS do nosso — um requestAnimationFrame
-    // simples era anulado. Tentamos algumas vezes nos primeiros 600 ms, para o
-    // salto cair sempre depois do reset do Next. Cálculo absoluto (idempotente):
-    // repetir aterra sempre no mesmo sítio.
+    // Usamos scrollIntoView (encontra sozinho o contentor com scroll, seja a
+    // janela ou outro) e repetimos nos primeiros ~1,2 s: o Next.js faz o seu
+    // próprio "scroll para o topo" ao montar a página, às vezes DEPOIS do nosso,
+    // e a hidratação pode atrasar a lista. Repetir vence ambos; quando o cartão
+    // já está no topo, o scrollIntoView é praticamente um no-op.
     let cancelado = false;
-    function irParaAlvo() {
+    const delays = [50, 150, 300, 500, 800, 1200];
+    const timers = delays.map((ms) => window.setTimeout(() => {
       if (cancelado) return;
-      const el = alvoRef.current;
-      if (!el) return;
-      const y = el.getBoundingClientRect().top + window.scrollY - 12;
-      window.scrollTo({ top: y, behavior: "auto" });
-    }
-    const timers = [60, 200, 450, 700].map((ms) => window.setTimeout(irParaAlvo, ms));
+      alvoRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    }, ms));
     return () => { cancelado = true; timers.forEach((t) => clearTimeout(t)); };
-  }, [scrollId]);
+  }, [idxAlvo]);
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -93,12 +94,12 @@ export default function CalendarioPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          {lista.map((s) => (
+          {lista.map((s, i) => (
             <CartaoSemana
               key={s.semana}
               s={s}
               alvoId={alvoId}
-              alvoRef={s.idCompeticao === scrollId ? alvoRef : undefined}
+              alvoRef={i === idxAlvo ? alvoRef : undefined}
             />
           ))}
         </div>
