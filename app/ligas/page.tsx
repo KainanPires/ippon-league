@@ -117,14 +117,18 @@ export default function Ligas() {
     set: (p: PosOficial) => void
   ) {
     try {
+      // Posição no RANKING DO ANO (liga oficial anual), da mesma fonte que o
+      // interior da liga: /api/liga/geral com tipo oficial (recorta o ano).
       const params = new URLSearchParams({ tipo, comp: idComp, user_id: uid });
-      const res = await fetch(`/api/liga/oficial?${params.toString()}`);
+      const res = await fetch(`/api/liga/geral?${params.toString()}`);
       const j = await res.json();
       if (!vivo || !j.ok || !Array.isArray(j.membros)) return;
       const eu = j.membros.find((m: { user_id: string }) => m.user_id === uid);
+      // "No ranking" = tem pontos acumulados no ano (pontos_geral > 0).
+      const noRanking = !!(eu && eu.pontos_geral > 0);
       set({
-        posicao: eu && eu.escalou ? eu.posicao : null,
-        escalou: !!(eu && eu.escalou),
+        posicao: noRanking ? eu.posicao : null,
+        escalou: noRanking,
         total: j.membros.length,
       });
     } catch { /* o cartão mostra o estado neutro */ }
