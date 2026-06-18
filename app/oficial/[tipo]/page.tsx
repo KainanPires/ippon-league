@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { focoMercado } from "@/lib/calendario";
+import { focoMercado, competicoesReais } from "@/lib/calendario";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -13,6 +13,17 @@ const GOLD = "#d9a441";
 
 // Atualização ao vivo do ranking enquanto a competição decorre.
 const TICK_AO_VIVO_MS = 15000;
+
+// Descobre a ÚLTIMA competição real de um ano (a que fecha a época anual da liga
+// oficial). competicoesReais() vem ordenada por data; filtramos as do ano e
+// ficamos com a última. Devolve null se não houver competições nesse ano.
+function ultimaCompeticaoDoAno(ano: number): { idCompeticao: string; nome: string } | null {
+  const doAno = competicoesReais().filter((s) => parseInt(String(s.de).slice(0, 4), 10) === ano);
+  if (doAno.length === 0) return null;
+  const ultima = doAno[doAno.length - 1];
+  return { idCompeticao: ultima.idCompeticao, nome: ultima.nome };
+}
+
 
 type Vista = "rodada" | "geral";
 
@@ -72,6 +83,11 @@ export default function PaginaOficial() {
   const compAtual = foco.aDecorrer ?? foco.atual;
   const idComp = compAtual.idCompeticao;
   const emAndamento = foco.aDecorrer !== null;
+
+  // Época anual: qual a última competição do ano corrente, e a atual já é essa?
+  const anoCorrente = new Date().getFullYear();
+  const ultimaDoAno = ultimaCompeticaoDoAno(anoCorrente);
+  const atualEhUltimaDoAno = !!ultimaDoAno && ultimaDoAno.idCompeticao === idComp;
 
   const titulo = ehMundial ? "Liga Mundial" : (nomeContinente ? `Liga ${nomeContinente}` : "Liga Continental");
 
@@ -220,6 +236,20 @@ export default function PaginaOficial() {
             Só membros Pro entram no ranking · {compAtual.nome}
           </div>
         </div>
+
+        {/* Informativo de ÉPOCA ANUAL (Mundial e Continental). A época vai de
+            janeiro à última competição do ano; depois recomeça do zero. Quando a
+            competição atual já é a última do ano, muda para o texto de fecho. */}
+        {estado === "pronto" && (
+          <div style={{ background: "#0f1411", border: `1px solid ${atualEhUltimaDoAno ? GOLD : "#2a4d3e"}`, borderRadius: 12, padding: "11px 13px", marginBottom: 14, display: "flex", gap: 9, alignItems: "flex-start" }}>
+            <span aria-hidden="true" style={{ fontSize: 15, flexShrink: 0 }}>{atualEhUltimaDoAno ? "🏁" : "📅"}</span>
+            <span style={{ fontSize: 12.5, color: atualEhUltimaDoAno ? "#f0d79a" : "#aee9c9", lineHeight: 1.45 }}>
+              {atualEhUltimaDoAno
+                ? <>Esta é a <strong>última competição de {anoCorrente}</strong>! O ranking fecha aqui e os campeões do ano serão definidos. Em {anoCorrente + 1} recomeça uma época nova, do zero.</>
+                : <>Esta liga é <strong>anual</strong>. A época de {anoCorrente} vai até à última competição do ano, em dezembro. No ano seguinte começa uma época nova — o ranking recomeça do zero.</>}
+            </span>
+          </div>
+        )}
 
         {/* Campeões do ANO fechado (livro de campeões). Visível a todos; o top-3
             que seja "eu" vê o botão de partilhar o seu certificado. */}
