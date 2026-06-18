@@ -68,6 +68,9 @@ export default function Ligas() {
   const [erroEntrar, setErroEntrar] = useState("");
   const [souPro, setSouPro] = useState(false);
 
+  // Aviso de confirmação quando a liga já começou (entra com 0 pontos).
+  const [confirmacao, setConfirmacao] = useState<{ codigo: string; nome: string; rodadaInicio: number; rodadaEntrada: number } | null>(null);
+
   // Ligas oficiais: nome do continente + posição do utilizador em cada uma.
   const [nomeContinente, setNomeContinente] = useState<string | null>(null);
   const [posMundial, setPosMundial] = useState<PosOficial | null>(null);
@@ -156,7 +159,7 @@ export default function Ligas() {
     if (t === "mercado") carregarMercado();
   }
 
-  async function entrarPorCodigo() {
+  async function entrarPorCodigo(confirmar = false) {
     const c = codigo.trim().toUpperCase();
     if (c.length < 4) { setErroEntrar("Código demasiado curto."); return; }
     setErroEntrar("");
@@ -168,9 +171,20 @@ export default function Ligas() {
       const res = await fetch("/api/liga/entrar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: uid, codigo: c }),
+        body: JSON.stringify({ user_id: uid, codigo: c, confirmar }),
       });
       const j = await res.json();
+      // A liga já começou: pede confirmação antes de entrar (começa com 0 pontos).
+      if (!j.ok && j.jaComecou) {
+        setConfirmacao({
+          codigo: c,
+          nome: j.liga?.name || "esta liga",
+          rodadaInicio: Number(j.rodadaInicio),
+          rodadaEntrada: Number(j.rodadaEntrada),
+        });
+        setAEntrar(false);
+        return;
+      }
       if (!j.ok) {
         setErroEntrar(j.erro || "Não encontrámos essa liga.");
         setAEntrar(false);
@@ -181,6 +195,12 @@ export default function Ligas() {
       setErroEntrar("Falha de ligação.");
       setAEntrar(false);
     }
+  }
+
+  // Confirmou entrar numa liga já começada: repete o pedido já confirmado.
+  function confirmarEntradaComecada() {
+    setConfirmacao(null);
+    entrarPorCodigo(true);
   }
 
   // Ação no mercado: liga "aberta" entra direto; "por aprovação" envia pedido.
@@ -333,7 +353,7 @@ export default function Ligas() {
               <>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} placeholder="Código de convite" maxLength={8} style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 13px", color: "#f1ede2", fontSize: 15, fontFamily: FD, letterSpacing: "0.1em", outline: "none", textTransform: "uppercase" }} />
-                  <button onClick={entrarPorCodigo} disabled={aEntrar} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{aEntrar ? "…" : "Entrar"}</button>
+                  <button onClick={() => entrarPorCodigo()} disabled={aEntrar} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{aEntrar ? "…" : "Entrar"}</button>
                 </div>
                 {erroEntrar && (
                   erroEntrar.includes("Pro") ? (
@@ -394,6 +414,24 @@ export default function Ligas() {
 
         {tab === "resultados" && <ResultadosConteudo />}
       </div>
+
+      {/* Confirmação: a liga já começou, entras a meio e começas com 0 pontos. */}
+      {confirmacao && (
+        <div onClick={() => setConfirmacao(null)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "#121815", border: "1px solid #2a3a33", borderRadius: 16, padding: "20px 18px" }}>
+            <div style={{ textAlign: "center", fontSize: 30, marginBottom: 8 }}>⏱️</div>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "#f1ede2", textAlign: "center", marginBottom: 10 }}>Esta liga já começou</div>
+            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, textAlign: "center", margin: "0 0 6px" }}>
+              <strong style={{ color: "#f1ede2" }}>{confirmacao.nome}</strong> arrancou na rodada {confirmacao.rodadaInicio}. Se entrares agora, entras a partir da rodada {confirmacao.rodadaEntrada} e <strong style={{ color: GOLD }}>começas com 0 pontos</strong> — não recuperas as rodadas já jogadas.
+            </p>
+            <p style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.5, textAlign: "center", margin: "0 0 16px" }}>Queres entrar mesmo assim?</p>
+            <div style={{ display: "flex", gap: 9 }}>
+              <button onClick={() => setConfirmacao(null)} style={{ flex: 1, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>Cancelar</button>
+              <button onClick={confirmarEntradaComecada} style={{ flex: 1, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>Entrar mesmo assim</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around", zIndex: 50 }}>
         <NavTab label="Início" href="/inicio" icon={<HomeIcon />} />
