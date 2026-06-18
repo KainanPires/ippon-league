@@ -118,6 +118,12 @@ export async function GET(req: Request) {
     }
   } else if (tipo === "mundial" || tipo === "continental") {
     // OFICIAL: utilizadores Pro (filtrados por continente na continental).
+    // ÉPOCA ANUAL: a liga oficial conta só os pontos do ANO CIVIL corrente
+    // (1/jan–31/dez). A 1/jan o ranking recomeça do zero. Reutilizamos o
+    // mecanismo de janela (janelaIni/janelaFim + dentroDaJanela) já existente.
+    const anoAtual = new Date().getFullYear();
+    janelaIni = new Date(anoAtual, 0, 1, 0, 0, 0);        // 1 de janeiro
+    janelaFim = new Date(anoAtual, 11, 31, 23, 59, 59);   // 31 de dezembro
     if (tipo === "continental") {
       if (!user_id) return NextResponse.json({ ok: false, erro: "Falta ?user_id= para a continental." }, { status: 400 });
       const { data: eu } = await supabaseAdmin
