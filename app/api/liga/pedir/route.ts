@@ -2,18 +2,19 @@
 //
 // PEDIR ENTRADA NUMA LIGA (servidor, chave secreta).
 //
-// Recebe (POST): { user_id, codigo }
+// Recebe (POST): { user_id, codigo, confirmar? }
 // Comportamento conforme a privacidade da liga:
 //   - "aberta"          → entra já como membro (atalho; igual ao /entrar)
 //   - "mediante_pedido" → cria um pedido PENDENTE em league_requests
 //   - "fechada"         → não se pede pelo mercado; só por código (esta rota
 //                         não deixa pedir uma fechada — devolve erro claro)
 // Devolve:
-//   { ok:true, entrou:true, liga }       quando entrou direto (aberta)
-//   { ok:true, pedido:true }             quando ficou um pedido pendente
-//   { ok:true, jaEra:true, liga }        quando já era membro
-//   { ok:true, jaPediu:true }            quando já tinha pedido pendente
-//   { ok:false, erro }                   caso contrário
+//   { ok:true, entrou:true, liga }        quando entrou direto (aberta)
+//   { ok:true, pedido:true }              quando ficou um pedido pendente
+//   { ok:true, jaEra:true, liga }         quando já era membro
+//   { ok:true, jaPediu:true }             quando já tinha pedido pendente
+//   { ok:false, jaComecou:true, … }       liga aberta já começou: pede confirmação
+//   { ok:false, erro }                    caso contrário
 //
 // COPA — INSCRIÇÕES FECHADAS: tal como em /entrar, numa Copa Ippon depois de as
 // inscrições fecharem (estado deixa de ser "inscricao" OU passou o prazo
@@ -22,6 +23,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
+import { focoMercado, numeroDaRodada } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -91,7 +93,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação à base de dados." }, { status: 500 });
   }
 
-  let corpo: { user_id?: string; codigo?: string };
+  let corpo: { user_id?: string; codigo?: string; confirmar?: boolean };
   try {
     corpo = await req.json();
   } catch {
@@ -100,14 +102,16 @@ export async function POST(req: Request) {
 
   const user_id = (corpo.user_id || "").trim();
   const codigo = (corpo.codigo || "").trim().toUpperCase();
+  const confirmar = corpo.confirmar === true;
   if (!user_id) return NextResponse.json({ ok: false, erro: "Entra para te juntares a uma liga." }, { status: 401 });
   if (codigo.length < 4) return NextResponse.json({ ok: false, erro: "Código inválido." }, { status: 400 });
 
   // 1) Encontra a liga pelo código. (created_by para notificar o dono;
-  //    copa_estado + copa_fecho_inscricao para o portão da copa fechada.)
+  //    copa_estado + copa_fecho_inscricao para o portão da copa fechada;
+  //    liga_competicao_inicial para o aviso de "liga já começou".)
   const { data: liga, error: erroLiga } = await supabaseAdmin
     .from("leagues")
-    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code, created_by, copa_estado, copa_fecho_inscricao")
+    .select("id, name, type, formato, privacidade, descricao, escudo, invite_code, created_by, copa_estado, copa_fecho_inscricao, liga_competicao_inicial")
     .eq("invite_code", codigo)
     .maybeSingle();
   if (erroLiga || !liga) {
@@ -145,9 +149,31 @@ export async function POST(req: Request) {
       const bloqueio = await bloqueioPorLimite(user_id);
       if (bloqueio) return NextResponse.json({ ok: false, limite: true, erro: bloqueio }, { status: 403 });
     }
+
+    // 3a-bis) A liga (pontos corridos) JÁ COMEÇOU? Se a rodada de entrada (alvo de
+    //   agora) é posterior à rodada de arranque da liga, este novo membro começa
+    //   com 0 pontos e não recupera as rodadas já jogadas. Avisamos e só entramos
+    //   com confirmar:true. Mesma regra de /entrar; copas não passam por aqui.
+    const alvoAtual = focoMercado().alvo;
+    if (String(liga.formato) !== "copa" && !confirmar) {
+      const rodadaInicio = numeroDaRodada(String(liga.liga_competicao_inicial ?? ""));
+      const rodadaEntrada = numeroDaRodada(String(alvoAtual.idCompeticao));
+      if (rodadaInicio !== null && rodadaEntrada !== null && rodadaEntrada > rodadaInicio) {
+        return NextResponse.json({
+          ok: false,
+          jaComecou: true,
+          liga,
+          rodadaInicio,
+          rodadaEntrada,
+        });
+      }
+    }
+
+    // entrou_competicao = competição-alvo de agora (1ª que este membro joga).
+    // Tal como em /entrar: quem entra a meio NÃO herda as rodadas anteriores.
     const { error: erroMembro } = await supabaseAdmin
       .from("league_members")
-      .insert({ league_id: liga.id, user_id, score: 0, position: 0 });
+      .insert({ league_id: liga.id, user_id, score: 0, position: 0, entrou_competicao: alvoAtual.idCompeticao });
     if (erroMembro) {
       return NextResponse.json({ ok: false, erro: "Não foi possível entrar na liga." }, { status: 500 });
     }
