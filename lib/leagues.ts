@@ -1,10 +1,12 @@
 import { DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+
 export type LeagueFormat = "pontos" | "copa";
 // Privacidade da liga:
 //   "aberta"          → aparece no mercado e qualquer um entra direto
 //   "mediante_pedido" → aparece no mercado, mas o dono aprova quem entra
 //   "fechada"         → não aparece no mercado; só se entra por código
 export type LeaguePrivacy = "fechada" | "aberta" | "mediante_pedido";
+
 export type MyLeague = {
   id: string;
   name: string;
@@ -15,7 +17,9 @@ export type MyLeague = {
   inviteCode: string;
   createdAt: number;
 };
+
 const KEY = "ippon_my_leagues";
+
 export function loadLeagues(): MyLeague[] {
   try {
     const raw = localStorage.getItem(KEY);
@@ -43,6 +47,7 @@ export function newInviteCode(): string {
 export function newId(): string {
   return "lg_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
+
 export const DEFAULT_LEAGUE_SHIELD: Identity = {
   ...DEFAULT_IDENTITY,
   name: "A minha liga",
@@ -50,4 +55,8 @@ export const DEFAULT_LEAGUE_SHIELD: Identity = {
   bg2: "#102a20",
   border: "#d9a441",
   symbol: "trofeu",
+  // Ícone com aspeto "autocolante" de origem (dourado com contorno escuro), para
+  // a liga nova nascer já destacada — igual ao escudo do time.
+  icon: "#d9a441",
+  iconBorder: "#141110",
 };
