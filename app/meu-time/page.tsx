@@ -55,6 +55,33 @@ function sameTeam(a: TeamState, b: TeamState): boolean {
   return [...a.ids].sort().join(",") === [...b.ids].sort().join(",");
 }
 
+// LEMBRETE "esqueceste de salvar" — fala com /api/lembrete-salvar.
+// keepalive: o pedido completa mesmo que a página esteja a adormecer (é o
+// momento exato em que precisamos de o enviar — ao trocar de aba).
+function agendarLembreteSalvar(userId: string | null, idComp: string) {
+  if (!userId || !idComp) return;
+  try {
+    fetch("/api/lembrete-salvar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, id_competicao: idComp, acao: "agendar" }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch { /* sem rede: não bloqueia */ }
+}
+function cancelarLembreteSalvar(userId: string | null, idComp: string) {
+  if (!userId || !idComp) return;
+  try {
+    fetch("/api/lembrete-salvar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, id_competicao: idComp, acao: "cancelar" }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch { /* sem rede: não bloqueia */ }
+}
+
+
 type Modal =
   | { kind: "saved" | "trash" | "share" | "leave" | "missing" | "incompleta" }
   | { kind: "athlete"; a: Athlete }
@@ -492,6 +519,9 @@ function MeuTimeInner() {
   const alvo = foco.alvo;
   const aDecorrer = foco.aDecorrer;
   const [idComp, setIdComp] = useState<string>(alvo.idCompeticao);
+  // Quem sou eu (para o lembrete "esqueceste de salvar"). Guardado quando a
+  // sessão é confirmada; usado para agendar/cancelar o lembrete no servidor.
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -548,6 +578,10 @@ function MeuTimeInner() {
         return;
       }
       setReady(true);
+      try {
+        const uid = (data.session as { user?: { id?: string } } | null)?.user?.id;
+        if (uid) setUserId(uid);
+      } catch {}
       try {
         const meta = (data.session as { user?: { user_metadata?: { is_pro?: boolean } } } | null)?.user?.user_metadata;
         setIsPro(!!meta?.is_pro);
@@ -715,6 +749,29 @@ function MeuTimeInner() {
   const editavel = !emCompeticao;
   const dirty = editavel && !sameTeam(team, saved);
 
+  // LEMBRETE "esqueceste de salvar o teu time". Quando o utilizador SAI do ecrã
+  // (troca de aba/app → a página fica escondida) com alterações por salvar
+  // (dirty) e o mercado aberto (editavel), avisamos o servidor para agendar um
+  // lembrete (push) para daqui a 3 min. Se voltar e salvar, a função salvar()
+  // cancela; se voltar ao time original (dirty=false) com a página visível,
+  // cancelamos aqui (defensivo). keepalive: o pedido sobrevive à página a
+  // adormecer. (Frente pedida para quem monta o time e troca de aba sem salvar.)
+  useEffect(() => {
+    if (!userId || !idComp) return;
+    function aoMudarVisibilidadeLembrete() {
+      if (document.hidden) {
+        // Saiu do ecrã: se há alterações por salvar e o mercado está aberto,
+        // agenda o lembrete. O servidor revalida o mercado de qualquer forma.
+        if (dirty) agendarLembreteSalvar(userId, idComp);
+      } else {
+        // Voltou ao ecrã sem nada por salvar: cancela qualquer lembrete pendente.
+        if (!dirty) cancelarLembreteSalvar(userId, idComp);
+      }
+    }
+    document.addEventListener("visibilitychange", aoMudarVisibilidadeLembrete);
+    return () => document.removeEventListener("visibilitychange", aoMudarVisibilidadeLembrete);
+  }, [userId, idComp, dirty]);
+
   // Tutorial ativo conforme o momento + qual elemento destacar agora.
   const passos = emCompeticao ? STEPS_COMPETICAO : STEPS_EDICAO;
   const passoAtual = guide !== null ? passos[guide] : null;
@@ -756,6 +813,8 @@ function MeuTimeInner() {
     setSavingCloud(true);
     const res = await commitSavedCloudFor(alvo.idCompeticao, team, identity);
     setSaved(team);
+    // Salvou: cancela qualquer lembrete "esqueceste de salvar" pendente.
+    cancelarLembreteSalvar(userId, idComp);
     // Sincroniza o rascunho local com o guardado: sem isto, fica um rascunho
     // "fantasma" diferente do guardado e o meu-time pensaria que há alterações
     // por guardar ao voltar (ex: voltar do mercado sem mexer em nada).
