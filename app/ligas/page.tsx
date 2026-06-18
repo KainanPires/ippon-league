@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
 import { nomeContinenteDoPais } from "@/lib/continentes";
 import { CalendarioConteudo } from "@/components/CalendarioConteudo";
+import { ResultadosConteudo } from "@/components/ResultadosConteudo";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
