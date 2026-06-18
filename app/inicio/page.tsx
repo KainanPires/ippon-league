@@ -8,7 +8,9 @@ import { Desempenho } from "@/components/Desempenho";
 import { GaleriaResumos } from "@/components/GaleriaResumos";
 import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
-import { focoMercado, textoFecho } from "@/lib/calendario";
+import { focoMercado, textoFecho, competicaoDaSemana } from "@/lib/calendario";
+import { mensagemEspecialDeHoje, type MensagemEspecial } from "@/lib/mensagensEspeciais";
+import { continenteDoPais } from "@/lib/continentes";
 import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { PRECO } from "@/lib/precos";
 import { SinoNotificacoes } from "@/components/SinoNotificacoes";
@@ -57,6 +59,7 @@ export default function Inicio() {
   const [name, setName] = useState("");
   const [isPro, setIsPro] = useState(false);
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
+  const [msgEspecial, setMsgEspecial] = useState<MensagemEspecial | null>(null);
   const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
   const [minhasLigas, setMinhasLigas] = useState<{ id: string; name: string; membros: number }[] | null>(null);
   const [desempenho, setDesempenho] = useState<{ dados: DesempenhoRodada; team: TeamState } | null>(null);
@@ -116,14 +119,34 @@ export default function Inicio() {
       try {
         const metaName = data.session.user?.user_metadata?.nome;
         const savedName = localStorage.getItem(`ippon_name__${uid()}`) ?? localStorage.getItem("ippon_name");
+        const nomeParaMsg = metaName ? String(metaName).split(" ")[0] : (savedName || "");
         if (metaName) setName(String(metaName).split(" ")[0]);
         else if (savedName) setName(savedName);
         else setName("Campeão");
         const meta = (data.session.user?.user_metadata ?? {}) as { is_pro?: boolean };
         setIsPro(Boolean(meta.is_pro));
         if (userId) {
-          supabase.from("users").select("belt").eq("id", userId).maybeSingle()
-            .then(({ data: row }) => { if (active) setFaixaJogo(normalizarFaixa(row?.belt)); });
+          supabase.from("users").select("belt, data_nascimento, country_code").eq("id", userId).maybeSingle()
+            .then(({ data: row }) => {
+              if (!active) return;
+              setFaixaJogo(normalizarFaixa(row?.belt));
+              // Mensagem especial do dia: junta data civil (aniversário/Dia do
+              // Judô/fim/começo de ano) com a grande competição da semana (do
+              // calendário; nunca clássicos; continental só do continente do user).
+              try {
+                const comp = competicaoDaSemana();
+                const msg = mensagemEspecialDeHoje(
+                  new Date(),
+                  {
+                    nome: nomeParaMsg || undefined,
+                    dataNascimento: row?.data_nascimento ? String(row.data_nascimento) : null,
+                    continente: continenteDoPais(row?.country_code),
+                  },
+                  { nome: comp.nome, nivel: comp.nivel, classico: comp.classico },
+                );
+                setMsgEspecial(msg);
+              } catch { /* sem mensagem: o cartão não aparece */ }
+            });
         }
         if (localStorage.getItem("ippon_onboarding") === "pending") {
           tutoriaisVistosConta().then((vistos) => {
@@ -330,6 +353,18 @@ export default function Inicio() {
             <SinoNotificacoes calcOpts={{ temEquipa: temEquipaCompleta }} />
           </div>
         </header>
+
+        {/* Mensagem especial do dia (aniversário, Dia do Judô, grande competição,
+            fim/começo de ano). Só aparece quando há mensagem para hoje. */}
+        {msgEspecial && (
+          <div style={{ background: "#121815", border: `1px solid ${msgEspecial.cor}`, borderRadius: 14, padding: "13px 15px", marginBottom: 14, display: "flex", gap: 11, alignItems: "flex-start" }}>
+            <span aria-hidden="true" style={{ fontSize: 22, flexShrink: 0, lineHeight: 1 }}>{msgEspecial.emoji}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em", color: msgEspecial.cor, marginBottom: 3 }}>{msgEspecial.titulo}</div>
+              <p style={{ fontSize: 12.5, color: "#d3dcd5", lineHeight: 1.5, margin: 0 }}>{msgEspecial.texto}</p>
+            </div>
+          </div>
+        )}
 
         {/* Convite para instalar a app (PWA). Só aparece a quem ainda não instalou. */}
         <CartaoInstalarApp />
