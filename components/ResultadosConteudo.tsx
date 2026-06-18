@@ -1,326 +1,486 @@
 "use client";
 
-// Conteúdo da aba "Resultados" (dentro de /ligas).
-// Duas secções:
-//   • Resultados positivos — onde ficaste em 1º/2º/3º, com certificado para
-//     partilhar. Junta: copas, ligas de amigos (pontos corridos), campeão do
-//     ano (Mundial/Continental) e Melhor da Rodada (Mundial/Continental).
-//   • Resultados — do 4º para baixo (ou eliminação em copa). Só registo, sem
-//     certificado, para a aba dar a sensação de histórico sem poluir.
-//
-// Tudo é montado a partir dos endpoints que JÁ existem (mesmos números do resto
-// da app): /api/liga/minhas, /api/copa/chave, /api/liga/geral, /api/liga/campeoes
-// e /api/liga/melhores-rodada?historico=1.
-
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useState, useEffect } from "react";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
-import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
+import { nomeContinenteDoPais } from "@/lib/continentes";
+import { CalendarioConteudo } from "@/components/CalendarioConteudo";
+import { ResultadosConteudo } from "@/components/ResultadosConteudo";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
+const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
-// Um certificado partilhável (1º/2º/3º ou Melhor da Rodada).
-interface Positivo {
-  chave: string;
-  // Como abrir o certificado:
-  variante: "anual" | "rodada";
-  posicao: PosicaoPodio;        // anual: campeao/vice/terceiro; rodada: sempre "campeao"
-  tituloRodada?: string;        // só na variante rodada (ex. "Mundial + Europa")
-  identity: Identity;
-  nomeCertificado: string;      // nome que aparece no certificado (liga/copa/competição)
-  nParticipantes: number;
-  // Para o cartão da lista:
-  medalha: string;
-  cor: string;
-  rotulo: string;               // ex. "Campeão", "3º lugar", "Mundial + Europa"
-  contexto: string;             // ex. "Copa do Dojo", "Liga Mundial 2026", nome da competição
-  pontos: number | null;
-}
+// Limites por plano (espelho do servidor; a regra real está nas rotas).
+const LIM_CRIAR_FREE = 1, LIM_CRIAR_PRO = 5;
+const LIM_PART_FREE = 2, LIM_PART_PRO = 5;
 
-// Um resultado sem pódio (4º+ ou eliminado). Só registo, sem certificado.
-interface Outro {
-  chave: string;
-  identity: Identity;
-  contexto: string;             // nome da liga/copa
-  detalhe: string;              // "5º de 12" / "Eliminado" / "Pontos corridos · terminada"
-}
+type Tab = "ativas" | "mercado" | "calendario" | "resultados";
+
+function esc(p: Partial<Identity>): Identity { return { ...DEFAULT_IDENTITY, ...p }; }
 
 interface MinhaLiga {
   id: string;
   name: string;
   formato: string;
-  invite_code: string;
+  privacidade: string;
   escudo: Identity | null;
+  invite_code: string;
+  membros: number;
+  sou_dono: boolean;
   estado?: string | null;
   copa_estado?: string | null;
 }
 
-function ident(escudo: Identity | null | undefined, nome: string): Identity {
-  return { ...DEFAULT_IDENTITY, ...(escudo || {}), name: nome };
-}
-function metaPosicao(pos: PosicaoPodio): { medalha: string; cor: string; rotulo: string } {
-  if (pos === "campeao") return { medalha: "🥇", cor: GOLD, rotulo: "Campeão" };
-  if (pos === "vice") return { medalha: "🥈", cor: "#c8ccd2", rotulo: "Vice-campeão" };
-  return { medalha: "🥉", cor: "#c87f43", rotulo: "3º lugar" };
-}
-function posicaoDePodio(n: number): PosicaoPodio | null {
-  return n === 1 ? "campeao" : n === 2 ? "vice" : n === 3 ? "terceiro" : null;
+// Uma liga/copa está terminada? Pontos corridos: estado='terminada'.
+// Copa: copa_estado='terminada'. As restantes contam como ativas.
+function ligaTerminada(l: MinhaLiga): boolean {
+  if (l.formato === "copa") return l.copa_estado === "terminada";
+  return l.estado === "terminada";
 }
 
-export function ResultadosConteudo() {
+interface LigaMercado {
+  id: string;
+  name: string;
+  formato: string;
+  privacidade: string;
+  escudo: Identity | null;
+  invite_code: string;
+  membros: number;
+  sou_membro: boolean;
+  sou_dono: boolean;
+}
+
+// Estado da posição do utilizador numa liga oficial (para o cartão).
+interface PosOficial {
+  posicao: number | null;  // null = não está no ranking (não-Pro ou não escalou)
+  escalou: boolean;
+  total: number;           // total de membros no ranking
+}
+
+export default function Ligas() {
+  const [tab, setTab] = useState<Tab>("ativas");
+  const [mine, setMine] = useState<MinhaLiga[]>([]);
   const [aCarregar, setACarregar] = useState(true);
-  const [semSessao, setSemSessao] = useState(false);
-  const [positivos, setPositivos] = useState<Positivo[]>([]);
-  const [outros, setOutros] = useState<Outro[]>([]);
-  const [cert, setCert] = useState<Positivo | null>(null);
+  const [codigo, setCodigo] = useState("");
+  const [aEntrar, setAEntrar] = useState(false);
+  const [erroEntrar, setErroEntrar] = useState("");
+  const [souPro, setSouPro] = useState(false);
 
-  const idComp = (focoMercado().aDecorrer ?? focoMercado().atual).idCompeticao;
+  // Ligas oficiais: nome do continente + posição do utilizador em cada uma.
+  const [nomeContinente, setNomeContinente] = useState<string | null>(null);
+  const [posMundial, setPosMundial] = useState<PosOficial | null>(null);
+  const [posContinental, setPosContinental] = useState<PosOficial | null>(null);
+
+  // Mercado de ligas (carrega só quando se abre a aba).
+  const [mercado, setMercado] = useState<LigaMercado[] | null>(null);
+  const [aCarregarMercado, setACarregarMercado] = useState(false);
+  const [aEntrarId, setAEntrarId] = useState<string | null>(null);
+  const [erroMercado, setErroMercado] = useState("");
+  const [pedidoEnviado, setPedidoEnviado] = useState<Record<string, boolean>>({});
+
+  // Competição da rodada atual (para calcular os rankings oficiais).
+  const foco = focoMercado();
+  const idComp = (foco.aDecorrer ?? foco.atual).idCompeticao;
 
   useEffect(() => {
     let vivo = true;
     (async () => {
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess.session?.user?.id;
-      if (!uid) { if (vivo) { setSemSessao(true); setACarregar(false); } return; }
-
-      const pos: Positivo[] = [];
-      const out: Outro[] = [];
-
-      // Helper de fetch tolerante a falhas.
-      async function getJSON(url: string): Promise<Record<string, unknown> | null> {
-        try { const r = await fetch(url); return await r.json(); } catch { return null; }
+      const meta = sess.session?.user?.user_metadata as { is_pro?: boolean; pais_iso?: string } | undefined;
+      if (vivo) {
+        setSouPro(!!meta?.is_pro);
+        setNomeContinente(nomeContinenteDoPais(meta?.pais_iso));
       }
+      if (!uid) { if (vivo) { setMine([]); setACarregar(false); } return; }
+      try {
+        const res = await fetch(`/api/liga/minhas?user_id=${uid}`);
+        const j = await res.json();
+        if (vivo && Array.isArray(j.ligas)) setMine(j.ligas);
+      } catch {}
+      if (vivo) setACarregar(false);
 
-      // 1) MELHOR DA RODADA (histórico): cada vitória de rodada é um certificado.
-      const mr = await getJSON(`/api/liga/melhores-rodada?historico=1&user_id=${uid}`);
-      if (mr && Array.isArray(mr.historico)) {
-        for (const r of mr.historico as Array<Record<string, unknown>>) {
-          pos.push({
-            chave: `rod-${String(r.id_competicao)}-${String(r.escopo)}-${String(r.continente)}`,
-            variante: "rodada",
-            posicao: "campeao",
-            tituloRodada: String(r.rotulo || "Melhor da Rodada"),
-            identity: ident(r.escudo as Identity | null, String(r.nome_time || "Equipa")),
-            nomeCertificado: String(r.nome_competicao || ""),
-            nParticipantes: Number(r.n_participantes || 0),
-            medalha: "🥇",
-            cor: GOLD,
-            rotulo: String(r.rotulo || "Melhor da Rodada"),
-            contexto: String(r.nome_competicao || ""),
-            pontos: Number(r.pontos || 0),
-          });
-        }
-      }
-
-      // 2) CAMPEÃO DO ANO (Mundial e Continental). Só entra se estiver no top 3.
-      //    O nº de participantes vem do ranking do ano (geral) — uma chamada por
-      //    âmbito, só quando há de facto um título a mostrar.
-      for (const tipo of ["mundial", "continental"] as const) {
-        const c = await getJSON(`/api/liga/campeoes?tipo=${tipo}&user_id=${uid}`);
-        if (!c || !c.ok || !Array.isArray(c.podio)) continue;
-        const ano = c.ano != null ? Number(c.ano) : null;
-        const eu = (c.podio as Array<Record<string, unknown>>).find((p) => String(p.user_id) === uid);
-        if (!eu) continue;
-        const posPodio = posicaoDePodio(Number(eu.posicao));
-        if (!posPodio) continue;
-        // Contagem de participantes do ano (aprox.: ranking atual desse âmbito).
-        let nPart = 0;
-        const g = await getJSON(`/api/liga/geral?tipo=${tipo}&comp=${idComp}&user_id=${uid}`);
-        if (g && Array.isArray(g.membros)) nPart = (g.membros as unknown[]).length;
-        const m = metaPosicao(posPodio);
-        const nomeLiga = tipo === "mundial"
-          ? `Liga Mundial${ano ? ` ${ano}` : ""}`
-          : `Liga Continental${ano ? ` ${ano}` : ""}`;
-        pos.push({
-          chave: `ano-${tipo}-${ano}`,
-          variante: "anual",
-          posicao: posPodio,
-          identity: ident(eu.escudo as Identity | null, String(eu.nome_time || "Equipa")),
-          nomeCertificado: nomeLiga,
-          nParticipantes: nPart,
-          medalha: m.medalha,
-          cor: m.cor,
-          rotulo: m.rotulo,
-          contexto: nomeLiga,
-          pontos: Number(eu.pontos || 0),
-        });
-      }
-
-      // 3) AS MINHAS LIGAS/COPAS TERMINADAS.
-      const minhasJ = await getJSON(`/api/liga/minhas?user_id=${uid}`);
-      const minhas: MinhaLiga[] = (minhasJ && Array.isArray(minhasJ.ligas) ? minhasJ.ligas : []) as MinhaLiga[];
-
-      for (const l of minhas) {
-        const ehCopa = l.formato === "copa";
-        const terminada = ehCopa ? l.copa_estado === "terminada" : l.estado === "terminada";
-        if (!terminada) continue;
-
-        if (ehCopa) {
-          // COPA: pódio (campeao/vice/terceiro) via /api/copa/chave.
-          const ch = await getJSON(`/api/copa/chave?id=${l.id}`);
-          const podio = (ch && (ch.podio as Record<string, unknown> | undefined)) || {};
-          const ids = (ch && (ch.identidades as Record<string, { nome_time?: string; escudo?: unknown }> | undefined)) || {};
-          const meuIdent = ids[uid] || {};
-          const nPart = ch ? Number(ch.nParticiparam || 0) : 0;
-          const minhaPos: PosicaoPodio | null =
-            String(podio.campeao) === uid ? "campeao" :
-            String(podio.vice) === uid ? "vice" :
-            String(podio.terceiro) === uid ? "terceiro" : null;
-          if (minhaPos) {
-            const m = metaPosicao(minhaPos);
-            pos.push({
-              chave: `copa-${l.id}`,
-              variante: "anual",
-              posicao: minhaPos,
-              identity: ident((meuIdent.escudo as Identity | null) ?? l.escudo, String(meuIdent.nome_time || l.name)),
-              nomeCertificado: l.name,
-              nParticipantes: nPart,
-              medalha: m.medalha,
-              cor: m.cor,
-              rotulo: m.rotulo,
-              contexto: `${l.name} · Copa Ippon`,
-              pontos: null,
-            });
-          } else {
-            out.push({
-              chave: `copa-${l.id}`,
-              identity: ident((meuIdent.escudo as Identity | null) ?? l.escudo, String(meuIdent.nome_time || l.name)),
-              contexto: l.name,
-              detalhe: "Copa Ippon · eliminado",
-            });
-          }
-        } else {
-          // PONTOS CORRIDOS: posição final via /api/liga/geral?league=.
-          const g = await getJSON(`/api/liga/geral?league=${l.id}&comp=${idComp}&user_id=${uid}`);
-          const membros = (g && Array.isArray(g.membros) ? g.membros : []) as Array<Record<string, unknown>>;
-          const eu = membros.find((m) => String(m.user_id) === uid);
-          const total = membros.length;
-          const minhaPos = eu ? Number(eu.posicao) : 0;
-          const posPodio = posicaoDePodio(minhaPos);
-          if (eu && posPodio) {
-            const m = metaPosicao(posPodio);
-            pos.push({
-              chave: `liga-${l.id}`,
-              variante: "anual",
-              posicao: posPodio,
-              identity: ident((eu.escudo as Identity | null) ?? l.escudo, String(eu.nome_time || l.name)),
-              nomeCertificado: l.name,
-              nParticipantes: total,
-              medalha: m.medalha,
-              cor: m.cor,
-              rotulo: m.rotulo,
-              contexto: `${l.name} · Pontos corridos`,
-              pontos: eu.pontos_geral != null ? Number(eu.pontos_geral) : null,
-            });
-          } else {
-            out.push({
-              chave: `liga-${l.id}`,
-              identity: ident((eu?.escudo as Identity | null) ?? l.escudo, String(eu?.nome_time || l.name)),
-              contexto: l.name,
-              detalhe: eu && minhaPos > 0 ? `Pontos corridos · ${minhaPos}º de ${total}` : "Pontos corridos · terminada",
-            });
-          }
-        }
-      }
-
-      if (!vivo) return;
-      setPositivos(pos);
-      setOutros(out);
-      setACarregar(false);
+      // Posição nas ligas oficiais (calcula o ranking das duas).
+      carregarPosicaoOficial("mundial", uid, vivo, setPosMundial);
+      carregarPosicaoOficial("continental", uid, vivo, setPosContinental);
     })();
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (aCarregar) {
-    return <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>;
+  // Busca o ranking de uma liga oficial e extrai a posição do próprio utilizador.
+  async function carregarPosicaoOficial(
+    tipo: "mundial" | "continental",
+    uid: string,
+    vivo: boolean,
+    set: (p: PosOficial) => void
+  ) {
+    try {
+      // Posição no RANKING DO ANO (liga oficial anual), da mesma fonte que o
+      // interior da liga: /api/liga/geral com tipo oficial (recorta o ano).
+      const params = new URLSearchParams({ tipo, comp: idComp, user_id: uid });
+      const res = await fetch(`/api/liga/geral?${params.toString()}`);
+      const j = await res.json();
+      if (!vivo || !j.ok || !Array.isArray(j.membros)) return;
+      const eu = j.membros.find((m: { user_id: string }) => m.user_id === uid);
+      // "No ranking" = tem pontos acumulados no ano (pontos_geral > 0).
+      const noRanking = !!(eu && eu.pontos_geral > 0);
+      set({
+        posicao: noRanking ? eu.posicao : null,
+        escalou: noRanking,
+        total: j.membros.length,
+      });
+    } catch { /* o cartão mostra o estado neutro */ }
   }
-  if (semSessao) {
-    return (
-      <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
-        <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 12 }}>Entra na tua conta para veres os teus resultados e certificados.</div>
-        <a href="/entrar?voltar=/ligas" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>Entrar</a>
-      </div>
-    );
+
+  // Carrega o mercado (uma vez). Chamado ao abrir a aba "mercado".
+  async function carregarMercado() {
+    if (mercado !== null || aCarregarMercado) return;
+    setACarregarMercado(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id || "";
+      const res = await fetch(`/api/liga/mercado?user_id=${uid}`);
+      const j = await res.json();
+      setMercado(Array.isArray(j.ligas) ? j.ligas : []);
+    } catch {
+      setMercado([]);
+    }
+    setACarregarMercado(false);
   }
-  if (positivos.length === 0 && outros.length === 0) {
-    return (
-      <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
-        <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Ainda não tens resultados.<br />Quando ficares no pódio de uma liga, copa ou rodada, o teu certificado aparece aqui.</div>
-      </div>
-    );
+
+  function mudarTab(t: Tab) {
+    setTab(t);
+    if (t === "mercado") carregarMercado();
   }
+
+  async function entrarPorCodigo() {
+    const c = codigo.trim().toUpperCase();
+    if (c.length < 4) { setErroEntrar("Código demasiado curto."); return; }
+    setErroEntrar("");
+    setAEntrar(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) { window.location.href = `/entrar?voltar=/ligas`; return; }
+      const res = await fetch("/api/liga/entrar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: uid, codigo: c }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        setErroEntrar(j.erro || "Não encontrámos essa liga.");
+        setAEntrar(false);
+        return;
+      }
+      window.location.href = `/liga/${j.liga.invite_code}`;
+    } catch {
+      setErroEntrar("Falha de ligação.");
+      setAEntrar(false);
+    }
+  }
+
+  // Ação no mercado: liga "aberta" entra direto; "por aprovação" envia pedido.
+  async function acaoMercado(liga: LigaMercado) {
+    setErroMercado("");
+    setAEntrarId(liga.id);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) { window.location.href = `/entrar?voltar=/ligas`; return; }
+      const res = await fetch("/api/liga/pedir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: uid, codigo: liga.invite_code }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        setErroMercado(j.erro || "Não foi possível concluir.");
+        setAEntrarId(null);
+        return;
+      }
+      if (j.entrou || j.jaEra) {
+        window.location.href = `/liga/${liga.invite_code}`;
+        return;
+      }
+      if (j.pedido || j.jaPediu) {
+        setPedidoEnviado((prev) => ({ ...prev, [liga.id]: true }));
+        setAEntrarId(null);
+        return;
+      }
+      window.location.href = `/liga/${liga.invite_code}`;
+    } catch {
+      setErroMercado("Falha de ligação.");
+      setAEntrarId(null);
+    }
+  }
+
+  // Separa as minhas ligas em ativas (lista principal). As terminadas e os
+  // certificados vivem agora na aba Resultados (componente ResultadosConteudo).
+  const ativas = mine.filter((l) => !ligaTerminada(l));
+
+  // Contagens para os avisos de limite (só ligas de amigos; mine já é só amigos).
+  // Conta SÓ as ativas — as terminadas já não ocupam lugar prático.
+  const nCriadas = ativas.filter((l) => l.sou_dono).length;
+  const nParticipa = ativas.length;
+  const limCriar = souPro ? LIM_CRIAR_PRO : LIM_CRIAR_FREE;
+  const limPart = souPro ? LIM_PART_PRO : LIM_PART_FREE;
+  const noLimiteCriar = nCriadas >= limCriar;
+  const noLimitePart = nParticipa >= limPart;
+
+  // Configuração visual dos dois cartões oficiais.
+  const cfgMundial = esc({ bg1: "#1c3a2e", bg2: "#102a20", border: GOLD, symbol: "mundo" });
+  const cfgContinental = esc({ bg1: "#2f6fb3", bg2: "#25588f", border: "#eaf2fd", symbol: "mapa-europa" });
 
   return (
-    <>
-      {/* SECÇÃO 1 — Resultados positivos (com certificado) */}
-      <Section>🏅 Resultados positivos</Section>
-      {positivos.length === 0 ? (
-        <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 14px", lineHeight: 1.5 }}>Ainda não tens pódios. Fica no top 3 de uma liga, copa ou rodada para ganhares o teu certificado.</p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
-          {positivos.map((p) => (
-            <div key={p.chave} style={{ background: "#121815", border: `1px solid ${p.cor}`, borderRadius: 12, padding: "10px 12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                <span style={{ fontSize: 22, flexShrink: 0 }}>{p.medalha}</span>
-                <div style={{ flexShrink: 0 }}><Escudo config={p.identity} size={32} /></div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.contexto}</div>
-                  <div style={{ fontSize: 10.5, color: p.cor, fontFamily: FD, fontWeight: 700, textTransform: "uppercase" }}>{p.rotulo}</div>
-                </div>
-                {p.pontos !== null && (
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: p.cor }}>{p.pontos}</div>
-                    <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
-                  </div>
-                )}
-              </div>
-              <button onClick={() => setCert(p)} style={{ width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: p.cor, color: p.posicao === "vice" ? "#14181a" : "#1b1208", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
-                Ver / partilhar certificado
-              </button>
-            </div>
+    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 84px" }}>
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <a href="/inicio" aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none" }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+            </a>
+            <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Ligas</h1>
+          </div>
+          <a href="/criar-liga" aria-label="Criar liga" style={{ width: 36, height: 36, borderRadius: "50%", background: GOLD, color: "#1b211e", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          </a>
+        </header>
+
+        <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #1a221d" }}>
+          {(["ativas", "mercado", "calendario", "resultados"] as Tab[]).map((t) => (
+            <button key={t} onClick={() => mudarTab(t)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${tab === t ? GOLD : "transparent"}`, color: tab === t ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>
+              {t === "ativas" ? "Ativas" : t === "mercado" ? "Mercado" : t === "calendario" ? "Calendário" : "Resultados"}
+            </button>
           ))}
         </div>
-      )}
 
-      {/* SECÇÃO 2 — Resultados (4º+), só registo */}
-      {outros.length > 0 && (
-        <>
-          <Section>Resultados</Section>
-          <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>As ligas e copas em que participaste e não subiste ao pódio. Já fazem parte do teu histórico.</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {outros.map((o) => (
-              <div key={o.chave} style={{ display: "flex", alignItems: "center", gap: 11, background: "#10140f", border: "1px solid #1f2a23", borderRadius: 12, padding: "10px 12px" }}>
-                <div style={{ flexShrink: 0, opacity: 0.85 }}><Escudo config={o.identity} size={30} /></div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#cfd8d2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.contexto}</div>
-                  <div style={{ fontSize: 11, color: "#7c8a82" }}>{o.detalhe}</div>
-                </div>
+        {tab === "ativas" && (
+          <>
+            <Section>Ligas oficiais · prémios</Section>
+
+            {/* Mundial — abre para todos; mostra a posição se estiver no ranking. */}
+            <OficialRow
+              cfg={cfgMundial}
+              name="Liga Mundial"
+              sub="Concorre aos prémios mundiais"
+              href="/oficial/mundial"
+              pos={posMundial}
+              souPro={souPro}
+            />
+
+            {/* Continental — nome do continente real; abre para todos. */}
+            <OficialRow
+              cfg={cfgContinental}
+              name={nomeContinente ? `Liga ${nomeContinente}` : "Liga Continental"}
+              sub="Concorre aos prémios do teu continente"
+              href="/oficial/continental"
+              pos={posContinental}
+              souPro={souPro}
+            />
+
+            {!souPro && (
+              <a href="/ippon-pro" style={{ display: "block", textAlign: "center", marginTop: 2, marginBottom: 4, background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "11px 14px", borderRadius: 10, textDecoration: "none", fontSize: 12.5, lineHeight: 1.4 }}>
+                🔒 Vês o ranking, mas só Pro concorre aos prémios · passa a Pro
+              </a>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, marginBottom: 10 }}>
+              <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>Ligas de amigos</span>
+              {!aCarregar && <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, color: noLimitePart ? "#e0894f" : "#7c8a82" }}>{nParticipa}/{limPart}</span>}
+            </div>
+            {aCarregar ? (
+              <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
+            ) : ativas.length > 0 ? (
+              <>
+                {ativas.map((l) => (
+                  <a key={l.id} href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}>
+                    <LeagueRow cfg={l.escudo || DEFAULT_IDENTITY} name={l.name} sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`} right={<ActionBtn kind="ver">Abrir</ActionBtn>} />
+                  </a>
+                ))}
+                {noLimiteCriar ? (
+                  <LimiteCard
+                    souPro={souPro}
+                    titulo={souPro ? "Atingiste o máximo de ligas criadas" : "Já criaste a tua liga"}
+                    texto={souPro
+                      ? "Com o Ippon Pro podes criar até 5 ligas — e já lá estás."
+                      : "Com a conta gratuita podes criar 1 liga. Passa a Ippon Pro para criares até 5."}
+                  />
+                ) : (
+                  <a href="/criar-liga" style={{ display: "block", textAlign: "center", marginTop: 10, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 13 }}>+ Criar outra liga</a>
+                )}
+              </>
+            ) : (
+              <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "18px 14px", textAlign: "center" }}>
+                <div style={{ fontSize: 13, color: "#c7d0c9", marginBottom: 12, lineHeight: 1.5 }}>Ainda não tens ligas de amigos.<br />Cria uma e desafia o teu dojo!</div>
+                <a href="/criar-liga" style={{ display: "inline-block", background: "#3f8f5a", color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>Criar liga</a>
               </div>
-            ))}
-          </div>
-        </>
-      )}
+            )}
 
-      {/* Modal do certificado escolhido */}
-      {cert && (
-        <CartaoCertificado
-          posicao={cert.posicao}
-          variante={cert.variante}
-          tituloRodada={cert.tituloRodada}
-          identity={cert.identity}
-          nomeCopa={cert.nomeCertificado}
-          nParticipantes={cert.nParticipantes}
-          onClose={() => setCert(null)}
-        />
-      )}
-    </>
+            <Section style={{ marginTop: 18 }}>Entrar com código</Section>
+            {noLimitePart ? (
+              <LimiteCard
+                souPro={souPro}
+                titulo={souPro ? "Estás no máximo de ligas" : "Estás em 2 ligas de amigos"}
+                texto={souPro
+                  ? "Com o Ippon Pro participas em até 5 ligas de amigos — e já lá estás."
+                  : "Com a conta gratuita participas em 2 ligas de amigos. Passa a Ippon Pro para entrares em até 5."}
+              />
+            ) : (
+              <>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} placeholder="Código de convite" maxLength={8} style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 13px", color: "#f1ede2", fontSize: 15, fontFamily: FD, letterSpacing: "0.1em", outline: "none", textTransform: "uppercase" }} />
+                  <button onClick={entrarPorCodigo} disabled={aEntrar} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{aEntrar ? "…" : "Entrar"}</button>
+                </div>
+                {erroEntrar && (
+                  erroEntrar.includes("Pro") ? (
+                    <a href="/ippon-pro" style={{ display: "block", fontSize: 12.5, color: GOLD, marginTop: 8, textDecoration: "none", background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 10, padding: "10px 12px", lineHeight: 1.4 }}>{erroEntrar} →</a>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 8 }}>{erroEntrar}</div>
+                  )
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {tab === "mercado" && (
+          <>
+            <Section>Ligas abertas</Section>
+            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>Ligas públicas. Nas abertas entras já; nas "por aprovação" o dono aceita o teu pedido. As fechadas não aparecem aqui — só por código.</p>
+
+            {mercado === null || aCarregarMercado ? (
+              <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
+            ) : mercado.length === 0 ? (
+              <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
+                <div style={{ fontSize: 13, color: "#c7d0c9", marginBottom: 12, lineHeight: 1.5 }}>Ainda não há ligas abertas.<br />Cria a tua e deixa-a <strong>aberta</strong> para todos entrarem!</div>
+                <a href="/criar-liga" style={{ display: "inline-block", background: "#3f8f5a", color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>Criar liga</a>
+              </div>
+            ) : (
+              <>
+                {mercado.map((l) => (
+                  <LeagueRow
+                    key={l.id}
+                    cfg={l.escudo || DEFAULT_IDENTITY}
+                    name={l.name}
+                    sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`}
+                    right={
+                      l.sou_membro ? (
+                        <a href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}><ActionBtn kind="ver">Abrir</ActionBtn></a>
+                      ) : pedidoEnviado[l.id] ? (
+                        <span style={{ background: "#23291f", color: "#93a39a", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, padding: "7px 11px", borderRadius: 8, whiteSpace: "nowrap" }}>Pedido enviado</span>
+                      ) : (
+                        <button onClick={() => acaoMercado(l)} disabled={aEntrarId === l.id} style={{ background: l.privacidade === "mediante_pedido" ? "#3a2f12" : "#3f8f5a", color: l.privacidade === "mediante_pedido" ? GOLD : "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 14px", borderRadius: 8, whiteSpace: "nowrap", cursor: aEntrarId === l.id ? "default" : "pointer", opacity: aEntrarId === l.id ? 0.7 : 1 }}>{aEntrarId === l.id ? "…" : l.privacidade === "mediante_pedido" ? "Solicitar" : "Entrar"}</button>
+                      )
+                    }
+                  />
+                ))}
+                {erroMercado && (
+                  erroMercado.includes("Pro") ? (
+                    <a href="/ippon-pro" style={{ display: "block", fontSize: 12.5, color: GOLD, marginTop: 8, textDecoration: "none", background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 10, padding: "10px 12px", lineHeight: 1.4 }}>{erroMercado} →</a>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 8 }}>{erroMercado}</div>
+                  )
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {tab === "calendario" && <CalendarioConteudo />}
+
+        {tab === "resultados" && <ResultadosConteudo />}
+      </div>
+
+      <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around", zIndex: 50 }}>
+        <NavTab label="Início" href="/inicio" icon={<HomeIcon />} />
+        <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} active />
+        <NavTab label="Atletas" href="/atletas" icon={<AthletesIcon />} />
+        <NavTab label="Pro" icon={<BoltIcon />} href="/ippon-pro" />
+      </nav>
+    </main>
   );
 }
 
-function Section({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", margin: "4px 0 10px" }}>{children}</div>;
+function NavTab({ label, icon, href, active }: { label: string; icon: React.ReactNode; href?: string; active?: boolean }) {
+  const style: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? GOLD : "#6f7d76", textDecoration: "none" };
+  const inner = <>{icon}<span style={{ fontSize: 11, fontWeight: active ? 700 : 400 }}>{label}</span></>;
+  return href ? <a href={href} style={style}>{inner}</a> : <div style={style}>{inner}</div>;
+}
+function HomeIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></svg>; }
+function TrophyIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 6H5v2a3 3 0 0 0 3 3M16 6h3v2a3 3 0 0 1-3 3M10 17h4M9 21h6M12 13v4" /></svg>; }
+function AthletesIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="6" r="3" /><circle cx="17" cy="7" r="2.5" /><path d="M3 20v-1a5 5 0 0 1 10 0v1M14 20v-1a4 4 0 0 1 7-2.6" /></svg>; }
+function BoltIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" /></svg>; }
+
+function Section({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", margin: "4px 0 10px", ...style }}>{children}</div>;
+}
+function LeagueRow({ cfg, name, sub, right }: { cfg: Identity; name: string; sub: string; right: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px", marginBottom: 9 }}>
+      <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={cfg} size={34} /></div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#f1ede2" }}>{name}</div>
+        <div style={{ fontSize: 11, color: "#93a39a" }}>{sub}</div>
+      </div>
+      {right}
+    </div>
+  );
+}
+
+// Cartão de liga oficial. Abre a página de ranking (para todos). À direita mostra
+// a posição do utilizador (se estiver no ranking) ou um convite a ver/ser Pro.
+function OficialRow({ cfg, name, sub, href, pos, souPro }: { cfg: Identity; name: string; sub: string; href: string; pos: PosOficial | null; souPro: boolean }) {
+  let right: React.ReactNode;
+  if (pos && pos.posicao !== null) {
+    // Está no ranking: mostra a posição em destaque.
+    right = (
+      <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: GOLD, lineHeight: 1 }}>{`#${pos.posicao.toLocaleString("pt-PT")}º`}</div>
+        <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase", marginTop: 2 }}>a tua posição</div>
+      </div>
+    );
+  } else if (souPro) {
+    // É Pro mas ainda não escalou nesta rodada.
+    right = <span style={{ fontFamily: FD, fontWeight: 700, color: "#7c8a82", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Escala para entrar</span>;
+  } else {
+    // Não-Pro: vê o ranking, mas não concorre.
+    right = <ActionBtn kind="ver">Ver ranking</ActionBtn>;
+  }
+  return (
+    <a href={href} style={{ textDecoration: "none", display: "block" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px", marginBottom: 9 }}>
+        <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={cfg} size={34} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+          <div style={{ fontSize: 11, color: "#93a39a" }}>{sub}</div>
+        </div>
+        {right}
+      </div>
+    </a>
+  );
+}
+
+function ActionBtn({ kind, children }: { kind: "ver" | "solicitar"; children: React.ReactNode }) {
+  const ver = kind === "ver";
+  return <span style={{ background: ver ? "#e67e22" : "#3f8f5a", color: ver ? "#1b0f06" : "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 12px", borderRadius: 8, whiteSpace: "nowrap", display: "inline-block" }}>{children}</span>;
+}
+
+// Cartão de limite atingido. Para free, convida ao Pro; para Pro, só informa.
+function LimiteCard({ souPro, titulo, texto }: { souPro: boolean; titulo: string; texto: string }) {
+  return (
+    <div style={{ background: souPro ? "#121815" : "#2a2410", border: `1px solid ${souPro ? "#243029" : "#5a4a18"}`, borderRadius: 14, padding: "13px 15px", marginTop: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+        <span style={{ fontSize: 14 }}>{souPro ? "✓" : "🔒"}</span>
+        <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, color: souPro ? "#cfd8d2" : GOLD }}>{titulo}</span>
+      </div>
+      <p style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.5, margin: souPro ? 0 : "0 0 10px" }}>{texto}</p>
+      {!souPro && (
+        <a href="/ippon-pro" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 12, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>Conhecer o Ippon Pro</a>
+      )}
+    </div>
+  );
 }
