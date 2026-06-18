@@ -40,19 +40,32 @@ type Estado = "passada" | "aDecorrer" | "proxima" | "futura";
 export default function CalendarioPage() {
   const foco = focoMercado();
   const alvoId = foco.alvo.idCompeticao;
+  // Para onde levar o scroll ao abrir: a competição A DECORRER se houver uma;
+  // senão, a próxima (alvo). O destaque visual "próxima" continua a usar alvoId.
+  const scrollId = foco.aDecorrer?.idCompeticao ?? alvoId;
   const lista = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
 
-  // Cartão-alvo (a decorrer / próxima) para levar o scroll até lá ao abrir.
+  // Cartão para onde levar o scroll ao abrir (a decorrer / próxima).
   const alvoRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    // Espera a lista pintar antes de saltar. Sem "smooth" para não dar a sensação
-    // de percorrer a página toda — abre já posicionado na competição-alvo.
-    const id = requestAnimationFrame(() => {
-      alvoRef.current?.scrollIntoView({ block: "start" });
-    });
-    return () => cancelAnimationFrame(id);
-  }, [alvoId]);
+    // Leva o scroll até à competição atual/próxima ao ABRIR.
+    // Porquê com atraso e repetido: o Next.js faz o seu próprio "scroll para o
+    // topo" ao montar a página, e às vezes DEPOIS do nosso — um requestAnimationFrame
+    // simples era anulado. Tentamos algumas vezes nos primeiros 600 ms, para o
+    // salto cair sempre depois do reset do Next. Cálculo absoluto (idempotente):
+    // repetir aterra sempre no mesmo sítio.
+    let cancelado = false;
+    function irParaAlvo() {
+      if (cancelado) return;
+      const el = alvoRef.current;
+      if (!el) return;
+      const y = el.getBoundingClientRect().top + window.scrollY - 12;
+      window.scrollTo({ top: y, behavior: "auto" });
+    }
+    const timers = [60, 200, 450, 700].map((ms) => window.setTimeout(irParaAlvo, ms));
+    return () => { cancelado = true; timers.forEach((t) => clearTimeout(t)); };
+  }, [scrollId]);
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -85,7 +98,7 @@ export default function CalendarioPage() {
               key={s.semana}
               s={s}
               alvoId={alvoId}
-              alvoRef={s.idCompeticao === alvoId ? alvoRef : undefined}
+              alvoRef={s.idCompeticao === scrollId ? alvoRef : undefined}
             />
           ))}
         </div>
