@@ -53,6 +53,40 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const tipo = (searchParams.get("tipo") || "").trim();
   const user_id = (searchParams.get("user_id") || "").trim();
+  const historico = (searchParams.get("historico") || "").trim() === "1";
+
+  // MODO HISTÓRICO: todas as vitórias de rodada (mundial + continental) deste
+  // utilizador, de todas as competições — para a "estante de troféus" na aba
+  // Resultados. Não depende de tipo; precisa de user_id.
+  if (historico) {
+    if (!user_id) {
+      return NextResponse.json({ ok: false, erro: "Falta ?user_id= para o histórico." }, { status: 400 });
+    }
+    const { data: minhas } = await supabaseAdmin
+      .from("melhores_rodada")
+      .select("id_competicao, nome_competicao, escopo, continente, combinado, pontos, n_participantes, nome_time, escudo, criada_em")
+      .eq("user_id", user_id)
+      .order("criada_em", { ascending: false });
+    const lista = (minhas || []).map((r) => {
+      const item: LinhaMelhor = {
+        user_id,
+        nome_time: String(r.nome_time || "Equipa"),
+        escudo: r.escudo ?? null,
+        pontos: Number(r.pontos ?? 0),
+        escopo: String(r.escopo || ""),
+        continente: String(r.continente || ""),
+        combinado: !!r.combinado,
+        n_participantes: Number(r.n_participantes ?? 0),
+      };
+      return {
+        ...item,
+        id_competicao: String(r.id_competicao),
+        nome_competicao: String(r.nome_competicao || ""),
+        rotulo: rotuloDe(item),
+      };
+    });
+    return NextResponse.json({ ok: true, historico: lista });
+  }
 
   if (tipo !== "mundial" && tipo !== "continental") {
     return NextResponse.json({ ok: false, erro: "tipo deve ser 'mundial' ou 'continental'." }, { status: 400 });
