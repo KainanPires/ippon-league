@@ -6,6 +6,7 @@ import { congelarCompeticao } from "@/lib/congelar";
 import { competicaoPorId } from "@/lib/copa";
 import { notificarMercado } from "@/lib/notificarMercado";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
+import { mensagensModaisDeHoje } from "@/lib/mensagensEspeciais";
 
 // CRON — prepara sozinho os preços/forma da competição que se aproxima.
 // Corre 1x/dia (vercel.json). Com Fluid Compute, uma função corre até 300s — as
@@ -15,6 +16,7 @@ import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 //   /api/cron?comp=ID          -> força uma competição específica
 //   /api/cron?key=SEGREDO      -> disparo MANUAL para teste (em vez do cabeçalho da Vercel)
 //   /api/cron?congelar=ID      -> força CONGELAR uma competição específica (teste)
+//   /api/cron?datas=1          -> força SÓ as notificações de datas especiais (teste)
 //
 // Etapas:
 //   (A) atualiza "a competir agora" (aviso no Mercado)
@@ -23,6 +25,9 @@ import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 //       resultados_atletas, resultados_rodada, precos_atletas, pontuacoes,
 //       users.patrimony_jc — com a FONTE CORRETA (competitor.contests por atleta).
 //   (D) no início do mês (dia 1), recalcula as faixas do mês anterior (users.belt)
+//   (E) notificações de mercado (aberto/fechado)
+//   (F) notificações de DATAS ESPECIAIS por push: aniversário (por utilizador) e
+//       Dia Mundial do Judô (a todos). Sino + push, idempotente por dia.
 //
 // Protegido por CRON_SECRET: a Vercel envia "Authorization: Bearer <CRON_SECRET>"
 // automaticamente; em alternativa aceitamos ?key=<CRON_SECRET> para testares à mão.
@@ -315,6 +320,128 @@ function mesAnteriorDe(d: Date): string {
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// ---------------------------------------------------------------------------
+// (F) DATAS ESPECIAIS por PUSH.
+//
+// Usa o MESMO motor dos modais (lib/mensagensEspeciais) para o texto ser único:
+// se um texto mudar lá, muda aqui também. Só envia o que o motor marca com
+// push=true — hoje, aniversário e Dia Mundial do Judô. As grandes competições
+// estão a push=false (já há o aviso de mercado), por isso não entram.
+//
+//  • Dia do Judô (e outros eventos GLOBAIS push=true): a todos os utilizadores.
+//  • Aniversário: só a quem faz anos hoje.
+//
+// Idempotente por dia: antes de enviar, vê quem já recebeu HOJE esse tipo (via
+// tabela notificacoes), para um re-disparo manual não duplicar.
+//
+// Escala (nota honesta): o envio do Dia do Judô percorre todos os utilizadores
+// um a um. Para uma base grande, isto deve passar a um envio em lote / fila.
+// Para o MVP é suficiente.
+// ---------------------------------------------------------------------------
+async function notificarDatasEspeciais(hoje: Date): Promise<{ dia_do_judo: number; aniversarios: number; outras_globais: number }> {
+  const out = { dia_do_judo: 0, aniversarios: 0, outras_globais: 0 };
+  if (!supabaseAdmin) return out;
+
+  // Eventos GLOBAIS com push de hoje (tipicamente o Dia do Judô). Pedimos ao
+  // motor com utilizador "neutro" (sem aniversário, sem continente) e a
+  // competição da semana — e ficamos só com push=true que NÃO sejam aniversário.
+  const compSemana = competicaoDaSemana(hoje);
+  const globais = mensagensModaisDeHoje(
+    hoje,
+    { nome: null, dataNascimento: null, continente: null },
+    { nome: compSemana.nome, nivel: compSemana.nivel, classico: compSemana.classico, idCompeticao: compSemana.idCompeticao },
+  ).filter((m) => m.push && m.tipo !== "aniversario");
+
+  // Aniversariantes de hoje.
+  const aniversariantes = await userIdsComAniversario(hoje);
+
+  // Idempotência: quem já recebeu HOJE cada um destes tipos.
+  const inicioDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0).toISOString();
+  const tiposCheck = Array.from(new Set([...globais.map((m) => `evento_${m.tipo}`), "evento_aniversario"]));
+  const jaFeito = new Set<string>();
+  if (tiposCheck.length > 0) {
+    try {
+      const { data } = await supabaseAdmin
+        .from("notificacoes")
+        .select("user_id, tipo")
+        .gte("criada_em", inicioDia)
+        .in("tipo", tiposCheck);
+      for (const r of data || []) jaFeito.add(`${r.tipo}::${r.user_id}`);
+    } catch { /* sem idempotência prévia: segue */ }
+  }
+
+  // 1) GLOBAIS → todos os utilizadores.
+  if (globais.length > 0) {
+    const ids = await todosOsUserIds();
+    for (const m of globais) {
+      const tipo = `evento_${m.tipo}`;
+      for (const uid of ids) {
+        if (jaFeito.has(`${tipo}::${uid}`)) continue;
+        try {
+          await criarNotificacaoServidor({ paraUserId: uid, tipo, titulo: m.titulo, corpo: m.texto, link: "/inicio" });
+          jaFeito.add(`${tipo}::${uid}`);
+          if (m.tipo === "dia_do_judo") out.dia_do_judo++; else out.outras_globais++;
+        } catch { /* falha de um utilizador não bloqueia os outros */ }
+      }
+    }
+  }
+
+  // 2) ANIVERSÁRIOS → só quem faz anos hoje. O motor devolve o texto certo a
+  //    partir da data de nascimento (sem nome, para push genérico mas correto).
+  for (const u of aniversariantes) {
+    const tipo = "evento_aniversario";
+    if (jaFeito.has(`${tipo}::${u.id}`)) continue;
+    const msg = mensagensModaisDeHoje(hoje, { nome: null, dataNascimento: u.dataNascimento, continente: null }, null)
+      .find((x) => x.tipo === "aniversario");
+    if (!msg) continue;
+    try {
+      await criarNotificacaoServidor({ paraUserId: u.id, tipo, titulo: msg.titulo, corpo: msg.texto, link: "/inicio" });
+      jaFeito.add(`${tipo}::${u.id}`);
+      out.aniversarios++;
+    } catch { /* não bloqueia os outros */ }
+  }
+
+  return out;
+}
+
+// Todos os IDs de utilizadores (paginado, para passar o limite de 1000 do PostgREST).
+async function todosOsUserIds(): Promise<string[]> {
+  if (!supabaseAdmin) return [];
+  const ids: string[] = [];
+  const PAG = 1000;
+  for (let from = 0; from < 100000; from += PAG) {
+    const { data, error } = await supabaseAdmin.from("users").select("id").range(from, from + PAG - 1);
+    if (error || !data || data.length === 0) break;
+    for (const r of data) ids.push(String(r.id));
+    if (data.length < PAG) break;
+  }
+  return ids;
+}
+
+// IDs (e data de nascimento) de quem faz anos HOJE. Compara só mês-dia ("MM-DD"),
+// para o aniversário cair todos os anos. Paginado.
+async function userIdsComAniversario(hoje: Date): Promise<{ id: string; dataNascimento: string }[]> {
+  if (!supabaseAdmin) return [];
+  const alvo = `${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+  const out: { id: string; dataNascimento: string }[] = [];
+  const PAG = 1000;
+  for (let from = 0; from < 100000; from += PAG) {
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .select("id, data_nascimento")
+      .not("data_nascimento", "is", null)
+      .range(from, from + PAG - 1);
+    if (error || !data || data.length === 0) break;
+    for (const r of data) {
+      const dn = r.data_nascimento ? String(r.data_nascimento) : "";
+      const mmdd = dn.slice(5, 10); // "AAAA-MM-DD" -> "MM-DD"
+      if (mmdd === alvo) out.push({ id: String(r.id), dataNascimento: dn });
+    }
+    if (data.length < PAG) break;
+  }
+  return out;
+}
+
 // FECHO DA ÉPOCA OFICIAL (anual). Calcula o pódio do ANO indicado — Mundial e
 // cada Continental — e grava em campeoes_oficiais (livro de campeões). Só Pro
 // entram (como no ranking ao vivo). Idempotente: upsert pela chave única, por
@@ -479,6 +606,15 @@ export async function GET(req: Request) {
     return NextResponse.json({ feito: true, modo: "mercado_forcado", mercado: r, ms_total: Date.now() - t0 });
   }
 
+  // Disparo manual SÓ das notificações de DATAS ESPECIAIS (teste): ?datas=1
+  // Corre apenas a etapa (F) (aniversário + Dia do Judô) e responde de imediato.
+  const soDatas = (searchParams.get("datas") || "").trim();
+  if (soDatas) {
+    let r: { dia_do_judo: number; aniversarios: number; outras_globais: number } = { dia_do_judo: 0, aniversarios: 0, outras_globais: 0 };
+    try { r = await notificarDatasEspeciais(hoje); } catch { /* não bloqueia */ }
+    return NextResponse.json({ feito: true, modo: "datas_forcado", datas: r, ms_total: Date.now() - t0 });
+  }
+
   // Disparo manual SÓ do encerramento de ligas terminadas (teste): ?encerrar=1
   const soEncerrar = (searchParams.get("encerrar") || "").trim();
   if (soEncerrar) {
@@ -603,6 +739,13 @@ export async function GET(req: Request) {
     mercado = await notificarMercado(hoje);
   } catch { /* não bloqueia */ }
 
+  // (F) Notificações de DATAS ESPECIAIS por push (aniversário + Dia do Judô).
+  //     Idempotente por dia. Não bloqueia o resto do cron se falhar.
+  let datas: { dia_do_judo: number; aniversarios: number; outras_globais: number } | null = null;
+  try {
+    datas = await notificarDatasEspeciais(hoje);
+  } catch { /* não bloqueia */ }
+
   return NextResponse.json({
     feito: true,
     comp,
@@ -618,6 +761,7 @@ export async function GET(req: Request) {
     faixas,
     fecho_anual: fechoAnual,
     mercado,
+    datas,
     ms_total: Date.now() - t0,
     passos,
   });
