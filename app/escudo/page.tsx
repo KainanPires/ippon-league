@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Escudo, SymbolGlyph, loadIdentity, saveIdentity, SHAPES, PATTERNS, SYMBOLS, COLORS, type Identity, type ShapeId, type PatternId, type SymbolId } from "@/components/Escudo";
-import { atualizarIdentidadeCloud } from "@/lib/team";
+import { atualizarIdentidadeCloud, loadIdentityCloudFor } from "@/lib/team";
+import { focoMercado } from "@/lib/calendario";
 import { supabase } from "@/lib/supabase";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -44,16 +45,55 @@ export default function EscudoEditorPage() {
   // Nome único: sugestões livres quando o nome escolhido já existe.
   const [sugestoes, setSugestoes] = useState<string[]>([]);
   const [aVerificarNome, setAVerificarNome] = useState(false);
+  // O nome que a equipa JÁ tinha ao abrir (para detetar mudança e avisar). "" = ainda sem nome.
+  const [nomeOriginal, setNomeOriginal] = useState("");
+  // Modal "tens a certeza?" quando se vai ALTERAR um nome já existente.
+  const [confirmarNome, setConfirmarNome] = useState(false);
 
   useEffect(() => {
-    const carregado = loadIdentity();
-    // Se o nome ainda é o por defeito, começamos com o campo VAZIO para obrigar a escolher.
-    if ((carregado.name || "").trim().toLowerCase() === "a minha equipa") {
-      setId({ ...carregado, name: "" });
-    } else {
-      setId(carregado);
-    }
+    let vivo = true;
+    // 1) Arranque rápido com o que está no dispositivo (local).
+    const local = loadIdentity();
+    const nomeLocal = (local.name || "").trim();
+    const ehDefault = nomeLocal.toLowerCase() === "a minha equipa" || nomeLocal === "";
+    setId(ehDefault ? { ...local, name: "" } : local);
+    setNomeOriginal(ehDefault ? "" : nomeLocal);
+
+    // 2) Pré-preenche a partir da NUVEM (fonte de verdade ligada à conta): se o
+    //    localStorage se perdeu (mudou de aparelho, limpou o browser), o nome e o
+    //    escudo verdadeiros estão na tabela `equipas`. Só sobrepõe se a nuvem
+    //    trouxer mesmo um nome — nunca apaga o que já está preenchido.
+    (async () => {
+      try {
+        const idComp = focoMercado().alvo.idCompeticao;
+        const cloud = await loadIdentityCloudFor(idComp);
+        if (!vivo || !cloud) return;
+        const nomeCloud = (cloud.name || "").trim();
+        setId((prev) => {
+          if (!prev) return prev;
+          const merged: Identity = { ...prev };
+          if (cloud.escudo && typeof cloud.escudo === "object") {
+            Object.assign(merged, cloud.escudo as Partial<Identity>);
+          }
+          // O nome da nuvem manda (é o oficial da conta), exceto se a pessoa já
+          // começou a escrever um diferente neste ecrã.
+          if (nomeCloud && (prev.name || "").trim() === (nomeOriginalRef.current || "")) {
+            merged.name = nomeCloud;
+          }
+          return merged;
+        });
+        if (nomeCloud) setNomeOriginal(nomeCloud);
+      } catch {
+        // sem nuvem: fica o local.
+      }
+    })();
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Ref espelho do nomeOriginal, para o efeito assíncrono comparar sem o repetir nas deps.
+  const nomeOriginalRef = useRef("");
+  useEffect(() => { nomeOriginalRef.current = nomeOriginal; }, [nomeOriginal]);
 
   if (!id) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
 
@@ -115,6 +155,20 @@ export default function EscudoEditorPage() {
     }
     setAVerificarNome(false);
 
+    // MUDANÇA DE NOME: se a equipa já tinha um nome e este é diferente, confirma
+    // antes de gravar (o nome é a identidade na liga). Se é a 1ª vez (sem nome
+    // anterior) ou se só mexeu em cores/forma, grava direto.
+    if (nomeOriginal !== "" && nome !== nomeOriginal) {
+      setConfirmarNome(true);
+      return;
+    }
+    await persistir();
+  }
+
+  // Grava de facto: local (rápido) + nuvem (propaga para a liga) e regressa.
+  async function persistir() {
+    const nome = (id!.name || "").trim();
+    setConfirmarNome(false);
     setAGuardar(true);
     const identidade = { ...id!, name: nome };
     // 1) Local (rápido, para o resto da app ver já).
@@ -174,6 +228,14 @@ export default function EscudoEditorPage() {
           <input value={id.name} onChange={(e) => set("name", e.target.value.slice(0, 24))} placeholder="Escreve o nome da tua equipa"
             style={{ width: "100%", boxSizing: "border-box", background: "#141a17", border: `1px solid ${erro ? "#c0392b" : "#243029"}`, borderRadius: 12, padding: "12px 14px", color: "#f1ede2", fontSize: 15, fontFamily: FB, outline: "none", marginBottom: (erro || ocupado) ? 8 : 24 }} />
           {erro && <div style={{ fontSize: 12.5, color: "#ef8d83", marginBottom: ocupado ? 10 : 20, fontWeight: 700 }}>{erro}</div>}
+
+          {/* Primeira vez (ainda sem nome): aviso de que os nomes são únicos. */}
+          {!erro && nomeOriginal === "" && (
+            <div style={{ fontSize: 12, color: "#aee9c9", lineHeight: 1.5, margin: "-12px 0 20px", display: "flex", gap: 7, alignItems: "flex-start" }}>
+              <span aria-hidden="true" style={{ flexShrink: 0 }}>ℹ️</span>
+              <span>Não existem dois times com o mesmo nome. Escolhe bem — este será a tua identidade na liga.</span>
+            </div>
+          )}
 
           {/* Sugestões de nomes LIVRES quando o escolhido já existe. */}
           {ocupado && (
@@ -265,6 +327,22 @@ export default function EscudoEditorPage() {
           </button>
         </div>
       </div>
+
+      {/* Confirmação ao ALTERAR um nome que já existia. */}
+      {confirmarNome && (
+        <div onClick={() => setConfirmarNome(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
+            <div style={{ fontSize: 30, marginBottom: 6 }}>✏️</div>
+            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>Mudar o nome do time?</h2>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 4px" }}>
+              Vais trocar <strong style={{ color: "#f1ede2" }}>{nomeOriginal}</strong> por <strong style={{ color: GOLD }}>{(id.name || "").trim()}</strong>.
+            </p>
+            <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5, margin: "0 0 18px" }}>O nome anterior fica livre para outra pessoa. Tens a certeza?</p>
+            <button onClick={persistir} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Sim, mudar o nome</button>
+            <button onClick={() => setConfirmarNome(false)} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Cancelar</button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
