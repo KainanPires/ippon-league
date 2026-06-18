@@ -183,6 +183,9 @@ export default function PaginaLiga() {
   // Certificado da liga terminada (a posição que o utilizador clicou).
   const [certificado, setCertificado] = useState<PosicaoPodio | null>(null);
 
+  // Overlay "a liga terminou" — salta uma vez (por conta+liga, via localStorage).
+  const [mostrarFimLiga, setMostrarFimLiga] = useState(false);
+
   // Foco do mercado: a competição que decorre (mercado fechado) ou a de mercado aberto.
   const foco = focoMercado();
   const compAtual = foco.aDecorrer ?? foco.atual;
@@ -349,7 +352,27 @@ export default function PaginaLiga() {
     };
   }, [estado, liga, idComp, emAndamento]);
 
-  // 3) Quando a liga está pronta: descobre se sou o dono e carrega os pedidos.
+  // 2-fim) Overlay "a liga terminou": salta UMA vez por conta+liga. Só quando a
+  // liga (pontos corridos) está terminada e o pódio já carregou (geralCarregado).
+  // A marca de "já visto" vive no localStorage, isolada por utilizador e liga.
+  useEffect(() => {
+    if (estado !== "pronto" || !liga || !meuId) return;
+    if (liga.formato === "copa") return;
+    if (String(liga.estado || "") !== "terminada") return;
+    if (!geralCarregado) return;
+    const temPodio = geral.some((m) => m.pontos_geral > 0);
+    if (!temPodio) return;
+    const chave = `ippon_liga_fim_visto__${meuId}__${liga.id}`;
+    try {
+      if (localStorage.getItem(chave)) return; // já viu antes
+      localStorage.setItem(chave, "1");
+    } catch {
+      // sem localStorage (modo privado, etc.): mostra à mesma, sem persistir.
+    }
+    setMostrarFimLiga(true);
+  }, [estado, liga, meuId, geralCarregado, geral]);
+
+
   //    A rota /api/liga/pedidos só devolve ok:true a quem é o dono (valida lá).
   useEffect(() => {
     if (estado !== "pronto" || !liga || !meuId) return;
@@ -741,6 +764,57 @@ export default function PaginaLiga() {
           </>
         )}
       </div>
+
+      {/* Overlay "a liga terminou" — salta uma vez. Mostra o pódio e, se estou
+          no top 3, deixa abrir o meu certificado. Por baixo, na página, fica o
+          cartão "Classificação final" para rever quando quiser. */}
+      {mostrarFimLiga && podioFinal.length > 0 && (() => {
+        const minhaIdx = podioFinal.findIndex((m) => m.user_id === meuId);
+        const POS: PosicaoPodio[] = ["campeao", "vice", "terceiro"];
+        const MEDALHAS = ["🥇", "🥈", "🥉"];
+        const CORES = [GOLD, "#c0c0c0", "#c87f43"];
+        const LABELS = ["Campeão da época", "Vice-campeão", "3º lugar"];
+        const minhaPos: PosicaoPodio | null = minhaIdx >= 0 ? POS[minhaIdx] : null;
+        const frase = minhaIdx === 0 ? "Foste campeão! 🥇"
+          : minhaIdx === 1 ? "Ficaste em 2º — que época! 🥈"
+          : minhaIdx === 2 ? "Subiste ao pódio, 3º lugar! 🥉"
+          : "A época chegou ao fim. Obrigado por jogares!";
+        return (
+          <div onClick={() => setMostrarFimLiga(false)} style={{ position: "fixed", inset: 0, zIndex: 110, background: "rgba(6,8,7,0.86)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "linear-gradient(170deg,#1b1810,#0f1411)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "22px 18px", maxHeight: "88vh", overflowY: "auto" }}>
+              <div style={{ textAlign: "center", fontSize: 38, marginBottom: 4 }}>🏆</div>
+              <div style={{ textAlign: "center", fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: GOLD, marginBottom: 4 }}>A liga terminou!</div>
+              <div style={{ textAlign: "center", fontSize: 14, fontWeight: 700, color: "#f1ede2", marginBottom: 4 }}>{liga?.name}</div>
+              <div style={{ textAlign: "center", fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 16 }}>{frase}</div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {podioFinal.map((m, i) => {
+                  const souEu = m.user_id === meuId;
+                  return (
+                    <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 11, background: souEu ? "#16201b" : "#121815", border: `1px solid ${souEu ? GOLD : CORES[i]}`, borderRadius: 12, padding: "10px 12px" }}>
+                      <span style={{ fontSize: 22, flexShrink: 0 }}>{MEDALHAS[i]}</span>
+                      <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={32} /></div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}{souEu ? " (tu)" : ""}</div>
+                        <div style={{ fontSize: 10.5, color: CORES[i], fontFamily: FD, fontWeight: 700, textTransform: "uppercase" }}>{LABELS[i]}</div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: CORES[i] }}>{m.pontos_geral}</div>
+                        <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {minhaPos && (
+                <button onClick={() => { setMostrarFimLiga(false); setCertificado(minhaPos); }} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer", marginBottom: 8 }}>Ver o meu certificado</button>
+              )}
+              <button onClick={() => setMostrarFimLiga(false)} style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #2a3a33", background: "transparent", color: "#cfd8d2", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Fechar</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal do certificado (liga terminada). A identidade e a contagem saem do
           pódio final acima. */}
