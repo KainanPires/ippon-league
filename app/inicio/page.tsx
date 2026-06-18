@@ -9,7 +9,7 @@ import { GaleriaResumos } from "@/components/GaleriaResumos";
 import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, textoFecho, competicaoDaSemana } from "@/lib/calendario";
-import { mensagemEspecialDeHoje, type MensagemEspecial } from "@/lib/mensagensEspeciais";
+import { mensagensModaisDeHoje, type MensagemEspecial } from "@/lib/mensagensEspeciais";
 import { continenteDoPais } from "@/lib/continentes";
 import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { PRECO } from "@/lib/precos";
@@ -51,6 +51,20 @@ function computeTeamInfo(saved: TeamState): { name: string; value: string; last:
   return { name: loadIdentity().name, value: resolvido ? String(value) : "—", last: resolvido ? last : 0 };
 }
 
+// ---------------------------------------------------------------------------
+// Modais de evento: controlo de "visto" (1x por evento) em localStorage, por
+// utilizador. A chave de cada modal vem do motor (comp-<id>, aniversario-<ano>…).
+// ---------------------------------------------------------------------------
+function modalKey(chave: string, userId: string | null | undefined): string {
+  return `ippon_modal_visto__${chave}__${userId ?? "anon"}`;
+}
+function modalVisto(chave: string, userId: string | null | undefined): boolean {
+  try { return localStorage.getItem(modalKey(chave, userId)) === "1"; } catch { return false; }
+}
+function marcarModalVisto(chave: string, userId: string | null | undefined) {
+  try { localStorage.setItem(modalKey(chave, userId), "1"); } catch {}
+}
+
 export default function Inicio() {
   const [ready, setReady] = useState(false);
   const [visitante, setVisitante] = useState(false);
@@ -59,7 +73,7 @@ export default function Inicio() {
   const [name, setName] = useState("");
   const [isPro, setIsPro] = useState(false);
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
-  const [msgEspecial, setMsgEspecial] = useState<MensagemEspecial | null>(null);
+  const [modaisFila, setModaisFila] = useState<MensagemEspecial[]>([]);
   const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
   const [minhasLigas, setMinhasLigas] = useState<{ id: string; name: string; membros: number }[] | null>(null);
   const [desempenho, setDesempenho] = useState<{ dados: DesempenhoRodada; team: TeamState } | null>(null);
@@ -130,22 +144,29 @@ export default function Inicio() {
             .then(({ data: row }) => {
               if (!active) return;
               setFaixaJogo(normalizarFaixa(row?.belt));
-              // Mensagem especial do dia: junta data civil (aniversário/Dia do
+              // Modais de evento do dia: junta data civil (aniversário/Dia do
               // Judô/fim/começo de ano) com a grande competição da semana (do
               // calendário; nunca clássicos; continental só do continente do user).
+              // Mostra só os que ainda não foram vistos (1x por evento).
               try {
-                const comp = competicaoDaSemana();
-                const msg = mensagemEspecialDeHoje(
+                const compSemana = competicaoDaSemana();
+                const lista = mensagensModaisDeHoje(
                   new Date(),
                   {
                     nome: nomeParaMsg || undefined,
                     dataNascimento: row?.data_nascimento ? String(row.data_nascimento) : null,
                     continente: continenteDoPais(row?.country_code),
                   },
-                  { nome: comp.nome, nivel: comp.nivel, classico: comp.classico },
+                  {
+                    nome: compSemana.nome,
+                    nivel: compSemana.nivel,
+                    classico: compSemana.classico,
+                    idCompeticao: (compSemana as { idCompeticao?: string }).idCompeticao,
+                  },
                 );
-                setMsgEspecial(msg);
-              } catch { /* sem mensagem: o cartão não aparece */ }
+                const naoVistos = lista.filter((m) => !modalVisto(m.chave, userId));
+                if (naoVistos.length > 0) setModaisFila(naoVistos);
+              } catch { /* sem mensagem: nenhum modal aparece */ }
             });
         }
         if (localStorage.getItem("ippon_onboarding") === "pending") {
@@ -263,6 +284,23 @@ export default function Inicio() {
     setPhase("tutorial");
   }
 
+  // Fecha o modal de evento da frente da fila: marca-o como visto, grava no sino
+  // (para não se perder) e avança para o próximo da fila.
+  function fecharModalEvento() {
+    const m = modaisFila[0];
+    if (m) {
+      marcarModalVisto(m.chave, userIdState);
+      const ehCompeticao = m.tipo === "mundial" || m.tipo === "olimpiada" || m.tipo === "masters" || m.tipo === "continental";
+      criarNotificacao({
+        tipo: `evento_${m.tipo}`,
+        titulo: m.titulo,
+        corpo: m.texto,
+        link: ehCompeticao ? destinoEscalar : "/inicio",
+      }).catch(() => {});
+    }
+    setModaisFila((fila) => fila.slice(1));
+  }
+
   async function abrirResumoDaGaleria(compEscolhida: string) {
     const cong = await buscarResultadosCongelados(compEscolhida);
     if (!cong) return;
@@ -311,9 +349,14 @@ export default function Inicio() {
     );
   }
 
+  // Os modais de evento só aparecem fora do tutorial de onboarding e sem outro
+  // overlay aberto (resumo da rodada / galeria), para não empilhar pop-ups.
+  const modalEvento = modaisFila[0] ?? null;
+  const podeMostrarModalEvento = !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta;
+
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes iltut{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.75)}50%{box-shadow:0 0 0 9px rgba(74,144,217,0.18)}} .iltut{animation:iltut 1.3s ease-in-out infinite} @keyframes ilentrar{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.28)}} .ilentrar{animation:ilentrar 1.5s ease-in-out infinite;border-radius:999px}`}</style>
+      <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes iltut{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.75)}50%{box-shadow:0 0 0 9px rgba(74,144,217,0.18)}} .iltut{animation:iltut 1.3s ease-in-out infinite} @keyframes ilentrar{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.28)}} .ilentrar{animation:ilentrar 1.5s ease-in-out infinite;border-radius:999px} @keyframes ilmodalin{0%{opacity:0;transform:translateY(10px) scale(0.97)}100%{opacity:1;transform:none}} .ilmodalin{animation:ilmodalin 0.28s cubic-bezier(0.2,0.7,0.3,1)}`}</style>
 
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 14px 86px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -353,18 +396,6 @@ export default function Inicio() {
             <SinoNotificacoes calcOpts={{ temEquipa: temEquipaCompleta }} />
           </div>
         </header>
-
-        {/* Mensagem especial do dia (aniversário, Dia do Judô, grande competição,
-            fim/começo de ano). Só aparece quando há mensagem para hoje. */}
-        {msgEspecial && (
-          <div style={{ background: "#121815", border: `1px solid ${msgEspecial.cor}`, borderRadius: 14, padding: "13px 15px", marginBottom: 14, display: "flex", gap: 11, alignItems: "flex-start" }}>
-            <span aria-hidden="true" style={{ fontSize: 22, flexShrink: 0, lineHeight: 1 }}>{msgEspecial.emoji}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em", color: msgEspecial.cor, marginBottom: 3 }}>{msgEspecial.titulo}</div>
-              <p style={{ fontSize: 12.5, color: "#d3dcd5", lineHeight: 1.5, margin: 0 }}>{msgEspecial.texto}</p>
-            </div>
-          </div>
-        )}
 
         {/* Convite para instalar a app (PWA). Só aparece a quem ainda não instalou. */}
         <CartaoInstalarApp />
@@ -501,6 +532,12 @@ export default function Inicio() {
 
       {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || "Campeão"} target={tutTarget} />}
 
+      {/* Modais de evento (aniversário, grande competição, etc.). Aparecem 1x por
+          evento; em sequência quando coincidem; ao fechar vão para o sino. */}
+      {podeMostrarModalEvento && modalEvento && (
+        <ModalEvento msg={modalEvento} onClose={fecharModalEvento} />
+      )}
+
       {desempenho && (
         <Desempenho
           dados={desempenho.dados}
@@ -636,6 +673,30 @@ function Overlay({ children }: { children: React.ReactNode }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.78)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 100 }}>
       <div style={{ width: "100%", maxWidth: 320 }}>{children}</div>
     </div>
+  );
+}
+
+// Modal de evento (estilo tutorial, com o Dôdo). Um botão único; ao fechar, o
+// chamador marca como visto, grava no sino e avança para o próximo da fila.
+function ModalEvento({ msg, onClose }: { msg: MensagemEspecial; onClose: () => void }) {
+  const expr: React.ComponentProps<typeof Mascot>["expression"] =
+    msg.tipo === "aniversario" ? "comemorando"
+      : msg.tipo === "fim_de_ano" || msg.tipo === "comeco_de_ano" || msg.tipo === "dia_do_judo" ? "feliz"
+        : "indicando";
+  return (
+    <Overlay>
+      <div className="ilmodalin" style={{ background: "#121815", border: `1px solid ${msg.cor}`, borderRadius: 16, padding: 20, textAlign: "center" }}>
+        <div style={{ width: 76, height: 76, margin: "0 auto 4px" }}>
+          <Mascot belt="#141110" expression={expr} />
+        </div>
+        <div style={{ fontSize: 30, lineHeight: 1, marginBottom: 8 }} aria-hidden="true">{msg.emoji}</div>
+        <div style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.15, marginBottom: 9, color: msg.cor }}>{msg.titulo}</div>
+        <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 18px" }}>{msg.texto}</p>
+        <button onClick={onClose} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 14, borderRadius: 12, fontSize: 15, cursor: "pointer", boxSizing: "border-box" }}>
+          {msg.botao}
+        </button>
+      </div>
+    </Overlay>
   );
 }
 
