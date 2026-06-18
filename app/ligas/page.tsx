@@ -69,7 +69,12 @@ export default function Ligas() {
   const [souPro, setSouPro] = useState(false);
 
   // Aviso de confirmação quando a liga já começou (entra com 0 pontos).
-  const [confirmacao, setConfirmacao] = useState<{ codigo: string; nome: string; rodadaInicio: number; rodadaEntrada: number } | null>(null);
+  // origem distingue a entrada por código da entrada por uma liga aberta no mercado.
+  const [confirmacao, setConfirmacao] = useState<
+    | { origem: "codigo"; nome: string; rodadaInicio: number; rodadaEntrada: number }
+    | { origem: "mercado"; liga: LigaMercado; nome: string; rodadaInicio: number; rodadaEntrada: number }
+    | null
+  >(null);
 
   // Ligas oficiais: nome do continente + posição do utilizador em cada uma.
   const [nomeContinente, setNomeContinente] = useState<string | null>(null);
@@ -177,7 +182,7 @@ export default function Ligas() {
       // A liga já começou: pede confirmação antes de entrar (começa com 0 pontos).
       if (!j.ok && j.jaComecou) {
         setConfirmacao({
-          codigo: c,
+          origem: "codigo",
           nome: j.liga?.name || "esta liga",
           rodadaInicio: Number(j.rodadaInicio),
           rodadaEntrada: Number(j.rodadaEntrada),
@@ -197,14 +202,18 @@ export default function Ligas() {
     }
   }
 
-  // Confirmou entrar numa liga já começada: repete o pedido já confirmado.
+  // Confirmou entrar numa liga já começada: repete o pedido já confirmado,
+  // pela mesma via por onde veio (código ou mercado).
   function confirmarEntradaComecada() {
+    const c = confirmacao;
     setConfirmacao(null);
-    entrarPorCodigo(true);
+    if (!c) return;
+    if (c.origem === "codigo") entrarPorCodigo(true);
+    else acaoMercado(c.liga, true);
   }
 
   // Ação no mercado: liga "aberta" entra direto; "por aprovação" envia pedido.
-  async function acaoMercado(liga: LigaMercado) {
+  async function acaoMercado(liga: LigaMercado, confirmar = false) {
     setErroMercado("");
     setAEntrarId(liga.id);
     try {
@@ -214,9 +223,21 @@ export default function Ligas() {
       const res = await fetch("/api/liga/pedir", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: uid, codigo: liga.invite_code }),
+        body: JSON.stringify({ user_id: uid, codigo: liga.invite_code, confirmar }),
       });
       const j = await res.json();
+      // Liga aberta já começada: pede confirmação antes de entrar.
+      if (!j.ok && j.jaComecou) {
+        setConfirmacao({
+          origem: "mercado",
+          liga,
+          nome: j.liga?.name || liga.name,
+          rodadaInicio: Number(j.rodadaInicio),
+          rodadaEntrada: Number(j.rodadaEntrada),
+        });
+        setAEntrarId(null);
+        return;
+      }
       if (!j.ok) {
         setErroMercado(j.erro || "Não foi possível concluir.");
         setAEntrarId(null);
