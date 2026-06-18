@@ -8,7 +8,12 @@
 //    No DIA (mercado fechado), revela-se o nome completo com a cidade.
 // Estados visuais: passada (cinza), a decorrer (verde), próxima (dourado a pulsar),
 // futura (normal). Os atletas não se mostram aqui — aparecem no mercado.
+//
+// Ao ABRIR, a página faz scroll automático até à competição-alvo (a que está a
+// decorrer ou a próxima com mercado aberto — focoMercado().alvo). A lista e a
+// ordem ficam iguais; quem subir o scroll vê as competições antigas.
 
+import { useEffect, useRef } from "react";
 import {
   CALENDARIO_2026,
   estadoMercado,
@@ -37,6 +42,18 @@ export default function CalendarioPage() {
   const alvoId = foco.alvo.idCompeticao;
   const lista = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
 
+  // Cartão-alvo (a decorrer / próxima) para levar o scroll até lá ao abrir.
+  const alvoRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Espera a lista pintar antes de saltar. Sem "smooth" para não dar a sensação
+    // de percorrer a página toda — abre já posicionado na competição-alvo.
+    const id = requestAnimationFrame(() => {
+      alvoRef.current?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [alvoId]);
+
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <style>{`@keyframes pulsoOuro {
@@ -64,7 +81,12 @@ export default function CalendarioPage() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {lista.map((s) => (
-            <CartaoSemana key={s.semana} s={s} alvoId={alvoId} />
+            <CartaoSemana
+              key={s.semana}
+              s={s}
+              alvoId={alvoId}
+              alvoRef={s.idCompeticao === alvoId ? alvoRef : undefined}
+            />
           ))}
         </div>
       </div>
@@ -79,7 +101,7 @@ export default function CalendarioPage() {
   );
 }
 
-function CartaoSemana({ s, alvoId }: { s: SemanaCalendario; alvoId: string }) {
+function CartaoSemana({ s, alvoId, alvoRef }: { s: SemanaCalendario; alvoId: string; alvoRef?: React.RefObject<HTMLDivElement | null> }) {
   const mkt = estadoMercado(s);
   const estado: Estado = competicaoFechada(s)
     ? "passada"
@@ -107,11 +129,13 @@ function CartaoSemana({ s, alvoId }: { s: SemanaCalendario; alvoId: string }) {
   const corTitulo = estado === "passada" ? "#7c8a82" : cego ? "#e6c97a" : "#f1ede2";
 
   return (
-    <div style={{
+    <div ref={alvoRef} style={{
       background: estado === "proxima" ? "#15170f" : "#121815",
       border: `1px solid ${corBorda}`,
       borderRadius: 14, display: "flex", alignItems: "center", gap: 12, padding: "12px 13px",
       opacity: opacidade,
+      // Margem ao saltar para este cartão: não cola ao topo do ecrã.
+      scrollMarginTop: 16,
       animation: estado === "proxima" ? "pulsoOuro 2.2s ease-in-out infinite" : undefined,
     }}>
       {/* Selo da rodada */}
