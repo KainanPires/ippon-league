@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Escudo, SymbolGlyph, SHAPES, PATTERNS, LEAGUE_SYMBOLS, COLORS, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+import { Escudo, SymbolGlyph, SHAPES, PATTERNS, LEAGUE_SYMBOLS, COLORS, type Identity } from "@/components/Escudo";
 import { DEFAULT_LEAGUE_SHIELD, type LeagueFormat, type LeaguePrivacy } from "@/lib/leagues";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, proximaDepoisDe, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
@@ -13,12 +13,20 @@ const GOLD = "#d9a441";
 // Limites de criação por plano (espelho do servidor; a regra real está na rota).
 const LIM_CRIAR_FREE = 1, LIM_CRIAR_PRO = 5;
 
-const COLOR_SLOTS: { key: keyof Identity; label: string }[] = [
-  { key: "bg1", label: "Fundo 1" },
-  { key: "bg2", label: "Fundo 2" },
-  { key: "stamp1", label: "Estampa 1" },
-  { key: "stamp2", label: "Estampa 2" },
-  { key: "border", label: "Borda" },
+// Slots de cor. Os cinco PRINCIPAIS são sempre visíveis; os dois da estampa só
+// aparecem quando há um padrão escolhido (deixa de fazer sentido no "Sólido").
+// É o mesmo modelo do editor do escudo do TIME, para a experiência ser igual.
+type Slot = "bg1" | "bg2" | "border" | "icon" | "iconBorder" | "stamp1" | "stamp2";
+const SLOTS_PRINCIPAIS: { id: Slot; label: string }[] = [
+  { id: "bg1", label: "Fundo 1" },
+  { id: "bg2", label: "Fundo 2" },
+  { id: "border", label: "Borda do fundo" },
+  { id: "icon", label: "Ícone" },
+  { id: "iconBorder", label: "Borda do ícone" },
+];
+const SLOTS_ESTAMPA: { id: Slot; label: string }[] = [
+  { id: "stamp1", label: "Estampa 1" },
+  { id: "stamp2", label: "Estampa 2" },
 ];
 
 const rnd = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -108,7 +116,7 @@ export default function CriarLiga() {
   const [fimComp, setFimComp] = useState<string>("");   // id da competição de fim
   const [fimMes, setFimMes] = useState<string>("");      // "AAAA-MM"
   const [privacy, setPrivacy] = useState<LeaguePrivacy>("fechada");
-  const [activeColor, setActiveColor] = useState<keyof Identity>("bg1");
+  const [slot, setSlot] = useState<Slot>("bg1");
   const [created, setCreated] = useState<LigaCriada | null>(null);
   const [copied, setCopied] = useState(false);
   const [a_criar, setACriar] = useState(false);
@@ -150,8 +158,14 @@ export default function CriarLiga() {
     setCfg((prev) => ({ ...prev, [key]: value }));
   }
   function sortear() {
-    setCfg((p) => ({ ...p, shape: rnd(SHAPES), pattern: rnd(PATTERNS).id, symbol: rnd(LEAGUE_SYMBOLS).id, bg1: rnd(COLORS), bg2: rnd(COLORS), stamp1: rnd(COLORS), stamp2: rnd(COLORS), border: rnd(COLORS) }));
+    setCfg((p) => ({ ...p, shape: rnd(SHAPES), pattern: rnd(PATTERNS).id, symbol: rnd(LEAGUE_SYMBOLS).id, bg1: rnd(COLORS), bg2: rnd(COLORS), stamp1: rnd(COLORS), stamp2: rnd(COLORS), border: rnd(COLORS), icon: rnd(COLORS), iconBorder: rnd(COLORS) }));
   }
+
+  // A estampa só importa quando há um padrão (não "Sólido"). Aí mostramos também
+  // os dois slots de cor da estampa.
+  const temEstampa = cfg.pattern !== "solido";
+  const slotsVisiveis = temEstampa ? [...SLOTS_PRINCIPAIS, ...SLOTS_ESTAMPA] : SLOTS_PRINCIPAIS;
+  const valorSlot = (cfg[slot] as string | undefined) || "";
 
   // --- Derivados das escolhas (ligas de pontos corridos) ---
   const compInicialObj = janela.find((c) => c.idCompeticao === ligaCompInicial) || null;
@@ -310,19 +324,42 @@ export default function CriarLiga() {
               ))}
             </ScrollRow>
 
+            {/* CORES — mesmo modelo do escudo do time: cinco camadas claras numa
+                linha que desliza, a estampa só quando há padrão, e a borda do
+                ícone pode ser "Nenhuma". */}
             <Label>Cores</Label>
-            <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-              {COLOR_SLOTS.map((sl) => (
-                <button key={sl.key} onClick={() => setActiveColor(sl.key)} style={{ flex: 1, minWidth: 64, background: activeColor === sl.key ? "#16201b" : "#121815", border: `1.5px solid ${activeColor === sl.key ? GOLD : "#243029"}`, borderRadius: 10, padding: "7px 4px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
-                  <span style={{ width: 20, height: 20, borderRadius: 5, background: cfg[sl.key] as string, border: "1px solid rgba(255,255,255,0.15)" }} />
-                  <span style={{ fontSize: 9.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.03em" }}>{sl.label}</span>
+            <ScrollRow>
+              {slotsVisiveis.map((s) => (
+                <button key={s.id} onClick={() => setSlot(s.id)} aria-label={s.label}
+                  style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "transparent", border: "none", cursor: "pointer", padding: 0, width: 64 }}>
+                  <span style={{ position: "relative", width: 44, height: 44, borderRadius: "50%", background: ((cfg[s.id] as string | undefined) || "") || "transparent", border: `2px solid ${slot === s.id ? GOLD : "rgba(255,255,255,0.25)"}`, boxShadow: slot === s.id ? `0 0 0 3px rgba(217,164,65,0.35)` : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {!((cfg[s.id] as string | undefined) || "") && (
+                      <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
+                        <line x1="10" y1="34" x2="34" y2="10" stroke="#7c8a82" strokeWidth="2" />
+                      </svg>
+                    )}
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: slot === s.id ? GOLD : "#93a39a", textAlign: "center", lineHeight: 1.2 }}>{s.label}</span>
                 </button>
               ))}
+            </ScrollRow>
+            <div style={{ fontSize: 11, color: "#93a39a", textAlign: "center", marginBottom: 10 }}>
+              A pintar: <span style={{ color: GOLD, fontWeight: 700 }}>{slotsVisiveis.find((s) => s.id === slot)?.label}</span>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 22 }}>
-              {COLORS.map((c) => (
-                <button key={c} onClick={() => set(activeColor, c)} aria-label={c} style={{ width: 30, height: 30, borderRadius: "50%", background: c, border: (cfg[activeColor] as string) === c ? `2px solid ${GOLD}` : "2px solid #243029", cursor: "pointer" }} />
-              ))}
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 9, marginBottom: 22 }}>
+              {/* A "Borda do ícone" pode ser NENHUMA (sem contorno). */}
+              {slot === "iconBorder" && (
+                <button onClick={() => set("iconBorder", "")} aria-label="Sem borda do ícone"
+                  style={{ position: "relative", width: 30, height: 30, borderRadius: "50%", background: "#0c0e0d", border: `2px solid ${valorSlot === "" ? "#f1ede2" : "#243029"}`, boxShadow: valorSlot === "" ? `0 0 0 2px ${GOLD}` : "none", cursor: "pointer" }}>
+                  <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
+                    <line x1="6" y1="20" x2="20" y2="6" stroke="#ef8d83" strokeWidth="2" />
+                  </svg>
+                </button>
+              )}
+              {COLORS.map((c) => {
+                const on = valorSlot.toLowerCase() === c.toLowerCase();
+                return <button key={c} onClick={() => set(slot, c)} aria-label={c} style={{ width: 30, height: 30, borderRadius: "50%", background: c, border: on ? `2px solid ${GOLD}` : "2px solid #243029", cursor: "pointer" }} />;
+              })}
             </div>
 
             <Label>Formato</Label>
