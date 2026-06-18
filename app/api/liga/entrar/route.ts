@@ -2,17 +2,18 @@
 //
 // ENTRAR NUMA LIGA por código de convite (servidor, chave secreta).
 //
-// Recebe (POST): { user_id, codigo }
+// Recebe (POST): { user_id, codigo, confirmar? }
 // Comportamento conforme a privacidade da liga:
 //   - "aberta"  e  "fechada"  → entra já como membro (o código é o convite)
 //   - "mediante_pedido"       → NÃO entra direto; cria um pedido pendente
 //                               (o dono tem de aprovar)
 // Devolve:
-//   { ok:true, liga }              entrou como membro
-//   { ok:true, jaEra:true, liga }  já era membro
-//   { ok:true, pedido:true }       ficou um pedido pendente (mediante_pedido)
-//   { ok:true, jaPediu:true }      já tinha pedido pendente
-//   { ok:false, erro }             caso contrário
+//   { ok:true, liga }               entrou como membro
+//   { ok:true, jaEra:true, liga }   já era membro
+//   { ok:true, pedido:true }        ficou um pedido pendente (mediante_pedido)
+//   { ok:true, jaPediu:true }       já tinha pedido pendente
+//   { ok:false, jaComecou:true, … } liga já começou: precisa de confirmação
+//   { ok:false, erro }              caso contrário
 //
 // COPA — INSCRIÇÕES FECHADAS: numa Copa Ippon (formato "copa"), assim que as
 // inscrições fecham (estado deixa de ser "inscricao", OU passou o prazo
@@ -21,7 +22,7 @@
 // barramos quem chega tarde a tentar entrar a meio. (Regra do Kainan.)
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { focoMercado } from "@/lib/calendario";
+import { focoMercado, numeroDaRodada } from "@/lib/calendario";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação à base de dados." }, { status: 500 });
   }
-  let corpo: { user_id?: string; codigo?: string };
+  let corpo: { user_id?: string; codigo?: string; confirmar?: boolean };
   try {
     corpo = await req.json();
   } catch {
@@ -82,6 +83,7 @@ export async function POST(req: Request) {
   }
   const user_id = (corpo.user_id || "").trim();
   const codigo = (corpo.codigo || "").trim().toUpperCase();
+  const confirmar = corpo.confirmar === true;
   if (!user_id) return NextResponse.json({ ok: false, erro: "Entra para te juntares a uma liga." }, { status: 401 });
   if (codigo.length < 4) return NextResponse.json({ ok: false, erro: "Código inválido." }, { status: 400 });
 
@@ -169,12 +171,35 @@ export async function POST(req: Request) {
     }
   }
 
+  // 4-bis) A liga (pontos corridos) JÁ COMEÇOU? Se a rodada onde este novo membro
+  //   entraria (a competição-alvo de agora) é POSTERIOR à rodada em que a liga
+  //   arrancou, ele perde as rodadas já jogadas e começa com 0 pontos. Avisamos
+  //   e só inserimos quando vier confirmar:true. Se for a MESMA rodada, ninguém
+  //   perdeu nada — entra na linha de partida e não há aviso.
+  //   (Copas não passam por aqui: em "inscricao" ainda não começaram; depois de
+  //   fechar inscrições já foram barradas no passo 2-bis. E sem
+  //   liga_competicao_inicial preenchido não bloqueamos — comporta-se como antes.)
+  const alvoAtual = focoMercado().alvo;
+  if (String(liga.formato) !== "copa" && !confirmar) {
+    const rodadaInicio = numeroDaRodada(String(liga.liga_competicao_inicial ?? ""));
+    const rodadaEntrada = numeroDaRodada(String(alvoAtual.idCompeticao));
+    if (rodadaInicio !== null && rodadaEntrada !== null && rodadaEntrada > rodadaInicio) {
+      return NextResponse.json({
+        ok: false,
+        jaComecou: true,
+        liga,
+        rodadaInicio,
+        rodadaEntrada,
+      });
+    }
+  }
+
   // 5) Adiciona como membro.
   //    entrou_competicao = a competição-alvo de agora (a 1ª que este membro pode
   //    jogar). É o ponto a partir do qual o ranking geral conta os pontos dele —
   //    quem entra a meio NÃO herda as rodadas anteriores. (Membros antigos ficam
   //    com este campo a NULL e continuam a contar desde o início da liga.)
-  const entrouCompeticao = focoMercado().alvo.idCompeticao;
+  const entrouCompeticao = alvoAtual.idCompeticao;
   const { error: erroMembro } = await supabaseAdmin
     .from("league_members")
     .insert({ league_id: liga.id, user_id, score: 0, position: 0, entrou_competicao: entrouCompeticao });
