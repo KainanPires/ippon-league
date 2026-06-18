@@ -75,6 +75,7 @@ export function ResultadosConteudo() {
   const [positivos, setPositivos] = useState<Positivo[]>([]);
   const [outros, setOutros] = useState<Outro[]>([]);
   const [cert, setCert] = useState<Positivo | null>(null);
+  const [aba, setAba] = useState<"titulos" | "participacoes">("titulos");
 
   const idComp = (focoMercado().aDecorrer ?? focoMercado().atual).idCompeticao;
 
@@ -255,54 +256,75 @@ export function ResultadosConteudo() {
 
   return (
     <>
-      {/* SECÇÃO 1 — Resultados positivos (com certificado) */}
-      <Section>🏅 Resultados positivos</Section>
-      {positivos.length === 0 ? (
-        <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 14px", lineHeight: 1.5 }}>Ainda não tens pódios. Fica no top 3 de uma liga, copa ou rodada para ganhares o teu certificado.</p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
-          {positivos.map((p) => (
-            <div key={p.chave} style={{ background: "#121815", border: `1px solid ${p.cor}`, borderRadius: 12, padding: "10px 12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                <span style={{ fontSize: 22, flexShrink: 0 }}>{p.medalha}</span>
-                <div style={{ flexShrink: 0 }}><Escudo config={p.identity} size={32} /></div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.contexto}</div>
-                  <div style={{ fontSize: 10.5, color: p.cor, fontFamily: FD, fontWeight: 700, textTransform: "uppercase" }}>{p.rotulo}</div>
-                </div>
-                {p.pontos !== null && (
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: p.cor }}>{p.pontos}</div>
-                    <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
+      {/* Sub-abas: Títulos (conquistas, com certificado) vs Participações (4º+). */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, borderBottom: "1px solid #1a221d" }}>
+        {([
+          ["titulos", `Títulos${positivos.length ? ` (${positivos.length})` : ""}`],
+          ["participacoes", `Participações${outros.length ? ` (${outros.length})` : ""}`],
+        ] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setAba(k)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${aba === k ? GOLD : "transparent"}`, color: aba === k ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>{label}</button>
+        ))}
+      </div>
+
+      {/* SUB-ABA "TÍTULOS" — conquistas com certificado (1º/2º/3º e Melhor da Rodada). */}
+      {aba === "titulos" && (
+        positivos.length === 0 ? (
+          <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
+            <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Ainda não tens títulos.<br />Fica no top 3 de uma liga, copa ou rodada para ganhares o teu certificado.</div>
+          </div>
+        ) : (
+          <>
+            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-2px 0 12px", lineHeight: 1.5 }}>As tuas conquistas — pódios de copa e liga, Campeão do ano e Melhor da Rodada. Toca para ver e partilhar o certificado.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {positivos.map((p) => (
+                <div key={p.chave} style={{ background: "#121815", border: `1px solid ${p.cor}`, borderRadius: 12, padding: "10px 12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                    <span style={{ fontSize: 22, flexShrink: 0 }}>{p.medalha}</span>
+                    <div style={{ flexShrink: 0 }}><Escudo config={p.identity} size={32} /></div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.contexto}</div>
+                      <div style={{ fontSize: 10.5, color: p.cor, fontFamily: FD, fontWeight: 700, textTransform: "uppercase" }}>{p.rotulo}</div>
+                    </div>
+                    {p.pontos !== null && (
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: p.cor }}>{p.pontos}</div>
+                        <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <button onClick={() => setCert(p)} style={{ width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: p.cor, color: p.posicao === "vice" ? "#14181a" : "#1b1208", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
-                Ver / partilhar certificado
-              </button>
+                  <button onClick={() => setCert(p)} style={{ width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: p.cor, color: p.posicao === "vice" ? "#14181a" : "#1b1208", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+                    Ver / partilhar certificado
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )
       )}
 
-      {/* SECÇÃO 2 — Resultados (4º+), só registo */}
-      {outros.length > 0 && (
-        <>
-          <Section>Resultados</Section>
-          <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>As ligas e copas em que participaste e não subiste ao pódio. Já fazem parte do teu histórico.</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {outros.map((o) => (
-              <div key={o.chave} style={{ display: "flex", alignItems: "center", gap: 11, background: "#10140f", border: "1px solid #1f2a23", borderRadius: 12, padding: "10px 12px" }}>
-                <div style={{ flexShrink: 0, opacity: 0.85 }}><Escudo config={o.identity} size={30} /></div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#cfd8d2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.contexto}</div>
-                  <div style={{ fontSize: 11, color: "#7c8a82" }}>{o.detalhe}</div>
-                </div>
-              </div>
-            ))}
+      {/* SUB-ABA "PARTICIPAÇÕES" — 4º+ / eliminado, só registo (sem certificado). */}
+      {aba === "participacoes" && (
+        outros.length === 0 ? (
+          <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
+            <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Sem participações por aqui.<br />As ligas e copas em que jogaste sem subir ao pódio aparecem nesta lista.</div>
           </div>
-        </>
+        ) : (
+          <>
+            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-2px 0 12px", lineHeight: 1.5 }}>Ligas e copas em que participaste e não subiste ao pódio. Fazem parte do teu histórico.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {outros.map((o) => (
+                <div key={o.chave} style={{ display: "flex", alignItems: "center", gap: 11, background: "#10140f", border: "1px solid #1f2a23", borderRadius: 12, padding: "10px 12px" }}>
+                  <div style={{ flexShrink: 0, opacity: 0.85 }}><Escudo config={o.identity} size={30} /></div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#cfd8d2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.contexto}</div>
+                    <div style={{ fontSize: 11, color: "#7c8a82" }}>{o.detalhe}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )
       )}
 
       {/* Modal do certificado escolhido */}
@@ -319,8 +341,4 @@ export function ResultadosConteudo() {
       )}
     </>
   );
-}
-
-function Section({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", margin: "4px 0 10px" }}>{children}</div>;
 }
