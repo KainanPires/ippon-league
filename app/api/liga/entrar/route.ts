@@ -21,6 +21,7 @@
 // barramos quem chega tarde a tentar entrar a meio. (Regra do Kainan.)
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { focoMercado } from "@/lib/calendario";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -169,9 +170,14 @@ export async function POST(req: Request) {
   }
 
   // 5) Adiciona como membro.
+  //    entrou_competicao = a competição-alvo de agora (a 1ª que este membro pode
+  //    jogar). É o ponto a partir do qual o ranking geral conta os pontos dele —
+  //    quem entra a meio NÃO herda as rodadas anteriores. (Membros antigos ficam
+  //    com este campo a NULL e continuam a contar desde o início da liga.)
+  const entrouCompeticao = focoMercado().alvo.idCompeticao;
   const { error: erroMembro } = await supabaseAdmin
     .from("league_members")
-    .insert({ league_id: liga.id, user_id, score: 0, position: 0 });
+    .insert({ league_id: liga.id, user_id, score: 0, position: 0, entrou_competicao: entrouCompeticao });
   if (erroMembro) {
     return NextResponse.json({ ok: false, erro: "Não foi possível entrar na liga.", detalhe: erroMembro.message }, { status: 500 });
   }
