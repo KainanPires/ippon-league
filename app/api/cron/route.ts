@@ -315,6 +315,104 @@ function mesAnteriorDe(d: Date): string {
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// FECHO DA ÉPOCA OFICIAL (anual). Calcula o pódio do ANO indicado — Mundial e
+// cada Continental — e grava em campeoes_oficiais (livro de campeões). Só Pro
+// entram (como no ranking ao vivo). Idempotente: upsert pela chave única, por
+// isso re-correr o fecho do mesmo ano atualiza, não duplica.
+// Os continentes são descobertos a partir dos dados (continentes com Pro), para
+// não depender de uma lista fixa.
+async function fecharAnoOficial(ano: number): Promise<{ ano: number; mundial: number; continentais: Record<string, number> }> {
+  const out = { ano, mundial: 0, continentais: {} as Record<string, number> };
+  if (!supabaseAdmin) return out;
+
+  // Soma de pontos do ANO por utilizador (só competições cuja data cai no ano).
+  // Lê o histórico congelado (resultados_rodada) e filtra pelo ano da competição.
+  const noAno = (idComp: string): boolean => {
+    const c = competicaoPorId(idComp);
+    if (!c) return false; // sem data conhecida não conta para o ano
+    const a = parseInt(String(c.de).slice(0, 4), 10);
+    return a === ano;
+  };
+
+  // 1) Quem é Pro e qual o seu continente (mundial = todos; continental = por grupo).
+  const { data: pros } = await supabaseAdmin
+    .from("users")
+    .select("id, continente, patrimony_jc")
+    .eq("is_pro", true);
+  const prosLista = (pros || []).map((p) => ({ id: String(p.id), continente: (p.continente ? String(p.continente) : null) }));
+  if (prosLista.length === 0) return out;
+  const idsPro = new Set(prosLista.map((p) => p.id));
+
+  // 2) Soma dos pontos do ano, por utilizador Pro.
+  const { data: rodadas } = await supabaseAdmin
+    .from("resultados_rodada")
+    .select("user_id, pontos_rodada, id_competicao");
+  const pontosPorUser = new Map<string, number>();
+  for (const r of rodadas || []) {
+    const u = String(r.user_id);
+    if (!idsPro.has(u)) continue;
+    if (!noAno(String(r.id_competicao))) continue;
+    pontosPorUser.set(u, (pontosPorUser.get(u) ?? 0) + Number(r.pontos_rodada ?? 0));
+  }
+
+  // 3) Identidade (nome + escudo) de cada Pro, da equipa mais recente.
+  const { data: eqs } = await supabaseAdmin
+    .from("equipas")
+    .select("user_id, nome, escudo, id_competicao")
+    .in("user_id", prosLista.map((p) => p.id))
+    .order("id_competicao", { ascending: false });
+  const identDe = new Map<string, { nome: string; escudo: unknown }>();
+  for (const e of eqs || []) {
+    const u = String(e.user_id);
+    if (!identDe.has(u)) identDe.set(u, { nome: e.nome ?? "Equipa", escudo: e.escudo ?? null });
+  }
+
+  // Grava o pódio (top 3 por pontos > 0) de um grupo de utilizadores.
+  // Nota: no mundial guardamos continente='' (não null) para casar com o índice
+  // único (ano,tipo,COALESCE(continente,''),posicao) e o upsert funcionar.
+  async function gravarPodio(tipo: "mundial" | "continental", continente: string, userIds: string[]) {
+    const ordenados = userIds
+      .map((u) => ({ u, pts: pontosPorUser.get(u) ?? 0 }))
+      .filter((x) => x.pts > 0)
+      .sort((a, b) => b.pts - a.pts)
+      .slice(0, 3);
+    for (let i = 0; i < ordenados.length; i++) {
+      const { u, pts } = ordenados[i];
+      const ident = identDe.get(u) || { nome: "Equipa", escudo: null };
+      await supabaseAdmin!
+        .from("campeoes_oficiais")
+        .upsert(
+          {
+            ano, tipo, continente,
+            posicao: i + 1,
+            user_id: u,
+            nome_time: ident.nome,
+            escudo: ident.escudo,
+            pontos: Math.round(pts * 10) / 10,
+          },
+          { onConflict: "ano,tipo,continente,posicao" }
+        );
+    }
+    return ordenados.length;
+  }
+
+  // 4) Mundial: todos os Pro.
+  out.mundial = await gravarPodio("mundial", "", prosLista.map((p) => p.id));
+
+  // 5) Continental: um pódio por continente que tenha Pro.
+  const porContinente = new Map<string, string[]>();
+  for (const p of prosLista) {
+    if (!p.continente) continue;
+    if (!porContinente.has(p.continente)) porContinente.set(p.continente, []);
+    porContinente.get(p.continente)!.push(p.id);
+  }
+  for (const [cont, ids] of porContinente.entries()) {
+    out.continentais[cont] = await gravarPodio("continental", cont, ids);
+  }
+
+  return out;
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get("key");
@@ -385,6 +483,15 @@ export async function GET(req: Request) {
     let r: { encerradas: number; ids: string[] } = { encerradas: 0, ids: [] };
     try { r = await encerrarLigasTerminadas(hoje); } catch { /* não bloqueia */ }
     return NextResponse.json({ feito: true, modo: "encerrar_forcado", ligas_encerradas: r, ms_total: Date.now() - t0 });
+  }
+
+  // Disparo manual do FECHO DA ÉPOCA OFICIAL de um ano (teste): ?fecharano=AAAA
+  // Calcula e grava o pódio anual (mundial + continentais) no livro de campeões.
+  const fecharAno = (searchParams.get("fecharano") || "").trim();
+  if (fecharAno && /^\d{4}$/.test(fecharAno)) {
+    let r: { ano: number; mundial: number; continentais: Record<string, number> } | null = null;
+    try { r = await fecharAnoOficial(parseInt(fecharAno, 10)); } catch { /* não bloqueia */ }
+    return NextResponse.json({ feito: true, modo: "fechar_ano_forcado", fecho: r, ms_total: Date.now() - t0 });
   }
 
   // (A) Atualiza a lista de "a competir agora" (para o aviso no Mercado).
@@ -465,6 +572,15 @@ export async function GET(req: Request) {
     }
   } catch { /* não bloqueia */ }
 
+  // (D-bis) FECHO DA ÉPOCA OFICIAL: no dia 1 de JANEIRO, fecha o ano que acabou
+  //         (grava o pódio anual mundial + continentais no livro de campeões).
+  let fechoAnual: { ano: number; mundial: number; continentais: Record<string, number> } | null = null;
+  try {
+    if (hoje.getDate() === 1 && hoje.getMonth() === 0) { // 1 de janeiro
+      fechoAnual = await fecharAnoOficial(hoje.getFullYear() - 1);
+    }
+  } catch { /* não bloqueia */ }
+
   // (E) Notificações de MERCADO (aberto/fechado), idempotentes. Uma vez por
   //     competição. Não bloqueia o resto do cron se falhar.
   let mercado: { aberto: string | null; vespera: string | null; fechado: string | null } | null = null;
@@ -485,6 +601,7 @@ export async function GET(req: Request) {
     copas,
     ligas_encerradas: ligasEncerradas,
     faixas,
+    fecho_anual: fechoAnual,
     mercado,
     ms_total: Date.now() - t0,
     passos,
