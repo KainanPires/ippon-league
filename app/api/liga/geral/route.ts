@@ -79,13 +79,24 @@ export async function GET(req: Request) {
   let janelaIni: Date | null = null;
   let janelaFim: Date | null = null;
 
+  // Data de entrada (por competição) de cada membro de uma liga de amigos. null =
+  // membro fundador / sem registo → conta desde o início da liga. Para quem entrou
+  // a meio, guarda a DATA da competição de entrada: rodadas anteriores não contam.
+  const entrouDataDe = new Map<string, Date | null>();
+
   if (league_id) {
     // LIGA DE AMIGOS: membros da liga.
     const { data: membros } = await supabaseAdmin
       .from("league_members")
-      .select("user_id")
+      .select("user_id, entrou_competicao")
       .eq("league_id", league_id);
     userIds = (membros || []).map((m) => String(m.user_id));
+
+    // Data de entrada por membro (competição → data). NULL fica null (sem corte).
+    for (const m of membros || []) {
+      const cid = m.entrou_competicao ? String(m.entrou_competicao) : "";
+      entrouDataDe.set(String(m.user_id), cid ? dataDaComp(cid) : null);
+    }
 
     // Lê a janela desta liga (se tiver).
     const { data: ligaRow } = await supabaseAdmin
@@ -176,9 +187,22 @@ export async function GET(req: Request) {
   const geralPorUser = new Map<string, number>();
   for (const r of rodadas || []) {
     const u = String(r.user_id);
-    if (String(r.id_competicao) === comp) continue; // a atual entra ao vivo
-    if (!dentroDaJanela(String(r.id_competicao))) continue; // fora da janela da liga
+    const idc = String(r.id_competicao);
+    if (idc === comp) continue; // a atual entra ao vivo
+    if (!dentroDaJanela(idc)) continue; // fora da janela da liga
+    // Corte por ENTRADA do membro: rodadas anteriores à competição em que entrou
+    // não contam (só ligas de amigos; nas oficiais o mapa está vazio → sem corte).
+    if (!contaParaMembro(u, idc)) continue;
     geralPorUser.set(u, (geralPorUser.get(u) ?? 0) + Number(r.pontos_rodada ?? 0));
+  }
+
+  // Uma rodada conta para ESTE membro? Antes da competição de entrada → não.
+  function contaParaMembro(uid: string, idComp: string): boolean {
+    const entrou = entrouDataDe.get(uid);
+    if (!entrou) return true; // sem data de entrada (fundador / oficial) → conta tudo
+    const d = dataDaComp(idComp);
+    if (!d) return true;      // competição sem data → não dá para cortar, conta
+    return d >= entrou;       // só conta da competição de entrada em diante
   }
 
   // -------------------------------------------------------------------------
@@ -240,10 +264,11 @@ export async function GET(req: Request) {
 
   const linhas: MembroGeral[] = userIds.map((uid) => {
     const eq = equipaDe.get(uid);
-    // Rodada ao vivo (só se escalou nesta competição E ela está na janela da liga).
+    // Rodada ao vivo (só se escalou nesta competição, ela está na janela da liga
+    // E a competição atual já é da entrada deste membro em diante).
     let pontosRodada = 0;
     let escalou = false;
-    if (eq && eq.atletas.length > 0 && atualNaJanela) {
+    if (eq && eq.atletas.length > 0 && atualNaJanela && contaParaMembro(uid, comp)) {
       escalou = true;
       for (const aid of eq.atletas) {
         const p = pontosPorAtleta[aid] ?? 0;
@@ -285,6 +310,15 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({ ok: true, tipo: tipo || "amigos", continente, nomeContinente, comp, membros: linhas });
+}
+
+// Data (meio-dia, para evitar fronteiras de fuso) da competição no calendário.
+// null se a competição não estiver no calendário ou tiver data inválida.
+function dataDaComp(idComp: string): Date | null {
+  const c = competicaoPorId(idComp);
+  if (!c) return null;
+  const d = new Date(c.de.replace(/\//g, "-") + "T12:00:00");
+  return isNaN(d.getTime()) ? null : d;
 }
 
 // Soma, por atleta (id_person), os pontos de todas as lutas da competição.
