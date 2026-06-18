@@ -286,17 +286,23 @@ export default function Inicio() {
 
   // Fecha o modal de evento da frente da fila: marca-o como visto, grava no sino
   // (para não se perder) e avança para o próximo da fila.
+  // Nota: os eventos COM push (aniversário, Dia do Judô) já são gravados no sino
+  // pelo cron (sino + push), por isso aqui NÃO os duplicamos. Os restantes
+  // (competições, fim/começo de ano) não têm push — é o fecho do modal que os
+  // guarda no sino.
   function fecharModalEvento() {
     const m = modaisFila[0];
     if (m) {
       marcarModalVisto(m.chave, userIdState);
-      const ehCompeticao = m.tipo === "mundial" || m.tipo === "olimpiada" || m.tipo === "masters" || m.tipo === "continental";
-      criarNotificacao({
-        tipo: `evento_${m.tipo}`,
-        titulo: m.titulo,
-        corpo: m.texto,
-        link: ehCompeticao ? destinoEscalar : "/inicio",
-      }).catch(() => {});
+      if (!m.push) {
+        const ehCompeticao = m.tipo === "mundial" || m.tipo === "olimpiada" || m.tipo === "masters" || m.tipo === "continental";
+        criarNotificacao({
+          tipo: `evento_${m.tipo}`,
+          titulo: m.titulo,
+          corpo: m.texto,
+          link: ehCompeticao ? destinoEscalar : "/inicio",
+        }).catch(() => {});
+      }
     }
     setModaisFila((fila) => fila.slice(1));
   }
