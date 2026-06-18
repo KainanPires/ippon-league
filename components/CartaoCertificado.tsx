@@ -27,6 +27,7 @@ const CARD_CSS = `
 .ccard-selo{font-weight:700;font-size:30px;letter-spacing:9px;text-transform:uppercase;color:var(--cor)}
 .ccard-medalha{font-size:200px;line-height:1.05;margin:4px 0 0;filter:drop-shadow(0 0 60px var(--glow))}
 .ccard-titulo{font-weight:900;font-size:96px;line-height:1;letter-spacing:-1px;text-transform:uppercase;color:var(--cor);text-shadow:0 0 70px var(--glow);margin:6px 0 0}
+.ccard-titulo.rodada{font-size:72px;line-height:1.05;letter-spacing:0;overflow-wrap:break-word;max-width:100%}
 .ccard-sep{width:120px;height:4px;background:var(--cor);border-radius:2px;margin:40px 0 36px;opacity:0.7}
 .ccard-crest{width:200px;height:230px;display:grid;place-items:center;filter:drop-shadow(0 10px 22px rgba(0,0,0,0.5))}
 .ccard-team{font-weight:700;font-size:62px;line-height:1.04;letter-spacing:0.3px;text-transform:uppercase;color:#f1ede2;margin:22px 0 0;max-width:100%;overflow-wrap:break-word}
@@ -59,12 +60,16 @@ export function CartaoCertificado({
   identity,
   nomeCopa,
   nParticipantes,
+  variante = "anual",
+  tituloRodada,
   onClose,
 }: {
   posicao: PosicaoPodio;
   identity: Identity;
   nomeCopa: string;
   nParticipantes: number;
+  variante?: "anual" | "rodada";
+  tituloRodada?: string;
   onClose: () => void;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -115,7 +120,9 @@ export function CartaoCertificado({
     if (!blob) return;
     const file = new File([blob], "ippon-certificado.png", { type: "image/png" });
     const link = "https://www.ipponleague.com/inicio";
-    const texto = `${t.titulo} da ${nomeCopa} na Ippon League — entre ${nParticipantes} participantes! Joga também: ${link}`;
+    const texto = variante === "rodada"
+      ? `Melhor da Rodada — ${tituloRodada} em ${nomeCopa} na Ippon League, entre ${nParticipantes} ${nParticipantes === 1 ? "participante" : "participantes"}! Joga também: ${link}`
+      : `${t.titulo} da ${nomeCopa} na Ippon League — entre ${nParticipantes} participantes! Joga também: ${link}`;
     const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean; share?: (d: unknown) => Promise<void> };
     try {
       if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
@@ -146,7 +153,7 @@ export function CartaoCertificado({
 
         <div ref={previewRef} style={{ width: "100%", aspectRatio: "1080 / 1350", borderRadius: 12, overflow: "hidden", marginBottom: 14, position: "relative", background: "#0b0d0a" }}>
           <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1350, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <CertificadoNode innerRef={cardRef} vars={cardVars} tema={t} identity={identity} nomeCopa={nomeCopa} nParticipantes={nParticipantes} />
+            <CertificadoNode innerRef={cardRef} vars={cardVars} tema={t} identity={identity} nomeCopa={nomeCopa} nParticipantes={nParticipantes} variante={variante} tituloRodada={tituloRodada} />
           </div>
         </div>
 
@@ -160,22 +167,27 @@ export function CartaoCertificado({
   );
 }
 
-function CertificadoNode({ innerRef, vars, tema, identity, nomeCopa, nParticipantes }: {
+function CertificadoNode({ innerRef, vars, tema, identity, nomeCopa, nParticipantes, variante, tituloRodada }: {
   innerRef: { current: HTMLDivElement | null };
   vars: CSSProperties;
   tema: TemaPosicao;
   identity: Identity;
   nomeCopa: string;
   nParticipantes: number;
+  variante: "anual" | "rodada";
+  tituloRodada?: string;
 }) {
+  const ehRodada = variante === "rodada";
+  const selo = ehRodada ? "MELHOR DA RODADA" : tema.selo;
+  const titulo = ehRodada ? (tituloRodada || "Melhor da Rodada") : tema.titulo;
   return (
     <div ref={innerRef} className="ccard" style={vars}>
       <div className="ccard-bg" />
       <div className="ccard-glow" />
       <div className="ccard-inner">
-        <div className="ccard-selo">{tema.selo}</div>
+        <div className="ccard-selo">{selo}</div>
         <div className="ccard-medalha">{tema.medalha}</div>
-        <div className="ccard-titulo">{tema.titulo}</div>
+        <div className={ehRodada ? "ccard-titulo rodada" : "ccard-titulo"}>{titulo}</div>
         <div className="ccard-sep" />
         <div className="ccard-crest"><Escudo config={identity} size={200} /></div>
         <div className="ccard-team">{identity.name}</div>
