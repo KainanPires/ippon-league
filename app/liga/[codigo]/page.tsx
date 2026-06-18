@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { focoMercado } from "@/lib/calendario";
+import { focoMercado, CALENDARIO_2026, numeroDaRodada, type SemanaCalendario } from "@/lib/calendario";
 import { competicaoPorId } from "@/lib/copa";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
 
@@ -107,6 +107,55 @@ function infoEpoca(liga: { liga_competicao_inicial?: string | null; fim_tipo?: s
   return "";
 }
 
+// Data (meio-dia, para evitar fronteiras de fuso) de uma competição do calendário.
+function dataDaSemana(s: SemanaCalendario): Date {
+  return new Date(s.de.replace(/\//g, "-") + "T12:00:00");
+}
+
+// Lista de rodadas que ESTA liga disputou: as competições do calendário dentro da
+// janela início→fim da liga que JÁ COMEÇARAM (não mostra rodadas futuras nem as
+// de antes do arranque). Ordenada da mais recente para a mais antiga (para o
+// dropdown começar pelas últimas). Ligas sem janela (antigas) → todas as já
+// começadas até hoje. A competição que decorre agora também entra (é "a atual").
+function rodadasDaLiga(liga: LigaInfo, idAtual: string): SemanaCalendario[] {
+  const ordenado = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
+
+  // Limites da janela (se a liga os tiver).
+  const compIni = competicaoPorId(String(liga.liga_competicao_inicial || ""));
+  const iniDate = compIni ? dataDaSemana(compIni) : null;
+
+  let fimDate: Date | null = null;
+  if (liga.fim_tipo === "competicao") {
+    const compFim = competicaoPorId(String(liga.fim_valor || ""));
+    if (compFim) fimDate = new Date(compFim.de.replace(/\//g, "-") + "T23:59:59");
+  } else if (liga.fim_tipo === "mes") {
+    const m = /^(\d{4})-(\d{2})$/.exec(String(liga.fim_valor || ""));
+    if (m) fimDate = new Date(Number(m[1]), Number(m[2]), 0, 23, 59, 59); // último dia do mês
+  }
+
+  const agora = new Date();
+  const out = ordenado.filter((s) => {
+    const d = dataDaSemana(s);
+    // Já começou? (a competição-alvo atual conta mesmo que ainda não tenha
+    // "começado" pela data — é a rodada para que se está a escalar/decorrer.)
+    const jaComecou = d.getTime() <= agora.getTime() || s.idCompeticao === idAtual;
+    if (!jaComecou) return false;
+    if (iniDate && d < iniDate) return false;       // antes do arranque da liga
+    if (fimDate && d > fimDate) return false;        // depois do fim da liga
+    return true;
+  });
+
+  // Garante que a competição atual está na lista (caso o filtro de data a deixe
+  // de fora por ser futura mas estar a decorrer/ser o alvo).
+  if (!out.some((s) => s.idCompeticao === idAtual)) {
+    const atualNoCal = ordenado.find((s) => s.idCompeticao === idAtual);
+    if (atualNoCal) out.push(atualNoCal);
+  }
+
+  // Mais recente primeiro.
+  return out.sort((a, b) => b.semana - a.semana);
+}
+
 export default function PaginaLiga() {
   const params = useParams();
   const router = useRouter();
@@ -140,6 +189,15 @@ export default function PaginaLiga() {
   const idComp = compAtual.idCompeticao;
   const emAndamento = foco.aDecorrer !== null;
   const mercadoFechado = emAndamento; // só se pode ver o dojo dos outros com mercado fechado
+
+  // RODADA ESCOLHIDA no dropdown (vista "Rodada"). Por defeito a atual. Só afeta
+  // a vista "Rodada" e o ver-dojo dessa vista — Geral/JC/tick ficam na atual.
+  const [rodadaSel, setRodadaSel] = useState<string>(idComp);
+  const rodadaEhAtual = rodadaSel === idComp;
+  // Os membros mostrados na vista Rodada: se for a atual, usa o ranking ao vivo
+  // (membros); se for passada, usa o que vier da rodada escolhida (membrosRodada).
+  const [membrosRodada, setMembrosRodada] = useState<Membro[]>([]);
+  const [rodadaCarregada, setRodadaCarregada] = useState(false);
 
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -234,6 +292,29 @@ export default function PaginaLiga() {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [estado, liga, idComp, emAndamento]);
+
+  // 2-rodada) Quando se escolhe uma rodada PASSADA no dropdown, busca a
+  // classificação dessa rodada (uma vez; rodadas passadas não mudam). A rodada
+  // atual usa o ranking ao vivo do efeito acima, por isso aqui só tratamos as
+  // passadas.
+  useEffect(() => {
+    if (estado !== "pronto" || !liga) return;
+    if (rodadaEhAtual) { setRodadaCarregada(true); return; }
+    let vivo = true;
+    setRodadaCarregada(false);
+    (async () => {
+      try {
+        const res = await fetch(`/api/liga?id=${liga.id}&comp=${rodadaSel}`);
+        const j = await res.json();
+        if (!vivo) return;
+        if (Array.isArray(j.membros)) setMembrosRodada(j.membros);
+      } catch {
+        if (vivo) setMembrosRodada([]);
+      }
+      if (vivo) setRodadaCarregada(true);
+    })();
+    return () => { vivo = false; };
+  }, [estado, liga, rodadaSel, rodadaEhAtual]);
 
   // 2-bis) Ranking GERAL (acumulado ao vivo) + Judocoins — só para ligas de
   // pontos corridos. Uma só chamada a /api/liga/geral alimenta as vistas "Geral"
@@ -354,12 +435,15 @@ export default function PaginaLiga() {
   }
 
   function verDojo(m: Membro) {
-    if (!mercadoFechado) {
+    // Numa rodada PASSADA (já terminada) as escalações são públicas — abre sempre.
+    // Na rodada ATUAL mantém a regra: só com o mercado fechado.
+    const passada = !rodadaEhAtual;
+    if (!passada && !mercadoFechado) {
       alert("Podes ver a equipa dos teus rivais quando o mercado fechar. 🔒");
       return;
     }
-    // Abre o dojo do adversário em modo leitura (a app já tem /meu-time; passamos o user).
-    window.location.href = `/meu-time?ver=${m.user_id}&comp=${idComp}`;
+    // Abre o dojo do adversário em modo leitura, na rodada que está a ser vista.
+    window.location.href = `/meu-time?ver=${m.user_id}&comp=${rodadaSel}`;
   }
 
   // Liga de pontos corridos terminada? (mostra o pódio da época + certificado)
@@ -368,6 +452,20 @@ export default function PaginaLiga() {
   const podioFinal = ligaTerminada ? geral.filter((m) => m.pontos_geral > 0).slice(0, 3) : [];
   // Quantos participaram da época (pontuaram). Para o "entre N participantes".
   const nParticipantesEpoca = geral.filter((m) => m.pontos_geral > 0).length;
+
+  // Lista de rodadas para o dropdown (só quando a liga está pronta e é de pontos).
+  const listaRodadas: SemanaCalendario[] = (liga && liga.formato !== "copa") ? rodadasDaLiga(liga, idComp) : [];
+  // A competição cuja rodada está a ser mostrada (para o cabeçalho/labels).
+  const compVista = competicaoPorId(rodadaSel) ?? compAtual;
+  // Os membros a mostrar na vista Rodada e o estado de carregamento.
+  const membrosVista = rodadaEhAtual ? membros : membrosRodada;
+  const rodadaVistaCarregada = rodadaEhAtual ? true : rodadaCarregada;
+  // Etiqueta de uma rodada no dropdown: "Rodada 6 · Paris Grand Slam".
+  function rotuloRodadaItem(s: SemanaCalendario): string {
+    const n = numeroDaRodada(s.idCompeticao);
+    const nome = s.classico ? s.nome.replace(/\s*[—-]\s*Cl[áa]ssico\s*$/i, "") : s.nome;
+    return `${n ? `Rodada ${n} · ` : ""}${nome}${s.idCompeticao === idComp ? " (atual)" : ""}`;
+  }
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -488,27 +586,57 @@ export default function PaginaLiga() {
               ))}
             </div>
 
+            {/* Dropdown de RODADA (só na vista Rodada): escolher uma rodada passada. */}
+            {vista === "rodada" && listaRodadas.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: "block", fontSize: 10.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: FD, fontWeight: 700, marginBottom: 6 }}>Escolher rodada</label>
+                <div style={{ position: "relative" }}>
+                  <select
+                    value={rodadaSel}
+                    onChange={(e) => setRodadaSel(e.target.value)}
+                    style={{ width: "100%", appearance: "none", WebkitAppearance: "none", MozAppearance: "none", background: "#141a17", border: `1px solid ${rodadaEhAtual ? "#243029" : GOLD}`, borderRadius: 10, padding: "11px 38px 11px 13px", color: "#f1ede2", fontSize: 13.5, fontFamily: FB, fontWeight: 700, outline: "none", cursor: "pointer" } as React.CSSProperties}
+                  >
+                    {listaRodadas.map((s) => (
+                      <option key={s.idCompeticao} value={s.idCompeticao} style={{ background: "#141a17", color: "#f1ede2" }}>{rotuloRodadaItem(s)}</option>
+                    ))}
+                  </select>
+                  <span style={{ position: "absolute", right: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: GOLD }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+                  </span>
+                </div>
+                {!rodadaEhAtual && (
+                  <div style={{ fontSize: 11, color: "#7fd1a3", marginTop: 7 }}>A ver uma rodada passada. Toca num membro para ver a equipa que ele escalou.</div>
+                )}
+              </div>
+            )}
+
             {/* Cabeçalho da vista + estado ao vivo */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>
-                {vista === "geral" ? "Ranking geral · época" : vista === "rodada" ? `Rodada · ${compAtual.nome}` : "Judocoins · património"}
+                {vista === "geral" ? "Ranking geral · época" : vista === "rodada" ? `Rodada · ${compVista.nome}` : "Judocoins · património"}
               </span>
-              {emAndamento && vista !== "jc" ? (
+              {emAndamento && vista === "rodada" && rodadaEhAtual ? (
                 <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo {horaTick && vista === "rodada" && `· ${horaTick}`}
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo {horaTick && `· ${horaTick}`}
                 </span>
-              ) : vista === "rodada" ? (
+              ) : emAndamento && vista === "geral" ? (
+                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo
+                </span>
+              ) : vista === "rodada" && rodadaEhAtual ? (
                 <span style={{ fontSize: 11, color: "#7fd1a3" }}>Pré-competição</span>
               ) : null}
             </div>
 
-            {/* VISTA RODADA: a tabela original (clicável para ver o dojo). */}
+            {/* VISTA RODADA: classificação da rodada escolhida (clicável para ver o dojo). */}
             {vista === "rodada" && (
-              membros.length === 0 ? (
-                <Aviso>Ainda sem pontos nesta rodada.</Aviso>
+              !rodadaVistaCarregada ? (
+                <Aviso>A carregar a rodada…</Aviso>
+              ) : membrosVista.length === 0 ? (
+                <Aviso>{rodadaEhAtual ? "Ainda sem pontos nesta rodada." : "Ninguém escalou nesta rodada."}</Aviso>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  {membros.map((m) => {
+                  {membrosVista.map((m) => {
                     const euMesmo = m.user_id === meuId;
                     const medal = m.posicao === 1 && m.escalou ? GOLD : "#243029";
                     return (
@@ -605,6 +733,7 @@ export default function PaginaLiga() {
             <div style={{ marginTop: 12, fontSize: 11, color: "#5f6f67", textAlign: "center" }}>
               {vista === "jc"
                 ? "Quem mais valorizou a equipa ao longo da época lidera os Judocoins."
+                : vista === "rodada" && !rodadaEhAtual ? "Estás a ver uma rodada passada. Toca num membro para ver a equipa dele."
                 : mercadoFechado ? "Toca num membro para ver o dojo dele." : "Os dojos dos rivais abrem quando o mercado fechar. 🔒"}
             </div>
             </>
