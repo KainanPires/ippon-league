@@ -376,10 +376,11 @@ async function fecharAnoOficial(ano: number): Promise<{ ano: number; mundial: nu
       .filter((x) => x.pts > 0)
       .sort((a, b) => b.pts - a.pts)
       .slice(0, 3);
+    let gravados = 0;
     for (let i = 0; i < ordenados.length; i++) {
       const { u, pts } = ordenados[i];
       const ident = identDe.get(u) || { nome: "Equipa", escudo: null };
-      await supabaseAdmin!
+      const { error } = await supabaseAdmin!
         .from("campeoes_oficiais")
         .upsert(
           {
@@ -392,8 +393,9 @@ async function fecharAnoOficial(ano: number): Promise<{ ano: number; mundial: nu
           },
           { onConflict: "ano,tipo,continente,posicao" }
         );
+      if (!error) gravados++; // conta só o que GRAVOU de facto (não o que tentou)
     }
-    return ordenados.length;
+    return gravados;
   }
 
   // 4) Mundial: todos os Pro.
