@@ -152,6 +152,7 @@ const GRUPOS: Grupo[] = [
               <Li><B>Grupo exclusivo</B> (WhatsApp/Telegram) só para membros Pro Max.</Li>
               <Li><B>Layout e visual exclusivos</B> Pro Max.</Li>
             </Passos>
+            <P>Os <B>Clássicos</B> (competições do passado) não têm chave ao vivo nem análise, por já terem acontecido.</P>
             <P>Vês os detalhes em <B>Perfil → Ippon Pro e Pro Max</B>.</P>
           </>
         ),
