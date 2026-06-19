@@ -27,10 +27,10 @@ const PRO: string[] = [
 
 // O Pro Max TEM tudo o que o Pro tem, MAIS estes extras.
 const MAX_EXTRA: string[] = [
-  "Chave AO VIVO — acompanha a chave a decorrer em tempo real, durante a competição",
+  "Chave AO VIVO — acompanha a chave a decorrer em tempo real, nas principais competições do circuito mundial",
   "Alerta dos teus atletas favoritos — avisamos quando o teu atleta é o próximo a lutar",
   "Até 10 ligas e copas (o dobro do Pro)",
-  "Análise da chave — os atletas com mais hipótese de pontuar muito ou ser campeão, pelos confrontos prováveis",
+  "Análise da chave — os atletas com mais hipótese de pontuar muito ou ser campeão, nas principais competições do circuito mundial",
   "Grupo exclusivo (WhatsApp/Telegram) — informação da rodada e conversa com outros Pro Max",
   "Layout e visual exclusivos Pro Max",
 ];
