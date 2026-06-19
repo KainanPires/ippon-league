@@ -12,6 +12,9 @@ const GOLD = "#d9a441";
 
 // O que tens com o Pro. Só o que é REAL ou fundamentado na análise. Nada que
 // entregue a decisão do jogador (quem montar / quem é o melhor da rodada).
+// NOTA (fase de testes): não prometemos prémios — o foco é a vantagem de
+// informação e a competição. Prémios/experiências ficam para quando o jogo
+// estiver validado.
 const VANTAGENS: { t: string; x: string }[] = [
   { t: "Scout avançado", x: "Estatísticas baseadas no histórico real de cada atleta: títulos, forma recente e como pontua em cada nível de competição." },
   { t: "Análise do teu time", x: "Uma leitura honesta da tua escalação: o que parece sólido, onde há risco e porquê. Sem te dizer o que fazer — a decisão é sempre tua." },
@@ -21,7 +24,6 @@ const VANTAGENS: { t: string; x: string }[] = [
   { t: "Acompanhamento ao vivo", x: "No dia da competição, acompanha as pontuações dos teus atletas em tempo real." },
   { t: "Até 5 ligas ativas", x: "Cria até 5 ligas em simultâneo, entre mata-mata e pontos corridos." },
   { t: "Design exclusivo Pro", x: "Um visual próprio e distinto, só para membros Ippon Pro." },
-  { t: "Elegibilidade a prémios", x: "Concorre aos prémios das ligas Mundial e Continental (ver abaixo)." },
 ];
 
 export default function SobrePro() {
@@ -72,22 +74,8 @@ export default function SobrePro() {
         <SectionTitle>O que o Pro não faz</SectionTitle>
         <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 22 }}>
           <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.6, margin: 0 }}>
-            O Pro <strong style={{ color: "#cfd8d2" }}>não monta o teu time por ti</strong> e <strong style={{ color: "#cfd8d2" }}>não te diz quem vai ganhar a competição</strong>. Não entregamos "os melhores da rodada" nem em quem apostar — isso tiraria a graça do jogo. Damos-te informação e leituras do histórico; o mérito de acertar é sempre teu.
+            O Pro <strong style={{ color: "#cfd8d2" }}>não monta o teu time por ti</strong> e <strong style={{ color: "#cfd8d2" }}>não te diz quem vai ganhar a competição</strong>. Não entregamos &quot;os melhores da rodada&quot; nem em quem apostar — isso tiraria a graça do jogo. Damos-te informação e leituras do histórico; o mérito de acertar é sempre teu.
           </p>
-        </div>
-
-        {/* Prémios */}
-        <SectionTitle>Como funcionam os prémios</SectionTitle>
-        <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 22 }}>
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: GOLD, marginBottom: 4 }}>Liga Mundial</div>
-            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>Prémio em <strong>cada rodada</strong> para o melhor da rodada a nível mundial, e ainda um <strong>prémio final de temporada</strong> para o 1.º lugar no fim do ano.</p>
-          </div>
-          <div style={{ borderTop: "1px solid #1a221d", paddingTop: 14 }}>
-            <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: GOLD, marginBottom: 4 }}>Liga Continental</div>
-            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>Um <strong>prémio final de temporada</strong> para o 1.º lugar, atribuído no fim do ano.</p>
-          </div>
-          <p style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.5, margin: "14px 0 0" }}>Os prémios e experiências são definidos a cada temporada e podem contar com o apoio de patrocinadores.</p>
         </div>
 
         {/* Assinatura */}
