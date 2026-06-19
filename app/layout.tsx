@@ -2,17 +2,15 @@ import type { Metadata, Viewport } from "next";
 import { Oswald, Manrope } from "next/font/google";
 import "./globals.css";
 import { RegistarServiceWorker } from "@/components/RegistarServiceWorker";
-
+import { JudoguiProvider } from "@/components/JudoguiProvider";
 const geistSans = Manrope({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
-
 const geistMono = Oswald({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-
 export const metadata: Metadata = {
   title: "Ippon League",
   description: "O jogo oficial dos fãs de judô.",
@@ -31,11 +29,9 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
-
 export const viewport: Viewport = {
   themeColor: "#0c0e0d",
 };
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -48,7 +44,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <RegistarServiceWorker />
-        {children}
+        <JudoguiProvider>
+          {children}
+        </JudoguiProvider>
       </body>
     </html>
   );
