@@ -14,22 +14,18 @@
 //   PRECO.emPromocao   -> true         (se false, esconde-se o riscado)
 //   PRECO.etiqueta     -> "Promoção"   (texto da etiqueta de promoção)
 //   PRECO.promoComPeriodo -> "4,90€/mês"
-
 export const PRECO = {
   // Está em promoção de lançamento? Quando acabar a promoção, pôr false:
   // o preço passa a mostrar só o normal, sem riscado nem etiqueta.
   emPromocao: true,
-
   // Valores (texto pronto a mostrar, com vírgula decimal à europeia).
   promo: "4,90€",   // preço a cobrar agora
   normal: "9,90€",  // preço cheio (riscado quando em promoção)
   periodo: "/mês",
-
   // Atalhos prontos.
   etiqueta: "Promoção",
   promoComPeriodo: "4,90€/mês",
   normalComPeriodo: "9,90€/mês",
-
   // O preço "em vigor" (o que a pessoa paga): promo se houver promoção, senão normal.
   get atual(): string {
     return this.emPromocao ? this.promo : this.normal;
@@ -37,7 +33,8 @@ export const PRECO = {
   get atualComPeriodo(): string {
     return this.emPromocao ? this.promoComPeriodo : this.normalComPeriodo;
   },
-
-  // Mensagem de valor a mostrar junto do Pro, em todo o lado.
-  premios: "Sendo PRO concorra a prémios todas as rodadas",
+  // Mensagem de valor a mostrar junto do Pro, em todo o lado. Na FASE DE TESTES
+  // não prometemos prémios — focamos a vantagem de informação e a competição.
+  // (A chave mantém o nome `premios` por compatibilidade com quem a importa.)
+  premios: "Joga com mais informação e compete pelo topo do ranking",
 } as const;
