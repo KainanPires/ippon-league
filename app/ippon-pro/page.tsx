@@ -117,6 +117,9 @@ export default function IpponPro() {
           <div style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.6 }}>
             Nem o Pro nem o Pro Max <strong style={{ color: "#cfd8d2" }}>montam o teu time por ti</strong> ou te dizem quem vai ganhar. Dão-te informação e leituras do histórico — a graça de acertar continua a ser tua.
           </div>
+          <div style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.55, marginTop: 10 }}>
+            Os Clássicos (competições do passado) não têm chave ao vivo nem análise, por já terem acontecido.
+          </div>
         </div>
 
         <div style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", lineHeight: 1.5 }}>
