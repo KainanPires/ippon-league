@@ -101,6 +101,10 @@ export default function SobrePro() {
           ))}
         </div>
 
+        <p style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.55, margin: "0 2px 22px" }}>
+          Os Clássicos (competições do passado) não têm chave ao vivo nem análise, por já terem acontecido.
+        </p>
+
         {/* O que o Pro NÃO faz — protege o jogo e a confiança */}
         <SectionTitle>O que o Pro não faz</SectionTitle>
         <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 22 }}>
