@@ -60,6 +60,27 @@ export async function marcarDesempenhoVisto(idCompeticao: string): Promise<void>
   }
 }
 
+// --- "Visto" do AO VIVO (chave PRÓPRIA, separada do resumo final) ---
+//
+// O resumo AO VIVO aparece UMA vez automaticamente por competição e depois nunca
+// mais salta sozinho (mesmo ao mudar de aba ou reabrir o app). Para isso, o
+// "já vi o ao vivo" é guardado na CONTA, tal como o final — mas com a chave
+// PREFIXADA "aovivo-<idComp>", para NÃO se confundir com o "visto" do resumo
+// final (que usa a chave "<idComp>"). Assim, ver o ao vivo não esconde o resumo
+// final, e vice-versa. Reutiliza o mesmo armazenamento (desempenhos_vistos).
+function chaveAoVivo(idCompeticao: string): string {
+  return `aovivo-${idCompeticao}`;
+}
+
+export async function aoVivoVistoConta(idCompeticao: string): Promise<boolean> {
+  const vistos = await desempenhosVistosConta();
+  return !!vistos[chaveAoVivo(idCompeticao)];
+}
+
+export async function marcarAoVivoVisto(idCompeticao: string): Promise<void> {
+  await marcarDesempenhoVisto(chaveAoVivo(idCompeticao));
+}
+
 // --- Cálculo do desempenho a partir da equipa + resultados ---
 
 /**
