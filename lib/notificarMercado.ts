@@ -79,16 +79,24 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
   let fechado: string | null = null;
 
   // --- MERCADO ABERTO (competição alvo) ---
-  if (foco.alvo && (await reservarEvento(`mercado_aberto:${foco.alvo.idCompeticao}`))) {
-    const ids = await todosOsUtilizadores();
-    const prazo = textoFecho(foco.alvo, hoje); // ex.: "Mercado fecha em 3 dias"
-    await notificarMuitos(ids, {
-      tipo: "mercado",
-      titulo: `🥋 Mercado aberto: ${foco.alvo.nome}`,
-      corpo: `Já podes montar a tua equipa para o ${foco.alvo.nome}. ${prazo} — escala os teus 8 atletas e o capitão antes de fechar!`,
-      link: "/inicio",
-    });
-    aberto = foco.alvo.idCompeticao;
+  // REGRA: o mercado da PRÓXIMA competição só "abre" depois de a competição que
+  // está a decorrer terminar. Enquanto houver uma competição a decorrer
+  // (foco.aDecorrer), NÃO anunciamos o mercado aberto da seguinte — senão sai
+  // cedo demais (ex.: anunciar o Qingdao enquanto o Ulaanbaatar ainda joga).
+  // A verificação do aDecorrer vem ANTES da reserva do evento, para não "queimar"
+  // a chave: assim, quando a competição atual terminar, o anúncio ainda pode sair.
+  if (foco.alvo && !foco.aDecorrer && estadoMercado(foco.alvo, hoje).estado === "aberto") {
+    if (await reservarEvento(`mercado_aberto:${foco.alvo.idCompeticao}`)) {
+      const ids = await todosOsUtilizadores();
+      const prazo = textoFecho(foco.alvo, hoje); // ex.: "Mercado fecha em 3 dias"
+      await notificarMuitos(ids, {
+        tipo: "mercado",
+        titulo: `🥋 Mercado aberto: ${foco.alvo.nome}`,
+        corpo: `Já podes montar a tua equipa para o ${foco.alvo.nome}. ${prazo} — escala os teus 8 atletas e o capitão antes de fechar!`,
+        link: "/inicio",
+      });
+      aberto = foco.alvo.idCompeticao;
+    }
   }
 
   // --- VÉSPERA DO FECHO (competição alvo, mercado ainda aberto) ---
@@ -96,7 +104,9 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
   // um empurrão para conferir/ajustar a equipa antes do fecho. Quem ainda não
   // montou NÃO recebe este (a regra pedida foi só para quem montou). Uma vez por
   // competição (chave mercado_vespera:<id>).
-  if (foco.alvo) {
+  // Também aqui só faz sentido se NÃO houver competição a decorrer (a véspera é
+  // do fecho do mercado da próxima — não enquanto outra ainda joga).
+  if (foco.alvo && !foco.aDecorrer) {
     const est = estadoMercado(foco.alvo, hoje);
     // "Falta cerca de 1 dia": com hora oficial usamos msAteFecho; sem hora,
     // calculamos os ms até à meia-noite do dia de início (quando o mercado fecha).
