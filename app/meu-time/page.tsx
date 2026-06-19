@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
@@ -11,6 +11,7 @@ import { focoMercado, numeroDaRodada, CALENDARIO_2026 } from "@/lib/calendario";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, type TutKey } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
+import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -54,33 +55,6 @@ function sameTeam(a: TeamState, b: TeamState): boolean {
   if (a.ids.length !== b.ids.length) return false;
   return [...a.ids].sort().join(",") === [...b.ids].sort().join(",");
 }
-
-// LEMBRETE "esqueceste de salvar" — fala com /api/lembrete-salvar.
-// keepalive: o pedido completa mesmo que a página esteja a adormecer (é o
-// momento exato em que precisamos de o enviar — ao trocar de aba).
-function agendarLembreteSalvar(userId: string | null, idComp: string) {
-  if (!userId || !idComp) return;
-  try {
-    fetch("/api/lembrete-salvar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId, id_competicao: idComp, acao: "agendar" }),
-      keepalive: true,
-    }).catch(() => {});
-  } catch { /* sem rede: não bloqueia */ }
-}
-function cancelarLembreteSalvar(userId: string | null, idComp: string) {
-  if (!userId || !idComp) return;
-  try {
-    fetch("/api/lembrete-salvar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId, id_competicao: idComp, acao: "cancelar" }),
-      keepalive: true,
-    }).catch(() => {});
-  } catch { /* sem rede: não bloqueia */ }
-}
-
 
 type Modal =
   | { kind: "saved" | "trash" | "share" | "leave" | "missing" | "incompleta" }
@@ -520,30 +494,15 @@ function MeuTimeInner() {
   const aDecorrer = foco.aDecorrer;
   const [idComp, setIdComp] = useState<string>(alvo.idCompeticao);
   // Quem sou eu (para o lembrete "esqueceste de salvar"). Guardado quando a
-  // sessão é confirmada; usado para agendar/cancelar o lembrete no servidor.
+  // sessão é confirmada; usado pelo hook do lembrete.
   const [userId, setUserId] = useState<string | null>(null);
-  // Ref com o "dirty" (alterações por salvar) atual, para o gatilho de
-  // visibilidade do lembrete o ler sem depender da ordem de cálculo. É
-  // atualizada mais abaixo, depois de o dirty ser calculado.
-  const dirtyRef = useRef(false);
 
-  // LEMBRETE "esqueceste de salvar o teu time". Gatilho de visibilidade: quando
-  // o utilizador SAI do ecrã (troca de aba → página escondida) com alterações
-  // por salvar, avisa o servidor para agendar o lembrete (3 min). Se voltar ao
-  // ecrã sem nada por salvar, cancela. Lê o dirty atual via dirtyRef. Colocado
-  // aqui (antes de qualquer return condicional) para respeitar a ordem dos hooks.
-  useEffect(() => {
-    if (!userId || !idComp) return;
-    function aoMudarVisibilidadeLembrete() {
-      if (document.hidden) {
-        if (dirtyRef.current) agendarLembreteSalvar(userId, idComp);
-      } else {
-        if (!dirtyRef.current) cancelarLembreteSalvar(userId, idComp);
-      }
-    }
-    document.addEventListener("visibilitychange", aoMudarVisibilidadeLembrete);
-    return () => document.removeEventListener("visibilitychange", aoMudarVisibilidadeLembrete);
-  }, [userId, idComp]);
+  // LEMBRETE "esqueceste de salvar o teu time" — hook reutilizável. Observa a
+  // saída do ecrã e agenda/cancela conforme há (ou não) rascunho por salvar para
+  // esta competição. A lógica (rascunho vs guardado) vive no hook, partilhada com
+  // o Mercado, por isso aqui basta uma linha. O servidor recusa agendar com o
+  // mercado fechado, por isso não é preciso filtrar a competição aqui.
+  useLembreteSalvar(userId, idComp);
 
   useEffect(() => {
     let active = true;
@@ -770,14 +729,6 @@ function MeuTimeInner() {
   // EDITÁVEL só quando NÃO está em competição (mercado aberto).
   const editavel = !emCompeticao;
   const dirty = editavel && !sameTeam(team, saved);
-  // Mantém a ref do dirty sincronizada (lida pelo gatilho de visibilidade do
-  // lembrete, que vive num useEffect mais acima).
-  dirtyRef.current = dirty;
-
-  // LEMBRETE "esqueceste de salvar": o gatilho de visibilidade vive num
-  // useEffect colocado ANTES do return condicional (junto aos outros hooks),
-  // para não violar a ordem dos hooks. Ele lê o "dirty" atual através de uma ref
-  // (dirtyRef), atualizada mais abaixo. Aqui não há hook nenhum.
 
   // Tutorial ativo conforme o momento + qual elemento destacar agora.
   const passos = emCompeticao ? STEPS_COMPETICAO : STEPS_EDICAO;
@@ -820,8 +771,11 @@ function MeuTimeInner() {
     setSavingCloud(true);
     const res = await commitSavedCloudFor(alvo.idCompeticao, team, identity);
     setSaved(team);
-    // Salvou: cancela qualquer lembrete "esqueceste de salvar" pendente.
-    cancelarLembreteSalvar(userId, idComp);
+    // Salvou: cancela qualquer lembrete "esqueceste de salvar" pendente. Agora
+    // que o rascunho ficou igual ao guardado, o hook não voltaria a agendar; mas
+    // cancelamos já o que possa estar pendente no servidor, sem esperar pela
+    // próxima saída de ecrã.
+    cancelarLembreteSalvarAgora(userId, idComp);
     // Sincroniza o rascunho local com o guardado: sem isto, fica um rascunho
     // "fantasma" diferente do guardado e o meu-time pensaria que há alterações
     // por guardar ao voltar (ex: voltar do mercado sem mexer em nada).
@@ -1430,6 +1384,20 @@ const overlayBg: React.CSSProperties = { position: "fixed", inset: 0, background
 const cardBox: React.CSSProperties = { width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" };
 const primaryBtn: React.CSSProperties = { width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" };
 const ghostBtn: React.CSSProperties = { marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB };
+
+// Cancelamento imediato do lembrete "esqueceste de salvar", chamado ao SALVAR
+// (sem esperar pela próxima saída de ecrã). Reutiliza a mesma rota do hook.
+function cancelarLembreteSalvarAgora(userId: string | null, idComp: string) {
+  if (!userId || !idComp) return;
+  try {
+    fetch("/api/lembrete-salvar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, id_competicao: idComp, acao: "cancelar" }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {}
+}
 
 // Tutorial do Meu Time (edição ou competição). Balão em baixo, seta SEMPRE para
 // cima (os elementos destacados estão acima do balão). O elemento citado pulsa
