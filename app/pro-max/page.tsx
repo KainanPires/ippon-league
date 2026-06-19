@@ -13,10 +13,10 @@ const MAX = "#7fb8f5"; // tom do Pro Max
 //
 // NOTA (fase de testes): sem prémios; o botão não cobra — alerta "em breve".
 const EXTRAS: { t: string; x: string }[] = [
-  { t: "Chave ao vivo", x: "Acompanha o chaveamento a decorrer em tempo real, durante a competição — vês as pontuações e o caminho dos atletas enquanto as lutas acontecem. O Pro vê a chave quando sai e no fim; o Pro Max vê também todo o meio, ao vivo." },
+  { t: "Chave ao vivo", x: "Acompanha o chaveamento a decorrer em tempo real, durante a competição. Vês as pontuações e o caminho dos atletas enquanto as lutas acontecem. Disponível nas competições de topo: Mundial, Grand Slam, Grand Prix, Masters e Olimpíadas." },
   { t: "Alerta dos teus favoritos", x: "Avisamos-te quando um atleta que segues é o próximo a entrar no tatame, para não perderes nenhuma luta importante." },
   { t: "Até 10 ligas e copas", x: "O dobro do Pro: cria e joga em até 10 ligas e copas em simultâneo, entre mata-mata e pontos corridos." },
-  { t: "Análise da chave", x: "Quando o chaveamento sai, mostramos quais atletas têm mais hipótese de pontuar muito ou chegar longe, com base nos confrontos prováveis e no caminho de cada um na chave." },
+  { t: "Análise da chave", x: "Quando o chaveamento sai, mostramos quais atletas têm mais hipótese de pontuar muito ou chegar longe, com base nos confrontos prováveis e no caminho de cada um na chave. Disponível nas competições de topo: Mundial, Grand Slam, Grand Prix, Masters e Olimpíadas." },
   { t: "Grupo exclusivo", x: "Acesso ao grupo de WhatsApp/Telegram só para membros Pro Max — informação da rodada e conversa com outros jogadores." },
   { t: "Layout e visual exclusivos", x: "Um aspeto próprio e distinto, reservado a quem é Pro Max." },
 ];
@@ -24,7 +24,7 @@ const EXTRAS: { t: string; x: string }[] = [
 export default function ProMax() {
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 40px" }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 130px" }}>
         <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 10 }}>
           <a href="/pro" aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
