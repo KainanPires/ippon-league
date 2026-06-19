@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Mascot } from "@/components/Mascot";
+import { useJudogui, type JudoguiCor } from "@/components/JudoguiProvider";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { LinhaInstalarApp } from "@/components/InstalarApp";
 import { BotaoNotificacoes } from "@/components/NotificacoesPush";
@@ -248,6 +249,8 @@ export default function Perfil() {
           </div>
         )}
 
+        {abertoDados && ready && conta && <SeletorJudogui />}
+
         {abertoDados && ready && conta && <AlterarSenha email={conta.email} />}
 
         {ready && conta && (
@@ -408,6 +411,82 @@ function AlterarSenha({ email }: { email: string }) {
 
             <button onClick={alterar} disabled={guardando} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 12, cursor: guardando ? "default" : "pointer", opacity: guardando ? 0.7 : 1 }}>{guardando ? "A alterar…" : "Alterar senha"}</button>
             <button onClick={() => { setAberto(false); limpar(); }} disabled={guardando} style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Cancelar</button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// Seletor de cor do judogui do Dôdo (Pro Max). Mostra o Dôdo nas duas cores;
+// Pro Max escolhe, não-Pro-Max vê bloqueado com convite. Lê/grava via o contexto
+// global (useJudogui), por isso a mudança aplica-se ao Dôdo em toda a app na hora.
+const MAX_AZUL = "#7fb8f5";
+function SeletorJudogui() {
+  const { judogui, isProMax, setJudogui } = useJudogui();
+  const [aberto, setAberto] = useState(false);
+
+  function escolher(cor: JudoguiCor) {
+    if (!isProMax) { window.location.href = "/pro-max"; return; }
+    void setJudogui(cor);
+  }
+
+  const opcoes: { id: JudoguiCor; nome: string }[] = [
+    { id: "branco", nome: "Branco" },
+    { id: "azul", nome: "Azul" },
+  ];
+
+  return (
+    <>
+      <SectionTitle>O judogui do Dôdo</SectionTitle>
+      <div style={{ background: "#121815", border: `1px solid ${isProMax ? "#2a4d3e" : "#243029"}`, borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
+        <button onClick={() => setAberto((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "14px 16px", background: "transparent", border: "none", color: "#f1ede2", fontFamily: FB, fontSize: 14, cursor: "pointer" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 30, height: 30, flexShrink: 0 }}><Mascot belt="#141110" expression="feliz" judogui={judogui} /></span>
+            <span>Cor do judogui</span>
+            {!isProMax && <span style={{ fontSize: 9.5, color: MAX_AZUL, border: `1px solid #2f5478`, borderRadius: 999, padding: "2px 7px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro Max</span>}
+          </span>
+          <span style={{ color: "#93a39a", transform: aberto ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+          </span>
+        </button>
+
+        {aberto && (
+          <div style={{ padding: "0 16px 16px" }}>
+            {!isProMax && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 9, background: "#0f1620", border: "1px solid #2f5478", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                <span style={{ color: MAX_AZUL, flexShrink: 0, marginTop: 1 }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                </span>
+                <div style={{ fontSize: 12, color: "#cdd9e6", lineHeight: 1.5 }}>
+                  Mudar a cor do judogui do Dôdo é exclusivo do <strong style={{ color: MAX_AZUL }}>Pro Max</strong>.
+                </div>
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
+              {opcoes.map((o) => {
+                const escolhido = judogui === o.id;
+                return (
+                  <button key={o.id} onClick={() => escolher(o.id)} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#0c0e0d", border: `2px solid ${escolhido ? "#7fd1a3" : "#243029"}`, borderRadius: 12, padding: "12px 8px", cursor: "pointer", opacity: isProMax ? 1 : 0.85 }}>
+                    <span style={{ width: 56, height: 56 }}><Mascot belt="#141110" expression="feliz" judogui={o.id} /></span>
+                    <span style={{ fontSize: 12, color: escolhido ? "#7fd1a3" : "#cfd8d2", fontWeight: 700 }}>{o.nome}</span>
+                    {escolhido && (
+                      <span style={{ position: "absolute", top: -8, right: -7, background: "#7fd1a3", color: "#0c1a12", borderRadius: "50%", width: 19, height: 19, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
+                      </span>
+                    )}
+                    {!isProMax && (
+                      <span style={{ position: "absolute", top: 8, right: 8, color: "#93a39a" }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {!isProMax && (
+              <a href="/pro-max" style={{ display: "block", textAlign: "center", marginTop: 12, background: MAX_AZUL, color: "#0a1828", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, textDecoration: "none" }}>Desbloquear com Pro Max</a>
+            )}
           </div>
         )}
       </div>
