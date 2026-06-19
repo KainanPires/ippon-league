@@ -23,6 +23,7 @@ export function Desempenho({
   pro = false,
   extra,
   daGaleria = false,
+  aoVivo = false,
   userId,
   onFechar,
   onNaoMostrarMais,
@@ -35,6 +36,7 @@ export function Desempenho({
   pro?: boolean;
   extra?: ResumoExtra | null;
   daGaleria?: boolean;
+  aoVivo?: boolean;
   userId?: string | null;
   onFechar: () => void;
   onNaoMostrarMais?: () => void;
@@ -53,6 +55,13 @@ export function Desempenho({
     window.location.href = `/meu-time?ver=${encodeURIComponent(userId!)}&comp=${encodeURIComponent(dados.idCompeticao)}`;
   }
 
+  // AO VIVO: a competição ainda decorre, os pontos são PARCIAIS. Muda o
+  // enquadramento (título, rótulo, mensagem) para não parecer um resultado final.
+  const rotuloTopo = aoVivo
+    ? (dados.numeroRodada ? `Rodada ${dados.numeroRodada} · Ao vivo` : "Ao vivo")
+    : (dados.numeroRodada ? `Rodada ${dados.numeroRodada} · O teu desempenho` : "O teu desempenho");
+  const rotuloPontos = aoVivo ? "pontos até agora" : "pontos na rodada";
+
   return (
     <>
       <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.86)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 125, overflowY: "auto" }}>
@@ -61,9 +70,17 @@ export function Desempenho({
           <div style={{ width: 80, height: 80, margin: "0 auto 6px" }}>
             <Mascot belt="#141110" expression={total >= 30 ? "comemorando" : "feliz"} />
           </div>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#93a39a" }}>
-            {dados.numeroRodada ? `Rodada ${dados.numeroRodada} · O teu desempenho` : "O teu desempenho"}
-          </div>
+          {/* Ao vivo: selo "a decorrer" com ponto pulsante; senão, o rótulo normal. */}
+          {aoVivo ? (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#e2655a" }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} />
+              {rotuloTopo}
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#93a39a" }}>
+              {rotuloTopo}
+            </div>
+          )}
           <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 2px", lineHeight: 1.1 }}>{dados.nomeCompeticao}</h2>
 
           {/* Pontuação grande */}
@@ -71,13 +88,14 @@ export function Desempenho({
             <div style={{ fontFamily: FD, fontSize: 52, fontWeight: 700, color: positivo ? GOLD : "#ef8d83", lineHeight: 1 }}>
               {positivo ? "+" : ""}{total}
             </div>
-            <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>pontos na rodada</div>
+            <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>{rotuloPontos}</div>
           </div>
 
-          <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "10px 0 18px" }}>{mensagemDesempenho(total, nome)}</p>
+          <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "10px 0 18px" }}>{mensagemDesempenho(total, nome, aoVivo)}</p>
 
-          {/* BÓNUS: posição na rodada + comparação com a média (só no modal) */}
-          {extra && extra.totalJogadores > 0 && (
+          {/* BÓNUS: posição na rodada + comparação com a média. Só no resumo FINAL —
+              ao vivo a média/posição ainda estão a mexer, não as mostramos. */}
+          {!aoVivo && extra && extra.totalJogadores > 0 && (
             <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center" }}>
                 <div>
@@ -134,7 +152,7 @@ export function Desempenho({
           </div>
 
           <button onClick={() => setPartilhar(true)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>
-            Partilhar desempenho
+            {aoVivo ? "Partilhar parcial" : "Partilhar desempenho"}
           </button>
 
           {/* Rever a equipa que escalei nesta rodada (só-leitura). */}
@@ -144,9 +162,13 @@ export function Desempenho({
             </button>
           )}
 
-          {/* Da galeria: só "Fechar". Do popup automático: "Não mostrar mais" (esconde
-              o popup automático) + "Fechar" (só fecha, volta a aparecer no próximo login). */}
-          {daGaleria ? (
+          {/* AO VIVO: só "Fechar" (sem "Não mostrar mais", para não queimar o
+              resumo FINAL que aparece quando a competição fechar).
+              FINAL da galeria: só "Fechar".
+              FINAL automático: "Não mostrar mais" + "Fechar (ver mais tarde)". */}
+          {aoVivo ? (
+            <button onClick={onFechar} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Fechar</button>
+          ) : daGaleria ? (
             <button onClick={onFechar} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Fechar</button>
           ) : (
             <>
