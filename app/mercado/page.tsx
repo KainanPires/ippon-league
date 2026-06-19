@@ -9,6 +9,7 @@ import { Mascot } from "@/components/Mascot";
 import { focoMercado } from "@/lib/calendario";
 import { supabase } from "@/lib/supabase";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
+import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -93,6 +94,17 @@ function MercadoInner() {
   const [avisoCategoria, setAvisoCategoria] = useState(false);
   // Mensagem explícita ao completar um género: "Já tens os 4 X, agora os 4 Y".
   const [avisoGenero, setAvisoGenero] = useState<null | { feito: Gender; falta: Gender }>(null);
+  // Quem sou eu — para o lembrete "esqueceste de salvar" (hook). Guardado quando
+  // a sessão é confirmada (mesma leitura que decide o is_pro).
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // LEMBRETE "esqueceste de salvar o teu time" — hook reutilizável (o mesmo da
+  // meu-time). É AQUI que ele mais conta: a edição real acontece no mercado, e
+  // sair daqui com um rascunho por salvar passa agora a agendar o lembrete.
+  // Chamado SEMPRE (antes de qualquer return condicional, ex.: o ecrã de mercado
+  // fechado) para respeitar a ordem dos hooks. O servidor recusa agendar com o
+  // mercado fechado, por isso é seguro mesmo durante uma competição a decorrer.
+  useLembreteSalvar(userId, COMPETICAO);
 
   // BLOQUEIO DO MERCADO: se há uma competição a decorrer, o mercado fecha por
   // completo (a equipa está trancada durante a rodada). Decidido pelo calendário,
@@ -134,12 +146,14 @@ function MercadoInner() {
     } catch {}
 
     // Saber se o utilizador é Pro: desbloqueia a info "Mínimo para valorizar"
-    // nos cards e a ordenação por esse valor.
+    // nos cards e a ordenação por esse valor. Guardamos também o userId (para o
+    // hook do lembrete saber a quem agendar).
     supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
       if (!active) return;
       try {
-        const meta = (data.session as { user?: { user_metadata?: { is_pro?: boolean } } } | null)?.user?.user_metadata;
-        setIsPro(!!meta?.is_pro);
+        const sess = data.session as { user?: { id?: string; user_metadata?: { is_pro?: boolean } } } | null;
+        if (sess?.user?.id) setUserId(sess.user.id);
+        setIsPro(!!sess?.user?.user_metadata?.is_pro);
       } catch {}
     });
 
