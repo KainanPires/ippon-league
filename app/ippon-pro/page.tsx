@@ -31,6 +31,7 @@ const MAX_EXTRA: string[] = [
   "Alerta dos teus atletas favoritos — avisamos quando o teu atleta é o próximo a lutar",
   "Até 10 ligas e copas (o dobro do Pro)",
   "Análise da chave — os atletas com mais hipótese de pontuar muito ou ser campeão, pelos confrontos prováveis",
+  "Grupo exclusivo (WhatsApp/Telegram) — informação da rodada e conversa com outros Pro Max",
   "Layout e visual exclusivos Pro Max",
 ];
 
