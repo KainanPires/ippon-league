@@ -6,22 +6,32 @@ import { PRECO } from "@/lib/precos";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
+const MAX = "#7fb8f5"; // tom do Pro Max, para o distinguir do Pro (dourado)
 
-// Apenas benefícios REAIS ou fundamentados na análise. Nada que entregue a
-// decisão do jogador (quem montar / quem é o melhor da rodada) — isso mataria o
-// jogo. A valorização é vendida como POSSIBILIDADE segundo a análise, não promessa.
-// NOTA (fase de testes): não prometemos prémios — o foco é a vantagem de
-// informação e a competição. Os prémios/experiências ficam para quando o jogo
-// estiver validado.
-const BENEFITS: { t: string; x: string }[] = [
-  { t: "Scout avançado dos atletas", x: "O histórico real de cada atleta: títulos, forma recente e como costuma pontuar em cada nível de competição." },
-  { t: "Análise do teu time", x: "Uma leitura honesta da tua escalação — o que parece forte e onde está o risco. Sem te dizer o que fazer; a decisão é tua." },
-  { t: "Dica de capitão", x: "Entre os atletas que TU escolheste, qual tem o histórico mais forte para esta competição. Continuas a montar o teu time à tua maneira." },
-  { t: "Maior possibilidade de valorização", x: "Pela análise do histórico, vê quais dos teus atletas têm mais hipótese de valorizar e render JC. É uma tendência, não uma garantia." },
-  { t: "Chaveamento das competições", x: "Vê o quadro de lutas e acompanha o caminho dos teus atletas na chave." },
-  { t: "Acompanhamento ao vivo", x: "No dia da competição, segue as pontuações dos teus atletas em tempo real." },
-  { t: "Até 5 ligas ativas", x: "Cria até 5 ligas em simultâneo, entre mata-mata e pontos corridos." },
-  { t: "Ligas e badges exclusivos", x: "Distinções e ligas só para membros Ippon Pro, com um visual próprio." },
+// O que cada nível dá. Princípio: só informação e ferramentas — nunca decidir o
+// time pela pessoa, nunca prometer resultado. (Fase de testes: sem prémios.)
+//
+// CHAVE: o Pro vê o chaveamento no INÍCIO (quando sai) e no FIM (com resultados),
+// e fica guardado até à competição seguinte. O Pro Max vê também o MEIO — a chave
+// AO VIVO durante a competição — além dos extras.
+const PRO: string[] = [
+  "Scout avançado dos atletas (histórico, forma e como pontuam)",
+  "Análise do teu time — o que é forte e onde está o risco",
+  "Dica de capitão entre os atletas que tu escolheste",
+  "Maior possibilidade de valorização (tendência, não garantia)",
+  "Chaveamento da competição — vês a chave quando sai e no fim, com resultados",
+  "Acompanhamento ao vivo das pontuações dos teus atletas",
+  "Até 5 ligas ativas (mata-mata e pontos corridos)",
+  "Design exclusivo Pro",
+];
+
+// O Pro Max TEM tudo o que o Pro tem, MAIS estes extras.
+const MAX_EXTRA: string[] = [
+  "Chave AO VIVO — acompanha a chave a decorrer em tempo real, durante a competição",
+  "Alerta dos teus atletas favoritos — avisamos quando o teu atleta é o próximo a lutar",
+  "Até 10 ligas e copas (o dobro do Pro)",
+  "Análise da chave — os atletas com mais hipótese de pontuar muito ou ser campeão, pelos confrontos prováveis",
+  "Layout e visual exclusivos Pro Max",
 ];
 
 export default function IpponPro() {
@@ -36,51 +46,80 @@ export default function IpponPro() {
         </header>
 
         {/* Hero */}
-        <div style={{ textAlign: "center", background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "22px 18px", marginBottom: 16 }}>
-          <div style={{ width: 92, height: 92, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="sabio" /></div>
-          <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.1 }}>Joga com vantagem</div>
-          <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "8px 0 6px" }}>Conhece o histórico de cada atleta, vê quem tem mais hipótese de render e monta o teu time com mais informação. A estratégia é sempre tua.</p>
-          <p style={{ fontSize: 13, color: GOLD, fontWeight: 700, lineHeight: 1.4, margin: "0 0 14px" }}>{PRECO.premios}.</p>
-          <div>
-            {PRECO.emPromocao && <><span style={{ fontSize: 15, color: "#7c8a82", textDecoration: "line-through" }}>{PRECO.normal}</span>{" "}</>}
-            <span style={{ fontFamily: FD, fontSize: 36, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
-            <span style={{ fontSize: 13, color: "#93a39a" }}>{PRECO.periodo}</span>
+        <div style={{ textAlign: "center", background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", marginBottom: 16 }}>
+          <div style={{ width: 80, height: 80, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="sabio" /></div>
+          <div style={{ fontFamily: FD, fontSize: 23, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.1 }}>Joga com vantagem</div>
+          <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "8px 0 0" }}>{PRECO.premios}. A estratégia é sempre tua.</p>
+          {PRECO.emPromocao && <div style={{ fontSize: 11.5, color: GOLD, marginTop: 8, fontWeight: 700 }}>{PRECO.etiqueta} · metade do preço · 7 dias grátis</div>}
+        </div>
+
+        {/* CARTÃO PRO */}
+        <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "18px 16px", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Pro</span>
+            <span>
+              {PRECO.emPromocao && <span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through", marginRight: 6 }}>{PRECO.normal}</span>}
+              <span style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
+              <span style={{ fontSize: 12, color: "#93a39a" }}>{PRECO.periodo}</span>
+            </span>
           </div>
-          {PRECO.emPromocao && <div style={{ fontSize: 11, color: GOLD, marginTop: 2 }}>Oferta de lançamento · 7 dias grátis · plano anual</div>}
+          <p style={{ fontSize: 12, color: "#93a39a", margin: "0 0 12px" }}>Ferramentas de informação para jogares com mais conhecimento.</p>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            {PRO.map((t) => (
+              <li key={t} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+                <span style={{ color: GOLD, fontWeight: 700, flexShrink: 0 }}>✓</span>
+                <span style={{ fontSize: 13, color: "#dfe6e0", lineHeight: 1.45 }}>{t}</span>
+              </li>
+            ))}
+          </ul>
+          <button onClick={() => alert("Pagamento em breve! Estamos a preparar o Ippon Pro.")} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 13, borderRadius: 11, fontSize: 14, cursor: "pointer" }}>
+            Contratar Pro · {PRECO.atualComPeriodo}
+          </button>
         </div>
 
-        {/* Benefícios */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
-          {BENEFITS.map((b) => (
-            <div key={b.t} style={{ display: "flex", gap: 11, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px" }}>
-              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#3a2f12", color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}>✓</div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>{b.t}</div>
-                <div style={{ fontSize: 12, color: "#93a39a", marginTop: 2, lineHeight: 1.45 }}>{b.x}</div>
-              </div>
-            </div>
-          ))}
+        {/* CARTÃO PRO MAX — destacado (é o upsell) */}
+        <div style={{ background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 18, padding: "18px 16px", marginBottom: 18, position: "relative" }}>
+          <div style={{ position: "absolute", top: -10, left: 16, background: MAX, color: "#0b1220", fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "3px 10px", borderRadius: 6 }}>Mais completo</div>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4, marginTop: 4 }}>
+            <span style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", color: MAX }}>Pro Max</span>
+            <span>
+              {PRECO.emPromocao && <span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through", marginRight: 6 }}>{PRECO.maxNormal}</span>}
+              <span style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: MAX }}>{PRECO.maxAtual}</span>
+              <span style={{ fontSize: 12, color: "#93a39a" }}>{PRECO.periodo}</span>
+            </span>
+          </div>
+          <p style={{ fontSize: 12, color: "#9fb3cc", margin: "0 0 12px" }}>Tudo o que o Pro tem — e ainda acompanhas a competição ao vivo, com mais ligas e análise da chave.</p>
+
+          {/* Linha "tudo o que o Pro tem" */}
+          <div style={{ display: "flex", gap: 9, alignItems: "center", background: "rgba(127,184,245,0.08)", border: "1px solid #24364a", borderRadius: 10, padding: "9px 11px", marginBottom: 12 }}>
+            <span style={{ color: MAX, fontWeight: 700 }}>★</span>
+            <span style={{ fontSize: 12.5, color: "#dfe6e0", fontWeight: 700 }}>Tudo o que o Pro inclui</span>
+          </div>
+
+          {/* Extras do Max */}
+          <div style={{ fontSize: 11, color: "#9fb3cc", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, marginBottom: 8 }}>E ainda, só no Pro Max:</div>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            {MAX_EXTRA.map((t) => (
+              <li key={t} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+                <span style={{ color: MAX, fontWeight: 700, flexShrink: 0 }}>✓</span>
+                <span style={{ fontSize: 13, color: "#eaf1f8", lineHeight: 1.45 }}>{t}</span>
+              </li>
+            ))}
+          </ul>
+          <button onClick={() => alert("Pagamento em breve! Estamos a preparar o Ippon Pro Max.")} style={{ width: "100%", marginTop: 16, background: MAX, color: "#0b1220", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 13, borderRadius: 11, fontSize: 14, cursor: "pointer" }}>
+            Contratar Pro Max · {PRECO.maxAtualComPeriodo}
+          </button>
         </div>
 
-        {/* Nota honesta: o que o Pro NÃO faz (protege o jogo e a confiança) */}
+        {/* Nota honesta: o que o Pro NÃO faz */}
         <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px", marginBottom: 16 }}>
           <div style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.6 }}>
-            O Pro <strong style={{ color: "#cfd8d2" }}>não monta o teu time por ti</strong> nem te diz quem vai ganhar. Dá-te informação e leituras do histórico — a graça de acertar continua a ser tua.
+            Nem o Pro nem o Pro Max <strong style={{ color: "#cfd8d2" }}>montam o teu time por ti</strong> ou te dizem quem vai ganhar. Dão-te informação e leituras do histórico — a graça de acertar continua a ser tua.
           </div>
         </div>
 
-        <div style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", marginBottom: 14, lineHeight: 1.5 }}>
-          Sem anúncios · apoia o crescimento da Ippon League. 🥋
-        </div>
-      </div>
-
-      {/* Barra fixa de assinatura */}
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "12px 16px" }}>
-        <div style={{ maxWidth: 460, margin: "0 auto" }}>
-          <button onClick={() => alert("Pagamento em breve! Estamos a preparar o Ippon Pro.")} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 15, borderRadius: 12, fontSize: 16, cursor: "pointer" }}>
-            Assinar por {PRECO.atualComPeriodo}
-          </button>
-          <a href="/inicio" style={{ display: "block", textAlign: "center", marginTop: 8, color: "#93a39a", fontSize: 12, textDecoration: "none", fontFamily: FB }}>Agora não</a>
+        <div style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", lineHeight: 1.5 }}>
+          Sem anúncios · planos anuais · {PRECO.etiqueta.toLowerCase()} (metade do preço). 🥋
         </div>
       </div>
     </main>
