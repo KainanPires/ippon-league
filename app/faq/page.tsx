@@ -133,8 +133,26 @@ const GRUPOS: Grupo[] = [
               <Li>Scout avançado e histórico de cada atleta.</Li>
               <Li>Análise da tua equipa e dica de capitão.</Li>
               <Li>Acompanhamento mais completo no dia da competição.</Li>
+              <Li>Chaveamento da competição: vês a chave quando sai e no fim, com os resultados.</Li>
             </Passos>
-            <P>Vês os detalhes em <B>Perfil → Ippon Pro</B>.</P>
+            <P>Vês os detalhes em <B>Perfil → Ippon Pro e Pro Max</B>.</P>
+          </>
+        ),
+      },
+      {
+        p: "O que é o Ippon Pro Max?",
+        r: (
+          <>
+            <P>O Ippon Pro Max inclui <B>tudo o que o Pro tem</B> — e ainda acrescenta:</P>
+            <Passos>
+              <Li><B>Chave ao vivo:</B> acompanha o chaveamento a decorrer em tempo real, durante a competição. Disponível nas competições de topo (Mundial, Grand Slam, Grand Prix, Masters e Olimpíadas).</Li>
+              <Li><B>Alerta dos teus favoritos:</B> avisamos quando um atleta que segues é o próximo a lutar.</Li>
+              <Li><B>Até 10 ligas e copas</B> (o dobro do Pro).</Li>
+              <Li><B>Análise da chave:</B> quem tem mais hipótese de pontuar muito ou chegar longe, pelos confrontos prováveis. Também nas competições de topo.</Li>
+              <Li><B>Grupo exclusivo</B> (WhatsApp/Telegram) só para membros Pro Max.</Li>
+              <Li><B>Layout e visual exclusivos</B> Pro Max.</Li>
+            </Passos>
+            <P>Vês os detalhes em <B>Perfil → Ippon Pro e Pro Max</B>.</P>
           </>
         ),
       },
