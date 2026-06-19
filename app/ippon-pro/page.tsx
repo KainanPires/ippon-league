@@ -10,6 +10,9 @@ const GOLD = "#d9a441";
 // Apenas benefícios REAIS ou fundamentados na análise. Nada que entregue a
 // decisão do jogador (quem montar / quem é o melhor da rodada) — isso mataria o
 // jogo. A valorização é vendida como POSSIBILIDADE segundo a análise, não promessa.
+// NOTA (fase de testes): não prometemos prémios — o foco é a vantagem de
+// informação e a competição. Os prémios/experiências ficam para quando o jogo
+// estiver validado.
 const BENEFITS: { t: string; x: string }[] = [
   { t: "Scout avançado dos atletas", x: "O histórico real de cada atleta: títulos, forma recente e como costuma pontuar em cada nível de competição." },
   { t: "Análise do teu time", x: "Uma leitura honesta da tua escalação — o que parece forte e onde está o risco. Sem te dizer o que fazer; a decisão é tua." },
@@ -18,7 +21,6 @@ const BENEFITS: { t: string; x: string }[] = [
   { t: "Chaveamento das competições", x: "Vê o quadro de lutas e acompanha o caminho dos teus atletas na chave." },
   { t: "Acompanhamento ao vivo", x: "No dia da competição, segue as pontuações dos teus atletas em tempo real." },
   { t: "Até 5 ligas ativas", x: "Cria até 5 ligas em simultâneo, entre mata-mata e pontos corridos." },
-  { t: "Prémios e experiências", x: "Sendo PRO concorres a prémios todas as rodadas — e a experiências no mundo do judô." },
   { t: "Ligas e badges exclusivos", x: "Distinções e ligas só para membros Ippon Pro, com um visual próprio." },
 ];
 
@@ -68,7 +70,7 @@ export default function IpponPro() {
         </div>
 
         <div style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", marginBottom: 14, lineHeight: 1.5 }}>
-          Sem anúncios · prioridade em sorteios e experiências · apoia o crescimento da Ippon League. 🥋
+          Sem anúncios · apoia o crescimento da Ippon League. 🥋
         </div>
       </div>
 
