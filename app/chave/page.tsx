@@ -8,6 +8,11 @@
 //
 // Teste: categoria fixa -48 F do Ulaanbaatar (comp 3149). Aberta a todos por
 // agora; o fecho ao Pro Max entra depois de validarmos contra a realidade.
+//
+// PONTINHO "PRÓXIMA LUTA": cada bloco (zona/repescagem/final) mostra um ponto
+// verde a piscar na sua PRÓXIMA luta — a primeira ainda não decidida onde ambos
+// os lados já estão definidos. Só ao vivo (quando há lutas por jogar nesse
+// bloco). É a base que o alerta "o teu atleta é o próximo" vai usar depois.
 
 import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect, createContext, useContext } from "react";
 import type { ReactNode } from "react";
@@ -17,6 +22,7 @@ const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const LINHA = "#3a4a42";
+const VERDE = "#5fd38a"; // pontinho da próxima luta
 
 const COMP = "3149";
 const CAT = "-48";
@@ -55,6 +61,19 @@ function apelido(nome: string): string {
 // 1 -> "A", 2 -> "B", ... (para os blocos).
 function letraBloco(n: number): string {
   return String.fromCharCode(64 + n); // 65 = "A"
+}
+
+// A PRÓXIMA luta de um conjunto: a primeira ainda NÃO decidida onde AMBOS os
+// lados já estão definidos (têm id). Entre as candidatas, a de menor round
+// (ronda mais adiantada primeiro) e, em empate, menor ordem — "de cima para
+// baixo, ronda a ronda". Devolve o id da luta, ou null se não houver nenhuma
+// pronta a decorrer (ex.: participantes ainda por definir). É isto que dá o
+// "pontinho" e, mais tarde, o gatilho do alerta.
+function proximaLutaId(lutas: Luta[]): string | null {
+  const candidatas = lutas.filter((l) => !l.decidida && !!l.azul.id && !!l.branco.id);
+  if (candidatas.length === 0) return null;
+  candidatas.sort((a, b) => (Number(a.round) - Number(b.round)) || (Number(a.ordem) - Number(b.ordem)));
+  return candidatas[0].id;
 }
 
 // Marcador real do judô deste atleta na luta, escondendo os zeros.
@@ -127,6 +146,10 @@ interface FavCtx {
   ativo: boolean;                    // há sessão? (sem sessão, escondemos a estrela)
 }
 const FavoritosContexto = createContext<FavCtx | null>(null);
+
+// Contexto da "próxima luta": o id da luta que leva o pontinho, por bloco.
+// Cada <Bloco> calcula o seu e fornece-o; a LinhaLado lê para desenhar o ponto.
+const ProximaContexto = createContext<string | null>(null);
 
 export default function ChavePage() {
   const [dados, setDados] = useState<ChaveResp | null>(null);
@@ -236,7 +259,9 @@ export default function ChavePage() {
       <style>{`
         @keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.35}}
         .ilpulse{animation:ilpulse 1.2s ease-in-out infinite}
-        @media (prefers-reduced-motion: reduce){.ilpulse{animation:none}}
+        @keyframes ilpontopulse{0%{box-shadow:0 0 0 0 rgba(95,211,138,0.55)}70%{box-shadow:0 0 0 6px rgba(95,211,138,0)}100%{box-shadow:0 0 0 0 rgba(95,211,138,0)}}
+        .ilponto{animation:ilpontopulse 1.4s ease-out infinite}
+        @media (prefers-reduced-motion: reduce){.ilpulse{animation:none}.ilponto{animation:none}}
         .il-scroll::-webkit-scrollbar{height:8px}
         .il-scroll::-webkit-scrollbar-thumb{background:#243029;border-radius:8px}
       `}</style>
@@ -259,10 +284,15 @@ export default function ChavePage() {
           </button>
         </header>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 8px", flexWrap: "wrap" }}>
           <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
           <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#e2655a" }}>Ao vivo</span>
           {quando && <span style={{ fontSize: 11, color: "#7c8a82" }}>· atualizado às {quando}</span>}
+          {/* Legenda do pontinho verde da próxima luta. */}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDE, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: "#7c8a82" }}>próxima luta de cada bloco</span>
+          </span>
         </div>
 
         {aCarregar && !dados ? (
@@ -289,6 +319,8 @@ export default function ChavePage() {
 // Um bloco = uma ou mais árvores empilhadas, com conectores em cotovelo medidos.
 function Bloco({ titulo, lutas, mostrarVencedor, rotuloVencedor }: { titulo: string; lutas: Luta[]; mostrarVencedor: boolean; rotuloVencedor: string }) {
   const { arvores, arestas } = useMemo(() => montarBloco(lutas, mostrarVencedor), [lutas, mostrarVencedor]);
+  // A próxima luta DESTE bloco — leva o pontinho verde.
+  const proxima = useMemo(() => proximaLutaId(lutas), [lutas]);
   const innerRef = useRef<HTMLDivElement | null>(null);
   const refs = useRef<Map<string, HTMLElement>>(new Map());
   const [paths, setPaths] = useState<string[]>([]);
@@ -351,6 +383,7 @@ function Bloco({ titulo, lutas, mostrarVencedor, rotuloVencedor }: { titulo: str
   };
 
   return (
+    <ProximaContexto.Provider value={proxima}>
     <section style={{ marginTop: 26 }}>
       <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cfd8d2", marginBottom: 12 }}>
         {titulo}
@@ -377,6 +410,7 @@ function Bloco({ titulo, lutas, mostrarVencedor, rotuloVencedor }: { titulo: str
         </div>
       )}
     </section>
+    </ProximaContexto.Provider>
   );
 }
 
@@ -399,8 +433,19 @@ function Vazio({ texto }: { texto: string }) {
 const CAIXA_W = 184;
 
 function CaixaLuta({ luta }: { luta: Luta }) {
+  // Esta luta é a PRÓXIMA do bloco? Então marca-se com o pontinho verde.
+  const proxima = useContext(ProximaContexto);
+  const ehProxima = proxima === luta.id;
   return (
-    <div style={{ width: CAIXA_W, background: "#121815", border: "1px solid #243029", borderRadius: 10, overflow: "hidden" }}>
+    <div style={{ position: "relative", width: CAIXA_W, background: "#121815", border: `1px solid ${ehProxima ? VERDE : "#243029"}`, borderRadius: 10, overflow: "hidden" }}>
+      {ehProxima && (
+        <span
+          className="ilponto"
+          aria-label="Próxima luta"
+          title="Próxima luta deste bloco"
+          style={{ position: "absolute", top: -5, right: -5, width: 11, height: 11, borderRadius: "50%", background: VERDE, border: "2px solid #0c0e0d", zIndex: 2 }}
+        />
+      )}
       <LinhaLado lado={luta.azul} />
       <div style={{ height: 1, background: "#1a221d" }} />
       <LinhaLado lado={luta.branco} />
