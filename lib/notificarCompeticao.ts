@@ -9,7 +9,9 @@
 // CELEBRAÇÃO POR NÍVEL:
 //   - Competição GRANDE (Mundial / Continental): pódio 1/2/3 com textos ESPECIAIS
 //     e celebrativos (estar no pódio de um Mundial é enorme). O 1º tem a coroa.
-//   - Competição normal: pódio 1/2/3 com textos bonitos mas mais sóbrios.
+//     Estas são CONQUISTAS ("melhor da rodada" mundial/continental) → levam à
+//     aba de RESULTADOS (onde ficam os títulos).
+//   - Competição normal: pódio 1/2/3 com textos bonitos mas mais sóbrios → liga.
 //   - Fora do pódio: resultado simples, leva à liga.
 //
 // NOTA: a HIPER-MEGA notificação do 1/2/3 da LIGA TODA (acumulado, fim do ano)
@@ -52,6 +54,9 @@ export async function notificarFimDeCompeticao(idComp: string): Promise<void> {
   if (lista.length === 0) return;
 
   const ehGrande = nivel === "Mundial" || nivel === "Continental";
+  // Destino das CONQUISTAS (pódio mundial/continental): a aba de Resultados, onde
+  // ficam guardados os títulos. O resto (resumo da rodada) continua a ir à liga.
+  const linkResultados = "/ligas?aba=resultados";
 
   // Notifica cada utilizador o seu resultado (UMA notificação, agregada).
   for (let i = 0; i < lista.length; i++) {
@@ -62,10 +67,13 @@ export async function notificarFimDeCompeticao(idComp: string): Promise<void> {
     let titulo: string;
     let corpo: string;
     let tipo = "resumo_rodada";
+    let link = "/ligas";
 
     if (ehGrande && posicao <= 3) {
       // ---- PÓDIO de competição GRANDE (Mundial / Continental): especial ----
+      // É uma conquista → vai para a aba de Resultados.
       tipo = "campeao_mundial";
+      link = linkResultados;
       if (posicao === 1) {
         titulo = `👑 És o nº1 do ${nomeComp}!`;
         corpo = `Ficaste em 1º lugar numa competição de nível ${nivel}, com ${pontos} pts. Estás entre os melhores do mundo na Ippon League. Que feito histórico!`;
@@ -96,7 +104,7 @@ export async function notificarFimDeCompeticao(idComp: string): Promise<void> {
       tipo,
       titulo,
       corpo,
-      link: "/ligas",
+      link,
     });
   }
 }
