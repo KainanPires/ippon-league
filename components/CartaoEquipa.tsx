@@ -41,17 +41,21 @@ function beltKey(faixa: string): Belt {
   return (["branca","azul","amarela","verde","roxa","castanha","preta"].includes(k) ? k : "branca") as Belt;
 }
 
-function frameShadow(b: BeltTheme, pro: boolean): string {
-  const w = pro ? 10 : b.frame;
-  const fc = pro ? GOLD : b.frameColor;
-  const dbl = pro || b.double;
+const MAX_AZUL = "#7fb8f5";
+const MAX_AZUL_FORTE = "#3f86d6";
+
+// premium=true desenha moldura/brilho reforçados; cor = dourado (Pro) ou azul (Pro Max).
+function frameShadow(b: BeltTheme, premium: boolean, cor: string): string {
+  const w = premium ? 10 : b.frame;
+  const fc = premium ? cor : b.frameColor;
+  const dbl = premium || b.double;
   const parts: string[] = [];
   parts.push(`inset 0 0 0 ${w}px ${fc}`);
   if (dbl) {
     parts.push(`inset 0 0 0 ${w + 6}px rgba(11,13,12,0.95)`);
-    parts.push(`inset 0 0 0 ${w + 8}px ${pro ? "rgba(217,164,65,0.85)" : "rgba(217,164,65,0.45)"}`);
+    parts.push(`inset 0 0 0 ${w + 8}px ${premium ? cor : "rgba(217,164,65,0.45)"}`);
   }
-  const glow = pro ? "0 0 120px rgba(217,164,65,0.55)" : b.glow ? `0 0 ${b.glow}px ${b.glowColor}` : null;
+  const glow = premium ? `0 0 120px ${cor}88` : b.glow ? `0 0 ${b.glow}px ${b.glowColor}` : null;
   if (glow) parts.push(glow);
   parts.push("0 44px 100px rgba(0,0,0,0.55)");
   return parts.join(", ");
@@ -107,6 +111,20 @@ const CARD_CSS = `
 .jcard.is-pro .pro-badge{margin-top:6px;margin-bottom:30px;padding:15px 50px;font-size:33px;letter-spacing:6px;background:linear-gradient(180deg,#fbe3a4 0%,#e7b75a 45%,#c79235 100%);border:2px solid #fbe7ad;box-shadow:0 0 26px rgba(217,164,65,0.5),0 0 70px rgba(217,164,65,0.6),inset 0 1px 0 rgba(255,255,255,0.65)}
 .jcard.is-pro .team-name{background:linear-gradient(176deg,#fbe7ad 0%,#e7c074 42%,#d9a441 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 1px 12px rgba(217,164,65,0.25))}
 .jcard.is-pro .foot-main.pro{background:linear-gradient(180deg,#fbe7ad,#d9a441);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 0 22px rgba(217,164,65,0.45))}
+.jcard.is-promax .dodo-medal{border-color:#3f86d6;border-width:4px;box-shadow:0 0 0 6px rgba(12,14,13,0.55),0 14px 30px rgba(0,0,0,0.5),0 0 44px rgba(63,134,214,0.5),inset 0 2px 10px rgba(0,0,0,0.4)}
+.jcard.is-promax .jcard-bg{background:linear-gradient(180deg,#101a28 0%,#0b1320 50%,#070b12 100%)}
+.jcard.is-promax .jcard-headglow{top:-160px;height:720px;background:radial-gradient(46% 60% at 50% 22%,color-mix(in srgb,#3f86d6 42%,transparent) 0%,transparent 64%),conic-gradient(from 200deg at 50% 14%,transparent 0deg,color-mix(in srgb,#3f86d6 16%,transparent) 30deg,transparent 70deg,transparent 290deg,color-mix(in srgb,#3f86d6 16%,transparent) 330deg,transparent 360deg)}
+.jcard.is-promax .pro-sheen{background:linear-gradient(122deg,transparent 38%,rgba(160,200,246,0.10) 49%,rgba(160,200,246,0.02) 56%,transparent 64%)}
+.jcard.is-promax .pro-corner{filter:drop-shadow(0 0 14px rgba(63,134,214,0.6))}
+.jcard.is-promax .pro-corner.tl{border-top-color:#3f86d6;border-left-color:#3f86d6}
+.jcard.is-promax .pro-corner.tr{border-top-color:#3f86d6;border-right-color:#3f86d6}
+.jcard.is-promax .jcard-inner{padding:50px 64px 56px}
+.jcard.is-promax .pro-badge{margin-top:6px;margin-bottom:30px;padding:15px 50px;font-size:33px;letter-spacing:6px;background:linear-gradient(180deg,#bcdcff 0%,#6aa6e8 45%,#3f86d6 100%);color:#0a1622;border:2px solid #bcdcff;box-shadow:0 0 26px rgba(63,134,214,0.5),0 0 70px rgba(63,134,214,0.6),inset 0 1px 0 rgba(255,255,255,0.65)}
+.jcard.is-promax .team-name{background:linear-gradient(176deg,#cfe4ff 0%,#8bb8ec 42%,#3f86d6 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 1px 12px rgba(63,134,214,0.25))}
+.jcard.is-promax .foot-main.pro{background:linear-gradient(180deg,#cfe4ff,#3f86d6);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 0 22px rgba(63,134,214,0.45))}
+.jcard.is-promax .foot-total .val{color:#7fb8f5}
+.jcard.is-promax .row.is-captain{background:linear-gradient(90deg,rgba(63,134,214,0.18) 0%,rgba(63,134,214,0.07) 100%);border:2px solid rgba(63,134,214,0.6);box-shadow:0 0 30px rgba(63,134,214,0.16)}
+.jcard.is-promax .cap-badge{background:linear-gradient(180deg,#bcdcff 0%,#6aa6e8 60%,#3f86d6 100%);color:#0a1622;box-shadow:0 0 22px rgba(63,134,214,0.5),inset 0 1px 0 rgba(255,255,255,0.5)}
 `;
 
 // Carrega o html-to-image de um CDN, uma vez.
@@ -126,7 +144,11 @@ function loadHtmlToImage(): Promise<any> {
   return _h2iPromise;
 }
 
-export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, pontos, onClose }: CartaoProps & { pro?: boolean; pontos?: Record<string, number>; onClose: () => void }) {
+export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, nivel, pontos, onClose }: CartaoProps & { pro?: boolean; nivel?: "normal" | "pro" | "pro_max"; pontos?: Record<string, number>; onClose: () => void }) {
+  // Nível efetivo: usa 'nivel' se vier; senão converte o 'pro' antigo (compat).
+  const nivelEf: "normal" | "pro" | "pro_max" = nivel ?? (pro ? "pro" : "normal");
+  const ehProMax = nivelEf === "pro_max";
+  const ehPremium = nivelEf !== "normal"; // pro ou pro_max têm moldura/brilho
   const cardRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0.3);
@@ -200,11 +222,12 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, p
   // monta as 8 linhas a partir dos dados reais
   const linhas = atletas.slice(0, 8);
 
+  const corPremium = ehProMax ? MAX_AZUL : GOLD;
   const cardVars = {
     ["--accent" as any]: b.accent,
     ["--chip-text" as any]: b.chipText,
-    ["--glow-accent" as any]: pro ? GOLD : b.accent,
-    boxShadow: frameShadow(b, pro),
+    ["--glow-accent" as any]: ehPremium ? corPremium : b.accent,
+    boxShadow: frameShadow(b, ehPremium, corPremium),
   } as CSSProperties;
 
   return (
@@ -216,7 +239,7 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, p
         {/* Pré-visualização: o cartão real (1080px) escalado para a largura do modal. */}
         <div ref={previewRef} style={{ width: "100%", aspectRatio: "1080 / 1350", borderRadius: 12, overflow: "hidden", marginBottom: 14, position: "relative", background: "#0c0e0d" }}>
           <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1350, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <CardNode innerRef={cardRef} vars={cardVars} pro={pro} belt={bk} beltName={b.name} identity={identity} linhas={linhas} capitao={capitao} pontos={pontos} />
+            <CardNode innerRef={cardRef} vars={cardVars} nivel={nivelEf} belt={bk} beltName={b.name} identity={identity} linhas={linhas} capitao={capitao} pontos={pontos} />
           </div>
         </div>
 
@@ -231,10 +254,10 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, p
 }
 
 // O nó do cartão a 1080×1350 — é isto que o html-to-image captura.
-function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capitao, pontos }: {
+function CardNode({ innerRef, vars, nivel, belt, beltName, identity, linhas, capitao, pontos }: {
   innerRef: { current: HTMLDivElement | null };
   vars: CSSProperties;
-  pro: boolean;
+  nivel: "normal" | "pro" | "pro_max";
   belt: Belt;
   beltName: string;
   identity: Identity;
@@ -243,6 +266,14 @@ function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capit
   pontos?: Record<string, number>;
 }) {
   const accent = (vars as any)["--accent"] as string;
+  const ehPro = nivel === "pro";
+  const ehProMax = nivel === "pro_max";
+  const premium = ehPro || ehProMax;
+  // Classe de moldura: dourado (is-pro) ou azul (is-promax). O Dôdo na medalha
+  // herda a cor do judogui do contexto, por isso aqui não forçamos cor de judogui.
+  const classeNivel = ehProMax ? "is-promax" : ehPro ? "is-pro" : "";
+  const seloTexto = ehProMax ? "★\u00a0\u00a0IPPON\u00a0PRO\u00a0MAX\u00a0\u00a0★" : "★\u00a0\u00a0IPPON\u00a0PRO\u00a0\u00a0★";
+  const rodapeTexto = ehProMax ? "JOGA NO MÁXIMO.\u00a0SÊ\u00a0PRO\u00a0MAX." : "JOGA COM VANTAGEM.\u00a0SÊ\u00a0IPPON\u00a0PRO.";
   // Há pontuação para mostrar? (modo competição). Se vier o mapa de pontos com
   // pelo menos uma entrada, mostramos a coluna de pontos e o total no rodapé.
   const temPontos = !!pontos && Object.keys(pontos).length > 0;
@@ -258,12 +289,12 @@ function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capit
     : 0;
 
   return (
-    <div ref={innerRef} className={`jcard belt-${belt} ${pro ? "is-pro" : ""}`} style={vars}>
+    <div ref={innerRef} className={`jcard belt-${belt} ${classeNivel}`} style={vars}>
       <div className="jcard-bg" />
       <div className="jcard-headglow" />
-      {pro && (<><div className="pro-sheen" /><div className="pro-corner tl" /><div className="pro-corner tr" /></>)}
+      {premium && (<><div className="pro-sheen" /><div className="pro-corner tl" /><div className="pro-corner tr" /></>)}
       <div className="jcard-inner">
-        {pro && <div className="pro-badge">★&nbsp;&nbsp;IPPON&nbsp;PRO&nbsp;&nbsp;★</div>}
+        {premium && <div className="pro-badge">{seloTexto}</div>}
         <header className="jcard-head">
           <div className="crest-wrap"><Escudo config={identity} size={150} /></div>
           <div className="head-text">
@@ -298,9 +329,9 @@ function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capit
               <span className="val">{total > 0 ? "+" : ""}{total} pts</span>
             </div>
           )}
-          {pro ? (
+          {premium ? (
             <>
-              <div className="foot-main pro">JOGA COM VANTAGEM.<br />SÊ IPPON PRO.</div>
+              <div className="foot-main pro">{rodapeTexto}</div>
               <div className="foot-link">www.ipponleague.com</div>
             </>
           ) : (
@@ -311,7 +342,7 @@ function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capit
           )}
         </footer>
         <div className="dodo-medal">
-          <div className="dodo-fig"><Mascot belt={accent} expression={pro ? "sabio" : "feliz"} /></div>
+          <div className="dodo-fig"><Mascot belt={accent} expression={premium ? "sabio" : "feliz"} /></div>
         </div>
       </div>
     </div>
