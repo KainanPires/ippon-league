@@ -17,6 +17,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect, createContext, useContext } from "react";
 import type { ReactNode } from "react";
 import { uid } from "@/lib/team";
+import { focoMercado } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -24,8 +25,29 @@ const GOLD = "#d9a441";
 const LINHA = "#3a4a42";
 const VERDE = "#5fd38a"; // pontinho da próxima luta
 
-const COMP = "3149";
-const CAT = "-48";
+// As 14 categorias olímpicas. Como nenhum número se repete entre géneros
+// (homens -60..+100, mulheres -48..+78), o `weight` sozinho identifica a
+// categoria — o género fica implícito. `peso` é o que vai no ?cat= (campo
+// `weight` do JudoBase); se o formato real for outro, ajusta-se só aqui.
+interface Categoria { peso: string; genero: "M" | "F" }
+const CATEGORIAS: Categoria[] = [
+  { peso: "-60", genero: "M" },
+  { peso: "-66", genero: "M" },
+  { peso: "-73", genero: "M" },
+  { peso: "-81", genero: "M" },
+  { peso: "-90", genero: "M" },
+  { peso: "-100", genero: "M" },
+  { peso: "+100", genero: "M" },
+  { peso: "-48", genero: "F" },
+  { peso: "-52", genero: "F" },
+  { peso: "-57", genero: "F" },
+  { peso: "-63", genero: "F" },
+  { peso: "-70", genero: "F" },
+  { peso: "-78", genero: "F" },
+  { peso: "+78", genero: "F" },
+];
+const CAT_INICIAL = "-60";
+const rotuloGenero = (g: "M" | "F") => (g === "M" ? "masc." : "fem.");
 
 // Espaçamentos da árvore.
 const COLGAP = 34; // espaço horizontal entre colunas (onde vivem os cotovelos)
@@ -152,6 +174,13 @@ const FavoritosContexto = createContext<FavCtx | null>(null);
 const ProximaContexto = createContext<string | null>(null);
 
 export default function ChavePage() {
+  // Competição a decorrer (ou a próxima alvo), como nas outras páginas.
+  const foco = useMemo(() => focoMercado(), []);
+  const compFoco = foco.aDecorrer ?? foco.alvo;
+  const comp = compFoco.idCompeticao;
+  // Categoria selecionada (muda pelo seletor de cima).
+  const [cat, setCat] = useState<string>(CAT_INICIAL);
+
   const [dados, setDados] = useState<ChaveResp | null>(null);
   const [aCarregar, setACarregar] = useState(true);
   const [erro, setErro] = useState("");
@@ -231,7 +260,7 @@ export default function ChavePage() {
 
   const carregar = useCallback(async () => {
     try {
-      const r = await fetch(`/api/chave?comp=${COMP}&cat=${encodeURIComponent(CAT)}`, { cache: "no-store" });
+      const r = await fetch(`/api/chave?comp=${encodeURIComponent(comp)}&cat=${encodeURIComponent(cat)}`, { cache: "no-store" });
       const j: ChaveResp = await r.json();
       if (!j.ok) { setErro(j.erro || "Não foi possível carregar a chave."); setACarregar(false); return; }
       setDados(j); setErro("");
@@ -240,9 +269,13 @@ export default function ChavePage() {
       setErro("Falha de ligação ao carregar a chave.");
     }
     setACarregar(false);
-  }, []);
+  }, [comp, cat]);
 
+  // Ao trocar de categoria, limpa a chave anterior e mostra "a carregar" (senão
+  // ficava a chave da categoria antiga visível enquanto a nova não chega).
   useEffect(() => {
+    setDados(null);
+    setACarregar(true);
     carregar();
     const t = setInterval(carregar, 60000);
     return () => clearInterval(t);
@@ -275,7 +308,7 @@ export default function ChavePage() {
             <div>
               <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, lineHeight: 1.05 }}>Chave da competição</h1>
               <div style={{ fontSize: 12, color: "#93a39a", marginTop: 1 }}>
-                {dados?.nome_competicao || "Ulaanbaatar Grand Slam"} · -48 kg feminino
+                {dados?.nome_competicao || compFoco.nome} · {cat} kg {rotuloGenero(CATEGORIAS.find((c) => c.peso === cat)?.genero ?? "M")}
               </div>
             </div>
           </div>
@@ -283,6 +316,33 @@ export default function ChavePage() {
             Atualizar
           </button>
         </header>
+
+        {/* Seletor de categorias — scroll horizontal, as 14 olímpicas. As que não
+            tiverem lutas nesta competição mostram "ainda sem lutas" no corpo. */}
+        <div className="il-scroll" style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 0 6px", marginTop: 4 }}>
+          {CATEGORIAS.map((c) => {
+            const ativa = c.peso === cat;
+            return (
+              <button
+                key={c.peso}
+                onClick={() => setCat(c.peso)}
+                aria-pressed={ativa}
+                style={{
+                  flexShrink: 0,
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
+                  minWidth: 62, padding: "7px 12px", borderRadius: 10, cursor: "pointer",
+                  fontFamily: FD, lineHeight: 1.1,
+                  background: ativa ? GOLD : "#141a17",
+                  border: `1px solid ${ativa ? GOLD : "#243029"}`,
+                  color: ativa ? "#1b211e" : "#cfd8d2",
+                }}
+              >
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{c.peso}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: ativa ? "#5c4410" : "#7c8a82" }}>{rotuloGenero(c.genero)}</span>
+              </button>
+            );
+          })}
+        </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 8px", flexWrap: "wrap" }}>
           <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
