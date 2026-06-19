@@ -12,6 +12,7 @@ import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, type TutKey } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
+import { TATAMES, TATAME_DEFAULT, tatamePorId, type TatameId } from "@/lib/tatames";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -479,6 +480,12 @@ function MeuTimeInner() {
   const [vistosConta, setVistosConta] = useState<Record<string, boolean> | null>(null);
   const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
   const [isPro, setIsPro] = useState(false);
+  // Personalização Pro Max: cor do tatame. tatameId = tema escolhido; isProMax
+  // decide se pode trocar (senão o seletor aparece bloqueado). seletorTatame
+  // abre/fecha o painel de escolha.
+  const [tatameId, setTatameId] = useState<TatameId>(TATAME_DEFAULT);
+  const [isProMax, setIsProMax] = useState(false);
+  const [seletorTatame, setSeletorTatame] = useState(false);
   const router = useRouter();
   // Marca "montar" (?montar=1): ativada pelo lixo. Enquanto está no ciclo
   // mercado<->meu-time, o meu-time mostra VAZIO (ignora a equipa salva) para a
@@ -566,6 +573,21 @@ function MeuTimeInner() {
       try {
         const meta = (data.session as { user?: { user_metadata?: { is_pro?: boolean } } } | null)?.user?.user_metadata;
         setIsPro(!!meta?.is_pro);
+      } catch {}
+      // Cor do tatame (personalização Pro Max) — lê do servidor a escolha guardada
+      // e se a conta é Pro Max (decide se o seletor está desbloqueado).
+      try {
+        const uidT = (data.session as { user?: { id?: string } } | null)?.user?.id;
+        if (uidT) {
+          fetch(`/api/tatame?user_id=${encodeURIComponent(uidT)}`)
+            .then((r) => r.json())
+            .then((j) => {
+              if (!active || !j?.ok) return;
+              setTatameId(tatamePorId(j.tatame).id);
+              setIsProMax(!!j.is_pro_max);
+            })
+            .catch(() => {});
+        }
       } catch {}
       // Tutoriais já vistos na CONTA — buscar uma vez (decide o tutorial só
       // depois disto chegar, para não reaparecer por causa do timing).
@@ -729,6 +751,9 @@ function MeuTimeInner() {
   // EDITÁVEL só quando NÃO está em competição (mercado aberto).
   const editavel = !emCompeticao;
   const dirty = editavel && !sameTeam(team, saved);
+  // Tema de cor do tatame (Pro Max). tatamePorId cai no default se o id não
+  // existir, por isso isto é sempre seguro.
+  const tema = tatamePorId(tatameId);
 
   // Tutorial ativo conforme o momento + qual elemento destacar agora.
   const passos = emCompeticao ? STEPS_COMPETICAO : STEPS_EDICAO;
@@ -896,8 +921,8 @@ function MeuTimeInner() {
               </div>
             )}
 
-            <section className={destaque === "atletas" || destaque === "vazio" ? "ilglow" : undefined} style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
-              <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
+            <section className={destaque === "atletas" || destaque === "vazio" ? "ilglow" : undefined} style={{ background: tema.foraBg, border: `2px solid ${tema.foraBorda}`, borderRadius: 16, padding: 10 }}>
+              <div style={{ background: tema.dentroBg, border: `2px solid ${tema.dentroBorda}`, borderRadius: 10, padding: "12px 10px" }}>
                 <SectionLabel>Masculino</SectionLabel>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
                   {males.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
@@ -910,6 +935,31 @@ function MeuTimeInner() {
                 </div>
               </div>
             </section>
+
+            {/* SELETOR DE COR DO TATAME (Pro Max). Botão discreto por baixo do
+                tatame. Pro Max escolhe entre os 5 temas; não-Pro-Max vê o painel
+                bloqueado, com convite a subir. Guarda no servidor (/api/tatame). */}
+            <SeletorTatame
+              aberto={seletorTatame}
+              onToggle={() => setSeletorTatame((v) => !v)}
+              atual={tatameId}
+              isProMax={isProMax}
+              onEscolher={(id) => {
+                if (!isProMax) { router.push("/pro-max"); return; }
+                const anterior = tatameId;
+                setTatameId(id); // otimista
+                if (userId) {
+                  fetch("/api/tatame", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_id: userId, tatame: id }),
+                  })
+                    .then((r) => r.json())
+                    .then((j) => { if (!j?.ok) setTatameId(anterior); }) // reverte se falhar
+                    .catch(() => setTatameId(anterior));
+                }
+              }}
+            />
 
             {/* SECÇÃO DE INDISPONÍVEIS: atletas guardados na equipa que a pool já
                 não conhece (sem dados de nome/género/preço). Mostramos só o id e,
@@ -1326,6 +1376,71 @@ function DetalheLutas({ estado, captain }: { estado: EstadoDetalhe; captain: boo
       {captain && (
         <div style={{ fontSize: 11, color: "#FF8F00", marginTop: 6, textAlign: "center" }}>
           Como capitão, este total conta a dobrar na tua pontuação da rodada.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Seletor de cor do tatame (Pro Max). Mostra os 5 temas em miniatura. Pro Max
+// escolhe; não-Pro-Max vê tudo bloqueado (cadeado + convite a subir a Pro Max).
+function SeletorTatame({ aberto, onToggle, atual, isProMax, onEscolher }: { aberto: boolean; onToggle: () => void; atual: TatameId; isProMax: boolean; onEscolher: (id: TatameId) => void }) {
+  return (
+    <div style={{ marginTop: 12 }}>
+      <button onClick={onToggle} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "#121815", border: `1px solid ${isProMax ? "#2a4d3e" : "#243029"}`, borderRadius: 12, padding: "11px 14px", cursor: "pointer", color: "#f1ede2", fontFamily: FB }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <span style={{ display: "flex", gap: 3 }}>
+            <span style={{ width: 12, height: 14, borderRadius: 3, background: tatamePorId(atual).foraBg, border: `1px solid ${tatamePorId(atual).foraBorda}` }} />
+            <span style={{ width: 12, height: 14, borderRadius: 3, background: tatamePorId(atual).dentroBg, border: `1px solid ${tatamePorId(atual).dentroBorda}` }} />
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>Cor do tatame</span>
+          {!isProMax && (
+            <span style={{ fontSize: 9.5, color: "#7fb8f5", border: "1px solid #2f5478", borderRadius: 999, padding: "2px 7px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro Max</span>
+          )}
+        </span>
+        <span style={{ color: "#93a39a", transform: aberto ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+        </span>
+      </button>
+
+      {aberto && (
+        <div style={{ marginTop: 8, background: "#121815", border: "1px solid #243029", borderRadius: 12, padding: 12 }}>
+          {!isProMax && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 9, background: "#0f1620", border: "1px solid #2f5478", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+              <span style={{ color: "#7fb8f5", flexShrink: 0, marginTop: 1 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+              </span>
+              <div style={{ fontSize: 12, color: "#cdd9e6", lineHeight: 1.5 }}>
+                Trocar a cor do tatame é exclusivo do <strong style={{ color: "#7fb8f5" }}>Pro Max</strong>. Toca num tema para saber mais.
+              </div>
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
+            {TATAMES.map((t) => {
+              const escolhido = isProMax && t.id === atual;
+              return (
+                <button key={t.id} onClick={() => onEscolher(t.id)} style={{ position: "relative", display: "flex", flexDirection: "column", gap: 6, background: "transparent", border: `2px solid ${escolhido ? "#7fd1a3" : "#243029"}`, borderRadius: 12, padding: 7, cursor: "pointer", opacity: isProMax ? 1 : 0.85 }}>
+                  <div style={{ border: `2px solid ${t.foraBorda}`, background: t.foraBg, borderRadius: 9, padding: 5 }}>
+                    <div style={{ border: `2px solid ${t.dentroBorda}`, background: t.dentroBg, borderRadius: 6, height: 30 }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: escolhido ? "#7fd1a3" : "#cfd8d2", fontWeight: 700, textAlign: "center" }}>{t.nome}</span>
+                  {escolhido && (
+                    <span style={{ position: "absolute", top: -8, right: -7, background: "#7fd1a3", color: "#0c1a12", borderRadius: "50%", width: 19, height: 19, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
+                    </span>
+                  )}
+                  {!isProMax && (
+                    <span style={{ position: "absolute", top: 8, right: 8, color: "rgba(255,255,255,0.85)" }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {!isProMax && (
+            <a href="/pro-max" style={{ display: "block", textAlign: "center", marginTop: 12, background: "#7fb8f5", color: "#0a1828", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, textDecoration: "none" }}>Desbloquear com Pro Max</a>
+          )}
         </div>
       )}
     </div>
