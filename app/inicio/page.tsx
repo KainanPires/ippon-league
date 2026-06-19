@@ -6,7 +6,7 @@ import { loadSavedFor, resolve, loadSavedCloudFor, loadIdentityCloudFor, setAthl
 import { loadIdentity, type Identity } from "@/components/Escudo";
 import { Desempenho } from "@/components/Desempenho";
 import { GaleriaResumos } from "@/components/GaleriaResumos";
-import { desempenhosVistosConta, marcarDesempenhoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
+import { desempenhosVistosConta, marcarDesempenhoVisto, aoVivoVistoConta, marcarAoVivoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, textoFecho, competicaoDaSemana } from "@/lib/calendario";
 import { mensagensModaisDeHoje, type MensagemEspecial } from "@/lib/mensagensEspeciais";
@@ -63,20 +63,6 @@ function modalVisto(chave: string, userId: string | null | undefined): boolean {
 }
 function marcarModalVisto(chave: string, userId: string | null | undefined) {
   try { localStorage.setItem(modalKey(chave, userId), "1"); } catch {}
-}
-
-// ---------------------------------------------------------------------------
-// Resumo AO VIVO: "visto NESTA SESSÃO". Ao contrário do resumo final (que usa o
-// Supabase e dura para sempre), o ao vivo só deve aparecer UMA vez por sessão —
-// quando se entra no app. Depois de fechado, não reaparece enquanto se navega
-// entre abas. Usa sessionStorage: limpa-se ao fechar o separador/app, por isso
-// numa NOVA sessão volta a aparecer, já atualizado. Por competição.
-// ---------------------------------------------------------------------------
-function aoVivoVistoNaSessao(idComp: string): boolean {
-  try { return sessionStorage.getItem(`ippon_aovivo_sessao__${idComp}`) === "1"; } catch { return false; }
-}
-function marcarAoVivoVistoNaSessao(idComp: string) {
-  try { sessionStorage.setItem(`ippon_aovivo_sessao__${idComp}`, "1"); } catch {}
 }
 
 export default function Inicio() {
@@ -235,9 +221,11 @@ export default function Inicio() {
 
         if (aDecorrer) {
           if (vistos[aDecorrer.idCompeticao]) return;
-          // Já vi o ponto de situação ao vivo nesta sessão? Então não reaparece
-          // enquanto navego (só volta numa nova sessão, já atualizado).
-          if (aoVivoVistoNaSessao(aDecorrer.idCompeticao)) return;
+          // Já vi o ponto de situação ao vivo desta competição (guardado na CONTA)?
+          // Então não reaparece automaticamente — fica acessível pela galeria de
+          // resumos ("Os meus resumos"). Só aparece sozinho UMA vez.
+          if (await aoVivoVistoConta(aDecorrer.idCompeticao)) return;
+          if (!active) return;
           const teamComp = await loadSavedCloudFor(aDecorrer.idCompeticao);
           if (!active || !teamComp || teamComp.ids.length === 0) return;
           const pontos = await buscarResultados(aDecorrer.idCompeticao);
@@ -252,10 +240,11 @@ export default function Inicio() {
           if (dados) {
             await carregarIdentidadeResumo(aDecorrer.idCompeticao);
             if (!active) return;
-            // Marca JÁ como visto nesta sessão: aparece uma vez ao entrar e não
-            // volta a aparecer enquanto navego (mesmo que eu saia sem carregar em
-            // "Fechar", apenas mudando de aba). Numa nova sessão volta, atualizado.
-            marcarAoVivoVistoNaSessao(aDecorrer.idCompeticao);
+            // Marca JÁ como visto na CONTA: aparece uma vez automaticamente e não
+            // volta a saltar sozinho — nem ao mudar de aba, nem ao reabrir o app,
+            // nem noutro telemóvel. Fica disponível em "Os meus resumos".
+            await marcarAoVivoVisto(aDecorrer.idCompeticao);
+            if (!active) return;
             setDesempenhoAoVivo(true);
             setDesempenho({ dados, team: teamComp });
             // AO VIVO: NÃO criamos a notificação de resumo aqui — a competição
@@ -586,9 +575,9 @@ export default function Inicio() {
           aoVivo={desempenhoAoVivo}
           userId={userIdState}
           onFechar={() => {
-            // Se era o ponto de situação ao vivo, marca a sessão para não voltar
-            // a aparecer enquanto se navega (só numa nova sessão).
-            if (desempenhoAoVivo) marcarAoVivoVistoNaSessao(desempenho.dados.idCompeticao);
+            // O ao vivo já foi marcado como visto na CONTA quando apareceu, por
+            // isso aqui só fechamos. Não reaparece sozinho — fica em "Os meus
+            // resumos".
             setDesempenho(null);
             setExtra(null);
             setDesempenhoDaGaleria(false);
