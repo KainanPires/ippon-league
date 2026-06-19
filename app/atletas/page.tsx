@@ -76,12 +76,14 @@ function Atletas() {
         const ids = lista.map((a) => a.id).filter(Boolean);
 
         let pontos: Record<string, number> = {};
+        let acoesMapa: Record<string, Record<string, number>> = {};
         let houve = false;
         if (ids.length > 0) {
           try {
             const res = await fetch(`/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`)
               .then((r) => r.json()).catch(() => null);
             pontos = res && res.pontos ? res.pontos : {};
+            acoesMapa = res && res.acoes ? res.acoes : {};
             houve = !!(res && res.tem_resultados);
           } catch {}
         }
@@ -101,6 +103,9 @@ function Atletas() {
               category: a?.category ?? "",
               gender: (a?.gender ?? "") as "M" | "F" | "",
               pontos: Math.round((pts as number) * 10) / 10,
+              // Ações somadas desta competição (o "como pontuou"), vindas do
+              // endpoint no modo por_atleta. Antes faltavam no ao vivo.
+              acoes: acoesMapa[id] && typeof acoesMapa[id] === "object" ? acoesMapa[id] : {},
             };
           });
         base.sort((x, y) => (y.pontos - x.pontos) || x.name.localeCompare(y.name));
@@ -305,7 +310,7 @@ function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClo
         </div>
 
         {/* A "razão" do ponto: resumo agregado das ações na competição (#scout). */}
-        {r.acoes && Object.keys(r.acoes).length > 0 && (
+        {r.acoes && Object.keys(r.acoes).length > 0 && linhasDeAcoes(r.acoes).length > 0 && (
           <div style={{ marginTop: 14 }}>
             <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 10 }}>
               Como pontuou
