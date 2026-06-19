@@ -61,6 +61,20 @@ interface PosOficial {
 
 export default function Ligas() {
   const [tab, setTab] = useState<Tab>("ativas");
+
+  // Permite abrir já numa aba específica via URL (?aba=resultados|mercado|
+  // calendario|ativas). É assim que as notificações de conquista levam direto à
+  // aba de Resultados. Lê-se no cliente (sem useSearchParams, evita Suspense).
+  useEffect(() => {
+    try {
+      const a = new URLSearchParams(window.location.search).get("aba");
+      if (a === "resultados" || a === "mercado" || a === "calendario" || a === "ativas") {
+        setTab(a);
+        if (a === "mercado") carregarMercado();
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [mine, setMine] = useState<MinhaLiga[]>([]);
   const [aCarregar, setACarregar] = useState(true);
   const [codigo, setCodigo] = useState("");
