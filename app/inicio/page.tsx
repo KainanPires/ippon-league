@@ -73,6 +73,7 @@ export default function Inicio() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [isPro, setIsPro] = useState(false);
+  const [isProMax, setIsProMax] = useState(false);
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
   const [modaisFila, setModaisFila] = useState<MensagemEspecial[]>([]);
   const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
@@ -146,8 +147,9 @@ export default function Inicio() {
         if (metaName) setName(String(metaName).split(" ")[0]);
         else if (savedName) setName(savedName);
         else setName("Campeão");
-        const meta = (data.session.user?.user_metadata ?? {}) as { is_pro?: boolean };
+        const meta = (data.session.user?.user_metadata ?? {}) as { is_pro?: boolean; is_pro_max?: boolean };
         setIsPro(Boolean(meta.is_pro));
+        setIsProMax(Boolean(meta.is_pro_max));
         if (userId) {
           supabase.from("users").select("belt, data_nascimento, country_code").eq("id", userId).maybeSingle()
             .then(({ data: row }) => {
@@ -446,7 +448,18 @@ export default function Inicio() {
           </button>
         )}
 
-        {isPro ? (
+        {isProMax ? (
+          <a href="/pro-max-central" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "linear-gradient(135deg,#3f86d6,#7fb8f5)", borderRadius: 14, padding: "13px 14px", marginBottom: 14, textDecoration: "none" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#0a1622", textTransform: "uppercase" }}>A tua central Pro Max</span>
+                <span style={{ background: "#0a1622", color: "#7fb8f5", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>★ Pro Max</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#0e2236", marginTop: 3 }}>Scout, personalização e as tuas vantagens no máximo</div>
+            </div>
+            <span style={{ background: "#0a1622", color: "#7fb8f5", fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Abrir</span>
+          </a>
+        ) : isPro ? (
           <a href="/pro" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "13px 14px", marginBottom: 14, textDecoration: "none" }}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -575,7 +588,7 @@ export default function Inicio() {
         <Tab label="Início" active icon={<HomeIcon />} href="/inicio" />
         <Tab label="Competições" icon={<TrophyIcon />} href="/ligas" />
         <Tab label="Atletas" icon={<AthletesIcon />} href="/atletas" />
-        <Tab label="Pro" icon={<BoltIcon />} href={isPro ? "/pro" : "/ippon-pro"} />
+        <Tab label="Pro" icon={<BoltIcon />} href={isProMax ? "/pro-max-central" : isPro ? "/pro" : "/ippon-pro"} />
       </nav>
 
       {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || "Campeão"} target={tutTarget} />}
