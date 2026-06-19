@@ -78,6 +78,10 @@ export async function POST(req: Request) {
     ligaRec.codigo ?? ligaRec.code ?? ligaRec.invite_code ?? ligaRec.slug ?? ""
   ).trim();
   const linkCopa = codigoLiga ? `/liga/${codigoLiga}/chave` : "/ligas";
+  // As CONQUISTAS (campeão, vice, 3º) viram um "resultado" e devem abrir a aba de
+  // Resultados (onde estão os títulos). As notificações de andamento (avançou,
+  // eliminado, repescagem) continuam a ir para a chave (linkCopa).
+  const linkResultados = "/ligas?aba=resultados";
 
   // 1) Todos os confrontos da liga (inclui `metade`, necessária à repescagem).
   const { data: todos } = await supabaseAdmin
@@ -188,7 +192,7 @@ export async function POST(req: Request) {
         tipo: "copa_campeao",
         titulo: "És o CAMPEÃO da Copa Ippon! 🏆",
         corpo: `Venceste a final e és o campeão da Copa "${nomeLiga}". Que conquista!`,
-        link: linkCopa,
+        link: linkResultados,
       });
       if (perdedor) {
         await criarNotificacaoServidor({
@@ -196,7 +200,7 @@ export async function POST(req: Request) {
           tipo: "copa_eliminado",
           titulo: "Vice-campeão da Copa Ippon 🥈",
           corpo: `Chegaste à final da Copa "${nomeLiga}" e ficaste em 2º. Grande campanha!`,
-          link: linkCopa,
+          link: linkResultados,
         });
       }
     } else if (fase === "bronze") {
@@ -206,7 +210,7 @@ export async function POST(req: Request) {
         tipo: "copa_avancou",
         titulo: "3º lugar na Copa Ippon 🥉",
         corpo: `Venceste a disputa do bronze na Copa "${nomeLiga}". Subiste ao pódio!`,
-        link: linkCopa,
+        link: linkResultados,
       });
       if (perdedor) {
         await criarNotificacaoServidor({
