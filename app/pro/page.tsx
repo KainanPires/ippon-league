@@ -18,9 +18,12 @@ const VERM = "#ef8d83";
 // Estado do dossiê de cada atleta enquanto carrega.
 type EstadoDossie = "carregando" | "erro" | Dossie;
 
-// Vantagens do Pro que ainda vamos construir (o scout já saiu daqui).
-const A_CHEGAR: { t: string; x: string }[] = [
-  { t: "Chaveamento das competições", x: "As chaves de cada competição e o caminho dos teus atletas." },
+// Vantagens do Pro que ainda vamos construir (o scout já saiu daqui). A primeira
+// — o Chaveamento — JÁ está pronta: é a página /chave, exclusiva Pro Max. Por
+// isso tem href + selo PRO MAX (em vez de "EM BREVE"). As restantes continuam
+// a chegar.
+const A_CHEGAR: { t: string; x: string; href?: string; proMax?: boolean }[] = [
+  { t: "Chaveamento das competições", x: "As chaves de cada competição, ao vivo, e o caminho dos teus atletas.", href: "/chave", proMax: true },
   { t: "Dicas e capitães da rodada", x: "Sugestões para te ajudar a decidir." },
 ];
 
@@ -37,18 +40,22 @@ export default function DashboardPro() {
 
   useEffect(() => {
     let active = true;
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!active) return;
-      const u = data.session?.user;
-      const m = u?.user_metadata || {};
-      const isPro = Boolean(m.is_pro);
-      setNome(String(m.nome || "").trim().split(" ")[0] || "Campeão");
 
-      if (!isPro) {
-        router.replace("/ippon-pro"); // não-Pro vai para a página de vendas
-        return;
-      }
+    // Lê is_pro da sessão. PROBLEMA conhecido: no PRIMEIRO instante após abrir a
+    // aba, o getSession() pode devolver a sessão com o user_metadata ainda não
+    // totalmente hidratado, e is_pro vir undefined → Boolean(undefined)=false →
+    // expulsava um Pro para a página de vendas. Por isso NÃO reencaminhamos só
+    // com a 1ª leitura: se a sessão disser "não Pro", CONFIRMAMOS com getUser()
+    // (vai ao servidor, traz o metadata fresco) antes de reencaminhar.
+    function lerIsPro(u: { user_metadata?: { is_pro?: boolean } } | null | undefined): boolean {
+      return Boolean(u?.user_metadata?.is_pro);
+    }
+
+    // Arranca a central Pro (só chamada quando temos a CERTEZA de que é Pro).
+    async function arrancarCentral(u: { user_metadata?: { nome?: string; is_pro?: boolean } } | null | undefined) {
+      if (!active) return;
+      const m = u?.user_metadata || {};
+      setNome(String(m.nome || "").trim().split(" ")[0] || "Campeão");
       setEstado("pro");
 
       const foco = focoMercado();
@@ -88,8 +95,56 @@ export default function DashboardPro() {
             if (active) setDossies((prev) => ({ ...prev, [a.id]: "erro" }));
           });
       }
+    }
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!active) return;
+      const u = data.session?.user;
+
+      // Sem sessão de todo → página de vendas (não é o caso do bug; é mesmo deslogado).
+      if (!u) {
+        router.replace("/ippon-pro");
+        return;
+      }
+
+      // 1ª leitura diz que é Pro → arranca já, sem hesitar.
+      if (lerIsPro(u)) {
+        await arrancarCentral(u);
+        return;
+      }
+
+      // 1ª leitura diz que NÃO é Pro → pode ser o falso-negativo do primeiro
+      // instante. CONFIRMA com getUser() (servidor, metadata fresco) antes de
+      // expulsar para vendas.
+      try {
+        const { data: fresco } = await supabase.auth.getUser();
+        if (!active) return;
+        if (lerIsPro(fresco?.user)) {
+          await arrancarCentral(fresco?.user);
+          return;
+        }
+      } catch { /* se a confirmação falhar, tratamos como não-Pro abaixo */ }
+
+      // Confirmado: não é Pro → página de vendas.
+      if (active) router.replace("/ippon-pro");
     })();
-    return () => { active = false; };
+
+    // Rede de segurança: se a sessão for atualizada logo a seguir (hidratação
+    // tardia do metadata), e ainda estivermos "a carregar", relê e arranca a
+    // central se afinal for Pro — sem reencaminhar.
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+      if (!active) return;
+      const u = session?.user;
+      if (u && lerIsPro(u)) {
+        setEstado((e) => {
+          if (e === "carregando") { void arrancarCentral(u); }
+          return e;
+        });
+      }
+    });
+
+    return () => { active = false; sub?.subscription?.unsubscribe?.(); };
   }, [router]);
 
   if (estado === "carregando") {
@@ -155,21 +210,43 @@ export default function DashboardPro() {
           </div>
         )}
 
-        {/* A chegar */}
+        {/* A chegar / já disponível em Pro Max */}
         <SectionTitle>A chegar à tua central</SectionTitle>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {A_CHEGAR.map((v) => (
-            <div key={v.t} style={{ display: "flex", gap: 11, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px", opacity: 0.92 }}>
-              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#23291f", color: "#7c8a82", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>{v.t}</div>
-                <div style={{ fontSize: 12.5, color: "#93a39a", marginTop: 2, lineHeight: 1.5 }}>{v.x}</div>
-              </div>
-              <span style={{ flexShrink: 0, alignSelf: "center", fontSize: 10, color: GOLD, border: `1px solid ${GOLD}`, borderRadius: 999, padding: "2px 8px", fontWeight: 700 }}>EM BREVE</span>
-            </div>
-          ))}
+          {A_CHEGAR.map((v) => {
+            const conteudo = (
+              <>
+                <div style={{ width: 26, height: 26, borderRadius: "50%", background: v.href ? "#1c3a2e" : "#23291f", color: v.href ? "#aee9c9" : "#7c8a82", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {v.href ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                  )}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{v.t}</div>
+                  <div style={{ fontSize: 12.5, color: "#93a39a", marginTop: 2, lineHeight: 1.5 }}>{v.x}</div>
+                </div>
+                {v.href ? (
+                  <span style={{ flexShrink: 0, alignSelf: "center", display: "flex", alignItems: "center", gap: 6 }}>
+                    {v.proMax && <span style={{ fontSize: 9.5, color: "#3a2a08", background: GOLD, borderRadius: 999, padding: "2px 8px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro Max</span>}
+                    <span style={{ color: GOLD, fontSize: 18 }}>›</span>
+                  </span>
+                ) : (
+                  <span style={{ flexShrink: 0, alignSelf: "center", fontSize: 10, color: GOLD, border: `1px solid ${GOLD}`, borderRadius: 999, padding: "2px 8px", fontWeight: 700 }}>EM BREVE</span>
+                )}
+              </>
+            );
+            const estiloBase: React.CSSProperties = {
+              display: "flex", gap: 11, background: "#121815", border: "1px solid #243029",
+              borderRadius: 14, padding: "13px 14px",
+            };
+            return v.href ? (
+              <a key={v.t} href={v.href} style={{ ...estiloBase, textDecoration: "none", color: "#f1ede2" }}>{conteudo}</a>
+            ) : (
+              <div key={v.t} style={{ ...estiloBase, opacity: 0.92 }}>{conteudo}</div>
+            );
+          })}
         </div>
       </div>
 
