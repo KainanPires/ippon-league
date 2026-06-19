@@ -199,6 +199,10 @@ export function gerarCalculadas(opts?: {
     const temEquipa = !!opts?.temEquipa;
     if (foco.aDecorrer) {
       // A decorrer: a mensagem muda conforme escalou ou não.
+      // IMPORTANTE: enquanto HÁ competição a decorrer, NÃO se anuncia o mercado da
+      // próxima competição (ele ainda não abriu de verdade — só abre quando esta
+      // terminar). Por isso este ramo gera apenas a notificação "em jogo" e mais
+      // nada de mercado.
       push("mercado_a_decorrer:" + foco.aDecorrer.idCompeticao, {
         tipo: "mercado",
         titulo: temEquipa ? "A tua equipa está em jogo" : "Competição a decorrer",
