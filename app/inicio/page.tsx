@@ -18,6 +18,7 @@ import { criarNotificacao } from "@/lib/notificacoes";
 import { normalizarFaixa, corDaFaixa, nomeDaFaixa, type Faixa } from "@/lib/faixas";
 import { CartaoInstalarApp } from "@/components/InstalarApp";
 import { LembreteNotificacoes } from "@/components/NotificacoesPush";
+import { reconciliarPush } from "@/lib/push";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -123,6 +124,11 @@ export default function Inicio() {
       setVisitante(false);
       const userId = data.session.user?.id;
       if (userId) setUserIdState(userId);
+      // Reconciliação silenciosa do push: garante que a subscrição deste aparelho
+      // fica ligada à conta ATUAL no servidor. Resolve a troca de conta no mesmo
+      // telemóvel (permissão já concedida → ativarPush nunca corria → a conta nova
+      // ficava sem push). Seguro: não faz nada sem permissão/subscrição.
+      if (userId) { void reconciliarPush(userId); }
       if (userId) {
         fetch(`/api/liga/minhas?user_id=${userId}`)
           .then((r) => r.json())
