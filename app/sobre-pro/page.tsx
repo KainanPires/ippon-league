@@ -9,6 +9,20 @@ import { supabase } from "@/lib/supabase";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
+const MAX = "#7fb8f5"; // tom do Pro Max
+
+// Extras que o Pro Max dá a mais (além de tudo o que o Pro tem). A chave ao vivo
+// e a análise existem só nas competições de topo (Mundial, Grand Slam, Grand
+// Prix, Masters, Olimpíadas) — dito de forma explícita, para não prometer chave
+// em competições onde ela não vai existir.
+const MAX_EXTRA: { t: string; x: string }[] = [
+  { t: "Chave ao vivo", x: "Acompanha o chaveamento a decorrer em tempo real, durante a competição — vês as pontuações e o caminho dos atletas enquanto as lutas acontecem. Nas competições de topo: Mundial, Grand Slam, Grand Prix, Masters e Olimpíadas." },
+  { t: "Alerta dos teus favoritos", x: "Avisamos-te quando um atleta que segues é o próximo a entrar no tatame." },
+  { t: "Até 10 ligas e copas", x: "O dobro do Pro: cria e joga em até 10 ligas e copas em simultâneo." },
+  { t: "Análise da chave", x: "Quando o chaveamento sai, mostramos quais atletas têm mais hipótese de pontuar muito ou chegar longe, pelos confrontos prováveis. Nas competições de topo: Mundial, Grand Slam, Grand Prix, Masters e Olimpíadas." },
+  { t: "Grupo exclusivo", x: "Acesso ao grupo de WhatsApp/Telegram só para membros Pro Max — informação da rodada e conversa com outros jogadores." },
+  { t: "Layout e visual exclusivos", x: "Um aspeto próprio e distinto, reservado a quem é Pro Max." },
+];
 
 // O que tens com o Pro. Só o que é REAL ou fundamentado na análise. Nada que
 // entregue a decisão do jogador (quem montar / quem é o melhor da rodada).
@@ -52,8 +66,8 @@ export default function SobrePro() {
         {/* Intro */}
         <section style={{ textAlign: "center", background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "24px 18px", marginBottom: 18 }}>
           <div style={{ width: 88, height: 88, margin: "0 auto 8px" }}><Mascot belt="#141110" expression="sabio" /></div>
-          <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", lineHeight: 1.1, color: GOLD }}>O que é o Ippon Pro</h2>
-          <p style={{ fontSize: 14, color: "#dfe6e0", lineHeight: 1.6, margin: 0 }}>Uma assinatura que te dá ferramentas de informação e vantagem para jogares com mais conhecimento. Tudo baseado em dados — a estratégia é sempre tua.</p>
+          <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", lineHeight: 1.1, color: GOLD }}>Pro e Pro Max</h2>
+          <p style={{ fontSize: 14, color: "#dfe6e0", lineHeight: 1.6, margin: 0 }}>Dois níveis de vantagem para jogares com mais informação. O <strong style={{ color: GOLD }}>Pro</strong> dá-te as ferramentas de scout e análise; o <strong style={{ color: MAX }}>Pro Max</strong> acrescenta a competição ao vivo e mais. A estratégia é sempre tua.</p>
         </section>
 
         {/* O que tens */}
@@ -62,6 +76,23 @@ export default function SobrePro() {
           {VANTAGENS.map((v) => (
             <div key={v.t} style={{ display: "flex", gap: 11, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px" }}>
               <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#3a2f12", color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}>✓</div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{v.t}</div>
+                <div style={{ fontSize: 12.5, color: "#93a39a", marginTop: 2, lineHeight: 1.5 }}>{v.x}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* O QUE O PRO MAX ACRESCENTA — secção própria, tom azul (MAX) */}
+        <SectionTitle>O Pro Max acrescenta</SectionTitle>
+        <p style={{ fontSize: 12.5, color: "#93a39a", margin: "0 0 12px", lineHeight: 1.55 }}>
+          O Pro Max inclui <strong style={{ color: "#cfd8d2" }}>tudo o que o Pro tem</strong> — e ainda:
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
+          {MAX_EXTRA.map((v) => (
+            <div key={v.t} style={{ display: "flex", gap: 11, background: "#121815", border: `1px solid #24364a`, borderRadius: 14, padding: "13px 14px" }}>
+              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "rgba(127,184,245,0.14)", color: MAX, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}>✓</div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700 }}>{v.t}</div>
                 <div style={{ fontSize: 12.5, color: "#93a39a", marginTop: 2, lineHeight: 1.5 }}>{v.x}</div>
