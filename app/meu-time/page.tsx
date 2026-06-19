@@ -142,6 +142,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   const router = useRouter();
   const [fase, setFase] = useState<"carregando" | "sem-equipa" | "erro" | "ok" | "bloqueado">("carregando");
   const [souEu, setSouEu] = useState(false);
+  const [meuNivel, setMeuNivel] = useState<"normal" | "pro" | "pro_max">("normal");
   const [nomeTime, setNomeTime] = useState("Equipa");
   const [escudoAlvo, setEscudoAlvo] = useState<Identity | null>(null);
   const [nomeComp, setNomeComp] = useState<string>("");
@@ -183,6 +184,10 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
       const meuId = sess.user?.id ?? "";
       const euMesmo = meuId === alvoUserId;
       setSouEu(euMesmo);
+      if (euMesmo) {
+        const meta = (sess as { user?: { user_metadata?: { is_pro?: boolean; is_pro_max?: boolean } } }).user?.user_metadata;
+        setMeuNivel(meta?.is_pro_max ? "pro_max" : meta?.is_pro ? "pro" : "normal");
+      }
       // Se o dojo é meu, vou buscar a minha faixa atual (para o cartão de partilha).
       if (euMesmo && meuId) {
         supabase.from("users").select("belt").eq("id", meuId).maybeSingle()
@@ -445,6 +450,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
           faixa={minhaFaixa}
           atletas={itens.map((i) => i.athlete || ({ id: i.id, name: i.nome, countryIso: i.pais, category: i.categoria } as Athlete))}
           capitao={capitao}
+          nivel={meuNivel}
           onClose={() => setPartilhar(false)}
         />
       )}
@@ -1133,7 +1139,7 @@ function MeuTimeInner() {
           faixa="Branca"
           atletas={resolve(team.ids)}
           capitao={team.captain}
-          pro={isPro}
+          nivel={isProMax ? "pro_max" : isPro ? "pro" : "normal"}
           pontos={emCompeticao ? pontos : undefined}
           onClose={() => setModal(null)}
         />
