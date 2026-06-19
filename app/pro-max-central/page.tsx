@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 import { useTatame } from "@/components/TatameProvider";
 import { useJudogui, type JudoguiCor } from "@/components/JudoguiProvider";
 import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
+import { ScoutDoTime } from "@/components/ScoutDoTime";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -146,15 +147,8 @@ export default function ProMaxCentral() {
         <SeletorTatameCentral />
         <SeletorJudoguiCentral />
 
-        {/* ATALHO PARA O SCOUT (vive na /pro) */}
-        <a href="/pro" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "#101722", border: "1px solid #24364a", borderRadius: 14, padding: "14px 14px", marginTop: 8 }}>
-          <span style={{ width: 30, height: 30, borderRadius: "50%", background: MAX, color: "#0a1622", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontFamily: FD, fontWeight: 700 }}>★</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#eaf1f8" }}>O scout do meu time</div>
-            <div style={{ fontSize: 12, color: "#9fb3cc", marginTop: 1, lineHeight: 1.4 }}>Análise de cada atleta e dica de capitão.</div>
-          </div>
-          <span style={{ color: MAX, fontSize: 20, flexShrink: 0 }}>›</span>
-        </a>
+        {/* SCOUT do time — o mesmo componente da /pro, aqui dentro (sem sair). */}
+        <ScoutDoTime />
       </div>
     </main>
   );
