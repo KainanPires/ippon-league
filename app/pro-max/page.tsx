@@ -63,6 +63,9 @@ export default function ProMax() {
           <div style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.6 }}>
             O Pro Max <strong style={{ color: "#cfd8d2" }}>não monta o teu time por ti</strong> nem te diz quem vai ganhar. Dá-te mais informação e mais formas de competir — a graça de acertar continua a ser tua.
           </div>
+          <div style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.55, marginTop: 10 }}>
+            Os Clássicos (competições do passado) não têm chave ao vivo nem análise, por já terem acontecido.
+          </div>
         </div>
       </div>
 
