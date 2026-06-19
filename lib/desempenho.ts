@@ -169,8 +169,19 @@ export async function buscarResumoExtra(idCompeticao: string, userId: string): P
 }
 
 // Mensagem personalizada conforme a pontuação (tom de jogo, sem humilhar).
-export function mensagemDesempenho(pontos: number, nome: string): string {
+//
+// `aoVivo` muda o enquadramento: durante a competição (vários dias) o resultado
+// é PARCIAL — nada de tom definitivo ("rodada para esquecer"). É um ponto de
+// situação: "vais com X, ainda dá para subir". O tom final só quando fecha.
+export function mensagemDesempenho(pontos: number, nome: string, aoVivo = false): string {
   const n = nome || "Campeão";
+  if (aoVivo) {
+    if (pontos >= 60) return `Que arranque, ${n}! Vais com ${pontos} pts e ainda há lutas pela frente. 🔥`;
+    if (pontos >= 30) return `Bom ritmo, ${n}! Já levas ${pontos} pts — e a competição ainda vai a meio.`;
+    if (pontos >= 10) return `Já tens ${pontos} pts, ${n}. Há muito por decidir — dá para subir!`;
+    if (pontos >= 0) return `${pontos} pts até agora, ${n}. A competição ainda vai a meio — há tempo para a reviravolta.`;
+    return `Começo difícil (${pontos} pts), ${n}, mas isto ainda vai a meio. Há muitas lutas para virar o jogo!`;
+  }
   if (pontos >= 60) return `Que rodada, ${n}! A tua equipa esteve imparável. 🔥`;
   if (pontos >= 30) return `Boa rodada, ${n}! A tua estratégia rendeu bons pontos.`;
   if (pontos >= 10) return `Rodada sólida, ${n}. Há margem para subir na próxima!`;
