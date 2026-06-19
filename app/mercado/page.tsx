@@ -106,6 +106,26 @@ function MercadoInner() {
   // mercado fechado, por isso é seguro mesmo durante uma competição a decorrer.
   useLembreteSalvar(userId, COMPETICAO);
 
+  // FAVORITOS — fonte de verdade é o SERVIDOR (tabela atletas_favoritos, a mesma
+  // que a página da chave e o alerta "o teu atleta é o próximo" usam). Quando o
+  // userId chega, buscamos a lista do servidor e alinhamos a interface + a cache
+  // local. Sem isto, o mercado teria uma lista local separada que o alerta nunca
+  // veria (era a desconexão que estava a partir o alerta).
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    fetch(`/api/favoritos?user_id=${encodeURIComponent(userId)}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!active || !j?.ok || !Array.isArray(j.favoritos)) return;
+        const ids = j.favoritos.map((f: { id_person: string }) => String(f.id_person));
+        setFavs(ids);
+        try { localStorage.setItem(FAV_KEY, JSON.stringify(ids)); } catch {}
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [userId]);
+
   // BLOQUEIO DO MERCADO: se há uma competição a decorrer, o mercado fecha por
   // completo (a equipa está trancada durante a rodada). Decidido pelo calendário,
   // como o resto da app. Não importa por que caminho se chega aqui — fica bloqueado.
@@ -131,7 +151,7 @@ function MercadoInner() {
         setCaptain(draft.captain);
       }
       const f = localStorage.getItem(FAV_KEY);
-      if (f) setFavs(JSON.parse(f));
+      if (f) setFavs(JSON.parse(f)); // cache rápida; o servidor é a verdade (ver efeito abaixo)
       // Guia do Mercado: só aparece se ainda não foi visto neste aparelho NEM na conta.
       if (!tutorialVistoLocal("ippon_market_tutorial")) {
         tutoriaisVistosConta().then((vistos) => {
@@ -196,12 +216,39 @@ function MercadoInner() {
     setCaptain(cap);
     saveDraftFor(COMPETICAO, { ids: next, captain: cap });
   }
-  function toggleFav(id: string) {
-    setFavs((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-      try { localStorage.setItem(FAV_KEY, JSON.stringify(next)); } catch {}
-      return next;
-    });
+  async function toggleFav(a: Athlete) {
+    // Favoritar guarda na CONTA (servidor) — é o que o alerta da chave lê. Sem
+    // sessão, pede login (coerente com o contratar atleta).
+    if (!userId) { setPedirLogin(true); return; }
+    const id = a.id;
+    const eraFav = favs.includes(id);
+    // Atualização otimista: a estrela reage já; se o servidor falhar, revertemos.
+    const otimista = eraFav ? favs.filter((x) => x !== id) : [...favs, id];
+    setFavs(otimista);
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(otimista)); } catch {}
+    try {
+      const res = await fetch("/api/favoritos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, id_person: id, nome: a.name, country_code: a.countryIso }),
+      });
+      const j = await res.json();
+      if (!j?.ok) throw new Error("falhou");
+      // Alinha ao estado real devolvido pelo servidor (favorito: true|false).
+      setFavs((prev) => {
+        const tem = prev.includes(id);
+        let next = prev;
+        if (j.favorito && !tem) next = [...prev, id];
+        if (!j.favorito && tem) next = prev.filter((x) => x !== id);
+        try { localStorage.setItem(FAV_KEY, JSON.stringify(next)); } catch {}
+        return next;
+      });
+    } catch {
+      // Reverte para o estado anterior (a operação não foi guardada).
+      const revertido = eraFav ? [...otimista, id] : otimista.filter((x) => x !== id);
+      setFavs(revertido);
+      try { localStorage.setItem(FAV_KEY, JSON.stringify(revertido)); } catch {}
+    }
   }
   function finishTutorial() {
     marcarTutorialVisto("ippon_market_tutorial"); // local (este aparelho) + conta (todos)
@@ -421,7 +468,7 @@ function MercadoInner() {
                       </div>
                     </div>
                     <span style={{ background: STATUS_COLORS[a.status][0], color: STATUS_COLORS[a.status][1], fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{a.status}</span>
-                    <button onClick={() => toggleFav(a.id)} aria-label={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"} style={{ background: "transparent", border: "none", cursor: "pointer", color: isFav ? GOLD : "#3c463f", fontSize: 20, lineHeight: 1, padding: 2, flexShrink: 0 }}>★</button>
+                    <button onClick={() => toggleFav(a)} aria-label={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"} style={{ background: "transparent", border: "none", cursor: "pointer", color: isFav ? GOLD : "#3c463f", fontSize: 20, lineHeight: 1, padding: 2, flexShrink: 0 }}>★</button>
                   </div>
                   <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 10 }}>
                     <div>
