@@ -347,8 +347,17 @@ function LinhaLado({ lado, esmaecido, semMarcador }: { lado: Lado; esmaecido?: b
   const venceu = lado.vencedor;
   const cor = esmaecido ? "#6b7a72" : venceu ? "#f1ede2" : "#a9b4ac";
   const acoes = semMarcador ? [] : marcadorDoLado(lado);
+  // Contorno dourado a destacar o vencedor — só nas lutas reais (não na caixa do
+  // vencedor da fase nem no bye, que já têm destaque próprio).
+  const destaque = venceu && !semMarcador;
   return (
-    <div style={{ padding: "7px 9px" }}>
+    <div style={{
+      padding: "7px 9px",
+      margin: destaque ? 3 : 0,
+      borderRadius: destaque ? 8 : 0,
+      border: destaque ? `1px solid ${GOLD}` : "1px solid transparent",
+      background: destaque ? "rgba(217,164,65,0.10)" : "transparent",
+    }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontFamily: FD, fontSize: 10, fontWeight: 700, color: venceu ? GOLD : "#7c8a82", width: 28, flexShrink: 0, letterSpacing: "0.03em" }}>
           {lado.pais}
