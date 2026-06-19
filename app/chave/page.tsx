@@ -24,7 +24,7 @@ const CAT = "-48";
 const COLGAP = 34; // espaço horizontal entre colunas (onde vivem os cotovelos)
 const ROWGAP = 12; // espaço vertical entre lutas irmãs
 
-interface Lado { id: string; nome: string; pais: string; vencedor: boolean }
+interface Lado { id: string; nome: string; pais: string; vencedor: boolean; ippon: number; waza: number; yuko: number; shido: number }
 interface Luta {
   id: string; fase: string; round: number; zona: number; ordem: number;
   azul: Lado; branco: Lado; decidida: boolean;
@@ -49,6 +49,22 @@ function apelido(nome: string): string {
   if (!t || t === "—") return "—";
   const maiusc = t.split(/\s+/).filter((w) => w.length > 1 && w === w.toUpperCase());
   return maiusc[0] || t.split(/\s+/)[0] || t;
+}
+
+// 1 -> "A", 2 -> "B", ... (para os blocos).
+function letraBloco(n: number): string {
+  return String.fromCharCode(64 + n); // 65 = "A"
+}
+
+// Marcador real do judô deste atleta na luta, escondendo os zeros.
+// Ex.: [{rotulo:"Ippon", n:1}, {rotulo:"Waza", n:2}, {rotulo:"Shido", n:1}]
+function marcadorDoLado(l: Lado): { rotulo: string; n: number; aviso?: boolean }[] {
+  const out: { rotulo: string; n: number; aviso?: boolean }[] = [];
+  if (l.ippon > 0) out.push({ rotulo: "Ippon", n: l.ippon });
+  if (l.waza > 0) out.push({ rotulo: l.waza > 1 ? "Waza-ari" : "Waza-ari", n: l.waza });
+  if (l.yuko > 0) out.push({ rotulo: "Yuko", n: l.yuko });
+  if (l.shido > 0) out.push({ rotulo: "Shido", n: l.shido, aviso: true });
+  return out;
 }
 
 // Constrói a(s) árvore(s) de um bloco de lutas + a lista de arestas (ligações).
@@ -174,7 +190,7 @@ export default function ChavePage() {
         ) : (
           <>
             {(dados?.zonas || []).map((z) => (
-              <Bloco key={z.zona} titulo={`Zona ${z.zona}`} lutas={z.lutas} mostrarVencedor rotuloVencedor="Vencedora" />
+              <Bloco key={z.zona} titulo={`Bloco ${letraBloco(z.zona)}`} lutas={z.lutas} mostrarVencedor rotuloVencedor="Vencedora" />
             ))}
             <Bloco titulo="Repescagem e Bronze" lutas={dados?.bronzes || []} mostrarVencedor rotuloVencedor="🥉 Bronze" />
             <Bloco titulo="Meias-finais e Final" lutas={semisEFinal} mostrarVencedor rotuloVencedor="🥇 Campeã" />
@@ -311,7 +327,7 @@ function CaixaLuta({ luta }: { luta: Luta }) {
 function CaixaBye({ lado }: { lado: Lado }) {
   return (
     <div style={{ width: CAIXA_W, background: "#0f1411", border: "1px dashed #2a3a33", borderRadius: 10 }}>
-      <LinhaLado lado={{ ...lado, vencedor: false }} esmaecido />
+      <LinhaLado lado={{ ...lado, vencedor: false }} esmaecido semMarcador />
     </div>
   );
 }
@@ -322,23 +338,41 @@ function CaixaVencedor({ lado, rotulo }: { lado: Lado; rotulo: string }) {
   return (
     <div style={{ width: CAIXA_W, background: "#141a17", border: `1px solid ${borda}`, borderRadius: 10, overflow: "hidden" }}>
       <div style={{ fontSize: 9, color: "#7c8a82", textTransform: "uppercase", letterSpacing: "0.07em", padding: "4px 9px 0" }}>{rotulo}</div>
-      <LinhaLado lado={{ ...lado, vencedor: true }} />
+      <LinhaLado lado={{ ...lado, vencedor: true }} semMarcador />
     </div>
   );
 }
 
-function LinhaLado({ lado, esmaecido }: { lado: Lado; esmaecido?: boolean }) {
+function LinhaLado({ lado, esmaecido, semMarcador }: { lado: Lado; esmaecido?: boolean; semMarcador?: boolean }) {
   const venceu = lado.vencedor;
   const cor = esmaecido ? "#6b7a72" : venceu ? "#f1ede2" : "#a9b4ac";
+  const acoes = semMarcador ? [] : marcadorDoLado(lado);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 9px" }}>
-      <span style={{ fontFamily: FD, fontSize: 10, fontWeight: 700, color: venceu ? GOLD : "#7c8a82", width: 28, flexShrink: 0, letterSpacing: "0.03em" }}>
-        {lado.pais}
-      </span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: venceu ? 700 : 400, color: cor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {apelido(lado.nome)}
-      </span>
-      {venceu && <span aria-label="venceu" style={{ color: GOLD, fontSize: 12, flexShrink: 0 }}>▸</span>}
+    <div style={{ padding: "7px 9px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontFamily: FD, fontSize: 10, fontWeight: 700, color: venceu ? GOLD : "#7c8a82", width: 28, flexShrink: 0, letterSpacing: "0.03em" }}>
+          {lado.pais}
+        </span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: venceu ? 700 : 400, color: cor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {apelido(lado.nome)}
+        </span>
+        {venceu && <span aria-label="venceu" style={{ color: GOLD, fontSize: 12, flexShrink: 0 }}>▸</span>}
+      </div>
+      {acoes.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4, paddingLeft: 36 }}>
+          {acoes.map((a, i) => (
+            <span key={i} style={{
+              fontFamily: FD, fontSize: 9, fontWeight: 700, letterSpacing: "0.02em",
+              color: a.aviso ? "#e0a96d" : "#9fb0a6",
+              background: a.aviso ? "rgba(224,169,109,0.12)" : "rgba(159,176,166,0.10)",
+              border: `1px solid ${a.aviso ? "rgba(224,169,109,0.35)" : "rgba(159,176,166,0.22)"}`,
+              borderRadius: 5, padding: "1px 5px", whiteSpace: "nowrap",
+            }}>
+              {a.n > 1 ? `${a.n} ` : ""}{a.rotulo}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
