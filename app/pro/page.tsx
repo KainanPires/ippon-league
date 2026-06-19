@@ -30,6 +30,16 @@ export default function DashboardPro() {
   const [dossies, setDossies] = useState<Record<string, EstadoDossie>>({});
   const [aberto, setAberto] = useState<string | null>(null); // id do atleta com detalhe aberto
   const [verBoasVindas, setVerBoasVindas] = useState(true); // caixa de boas-vindas fechável
+  // Depois de fechada uma vez, fica fechada (guardado no aparelho).
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("ippon_pro_boasvindas_fechada") === "1") setVerBoasVindas(false);
+    } catch {}
+  }, []);
+  function fecharBoasVindas() {
+    setVerBoasVindas(false);
+    try { localStorage.setItem("ippon_pro_boasvindas_fechada", "1"); } catch {}
+  }
 
   useEffect(() => {
     let active = true;
@@ -165,7 +175,7 @@ export default function DashboardPro() {
         {/* Boas-vindas Pro — fechável (ocupa espaço; depois de vista, pode esconder-se) */}
         {verBoasVindas && (
           <section style={{ position: "relative", textAlign: "center", background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", marginBottom: 18 }}>
-            <button onClick={() => setVerBoasVindas(false)} aria-label="Fechar" style={{ position: "absolute", top: 10, right: 10, width: 26, height: 26, borderRadius: "50%", border: "1px solid #4a3d18", background: "rgba(0,0,0,0.25)", color: "#c9b878", cursor: "pointer", fontSize: 13, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            <button onClick={fecharBoasVindas} aria-label="Fechar" style={{ position: "absolute", top: 10, right: 10, width: 26, height: 26, borderRadius: "50%", border: "1px solid #4a3d18", background: "rgba(0,0,0,0.25)", color: "#c9b878", cursor: "pointer", fontSize: 13, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             <div style={{ width: 72, height: 72, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="comemorando" /></div>
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: GOLD }}>★ Membro Ippon Pro ★</div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px" }}>Olá, {nome}!</h2>
