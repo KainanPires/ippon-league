@@ -9,8 +9,9 @@
 // Teste: categoria fixa -48 F do Ulaanbaatar (comp 3149). Aberta a todos por
 // agora; o fecho ao Pro Max entra depois de validarmos contra a realidade.
 
-import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect, createContext, useContext } from "react";
 import type { ReactNode } from "react";
+import { uid } from "@/lib/team";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -117,11 +118,93 @@ function montarBloco(lutas: Luta[], mostrarVencedor: boolean): { arvores: Arvore
   return { arvores, arestas };
 }
 
+// Contexto dos favoritos: evita passar props por todos os níveis da árvore.
+// favoritos = conjunto de id_person marcados; alternar = marca/desmarca.
+interface FavCtx {
+  favoritos: Set<string>;
+  pendentes: Set<string>;            // a meio de gravar (evita duplo-clique)
+  alternar: (lado: Lado) => void;
+  ativo: boolean;                    // há sessão? (sem sessão, escondemos a estrela)
+}
+const FavoritosContexto = createContext<FavCtx | null>(null);
+
 export default function ChavePage() {
   const [dados, setDados] = useState<ChaveResp | null>(null);
   const [aCarregar, setACarregar] = useState(true);
   const [erro, setErro] = useState("");
   const [quando, setQuando] = useState("");
+
+  // Favoritos do utilizador (id_person). Carregados da conta ao abrir.
+  const [favoritos, setFavoritos] = useState<Set<string>>(new Set());
+  const [pendentes, setPendentes] = useState<Set<string>>(new Set());
+  const [userId, setUserId] = useState<string>("anon");
+
+  useEffect(() => {
+    const u = uid();
+    setUserId(u);
+    if (u === "anon") return;
+    (async () => {
+      try {
+        const r = await fetch(`/api/favoritos?user_id=${encodeURIComponent(u)}`, { cache: "no-store" });
+        const j = await r.json();
+        if (j.ok && Array.isArray(j.favoritos)) {
+          setFavoritos(new Set(j.favoritos.map((f: { id_person: string }) => String(f.id_person))));
+        }
+      } catch { /* sem favoritos: segue */ }
+    })();
+  }, []);
+
+  // Alterna um favorito (otimista: muda já no ecrã, confirma com o servidor).
+  const alternar = useCallback((lado: Lado) => {
+    const u = userId;
+    if (u === "anon" || !lado.id) return;
+    const id = lado.id;
+    setPendentes((p) => { const n = new Set(p); n.add(id); return n; });
+    // Atualização otimista.
+    setFavoritos((f) => {
+      const n = new Set(f);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+    (async () => {
+      try {
+        const r = await fetch("/api/favoritos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: u, id_person: id, nome: lado.nome, country_code: lado.pais }),
+        });
+        const j = await r.json();
+        // Reconcilia com o estado real que o servidor devolveu.
+        if (j.ok) {
+          setFavoritos((f) => {
+            const n = new Set(f);
+            if (j.favorito) n.add(id); else n.delete(id);
+            return n;
+          });
+        } else {
+          // Falhou: desfaz a mudança otimista.
+          setFavoritos((f) => {
+            const n = new Set(f);
+            if (n.has(id)) n.delete(id); else n.add(id);
+            return n;
+          });
+        }
+      } catch {
+        setFavoritos((f) => {
+          const n = new Set(f);
+          if (n.has(id)) n.delete(id); else n.add(id);
+          return n;
+        });
+      } finally {
+        setPendentes((p) => { const n = new Set(p); n.delete(id); return n; });
+      }
+    })();
+  }, [userId]);
+
+  const favCtx: FavCtx = useMemo(
+    () => ({ favoritos, pendentes, alternar, ativo: userId !== "anon" }),
+    [favoritos, pendentes, alternar, userId]
+  );
 
   const carregar = useCallback(async () => {
     try {
@@ -148,6 +231,7 @@ export default function ChavePage() {
   }, [dados]);
 
   return (
+    <FavoritosContexto.Provider value={favCtx}>
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <style>{`
         @keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -198,6 +282,7 @@ export default function ChavePage() {
         )}
       </div>
     </main>
+    </FavoritosContexto.Provider>
   );
 }
 
@@ -350,6 +435,11 @@ function LinhaLado({ lado, esmaecido, semMarcador }: { lado: Lado; esmaecido?: b
   // Contorno dourado a destacar o vencedor — só nas lutas reais (não na caixa do
   // vencedor da fase nem no bye, que já têm destaque próprio).
   const destaque = venceu && !semMarcador;
+  // Favoritos: só nas lutas reais, com sessão e com atleta identificado.
+  const fav = useContext(FavoritosContexto);
+  const mostraEstrela = !semMarcador && !esmaecido && !!fav?.ativo && !!lado.id;
+  const ehFavorito = mostraEstrela && fav!.favoritos.has(lado.id);
+  const aGravar = mostraEstrela && fav!.pendentes.has(lado.id);
   return (
     <div style={{
       padding: "7px 9px",
@@ -366,6 +456,24 @@ function LinhaLado({ lado, esmaecido, semMarcador }: { lado: Lado; esmaecido?: b
           {apelido(lado.nome)}
         </span>
         {venceu && <span aria-label="venceu" style={{ color: GOLD, fontSize: 12, flexShrink: 0 }}>▸</span>}
+        {mostraEstrela && (
+          <button
+            type="button"
+            onClick={() => fav!.alternar(lado)}
+            disabled={aGravar}
+            aria-label={ehFavorito ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+            aria-pressed={ehFavorito}
+            title={ehFavorito ? "Nos teus atletas" : "Seguir este atleta"}
+            style={{
+              background: "transparent", border: "none", cursor: aGravar ? "default" : "pointer",
+              padding: 0, marginLeft: 2, flexShrink: 0, lineHeight: 1,
+              fontSize: 14, color: ehFavorito ? GOLD : "#5f6f67",
+              opacity: aGravar ? 0.5 : 1, transition: "color .15s",
+            }}
+          >
+            {ehFavorito ? "★" : "☆"}
+          </button>
+        )}
       </div>
       {acoes.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4, paddingLeft: 36 }}>
