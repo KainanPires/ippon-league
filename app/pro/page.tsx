@@ -19,15 +19,6 @@ const VERM = "#ef8d83";
 // Estado do dossiê de cada atleta enquanto carrega.
 type EstadoDossie = "carregando" | "erro" | Dossie;
 
-// Vantagens do Pro que ainda vamos construir (o scout já saiu daqui). A primeira
-// — o Chaveamento — JÁ está pronta: é a página /chave, exclusiva Pro Max. Por
-// isso tem href + selo PRO MAX (em vez de "EM BREVE"). As restantes continuam
-// a chegar.
-const A_CHEGAR: { t: string; x: string; href?: string; proMax?: boolean }[] = [
-  { t: "Chaveamento das competições", x: "As chaves de cada competição, ao vivo, e o caminho dos teus atletas.", href: "/chave", proMax: true },
-  { t: "Dicas e capitães da rodada", x: "Sugestões para te ajudar a decidir." },
-];
-
 export default function DashboardPro() {
   const router = useRouter();
   const [estado, setEstado] = useState<"carregando" | "pro">("carregando");
@@ -183,8 +174,8 @@ export default function DashboardPro() {
         )}
 
         {/* CHAMADA PARA AÇÃO: SÊ PRO MAX — compacta. Os detalhes vivem na página
-            de vendas (/ippon-pro), para não duplicar a lista aqui. */}
-        <a href="/ippon-pro" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 14, padding: "13px 14px", marginBottom: 18 }}>
+            dedicada /pro-max (só Pro Max, pois quem está aqui já é Pro). */}
+        <a href="/pro-max" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 14, padding: "13px 14px", marginBottom: 18 }}>
           <div style={{ width: 30, height: 30, borderRadius: "50%", background: MAX, color: "#0b1220", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontFamily: FD, fontWeight: 700 }}>★</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: MAX }}>Sê Pro Max</div>
@@ -226,44 +217,6 @@ export default function DashboardPro() {
           </div>
         )}
 
-        {/* A chegar / já disponível em Pro Max */}
-        <SectionTitle>A chegar à tua central</SectionTitle>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {A_CHEGAR.map((v) => {
-            const conteudo = (
-              <>
-                <div style={{ width: 26, height: 26, borderRadius: "50%", background: v.href ? "#1c3a2e" : "#23291f", color: v.href ? "#aee9c9" : "#7c8a82", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {v.href ? (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-                  )}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{v.t}</div>
-                  <div style={{ fontSize: 12.5, color: "#93a39a", marginTop: 2, lineHeight: 1.5 }}>{v.x}</div>
-                </div>
-                {v.href ? (
-                  <span style={{ flexShrink: 0, alignSelf: "center", display: "flex", alignItems: "center", gap: 6 }}>
-                    {v.proMax && <span style={{ fontSize: 9.5, color: "#3a2a08", background: GOLD, borderRadius: 999, padding: "2px 8px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro Max</span>}
-                    <span style={{ color: GOLD, fontSize: 18 }}>›</span>
-                  </span>
-                ) : (
-                  <span style={{ flexShrink: 0, alignSelf: "center", fontSize: 10, color: GOLD, border: `1px solid ${GOLD}`, borderRadius: 999, padding: "2px 8px", fontWeight: 700 }}>EM BREVE</span>
-                )}
-              </>
-            );
-            const estiloBase: React.CSSProperties = {
-              display: "flex", gap: 11, background: "#121815", border: "1px solid #243029",
-              borderRadius: 14, padding: "13px 14px",
-            };
-            return v.href ? (
-              <a key={v.t} href={v.href} style={{ ...estiloBase, textDecoration: "none", color: "#f1ede2" }}>{conteudo}</a>
-            ) : (
-              <div key={v.t} style={{ ...estiloBase, opacity: 0.92 }}>{conteudo}</div>
-            );
-          })}
-        </div>
       </div>
 
       {/* Detalhe do atleta */}
