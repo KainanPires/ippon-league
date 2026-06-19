@@ -3,6 +3,7 @@ import { Oswald, Manrope } from "next/font/google";
 import "./globals.css";
 import { RegistarServiceWorker } from "@/components/RegistarServiceWorker";
 import { JudoguiProvider } from "@/components/JudoguiProvider";
+import { TatameProvider } from "@/components/TatameProvider";
 const geistSans = Manrope({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -45,7 +46,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <RegistarServiceWorker />
         <JudoguiProvider>
-          {children}
+          <TatameProvider>
+            {children}
+          </TatameProvider>
         </JudoguiProvider>
       </body>
     </html>
