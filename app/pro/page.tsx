@@ -6,7 +6,6 @@ import { Mascot } from "@/components/Mascot";
 import { supabase } from "@/lib/supabase";
 import { loadSavedCloudFor, resolve, setAthletePool, type TeamState } from "@/lib/team";
 import { focoMercado, numeroDaRodada } from "@/lib/calendario";
-import { PRECO } from "@/lib/precos";
 import type { Athlete } from "@/lib/athletes";
 import type { Dossie } from "@/lib/scout";
 
@@ -19,17 +18,6 @@ const VERM = "#ef8d83";
 
 // Estado do dossiê de cada atleta enquanto carrega.
 type EstadoDossie = "carregando" | "erro" | Dossie;
-
-// Extras que o Pro Max dá a mais (para a chamada de upgrade). Mantém a mesma
-// ordem e linguagem da página de vendas.
-const MAX_EXTRA: string[] = [
-  "Chave AO VIVO durante a competição",
-  "Alerta dos teus atletas favoritos",
-  "Até 10 ligas e copas (o dobro)",
-  "Análise da chave — quem pode pontuar mais",
-  "Grupo exclusivo (WhatsApp/Telegram)",
-  "Layout e visual exclusivos Pro Max",
-];
 
 // Vantagens do Pro que ainda vamos construir (o scout já saiu daqui). A primeira
 // — o Chaveamento — JÁ está pronta: é a página /chave, exclusiva Pro Max. Por
@@ -50,6 +38,7 @@ export default function DashboardPro() {
   const [capitao, setCapitao] = useState<string | null>(null);
   const [dossies, setDossies] = useState<Record<string, EstadoDossie>>({});
   const [aberto, setAberto] = useState<string | null>(null); // id do atleta com detalhe aberto
+  const [verBoasVindas, setVerBoasVindas] = useState(true); // caixa de boas-vindas fechável
 
   useEffect(() => {
     let active = true;
@@ -182,39 +171,27 @@ export default function DashboardPro() {
           <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>A minha central Pro</h1>
         </header>
 
-        {/* Boas-vindas Pro */}
-        <section style={{ textAlign: "center", background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", marginBottom: 18 }}>
-          <div style={{ width: 72, height: 72, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="comemorando" /></div>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: GOLD }}>★ Membro Ippon Pro ★</div>
-          <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px" }}>Olá, {nome}!</h2>
-          <p style={{ fontSize: 13.5, color: "#dfe6e0", lineHeight: 1.55, margin: 0 }}>Esta é a tua central de vantagens. Toca em cada atleta para veres a análise profunda do scout.</p>
-        </section>
+        {/* Boas-vindas Pro — fechável (ocupa espaço; depois de vista, pode esconder-se) */}
+        {verBoasVindas && (
+          <section style={{ position: "relative", textAlign: "center", background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", marginBottom: 18 }}>
+            <button onClick={() => setVerBoasVindas(false)} aria-label="Fechar" style={{ position: "absolute", top: 10, right: 10, width: 26, height: 26, borderRadius: "50%", border: "1px solid #4a3d18", background: "rgba(0,0,0,0.25)", color: "#c9b878", cursor: "pointer", fontSize: 13, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            <div style={{ width: 72, height: 72, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="comemorando" /></div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: GOLD }}>★ Membro Ippon Pro ★</div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px" }}>Olá, {nome}!</h2>
+            <p style={{ fontSize: 13.5, color: "#dfe6e0", lineHeight: 1.55, margin: 0 }}>Esta é a tua central de vantagens. Toca em cada atleta para veres a análise profunda do scout.</p>
+          </section>
+        )}
 
-        {/* CHAMADA PARA AÇÃO: SÊ PRO MAX (upsell para quem já é Pro) */}
-        <section style={{ background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 18, padding: "18px 16px", marginBottom: 18, position: "relative" }}>
-          <div style={{ position: "absolute", top: -10, left: 16, background: MAX, color: "#0b1220", fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "3px 10px", borderRadius: 6 }}>Sobe de nível</div>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 4, marginBottom: 4 }}>
-            <span style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", color: MAX }}>Sê Pro Max</span>
-            <span style={{ textAlign: "right" }}>
-              <span style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: MAX }}>{PRECO.upgradeAtual}</span>
-              <span style={{ fontSize: 12, color: "#93a39a" }}>{PRECO.periodo}</span>
-            </span>
+        {/* CHAMADA PARA AÇÃO: SÊ PRO MAX — compacta. Os detalhes vivem na página
+            de vendas (/ippon-pro), para não duplicar a lista aqui. */}
+        <a href="/ippon-pro" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 14, padding: "13px 14px", marginBottom: 18 }}>
+          <div style={{ width: 30, height: 30, borderRadius: "50%", background: MAX, color: "#0b1220", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontFamily: FD, fontWeight: 700 }}>★</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: MAX }}>Sê Pro Max</div>
+            <div style={{ fontSize: 12, color: "#9fb3cc", marginTop: 1, lineHeight: 1.4 }}>Chave ao vivo, alerta de favoritos, mais ligas, análise da chave e grupo exclusivo.</div>
           </div>
-          <p style={{ fontSize: 12.5, color: "#9fb3cc", margin: "0 0 12px", lineHeight: 1.5 }}>
-            Já és Pro — sobe para Pro Max por apenas <strong style={{ color: MAX }}>{PRECO.upgradeAtualComPeriodo}</strong> e desbloqueia tudo isto:
-          </p>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 7 }}>
-            {MAX_EXTRA.map((t) => (
-              <li key={t} style={{ display: "flex", gap: 9, alignItems: "center" }}>
-                <span style={{ color: MAX, fontWeight: 700, flexShrink: 0 }}>✓</span>
-                <span style={{ fontSize: 13, color: "#eaf1f8", lineHeight: 1.4 }}>{t}</span>
-              </li>
-            ))}
-          </ul>
-          <button onClick={() => alert("Pagamento em breve! Estamos a preparar o Ippon Pro Max.")} style={{ width: "100%", marginTop: 16, background: MAX, color: "#0b1220", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 13, borderRadius: 11, fontSize: 14, cursor: "pointer" }}>
-            Quero o Pro Max · {PRECO.upgradeAtualComPeriodo}
-          </button>
-        </section>
+          <span style={{ color: MAX, fontSize: 20, flexShrink: 0 }}>›</span>
+        </a>
 
         {/* SCOUT — o teu time nesta competição */}
         <SectionTitle>O scout do teu time</SectionTitle>
