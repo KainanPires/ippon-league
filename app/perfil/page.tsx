@@ -14,7 +14,7 @@ const GOLD = "#d9a441";
 const INFO: { label: string; href?: string; soon?: boolean }[] = [
   { label: "Como se joga", href: "/como-jogar" },
   { label: "Sobre a Ippon League", href: "/sobre" },
-  { label: "Ippon Pro", href: "/sobre-pro" },
+  { label: "Ippon Pro e Pro Max", href: "/sobre-pro" },
   { label: "Perguntas frequentes", href: "/faq" },
   { label: "Termos de utilização", href: "/termos" },
   { label: "Política de privacidade", href: "/privacidade" },
