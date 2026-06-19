@@ -44,6 +44,12 @@ export interface LadoChave {
   nome: string;      // "BOUKLI Shirine"
   pais: string;      // "FRA"
   vencedor: boolean; // ganhou esta luta?
+  // Marcador REAL do judô nesta luta (não são pontos do jogo). Shido = nº de
+  // shidos que ESTE atleta recebeu (penalty do seu próprio lado no JudoBase).
+  ippon: number;
+  waza: number;
+  yuko: number;
+  shido: number;
 }
 export interface LutaChave {
   id: string;             // id_fight
@@ -59,11 +65,21 @@ export interface LutaChave {
 function lado(c: Bruto, cor: "blue" | "white"): LadoChave {
   const id = s(c[`id_person_${cor}`]);
   const winner = s(c["id_winner"]);
+  // No JudoBase os campos vêm com sufixo _b (blue) / _w (white).
+  const suf = cor === "blue" ? "b" : "w";
+  const n = (campo: string): number => {
+    const v = parseInt(s(c[campo]), 10);
+    return isNaN(v) ? 0 : v;
+  };
   return {
     id,
     nome: s(c[`person_${cor}`]) || "—",
     pais: s(c[`country_short_${cor}`]).toUpperCase() || "—",
     vencedor: !!id && id === winner,
+    ippon: n(`ippon_${suf}`),
+    waza: n(`waza_${suf}`),
+    yuko: n(`yuko_${suf}`),
+    shido: n(`penalty_${suf}`),
   };
 }
 
