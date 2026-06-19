@@ -79,6 +79,9 @@ export default function Inicio() {
   const [desempenho, setDesempenho] = useState<{ dados: DesempenhoRodada; team: TeamState } | null>(null);
   const [extra, setExtra] = useState<ResumoExtra | null>(null);
   const [desempenhoDaGaleria, setDesempenhoDaGaleria] = useState(false);
+  // O resumo aberto é AO VIVO (competição a decorrer, pontos parciais)? A galeria
+  // e os resultados congelados são sempre FINAIS (aoVivo=false).
+  const [desempenhoAoVivo, setDesempenhoAoVivo] = useState(false);
   const [galeriaAberta, setGaleriaAberta] = useState(false);
   const [userIdState, setUserIdState] = useState<string | null>(null);
   // Identidade (nome + escudo) a usar no cartão de resumo. Arranca da identidade
@@ -232,8 +235,11 @@ export default function Inicio() {
           if (dados) {
             await carregarIdentidadeResumo(aDecorrer.idCompeticao);
             if (!active) return;
+            setDesempenhoAoVivo(true);
             setDesempenho({ dados, team: teamComp });
-            await notificarResumo(aDecorrer.idCompeticao, aDecorrer.nome, dados);
+            // AO VIVO: NÃO criamos a notificação de resumo aqui — a competição
+            // ainda decorre. A notificação "fizeste X pontos" só sai quando a
+            // competição fecha (ramo dos resultados congelados, abaixo).
           }
           return;
         }
@@ -256,6 +262,7 @@ export default function Inicio() {
         if (!active) return;
         await carregarIdentidadeResumo(cong.comp);
         if (!active) return;
+        setDesempenhoAoVivo(false);
         setDesempenho({ dados, team: teamComp });
         setExtra(ex);
         await notificarResumo(cong.comp, cong.nome, dados);
@@ -322,6 +329,7 @@ export default function Inicio() {
     let ex: ResumoExtra | null = null;
     if (userIdState) ex = await buscarResumoExtra(cong.comp, userIdState);
     await carregarIdentidadeResumo(cong.comp);
+    setDesempenhoAoVivo(false);
     setDesempenho({ dados, team: teamComp });
     setExtra(ex);
     setDesempenhoDaGaleria(true);
@@ -554,17 +562,20 @@ export default function Inicio() {
           pro={isPro}
           extra={extra}
           daGaleria={desempenhoDaGaleria}
+          aoVivo={desempenhoAoVivo}
           userId={userIdState}
           onFechar={() => {
             setDesempenho(null);
             setExtra(null);
             setDesempenhoDaGaleria(false);
+            setDesempenhoAoVivo(false);
           }}
           onNaoMostrarMais={() => {
             marcarDesempenhoVisto(desempenho.dados.idCompeticao);
             setDesempenho(null);
             setExtra(null);
             setDesempenhoDaGaleria(false);
+            setDesempenhoAoVivo(false);
           }}
         />
       )}
