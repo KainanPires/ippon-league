@@ -49,21 +49,37 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
   const [estado, setEstado] = useState<EstadoPush>("pendente");
   const [aFazer, setAFazer] = useState(false);
   const [msg, setMsg] = useState("");
+  const [erro, setErro] = useState(false);
+  // "Subscrito AGORA neste aparelho": separa a SUBSCRIÇÃO (que controlamos) da
+  // PERMISSÃO do iOS (que fica "granted" mesmo após desativar). É isto que evita
+  // o botão ficar preso em "Desativar" depois de desativar. null = ainda não
+  // sabemos; true = acabou de ativar; false = acabou de desativar.
+  const [subscritoAgora, setSubscritoAgora] = useState<boolean | null>(null);
 
   useEffect(() => { setEstado(estadoPush()); }, []);
 
   async function ativar() {
-    setAFazer(true); setMsg("");
+    setAFazer(true); setMsg(""); setErro(false);
     const r = await ativarPush(userId);
     setAFazer(false);
     setEstado(estadoPush());
-    setMsg(r.ok ? "Notificações ativadas! 🥋" : (r.erro || "Não foi possível ativar."));
+    if (r.ok) {
+      setSubscritoAgora(true);
+      setErro(false);
+      // Diagnóstico útil: mostra a conta para onde foi registado, para se confirmar
+      // que é a conta certa (resolve casos de conta trocada no mesmo aparelho).
+      setMsg(`Notificações ativadas! 🥋 (conta ${userId.slice(0, 8)}…)`);
+    } else {
+      setErro(true);
+      setMsg(r.erro || "Não foi possível ativar.");
+    }
   }
   async function desativar() {
-    setAFazer(true); setMsg("");
+    setAFazer(true); setMsg(""); setErro(false);
     await desativarPush();
     setAFazer(false);
     setEstado(estadoPush());
+    setSubscritoAgora(false); // <- chave: o botão volta a "Ativar", não fica preso
     setMsg("Notificações desativadas neste aparelho.");
   }
 
@@ -85,6 +101,13 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
     );
   }
 
+  // Decide o que mostrar. A PERMISSÃO do iOS já não manda sozinha: o que manda é
+  // se o utilizador está subscrito AGORA. Se acabou de desativar (subscritoAgora
+  // === false), mostramos o botão "Ativar" mesmo com permissão "granted" — era
+  // aqui que o botão ficava preso.
+  const negadoNoSO = estado === "negado";
+  const mostrarComoAtivo = subscritoAgora === true || (subscritoAgora === null && estado === "concedido");
+
   return (
     <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
@@ -92,22 +115,22 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>Notificações</div>
           <div style={{ fontSize: 11.5, color: "#93a39a" }}>
-            {estado === "concedido" ? "Ativas neste aparelho" : estado === "negado" ? "Bloqueadas no navegador" : "Recebe avisos das tuas competições"}
+            {mostrarComoAtivo ? "Ativas neste aparelho" : negadoNoSO ? "Bloqueadas no navegador" : "Recebe avisos das tuas competições"}
           </div>
         </div>
       </div>
 
-      {estado === "concedido" ? (
-        <button onClick={desativar} disabled={aFazer} style={{ ...btnGhost, width: "100%" }}>Desativar notificações</button>
-      ) : estado === "negado" ? (
+      {negadoNoSO ? (
         <div style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.5 }}>
-          As notificações estão bloqueadas. Para ativar, vai às definições do navegador (ou do site) e permite notificações para a Ippon League.
+          As notificações estão bloqueadas nas definições do iPhone. Para ativar, vai a Definições → Notificações → Ippon League e permite as notificações.
         </div>
+      ) : mostrarComoAtivo ? (
+        <button onClick={desativar} disabled={aFazer} style={{ ...btnGhost, width: "100%" }}>{aFazer ? "A desativar..." : "Desativar notificações"}</button>
       ) : (
         <button onClick={ativar} disabled={aFazer} style={btnPri}>{aFazer ? "A ativar..." : "Ativar notificações"}</button>
       )}
 
-      {msg && <div style={{ fontSize: 11.5, color: "#7fd1a3", marginTop: 9 }}>{msg}</div>}
+      {msg && <div style={{ fontSize: 11.5, color: erro ? "#ef8d83" : "#7fd1a3", marginTop: 9, lineHeight: 1.5 }}>{msg}</div>}
     </div>
   );
 }
