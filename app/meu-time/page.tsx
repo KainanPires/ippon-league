@@ -12,7 +12,8 @@ import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, type TutKey } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
-import { TATAMES, TATAME_DEFAULT, tatamePorId, type TatameId } from "@/lib/tatames";
+import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
+import { useTatame } from "@/components/TatameProvider";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -486,11 +487,9 @@ function MeuTimeInner() {
   const [vistosConta, setVistosConta] = useState<Record<string, boolean> | null>(null);
   const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
   const [isPro, setIsPro] = useState(false);
-  // Personalização Pro Max: cor do tatame. tatameId = tema escolhido; isProMax
-  // decide se pode trocar (senão o seletor aparece bloqueado). seletorTatame
-  // abre/fecha o painel de escolha.
-  const [tatameId, setTatameId] = useState<TatameId>(TATAME_DEFAULT);
-  const [isProMax, setIsProMax] = useState(false);
+  // Personalização Pro Max: cor do tatame — agora via TatameProvider, para mudar
+  // na hora em todo o lado (Meu Time, central). seletorTatame abre/fecha o painel.
+  const { tatameId, isProMax, setTatame } = useTatame();
   const [seletorTatame, setSeletorTatame] = useState(false);
   const router = useRouter();
   // Marca "montar" (?montar=1): ativada pelo lixo. Enquanto está no ciclo
@@ -579,21 +578,6 @@ function MeuTimeInner() {
       try {
         const meta = (data.session as { user?: { user_metadata?: { is_pro?: boolean } } } | null)?.user?.user_metadata;
         setIsPro(!!meta?.is_pro);
-      } catch {}
-      // Cor do tatame (personalização Pro Max) — lê do servidor a escolha guardada
-      // e se a conta é Pro Max (decide se o seletor está desbloqueado).
-      try {
-        const uidT = (data.session as { user?: { id?: string } } | null)?.user?.id;
-        if (uidT) {
-          fetch(`/api/tatame?user_id=${encodeURIComponent(uidT)}`)
-            .then((r) => r.json())
-            .then((j) => {
-              if (!active || !j?.ok) return;
-              setTatameId(tatamePorId(j.tatame).id);
-              setIsProMax(!!j.is_pro_max);
-            })
-            .catch(() => {});
-        }
       } catch {}
       // Tutoriais já vistos na CONTA — buscar uma vez (decide o tutorial só
       // depois disto chegar, para não reaparecer por causa do timing).
@@ -952,18 +936,7 @@ function MeuTimeInner() {
               isProMax={isProMax}
               onEscolher={(id) => {
                 if (!isProMax) { router.push("/pro-max"); return; }
-                const anterior = tatameId;
-                setTatameId(id); // otimista
-                if (userId) {
-                  fetch("/api/tatame", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ user_id: userId, tatame: id }),
-                  })
-                    .then((r) => r.json())
-                    .then((j) => { if (!j?.ok) setTatameId(anterior); }) // reverte se falhar
-                    .catch(() => setTatameId(anterior));
-                }
+                void setTatame(id);
               }}
             />
 
