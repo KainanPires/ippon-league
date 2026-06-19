@@ -43,7 +43,7 @@ export default function DashboardPro() {
       return Boolean(u?.user_metadata?.is_pro_max);
     }
 
-    function arrancar(u: { user_metadata?: { nome?: string } } | null | undefined) {
+    function arrancar(u: { user_metadata?: { nome?: string; is_pro_max?: boolean } } | null | undefined) {
       if (!active) return;
       const m = u?.user_metadata || {};
       setNome(String(m.nome || "").trim().split(" ")[0] || "Campeão");
