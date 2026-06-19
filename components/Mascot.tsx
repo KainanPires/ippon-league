@@ -4,6 +4,13 @@
 // Mascote ornitorrinco judoca da Ippon League — o "Dôdo".
 // Expressões: feliz, determinado, comemorando, indicando, sabio (óculos).
 // A faixa (belt) muda de cor conforme o contexto.
+//
+// JUDOGUI (kimono): a cor vem do JudoguiProvider (escolha do Pro Max: branco ou
+// azul) e aplica-se em TODO o lado onde o Dôdo aparece, sem passar props. Pode
+// ser forçada via prop `judogui` (ex.: pré-visualização no seletor) — se não vier,
+// usa a cor global do contexto.
+
+import { useJudogui, type JudoguiCor } from "@/components/JudoguiProvider";
 
 export type MascotExpression =
   | "feliz"
@@ -12,13 +19,26 @@ export type MascotExpression =
   | "indicando"
   | "sabio";
 
+// Paleta do judogui por cor. corpo = preenchimento; borda = contorno;
+// golaA/golaB = as duas abas da gola.
+const JUDOGUI_CORES: Record<JudoguiCor, { corpo: string; borda: string; golaA: string; golaB: string }> = {
+  branco: { corpo: "#f6f3ea", borda: "#d8d1c0", golaA: "#ece5d5", golaB: "#e3dccb" },
+  azul:   { corpo: "#2f6fb3", borda: "#1f4e80", golaA: "#3f80c4", golaB: "#356fa8" },
+};
+
 export function Mascot({
   belt = "#141110",
   expression = "feliz",
+  judogui,
 }: {
   belt?: string;
   expression?: MascotExpression;
+  judogui?: JudoguiCor;
 }) {
+  const ctx = useJudogui();
+  const cor = judogui ?? ctx.judogui;
+  const J = JUDOGUI_CORES[cor] ?? JUDOGUI_CORES.branco;
+
   const happy = expression !== "determinado";
   const armsUp = expression === "comemorando";
   const pointing = expression === "indicando";
@@ -29,36 +49,36 @@ export function Mascot({
       <ellipse cx="72" cy="72" rx="13" ry="7.5" fill="#39998f" transform="rotate(-18 72 72)" />
       <line x1="65" y1="70" x2="79" y2="73" stroke="#2d7a72" strokeWidth="0.8" transform="rotate(-18 72 72)" />
       {/* corpo (judogi) */}
-      <path d="M50,40 C40,40 33,44 32,52 L30,80 C30,85 36,86 50,86 C64,86 70,85 70,80 L68,52 C67,44 60,40 50,40 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" />
+      <path d="M50,40 C40,40 33,44 32,52 L30,80 C30,85 36,86 50,86 C64,86 70,85 70,80 L68,52 C67,44 60,40 50,40 Z" fill={J.corpo} stroke={J.borda} strokeWidth="1" />
       {/* braço esquerdo: ao alto (comemorar) ou em repouso */}
       {armsUp ? (
         <>
-          <path d="M33,47 L20,34 L14,24 L27,30 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
+          <path d="M33,47 L20,34 L14,24 L27,30 Z" fill={J.corpo} stroke={J.borda} strokeWidth="1" strokeLinejoin="round" />
           <circle cx="14" cy="22" r="4.4" fill="#E65100" />
         </>
       ) : (
         <>
-          <path d="M33,47 L21,54 L25,63 L35,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
+          <path d="M33,47 L21,54 L25,63 L35,57 Z" fill={J.corpo} stroke={J.borda} strokeWidth="1" strokeLinejoin="round" />
           <circle cx="23" cy="62" r="4.2" fill="#E65100" />
         </>
       )}
       {/* braço direito: ao alto (comemorar/indicar) ou em repouso */}
       {armsUp || pointing ? (
         <>
-          <path d="M67,47 L80,34 L86,24 L73,30 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
+          <path d="M67,47 L80,34 L86,24 L73,30 Z" fill={J.corpo} stroke={J.borda} strokeWidth="1" strokeLinejoin="round" />
           <circle cx="86" cy="22" r="4.4" fill="#E65100" />
         </>
       ) : (
         <>
-          <path d="M67,47 L79,54 L75,63 L65,57 Z" fill="#f6f3ea" stroke="#d8d1c0" strokeWidth="1" strokeLinejoin="round" />
+          <path d="M67,47 L79,54 L75,63 L65,57 Z" fill={J.corpo} stroke={J.borda} strokeWidth="1" strokeLinejoin="round" />
           <circle cx="77" cy="62" r="4.2" fill="#E65100" />
         </>
       )}
       {/* cabeça */}
       <path d="M34,30 C34,18 42,12 50,12 C58,12 66,18 66,30 C66,38 60,43 50,43 C40,43 34,38 34,30 Z" fill="#4DB6AC" stroke="#2f8a80" strokeWidth="1" />
       {/* gola */}
-      <path d="M43,41 L50,53 L50,60 L41,51 Z" fill="#ece5d5" stroke="#d8d1c0" strokeWidth="0.6" />
-      <path d="M57,41 L50,53 L50,60 L59,51 Z" fill="#e3dccb" stroke="#d8d1c0" strokeWidth="0.6" />
+      <path d="M43,41 L50,53 L50,60 L41,51 Z" fill={J.golaA} stroke={J.borda} strokeWidth="0.6" />
+      <path d="M57,41 L50,53 L50,60 L59,51 Z" fill={J.golaB} stroke={J.borda} strokeWidth="0.6" />
       {/* faixa */}
       <rect x="28" y="65" width="44" height="8" rx="2" fill={belt} stroke="rgba(0,0,0,0.25)" strokeWidth="0.6" />
       <rect x="44" y="64" width="12" height="11" rx="2" fill={belt} />
