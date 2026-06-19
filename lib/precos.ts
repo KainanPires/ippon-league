@@ -47,6 +47,15 @@ export const PRECO = {
   get maxAtual(): string { return this.emPromocao ? MAX_PROMO : MAX_CHEIO; },
   get maxAtualComPeriodo(): string { return (this.emPromocao ? MAX_PROMO : MAX_CHEIO) + PERIODO; },
 
+  // --- Upgrade Pro -> Pro Max (para quem JÁ é Pro: paga só a parte Max) ---
+  // Promo de lançamento: +2,90/mês (metade da parte Max). Cheio: +4,90/mês.
+  // (A regra da janela de 7 dias entra com o pagamento real — ver nota no topo.)
+  upgradePromo: "+2,90€",
+  upgradeNormal: "+4,90€",
+  upgradePromoComPeriodo: "+2,90€" + PERIODO,
+  get upgradeAtual(): string { return this.emPromocao ? "+2,90€" : "+4,90€"; },
+  get upgradeAtualComPeriodo(): string { return (this.emPromocao ? "+2,90€" : "+4,90€") + PERIODO; },
+
   // Mensagem de valor (fase de testes: sem prémios — foco em informação/competição).
   premios: "Joga com mais informação e compete pelo topo do ranking",
 } as const;
