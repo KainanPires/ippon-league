@@ -1010,6 +1010,7 @@ function MeuTimeInner() {
             </div>
 
             {emCompeticao ? (
+              <>
               <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
                 A tua equipa está em competição. Podes acompanhar os pontos aqui — o mercado abre de novo para a próxima rodada.
                 {horaTick && (
@@ -1019,6 +1020,11 @@ function MeuTimeInner() {
                   </div>
                 )}
               </div>
+              <button onClick={() => setModal({ kind: "share" })} style={{ width: "100%", marginTop: 12, padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <ShareIcon />
+                Partilhar a minha equipa
+              </button>
+              </>
             ) : (
               <>
                 <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
@@ -1128,6 +1134,7 @@ function MeuTimeInner() {
           atletas={resolve(team.ids)}
           capitao={team.captain}
           pro={isPro}
+          pontos={emCompeticao ? pontos : undefined}
           onClose={() => setModal(null)}
         />
       )}
