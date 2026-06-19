@@ -79,9 +79,17 @@ const CARD_CSS = `
 .chip{flex-shrink:0;width:108px;height:62px;display:grid;place-items:center;border-radius:7px;background:var(--accent);color:var(--chip-text);font-family:'Courier New',Courier,monospace;font-weight:700;font-size:33px;letter-spacing:1px}
 .surname{flex:1;min-width:0;font-weight:700;font-size:52px;line-height:1;letter-spacing:0.5px;text-transform:uppercase;color:#f1ede2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .weight{flex-shrink:0;font-family:'Courier New',Courier,monospace;font-weight:500;font-size:32px;letter-spacing:0.5px;color:#93a39a}
+.pts{flex-shrink:0;font-family:'Courier New',Courier,monospace;font-weight:700;font-size:40px;letter-spacing:0.5px;min-width:120px;text-align:right}
+.pts.pos{color:#7fd1a3}
+.pts.neg{color:#ef8d83}
+.pts.zero{color:#93a39a}
+.pts.none{color:#5f6f67;font-size:30px}
 .row.is-captain{border-bottom:0;background:linear-gradient(90deg,rgba(217,164,65,0.16) 0%,rgba(217,164,65,0.07) 100%);border:2px solid rgba(217,164,65,0.55);border-radius:14px;padding:0 18px;box-shadow:0 0 30px rgba(217,164,65,0.14)}
 .cap-badge{flex-shrink:0;width:58px;height:58px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(180deg,#f1c969 0%,#d9a441 60%,#b9842c 100%);color:#20160a;font-weight:700;font-size:36px;margin-left:6px;box-shadow:0 0 22px rgba(217,164,65,0.5),inset 0 1px 0 rgba(255,255,255,0.5)}
 .jcard-foot{margin-top:14px;padding-top:26px;border-top:1.5px solid rgba(241,237,226,0.10);text-align:center}
+.foot-total{display:flex;align-items:center;justify-content:center;gap:22px;margin-bottom:20px}
+.foot-total .lbl{font-weight:700;font-size:34px;letter-spacing:3px;text-transform:uppercase;color:#93a39a}
+.foot-total .val{font-family:'Courier New',Courier,monospace;font-weight:700;font-size:60px;color:#d9a441}
 .foot-main{font-weight:700;font-size:48px;letter-spacing:8px;text-transform:uppercase;color:#d9a441;text-shadow:0 0 26px rgba(217,164,65,0.35)}
 .foot-main.pro{font-size:39px;letter-spacing:2px;line-height:1.12}
 .foot-sub{margin-top:10px;font-weight:300;font-size:27px;letter-spacing:1px;color:#93a39a}
@@ -118,7 +126,7 @@ function loadHtmlToImage(): Promise<any> {
   return _h2iPromise;
 }
 
-export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, onClose }: CartaoProps & { pro?: boolean; onClose: () => void }) {
+export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, pontos, onClose }: CartaoProps & { pro?: boolean; pontos?: Record<string, number>; onClose: () => void }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0.3);
@@ -208,7 +216,7 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, o
         {/* Pré-visualização: o cartão real (1080px) escalado para a largura do modal. */}
         <div ref={previewRef} style={{ width: "100%", aspectRatio: "1080 / 1350", borderRadius: 12, overflow: "hidden", marginBottom: 14, position: "relative", background: "#0c0e0d" }}>
           <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1350, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <CardNode innerRef={cardRef} vars={cardVars} pro={pro} belt={bk} beltName={b.name} identity={identity} linhas={linhas} capitao={capitao} />
+            <CardNode innerRef={cardRef} vars={cardVars} pro={pro} belt={bk} beltName={b.name} identity={identity} linhas={linhas} capitao={capitao} pontos={pontos} />
           </div>
         </div>
 
@@ -223,7 +231,7 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, o
 }
 
 // O nó do cartão a 1080×1350 — é isto que o html-to-image captura.
-function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capitao }: {
+function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capitao, pontos }: {
   innerRef: { current: HTMLDivElement | null };
   vars: CSSProperties;
   pro: boolean;
@@ -232,8 +240,23 @@ function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capit
   identity: Identity;
   linhas: Athlete[];
   capitao: string | null;
+  pontos?: Record<string, number>;
 }) {
   const accent = (vars as any)["--accent"] as string;
+  // Há pontuação para mostrar? (modo competição). Se vier o mapa de pontos com
+  // pelo menos uma entrada, mostramos a coluna de pontos e o total no rodapé.
+  const temPontos = !!pontos && Object.keys(pontos).length > 0;
+  // Total da equipa: soma dos pontos, dobrando o capitão. Só atletas com pontos.
+  const total = temPontos
+    ? Math.round(
+        linhas.reduce((s, a) => {
+          const p = pontos![a.id];
+          if (typeof p !== "number") return s;
+          return s + (a.id === capitao ? p * 2 : p);
+        }, 0) * 10
+      ) / 10
+    : 0;
+
   return (
     <div ref={innerRef} className={`jcard belt-${belt} ${pro ? "is-pro" : ""}`} style={vars}>
       <div className="jcard-bg" />
@@ -251,17 +274,30 @@ function CardNode({ innerRef, vars, pro, belt, beltName, identity, linhas, capit
         <div className="roster">
           {linhas.map((a, i) => {
             const cap = capitao != null && a.id === capitao;
+            // Pontos do atleta (já dobrados se capitão). undefined = ainda sem pontos.
+            const base = temPontos ? pontos![a.id] : undefined;
+            const tem = typeof base === "number";
+            const val = tem ? (cap ? (base as number) * 2 : (base as number)) : null;
+            const cls = !temPontos ? "" : val === null ? "none" : val > 0 ? "pos" : val < 0 ? "neg" : "zero";
             return (
               <div key={i} className={`row ${cap ? "is-captain" : ""}`}>
                 <span className="chip">{code3(a.countryIso)}</span>
                 <span className="surname">{sobrenome(a.name)}</span>
-                <span className="weight">{a.category}KG</span>
+                {temPontos
+                  ? <span className={`pts ${cls}`}>{val === null ? "—" : `${val > 0 ? "+" : ""}${val}`}</span>
+                  : <span className="weight">{a.category}KG</span>}
                 {cap && <span className="cap-badge">C</span>}
               </div>
             );
           })}
         </div>
         <footer className="jcard-foot">
+          {temPontos && (
+            <div className="foot-total">
+              <span className="lbl">Total da rodada</span>
+              <span className="val">{total > 0 ? "+" : ""}{total} pts</span>
+            </div>
+          )}
           {pro ? (
             <>
               <div className="foot-main pro">JOGA COM VANTAGEM.<br />SÊ IPPON PRO.</div>
