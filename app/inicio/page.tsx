@@ -538,12 +538,21 @@ export default function Inicio() {
             <div style={{ fontSize: 12, color: "#93a39a", marginTop: 3, lineHeight: 1.4 }}>
               A competição está a decorrer. Acompanha o chaveamento ao vivo e segue o caminho dos teus atletas na chave.
             </div>
-            {/* Botão para a chave ao vivo. Hoje aparece a quem tem sessão (igual à
-                página /chave, ainda aberta a todos). QUANDO o Pro Max existir,
-                troca-se a condição !visitante por "é Pro Max" — e fecha-se a
-                /chave no mesmo momento, para botão e porta ficarem coerentes. */}
-            {!visitante && (
-              <a href="/chave" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 11, background: "#15110a", border: `1px solid ${GOLD}`, borderRadius: 10, padding: "10px 13px", textDecoration: "none", color: "#f1ede2" }}>
+            {/* Botão para a chave ao vivo. Aparece a todos (com competição a
+                decorrer), mas com destinos diferentes por nível:
+                - visitante → entrar (e voltar à chave);
+                - grátis → página de vendas (/ippon-pro);
+                - Pro e Pro Max → /chave-atletas. A própria página mostra a versão
+                  certa: Pro vê congelada + convite Pro Max; Pro Max vê ao vivo. */}
+            {(() => {
+              const temAcesso = isPro || isProMax;
+              const destinoChave = visitante
+                ? "/entrar?voltar=/chave-atletas"
+                : temAcesso
+                  ? "/chave-atletas"
+                  : "/ippon-pro";
+              return (
+              <a href={destinoChave} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 11, background: "#15110a", border: `1px solid ${GOLD}`, borderRadius: 10, padding: "10px 13px", textDecoration: "none", color: "#f1ede2" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
                   <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 8, background: "#1c3a2e", flexShrink: 0 }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#aee9c9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>
@@ -551,11 +560,12 @@ export default function Inicio() {
                   <span style={{ fontSize: 13, fontWeight: 700 }}>Acompanha o chaveamento ao vivo</span>
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
-                  <span style={{ fontSize: 9.5, color: "#3a2a08", background: GOLD, borderRadius: 999, padding: "2px 8px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro Max</span>
+                  {!temAcesso && <span style={{ fontSize: 9.5, color: "#3a2a08", background: GOLD, borderRadius: 999, padding: "2px 8px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro</span>}
                   <span style={{ color: GOLD, fontSize: 18 }}>›</span>
                 </span>
               </a>
-            )}
+              );
+            })()}
           </Card>
         )}
 
