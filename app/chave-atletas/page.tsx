@@ -394,9 +394,14 @@ export default function ChaveAtletasPage() {
         .ilpulse{animation:ilpulse 1.2s ease-in-out infinite}
         @keyframes ilpontopulse{0%{box-shadow:0 0 0 0 rgba(95,211,138,0.55)}70%{box-shadow:0 0 0 6px rgba(95,211,138,0)}100%{box-shadow:0 0 0 0 rgba(95,211,138,0)}}
         .ilponto{animation:ilpontopulse 1.4s ease-out infinite}
-        @media (prefers-reduced-motion: reduce){.ilpulse{animation:none}.ilponto{animation:none}}
-        .il-scroll::-webkit-scrollbar{height:8px}
-        .il-scroll::-webkit-scrollbar-thumb{background:#243029;border-radius:8px}
+        @media (prefers-reduced-motion: reduce){.ilpulse{animation:none}.ilponto{animation:none}.ildesliza{animation:none}}
+        .il-scroll::-webkit-scrollbar{height:10px}
+        .il-scroll::-webkit-scrollbar-track{background:#11160f;border-radius:8px}
+        .il-scroll::-webkit-scrollbar-thumb{background:#3a4a42;border-radius:8px}
+        .il-scroll::-webkit-scrollbar-thumb:hover{background:#4c5f55}
+        .il-scroll{scrollbar-color:#3a4a42 #11160f}
+        @keyframes ildeslizax{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+        .ildesliza{animation:ildeslizax 1.6s ease-in-out infinite;display:inline-block}
       `}</style>
 
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "16px 14px 60px" }}>
@@ -460,18 +465,18 @@ export default function ChaveAtletasPage() {
               return <Bloco key={p} titulo={`Pool ${p}`} arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="Vence o pool" />;
             })}
 
-            {/* Meias + Final */}
-            {(() => {
-              const { arvores, arestas } = arvoreMeiasFinal(chave);
-              const proxima = proximaLutaId([...(chave.meias || []), chave.final]);
-              return <Bloco titulo="Meias-finais e Final" arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="🥇 Campeão" />;
-            })()}
-
-            {/* Repescagem + Bronze */}
+            {/* Repescagem + Bronze (antes da final) */}
             {(() => {
               const { arvores, arestas } = arvoreRepBronze(chave);
               const proxima = proximaLutaId([...(chave.repescagens || []), ...(chave.bronzes || [])]);
               return <Bloco titulo="Repescagem e Bronzes" arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="🥉 Bronze" />;
+            })()}
+
+            {/* Meias + Final (a final é a última luta da categoria) */}
+            {(() => {
+              const { arvores, arestas } = arvoreMeiasFinal(chave);
+              const proxima = proximaLutaId([...(chave.meias || []), chave.final]);
+              return <Bloco titulo="Meias-finais e Final" arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="🥇 Campeão" />;
             })()}
           </>
         )}
@@ -488,8 +493,15 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
   titulo: string; arvores: Arvore[]; arestas: Aresta[]; proxima: string | null; rotuloVencedor: string;
 }) {
   const innerRef = useRef<HTMLDivElement | null>(null);
+  const outerRef = useRef<HTMLDivElement | null>(null);
   const refs = useRef<Map<string, HTMLElement>>(new Map());
   const [paths, setPaths] = useState<string[]>([]);
+  const [temScroll, setTemScroll] = useState(false);
+
+  const medirScroll = useCallback(() => {
+    const o = outerRef.current;
+    if (o) setTemScroll(o.scrollWidth > o.clientWidth + 4);
+  }, []);
 
   const setRef = useCallback((key: string) => (el: HTMLElement | null) => {
     const m = refs.current;
@@ -519,17 +531,18 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
 
   useLayoutEffect(() => {
     calcular();
+    medirScroll();
     const inner = innerRef.current;
     let ro: ResizeObserver | null = null;
     if (inner && typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => calcular());
+      ro = new ResizeObserver(() => { calcular(); medirScroll(); });
       ro.observe(inner);
     }
-    const onR = () => calcular();
+    const onR = () => { calcular(); medirScroll(); };
     window.addEventListener("resize", onR);
-    const t = setTimeout(calcular, 80);
+    const t = setTimeout(() => { calcular(); medirScroll(); }, 80);
     return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", onR); clearTimeout(t); };
-  }, [calcular, arvores]);
+  }, [calcular, medirScroll, arvores]);
 
   const renderNo = (no: No): ReactNode => {
     if (no.tipo === "bye") {
@@ -550,28 +563,40 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
   return (
     <ProximaContexto.Provider value={proxima}>
     <section style={{ marginTop: 26 }}>
-      <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cfd8d2", marginBottom: 12 }}>
-        {titulo}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cfd8d2" }}>
+          {titulo}
+        </span>
+        {temScroll && (
+          <span style={{ fontFamily: FD, fontSize: 10, color: "#7c8a82", letterSpacing: "0.04em", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span className="ildesliza">→</span> deslize para ver toda a chave
+          </span>
+        )}
       </div>
       {arvores.length === 0 ? (
         <Vazio texto="Sem lutas nesta fase ainda." />
       ) : (
-        <div className="il-scroll" style={{ overflowX: "auto", paddingBottom: 8 }}>
-          <div ref={innerRef} style={{ position: "relative", width: "max-content", display: "flex", flexDirection: "column", gap: 22 }}>
-            <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }} aria-hidden="true">
-              {paths.map((d, i) => <path key={i} d={d} fill="none" stroke={LINHA} strokeWidth={1.5} />)}
-            </svg>
-            {arvores.map((a, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: COLGAP, position: "relative" }}>
-                {renderNo(a.no)}
-                {a.vencedor && (
-                  <div ref={setRef(a.vencedor.key)}>
-                    <CaixaVencedor lado={a.vencedor.lado} rotulo={rotuloVencedor} />
-                  </div>
-                )}
-              </div>
-            ))}
+        <div style={{ position: "relative" }}>
+          <div ref={outerRef} className="il-scroll" style={{ overflowX: "auto", paddingBottom: 10 }}>
+            <div ref={innerRef} style={{ position: "relative", width: "max-content", display: "flex", flexDirection: "column", gap: 22 }}>
+              <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }} aria-hidden="true">
+                {paths.map((d, i) => <path key={i} d={d} fill="none" stroke={LINHA} strokeWidth={1.5} />)}
+              </svg>
+              {arvores.map((a, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: COLGAP, position: "relative" }}>
+                  {renderNo(a.no)}
+                  {a.vencedor && (
+                    <div ref={setRef(a.vencedor.key)}>
+                      <CaixaVencedor lado={a.vencedor.lado} rotulo={rotuloVencedor} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
+          {temScroll && (
+            <div aria-hidden="true" style={{ position: "absolute", top: 0, right: 0, bottom: 10, width: 52, pointerEvents: "none", background: `linear-gradient(to right, rgba(12,14,13,0), ${FUNDO})` }} />
+          )}
         </div>
       )}
     </section>
