@@ -135,6 +135,35 @@ function consumir(
   return null;
 }
 
+// Constrói os "slots" da 1ª ronda em ordem POSICIONAL (como o quadro IJF):
+// empareia atletas-lutadores consecutivos da moldura; os byes ficam NA SUA
+// POSIÇÃO. NÃO mover byes para o topo — é isso que garante que os cruzamentos
+// dos quartos saem como no quadro real.
+function construirSlots(
+  ordem: string[],
+  byes: string[]
+): Array<{ bye?: string; match?: [string, string] }> {
+  const isBye = (id: string) => byes.includes(id);
+  const fighters = ordem.filter((id) => !isBye(id));
+  const segundos = new Set<string>();
+  const matchAt: Record<number, [string, string]> = {};
+  for (let k = 0; k < fighters.length; k += 2) {
+    const a = fighters[k];
+    const b = fighters[k + 1];
+    if (b === undefined) continue; // ímpar (defensivo): trata-se como avanço
+    matchAt[ordem.indexOf(a)] = [a, b];
+    segundos.add(b);
+  }
+  const slots: Array<{ bye?: string; match?: [string, string] }> = [];
+  ordem.forEach((id, idx) => {
+    if (isBye(id)) slots.push({ bye: id });
+    else if (segundos.has(id)) { /* já está no match do parceiro */ }
+    else if (matchAt[idx]) slots.push({ match: matchAt[idx] });
+    else slots.push({ bye: id }); // lutador sem par (defensivo): avança
+  });
+  return slots;
+}
+
 function resolverCorpoPool(
   poolId: PoolId,
   ordem: string[],
@@ -166,18 +195,14 @@ function resolverCorpoPool(
     return { venc };
   };
 
-  const naoBye = ordem.filter((id) => !byes.includes(id));
-  const comBye = ordem.filter((id) => byes.includes(id));
-
-  // 1ª ronda (entre não-byes)
+  // 1ª ronda: construção POSICIONAL (byes na posição certa do quadro).
+  const slots = construirSlots(ordem, byes);
   let nivel: (string | null)[] = [];
-  for (let i = 0; i < naoBye.length; i += 2) {
-    const a = naoBye[i] ?? null;
-    const b = naoBye[i + 1] ?? null;
-    if (a && !b) { nivel.push(a); continue; } // sobra ímpar: passa
+  for (const s of slots) {
+    if (s.bye) { nivel.push(s.bye); continue; } // bye: avança sem luta
+    const [a, b] = s.match!;
     nivel.push(novoNo(a, b, false).venc);
   }
-  nivel = [...comBye, ...nivel];
 
   // rondas seguintes até sobrarem 2 (esses 2 são os finalistas; a luta entre eles
   // é a FINAL do pool, resolvida na fase de medalhas)
