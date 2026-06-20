@@ -414,12 +414,13 @@ export default function ChaveAtletasPage() {
         <div style={{ maxWidth: 440, textAlign: "center" }}>
           <div style={{ fontSize: 34, marginBottom: 10 }}>🔒</div>
           <h1 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>Chave de Atletas</h1>
-          <p style={{ fontSize: 15, lineHeight: 1.5, color: "#bcc7c0", margin: "0 0 22px" }}>
-            O quadro de chaves ao vivo é exclusivo dos assinantes Ippon Pro e Pro Max.
-            Acompanha o caminho de cada atleta, da primeira luta ao pódio.
+          <p style={{ fontSize: 15, lineHeight: 1.55, color: "#bcc7c0", margin: "0 0 22px" }}>
+            Marca os teus atletas favoritos com uma estrela e acompanha o chaveamento ao vivo:
+            recebe uma notificação no telemóvel quando o teu atleta vai lutar, quando vence e quando
+            avança — luta a luta, da primeira ronda ao pódio.
           </p>
           <a href="/ippon-pro" style={{ display: "inline-block", background: GOLD, color: "#10130f", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px 22px", borderRadius: 10, textDecoration: "none" }}>
-            Conhecer o Ippon Pro
+            Conhecer os planos
           </a>
         </div>
       </main>
@@ -486,6 +487,19 @@ export default function ChaveAtletasPage() {
           </span>
         </div>
 
+        {nivel === "pro" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "0 0 10px", padding: "12px 14px", borderRadius: 11, background: "rgba(217,164,65,0.08)", border: `1px solid ${GOLD}` }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>⭐</span>
+            <span style={{ flex: 1, minWidth: 200, fontSize: 13, lineHeight: 1.5, color: "#e7dcc2" }}>
+              Marca o teu atleta favorito e recebe uma notificação a cada luta dele — quando vai lutar,
+              quando vence e quando avança — a acompanhar o chaveamento ao vivo, da primeira luta ao pódio.
+            </span>
+            <a href="/ippon-pro-max" style={{ flexShrink: 0, background: GOLD, color: "#10130f", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "9px 16px", borderRadius: 9, textDecoration: "none", whiteSpace: "nowrap" }}>
+              Seja Pro Max
+            </a>
+          </div>
+        )}
+
         {existeMoldura === false ? (
           <Tela texto="A chave desta categoria ainda não está disponível." />
         ) : !chave ? (
@@ -494,12 +508,13 @@ export default function ChaveAtletasPage() {
           <div style={{ textAlign: "center", padding: "48px 24px", marginTop: 8, borderRadius: 12, background: "rgba(127,184,245,0.06)", border: "1px solid #243a52" }}>
             <div style={{ fontSize: 30, marginBottom: 10 }}>⏳</div>
             <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>Categoria a decorrer</h2>
-            <p style={{ fontSize: 14, lineHeight: 1.5, color: "#bcc7c0", maxWidth: 420, margin: "0 auto 18px" }}>
-              O acompanhamento ao vivo é exclusivo do Pro Max. Vais poder ver o
-              resultado completo desta categoria assim que ela terminar e tiver campeão.
+            <p style={{ fontSize: 14, lineHeight: 1.55, color: "#bcc7c0", maxWidth: 440, margin: "0 auto 18px" }}>
+              Com o Pro Max acompanhas o chaveamento ao vivo e recebes uma notificação a cada luta do
+              teu atleta favorito — quando vai lutar, quando vence e quando avança. Sem Pro Max, vês o
+              resultado completo desta categoria assim que ela terminar.
             </p>
             <a href="/ippon-pro-max" style={{ display: "inline-block", background: GOLD, color: "#10130f", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 20px", borderRadius: 10, textDecoration: "none" }}>
-              Acompanhar ao vivo com o Pro Max
+              Seja Pro Max
             </a>
           </div>
         ) : (
