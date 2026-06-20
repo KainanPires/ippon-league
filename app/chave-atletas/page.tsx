@@ -28,7 +28,6 @@ import {
   createContext, useContext,
 } from "react";
 import type { ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { uid } from "@/lib/team";
 import { focoMercado } from "@/lib/calendario";
@@ -76,10 +75,12 @@ type Arvore = { no: No; vencedor: { key: string; lado: Lado } | null };
 // Helpers
 // ----------------------------------------------------------------------------
 function sobrenome(nome?: string): string {
+  // Mostra "Primeiro Último" (nome + sobrenome). Se só houver uma palavra, mostra-a.
   const t = (nome || "").trim();
   if (!t || t === "—") return "—";
   const p = t.split(/\s+/);
-  return p[p.length - 1] || t;
+  if (p.length === 1) return p[0];
+  return p[0] + " " + p[p.length - 1];
 }
 
 function ladoDe(lugar: Lugar | undefined, vencedorId: string | null): Lado {
@@ -281,8 +282,7 @@ const PontosContexto = createContext<Record<string, InfoAtleta> | null>(null);
 // Página
 // ----------------------------------------------------------------------------
 export default function ChaveAtletasPage() {
-  const router = useRouter();
-  const [acesso, setAcesso] = useState<"verificar" | "ok" | "negado">("verificar");
+  const [nivel, setNivel] = useState<"verificar" | "promax" | "pro" | "gratis">("verificar");
 
   const foco = useMemo(() => focoMercado(), []);
   const compInicial = foco.aDecorrer?.idCompeticao || foco.atual?.idCompeticao || (foco as { alvo?: { idCompeticao?: string } }).alvo?.idCompeticao || "";
@@ -301,18 +301,19 @@ export default function ChaveAtletasPage() {
   const [pendentes, setPendentes] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string>("anon");
 
-  // Acesso só Pro Max.
+  // Nível do utilizador: Pro Max (vê tudo ao vivo), Pro (só início ou final),
+  // grátis (não vê chave). Não redireciona — mostra na própria página.
   useEffect(() => {
     let vivo = true;
     supabase.auth.getUser().then(({ data }) => {
       if (!vivo) return;
       const meta = (data.user?.user_metadata || {}) as Record<string, unknown>;
-      if (Boolean(meta.is_pro_max)) { setAcesso("ok"); return; }
-      setAcesso("negado");
-      router.replace(Boolean(meta.is_pro) ? "/pro" : "/ippon-pro");
+      if (Boolean(meta.is_pro_max)) setNivel("promax");
+      else if (Boolean(meta.is_pro)) setNivel("pro");
+      else setNivel("gratis");
     });
     return () => { vivo = false; };
-  }, [router]);
+  }, []);
 
   // Carregar favoritos.
   useEffect(() => {
@@ -378,20 +379,56 @@ export default function ChaveAtletasPage() {
   }, [comp, cat]);
 
   useEffect(() => {
-    if (acesso !== "ok") return;
+    if (nivel !== "promax" && nivel !== "pro") return;
     setChave(null); setMoldura(null); setExisteMoldura(null);
     carregar();
     const t = setInterval(carregar, 60000);
     return () => clearInterval(t);
-  }, [acesso, carregar]);
+  }, [nivel, carregar]);
 
   const nomes = useMemo(() => (chave ? mapearNomes(chave) : {}), [chave]);
   const nomeDe = useCallback((id: string | null) => (id && nomes[id] ? sobrenome(nomes[id].nome) : "—"), [nomes]);
 
-  if (acesso === "verificar") return <Tela texto="A verificar acesso…" />;
-  if (acesso === "negado") return <Tela texto="A redirecionar…" />;
+  // Estado da categoria atual, derivado da chave:
+  //  - "terminada": já há campeão (final decidida);
+  //  - "aDecorrer": há lutas decididas mas ainda sem campeão;
+  //  - "naoComecou": nenhuma luta decidida ainda (quadro no estado inicial).
+  const estadoCat: "naoComecou" | "aDecorrer" | "terminada" = useMemo(() => {
+    if (!chave) return "naoComecou";
+    if (chave.campeao) return "terminada";
+    const todas: Luta[] = [
+      ...Object.values(chave.pools).flatMap((p) => p.lutas || []),
+      ...(chave.meias || []),
+      ...(chave.final ? [chave.final] : []),
+      ...(chave.repescagens || []),
+      ...(chave.bronzes || []),
+    ];
+    return todas.some((l) => l && l.vencedor) ? "aDecorrer" : "naoComecou";
+  }, [chave]);
+
+  if (nivel === "verificar") return <Tela texto="A verificar acesso…" />;
+
+  if (nivel === "gratis") {
+    return (
+      <main style={{ minHeight: "100vh", background: FUNDO, color: "#f1ede2", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ maxWidth: 440, textAlign: "center" }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>🔒</div>
+          <h1 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>Chave de Atletas</h1>
+          <p style={{ fontSize: 15, lineHeight: 1.5, color: "#bcc7c0", margin: "0 0 22px" }}>
+            O quadro de chaves ao vivo é exclusivo dos assinantes Ippon Pro e Pro Max.
+            Acompanha o caminho de cada atleta, da primeira luta ao pódio.
+          </p>
+          <a href="/ippon-pro" style={{ display: "inline-block", background: GOLD, color: "#10130f", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px 22px", borderRadius: 10, textDecoration: "none" }}>
+            Conhecer o Ippon Pro
+          </a>
+        </div>
+      </main>
+    );
+  }
 
   const generoCat = CATS_M.includes(cat) ? "masc." : "fem.";
+  // Pro vê o quadro inicial e o resultado final, mas não o decorrer ao vivo.
+  const bloquearPro = nivel === "pro" && estadoCat === "aDecorrer";
 
   return (
     <FavoritosContexto.Provider value={favCtx}>
@@ -421,7 +458,7 @@ export default function ChaveAtletasPage() {
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, lineHeight: 1.05 }}>Chave ao vivo</h1>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#7fb8f5", border: "1px solid #7fb8f5", borderRadius: 4, padding: "1px 6px", letterSpacing: 0.5 }}>PRO MAX</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#7fb8f5", border: "1px solid #7fb8f5", borderRadius: 4, padding: "1px 6px", letterSpacing: 0.5 }}>{nivel === "promax" ? "PRO MAX" : "PRO"}</span>
               </div>
               <div style={{ fontSize: 12, color: "#93a39a", marginTop: 1 }}>O quadro monta-se sozinho conforme os resultados chegam · {cat} kg {generoCat}</div>
             </div>
@@ -453,6 +490,18 @@ export default function ChaveAtletasPage() {
           <Tela texto="A chave desta categoria ainda não está disponível." />
         ) : !chave ? (
           <Tela texto="A carregar a chave…" />
+        ) : bloquearPro ? (
+          <div style={{ textAlign: "center", padding: "48px 24px", marginTop: 8, borderRadius: 12, background: "rgba(127,184,245,0.06)", border: "1px solid #243a52" }}>
+            <div style={{ fontSize: 30, marginBottom: 10 }}>⏳</div>
+            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>Categoria a decorrer</h2>
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: "#bcc7c0", maxWidth: 420, margin: "0 auto 18px" }}>
+              O acompanhamento ao vivo é exclusivo do Pro Max. Vais poder ver o
+              resultado completo desta categoria assim que ela terminar e tiver campeão.
+            </p>
+            <a href="/ippon-pro-max" style={{ display: "inline-block", background: GOLD, color: "#10130f", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 20px", borderRadius: 10, textDecoration: "none" }}>
+              Acompanhar ao vivo com o Pro Max
+            </a>
+          </div>
         ) : (
           <>
             {/* Pódio (se houver) */}
