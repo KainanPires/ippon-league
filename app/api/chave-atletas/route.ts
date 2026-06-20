@@ -81,7 +81,7 @@ export async function GET(req: Request) {
   // 2) Movimento + pontos + ações da TABELA (mantida fresca pelo cron).
   const { data: res } = await supabaseAdmin
     .from("resultados_atletas")
-    .select("id_person, nome, country_code, vitorias, derrotas, pontos, n_lutas, acoes")
+    .select("id_person, nome, country_code, vitorias, derrotas, pontos, n_lutas, vencidos, acoes")
     .eq("id_competicao", comp)
     .eq("weight_category", cat);
   const resultados: ResultadosPorId = {};
@@ -89,7 +89,8 @@ export async function GET(req: Request) {
   const infos: Record<string, { pontos: number; nLutas: number; acoes: unknown }> = {};
   for (const r of res || []) {
     const id = String(r.id_person);
-    resultados[id] = { vitorias: Number(r.vitorias) || 0, derrotas: Number(r.derrotas) || 0 };
+    const venc = Array.isArray(r.vencidos) ? (r.vencidos as unknown[]).map((x) => String(x)) : [];
+    resultados[id] = { vitorias: Number(r.vitorias) || 0, derrotas: Number(r.derrotas) || 0, vencidos: venc };
     identidades[id] = { nome: r.nome ? String(r.nome) : undefined, pais: r.country_code ? String(r.country_code) : undefined };
     infos[id] = { pontos: Number(r.pontos) || 0, nLutas: Number(r.n_lutas) || 0, acoes: r.acoes ?? null };
   }
