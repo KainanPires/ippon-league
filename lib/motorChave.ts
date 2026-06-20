@@ -121,9 +121,9 @@ function consumir(
   wl: Record<string, number>
 ): string | null {
   // Pré-final: o perdedor já está eliminado -> wl=0; o vencedor tem wl>0.
-  if (!a && !b) return null;
-  if (a && !b) return a; // bye/passagem direta
-  if (b && !a) return b;
+  // Lado em falta = feeder ainda pendente (os byes REAIS são tratados ao nível
+  // dos slots, não aqui). Pendente -> não decide, NÃO avança.
+  if (!a || !b) return null;
   const wa = wl[a!] ?? 0;
   const wb = wl[b!] ?? 0;
   if (wa > 0 && wb <= 0) { wl[a!] = wa - 1; return a!; }
@@ -211,7 +211,8 @@ function resolverCorpoPool(
     for (let i = 0; i < nivel.length; i += 2) {
       const a = nivel[i] ?? null;
       const b = nivel[i + 1] ?? null;
-      if (a && !b) { prox.push(a); continue; }
+      // sem atalho de "bye": se um lado está pendente, o nó fica por decidir
+      // (o atleta NÃO avança até a luta acontecer).
       prox.push(novoNo(a, b, false).venc);
     }
     nivel = prox;
