@@ -30,7 +30,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const ORCAMENTO_MS = 7000; // pára de pegar categorias novas depois disto (margem < 10s)
+const ORCAMENTO_MS = 5000; // pára de pegar categorias novas depois disto. Mesmo que
+                           // a última comece aqui e demore ~3-4s, fica < 10s (Hobby).
 const LOTE_ATLETAS = 12;   // chamadas em paralelo ao JudoBase, por categoria
 
 const n = (v: unknown): number => { const x = parseInt(String(v ?? "0"), 10); return isNaN(x) ? 0 : x; };
