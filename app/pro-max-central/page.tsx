@@ -123,6 +123,18 @@ export default function ProMaxCentral() {
           </section>
         )}
 
+        {/* CHAVE DE ATLETAS — atalho para a chave ao vivo (Pro Max vê tudo em direto). */}
+        <a href="/chave-atletas" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 14, padding: "13px 14px", marginBottom: 18, color: "#f1ede2" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1c3a2e", flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aee9c9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: MAX }}>Chave ao vivo</div>
+            <div style={{ fontSize: 12, color: "#9fb3cc", marginTop: 1, lineHeight: 1.4 }}>Acompanha cada categoria em direto e segue os teus favoritos.</div>
+          </div>
+          <span style={{ color: MAX, fontSize: 20, flexShrink: 0 }}>›</span>
+        </a>
+
         {/* Vantagens — fecháveis (permanente) */}
         {verVantagens && (
           <section style={{ position: "relative", background: "#101722", border: "1px solid #24364a", borderRadius: 16, padding: "16px 16px 14px", marginBottom: 18 }}>
