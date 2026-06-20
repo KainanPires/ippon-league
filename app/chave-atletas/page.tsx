@@ -272,6 +272,10 @@ interface FavCtx {
 const FavoritosContexto = createContext<FavCtx | null>(null);
 const ProximaContexto = createContext<string | null>(null);
 
+// Pontos Ippon por atleta (id -> { pontos, nLutas }), para o badge no cartão.
+type InfoAtleta = { pontos: number; nLutas: number };
+const PontosContexto = createContext<Record<string, InfoAtleta> | null>(null);
+
 // ----------------------------------------------------------------------------
 // Página
 // ----------------------------------------------------------------------------
@@ -285,6 +289,7 @@ export default function ChaveAtletasPage() {
   const [cat, setCat] = useState<string>(CAT_INICIAL);
 
   const [chave, setChave] = useState<Chave | null>(null);
+  const [infos, setInfos] = useState<Record<string, InfoAtleta>>({});
   const [moldura, setMoldura] = useState<Moldura | null>(null);
   const [existeMoldura, setExisteMoldura] = useState<boolean | null>(null);
   const [aCarregar, setACarregar] = useState(false);
@@ -363,6 +368,7 @@ export default function ChaveAtletasPage() {
       if (j?.ok) {
         setExisteMoldura(!!j.existeMoldura);
         setChave(j.chave || null);
+        setInfos(j.infos || {});
         setMoldura(j.moldura || null);
         setQuando(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
       }
@@ -388,6 +394,7 @@ export default function ChaveAtletasPage() {
 
   return (
     <FavoritosContexto.Provider value={favCtx}>
+    <PontosContexto.Provider value={infos}>
     <main style={{ minHeight: "100vh", background: FUNDO, color: "#f1ede2", fontFamily: FB }}>
       <style>{`
         @keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -482,6 +489,7 @@ export default function ChaveAtletasPage() {
         )}
       </div>
     </main>
+    </PontosContexto.Provider>
     </FavoritosContexto.Provider>
   );
 }
@@ -651,6 +659,11 @@ function LinhaLado({ lado, esmaecido, decidida, semEstrela }: { lado: Lado; esma
   const cor = vazio ? "#5a665e" : esmaecido ? "#6b7a72" : venceu ? "#f1ede2" : decidida ? "#7c8a82" : "#a9b4ac";
   const destaque = venceu && !semEstrela; // contorno dourado só nas lutas reais
   const fav = useContext(FavoritosContexto);
+  const pontosCtx = useContext(PontosContexto);
+  const info = !esmaecido && lado.id ? pontosCtx?.[lado.id] : undefined;
+  const temPontos = !!info && info.nLutas > 0;
+  const pts = info?.pontos ?? 0;
+  const corPts = pts > 0 ? "#5fd38a" : pts < 0 ? "#e0796d" : "#7c8a82";
   const mostraEstrela = !semEstrela && !esmaecido && !!fav?.ativo && !!lado.id;
   const ehFavorito = mostraEstrela && fav!.favoritos.has(lado.id);
   const aGravar = mostraEstrela && fav!.pendentes.has(lado.id);
@@ -667,6 +680,15 @@ function LinhaLado({ lado, esmaecido, decidida, semEstrela }: { lado: Lado; esma
         <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: venceu ? 700 : 400, color: cor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {vazio ? "—" : sobrenome(lado.nome)}
         </span>
+        {temPontos && (
+          <span title="Pontos Ippon nesta competição" style={{
+            fontFamily: FD, fontSize: 10, fontWeight: 700, flexShrink: 0,
+            color: corPts, background: "rgba(255,255,255,0.04)",
+            border: `1px solid ${corPts}33`, borderRadius: 5, padding: "1px 5px", letterSpacing: "0.02em",
+          }}>
+            {pts > 0 ? `+${pts}` : `${pts}`}
+          </span>
+        )}
         {venceu && <span aria-label="venceu" style={{ color: GOLD, fontSize: 12, flexShrink: 0 }}>▸</span>}
         {mostraEstrela && (
           <button type="button" onClick={() => fav!.alternar(lado)} disabled={aGravar}
