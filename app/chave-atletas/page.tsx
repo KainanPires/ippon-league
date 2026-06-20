@@ -51,7 +51,8 @@ const ROWGAP = 12;
 const CAIXA_W = 184;
 
 // ---- tipos do motor ----
-type Lugar = { id: string | null; nome?: string; pais?: string };
+type AcoesLuta = { i: number; w: number; y: number; s: number };
+type Lugar = { id: string | null; nome?: string; pais?: string; acoes?: AcoesLuta };
 type Luta = {
   fase: string; pool?: string; rotulo: string; chaveId?: string;
   azul: Lugar; branco: Lugar; vencedor: string | null; estado: string; ambigua?: boolean;
@@ -64,7 +65,7 @@ type Chave = {
 type Moldura = { pools: Record<string, string[]>; byes?: Record<string, string[]> | null };
 
 // ---- tipos do desenho (árvore) ----
-type Lado = { id: string; nome: string; pais: string; vencedor: boolean };
+type Lado = { id: string; nome: string; pais: string; vencedor: boolean; acoes?: AcoesLuta };
 type No =
   | { tipo: "luta"; key: string; luta: Luta; filhos: No[] }
   | { tipo: "bye"; key: string; lado: Lado };
@@ -83,7 +84,7 @@ function sobrenome(nome?: string): string {
 
 function ladoDe(lugar: Lugar | undefined, vencedorId: string | null): Lado {
   const id = lugar?.id || "";
-  return { id, nome: lugar?.nome || "—", pais: lugar?.pais || "", vencedor: !!id && id === vencedorId };
+  return { id, nome: lugar?.nome || "—", pais: lugar?.pais || "", vencedor: !!id && id === vencedorId, acoes: lugar?.acoes };
 }
 
 // Mapa id -> { nome, pais } a partir de TODAS as lutas (para pódio e byes).
@@ -659,14 +660,18 @@ function LinhaLado({ lado, esmaecido, decidida, semEstrela }: { lado: Lado; esma
   const cor = vazio ? "#5a665e" : esmaecido ? "#6b7a72" : venceu ? "#f1ede2" : decidida ? "#7c8a82" : "#a9b4ac";
   const destaque = venceu && !semEstrela; // contorno dourado só nas lutas reais
   const fav = useContext(FavoritosContexto);
-  const pontosCtx = useContext(PontosContexto);
-  const info = !esmaecido && lado.id ? pontosCtx?.[lado.id] : undefined;
-  const temPontos = !!info && info.nLutas > 0;
-  const pts = info?.pontos ?? 0;
-  const corPts = pts > 0 ? "#5fd38a" : pts < 0 ? "#e0796d" : "#7c8a82";
   const mostraEstrela = !semEstrela && !esmaecido && !!fav?.ativo && !!lado.id;
   const ehFavorito = mostraEstrela && fav!.favoritos.has(lado.id);
   const aGravar = mostraEstrela && fav!.pendentes.has(lado.id);
+  // Selos das ações DESTA luta (por baixo do nome). Só quando há ações.
+  const ac = !esmaecido ? lado.acoes : undefined;
+  const selos: Array<{ t: string; cor: string }> = [];
+  if (ac) {
+    if (ac.i > 0) selos.push({ t: `I:${ac.i}`, cor: GOLD });
+    if (ac.w > 0) selos.push({ t: `W:${ac.w}`, cor: "#5fd38a" });
+    if (ac.y > 0) selos.push({ t: `Y:${ac.y}`, cor: "#5fd38a" });
+    if (ac.s > 0) selos.push({ t: `S:-${ac.s}`, cor: "#e0796d" });
+  }
   return (
     <div style={{
       padding: "7px 9px", margin: destaque ? 3 : 0, borderRadius: destaque ? 8 : 0,
@@ -680,15 +685,6 @@ function LinhaLado({ lado, esmaecido, decidida, semEstrela }: { lado: Lado; esma
         <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: venceu ? 700 : 400, color: cor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {vazio ? "—" : sobrenome(lado.nome)}
         </span>
-        {temPontos && (
-          <span title="Pontos Ippon nesta competição" style={{
-            fontFamily: FD, fontSize: 10, fontWeight: 700, flexShrink: 0,
-            color: corPts, background: "rgba(255,255,255,0.04)",
-            border: `1px solid ${corPts}33`, borderRadius: 5, padding: "1px 5px", letterSpacing: "0.02em",
-          }}>
-            {pts > 0 ? `+${pts}` : `${pts}`}
-          </span>
-        )}
         {venceu && <span aria-label="venceu" style={{ color: GOLD, fontSize: 12, flexShrink: 0 }}>▸</span>}
         {mostraEstrela && (
           <button type="button" onClick={() => fav!.alternar(lado)} disabled={aGravar}
@@ -699,6 +695,19 @@ function LinhaLado({ lado, esmaecido, decidida, semEstrela }: { lado: Lado; esma
           </button>
         )}
       </div>
+      {selos.length > 0 && (
+        <div style={{ display: "flex", gap: 4, marginLeft: 38, marginTop: 3, flexWrap: "wrap" }}>
+          {selos.map((s, i) => (
+            <span key={i} style={{
+              fontFamily: FD, fontSize: 9.5, fontWeight: 700, lineHeight: 1.2,
+              color: s.cor, background: `${s.cor}14`, border: `1px solid ${s.cor}40`,
+              borderRadius: 4, padding: "0px 4px", letterSpacing: "0.04em",
+            }}>
+              {s.t}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
