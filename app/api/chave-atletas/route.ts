@@ -87,6 +87,32 @@ export async function GET(req: Request) {
     resultados[id] = { vitorias: Number(r.vitorias) || 0, derrotas: Number(r.derrotas) || 0 };
     identidades[id] = { nome: r.nome ? String(r.nome) : undefined, pais: r.country_code ? String(r.country_code) : undefined };
   }
+
+  // 2b) Nomes de TODOS os inscritos (não só de quem já lutou). A resultados_atletas
+  //     só tem linha para quem entrou em ação; os byes e os que ainda não lutaram
+  //     ficavam sem nome. O atletas_cache tem a lista completa (id, nome, país).
+  //     Os nomes da resultados_atletas têm prioridade; o cache só preenche o resto.
+  try {
+    const { data: cacheRow } = await supabaseAdmin
+      .from("atletas_cache")
+      .select("atletas")
+      .eq("id_competition", comp)
+      .maybeSingle();
+    const lista = Array.isArray(cacheRow?.atletas)
+      ? (cacheRow!.atletas as Array<{ id?: unknown; name?: unknown; countryIso?: unknown }>)
+      : [];
+    for (const a of lista) {
+      const id = a?.id != null ? String(a.id) : "";
+      if (!id || !todosIds.has(id)) continue;
+      const atual = identidades[id] || {};
+      if (!atual.nome && a?.name) atual.nome = String(a.name);
+      if (!atual.pais && a?.countryIso) atual.pais = String(a.countryIso);
+      identidades[id] = atual;
+    }
+  } catch {
+    // segue com os nomes que já houver
+  }
+
   // 3) Corre o motor.
   const chave = desenharChave(moldura, resultados, identidades);
   return NextResponse.json({
