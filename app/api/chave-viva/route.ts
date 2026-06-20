@@ -98,13 +98,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, comp: null, nada: "Nenhuma competição a decorrer." });
   }
 
-  // Molduras desta competição -> junta atletas (id, categoria).
-  const { data: molduras } = await supabaseAdmin
+  // Categoria opcional: ?cat=-81 processa SÓ essa categoria (~40 atletas, cabe
+  // no limite de 10s do plano Hobby). Sem ?cat=, processa todas (plano Pro).
+  const cat = (searchParams.get("cat") || "").trim();
+
+  // Molduras desta competição (filtradas por categoria, se pedida).
+  let q = supabaseAdmin
     .from("chave_atletas")
     .select("weight_category, pools")
     .eq("id_competicao", comp);
+  if (cat) q = q.eq("weight_category", cat);
+  const { data: molduras } = await q;
   if (!molduras || molduras.length === 0) {
-    return NextResponse.json({ ok: true, comp, nada: "Sem molduras para esta competição." });
+    return NextResponse.json({ ok: true, comp, cat: cat || null, nada: "Sem molduras para esta competição/categoria." });
   }
   const catDoAtleta = new Map<string, string>(); // id_person -> weight_category
   for (const m of molduras) {
@@ -177,7 +183,7 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({
-    ok: true, comp, atletas: ids.length, atualizados, com_resultados: comResultados, falhas_judobase: falhas,
+    ok: true, comp, cat: cat || "todas", atletas: ids.length, atualizados, com_resultados: comResultados, falhas_judobase: falhas,
     atualizado_em: new Date().toISOString(),
   });
 }
