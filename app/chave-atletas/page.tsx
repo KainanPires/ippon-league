@@ -295,6 +295,8 @@ export default function ChaveAtletasPage() {
   const [existeMoldura, setExisteMoldura] = useState<boolean | null>(null);
   const [aCarregar, setACarregar] = useState(false);
   const [quando, setQuando] = useState("");
+  // O bloqueio do Pro (categoria a decorrer) é decidido pelo SERVIDOR (Paywall).
+  const [bloqueadoSrv, setBloqueadoSrv] = useState(false);
 
   // Favoritos do utilizador (id_person).
   const [favoritos, setFavoritos] = useState<Set<string>>(new Set());
@@ -365,14 +367,25 @@ export default function ChaveAtletasPage() {
   const carregar = useCallback(async () => {
     setACarregar(true);
     try {
-      const r = await fetch(`/api/chave-atletas?comp=${encodeURIComponent(comp)}&cat=${encodeURIComponent(cat)}`, { cache: "no-store" });
+      // Paywall: enviamos o token de sessão para a API confirmar quem somos e
+      // decidir o que devolver. Sem token, a API responde "negado".
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token;
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const r = await fetch(`/api/chave-atletas?comp=${encodeURIComponent(comp)}&cat=${encodeURIComponent(cat)}`, { cache: "no-store", headers });
       const j = await r.json();
-      if (j?.ok) {
+      if (j?.ok && j.acesso !== "negado") {
         setExisteMoldura(!!j.existeMoldura);
         setChave(j.chave || null);
         setInfos(j.infos || {});
         setMoldura(j.moldura || null);
+        setBloqueadoSrv(!!j.bloqueado);
         setQuando(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
+      } else if (j?.acesso === "negado") {
+        // A API recusou (grátis/sem sessão). A página não devia chegar aqui com
+        // Pro/Pro Max, mas por segurança limpamos a chave.
+        setChave(null); setExisteMoldura(null); setBloqueadoSrv(false);
       }
     } catch { /* silencioso */ }
     setACarregar(false);
@@ -388,23 +401,6 @@ export default function ChaveAtletasPage() {
 
   const nomes = useMemo(() => (chave ? mapearNomes(chave) : {}), [chave]);
   const nomeDe = useCallback((id: string | null) => (id && nomes[id] ? sobrenome(nomes[id].nome) : "—"), [nomes]);
-
-  // Estado da categoria atual, derivado da chave:
-  //  - "terminada": já há campeão (final decidida);
-  //  - "aDecorrer": há lutas decididas mas ainda sem campeão;
-  //  - "naoComecou": nenhuma luta decidida ainda (quadro no estado inicial).
-  const estadoCat: "naoComecou" | "aDecorrer" | "terminada" = useMemo(() => {
-    if (!chave) return "naoComecou";
-    if (chave.campeao) return "terminada";
-    const todas: Luta[] = [
-      ...Object.values(chave.pools).flatMap((p) => p.lutas || []),
-      ...(chave.meias || []),
-      ...(chave.final ? [chave.final] : []),
-      ...(chave.repescagens || []),
-      ...(chave.bronzes || []),
-    ];
-    return todas.some((l) => l && l.vencedor) ? "aDecorrer" : "naoComecou";
-  }, [chave]);
 
   if (nivel === "verificar") return <Tela texto="A verificar acesso…" />;
 
@@ -428,8 +424,9 @@ export default function ChaveAtletasPage() {
   }
 
   const generoCat = CATS_M.includes(cat) ? "masc." : "fem.";
-  // Pro vê o quadro inicial e o resultado final, mas não o decorrer ao vivo.
-  const bloquearPro = nivel === "pro" && estadoCat === "aDecorrer";
+  // O bloqueio do Pro a decorrer é decidido pelo SERVIDOR (Paywall). A página
+  // apenas reflete: quando bloqueado, a API nem sequer enviou a chave.
+  const bloquearPro = nivel === "pro" && bloqueadoSrv;
 
   return (
     <FavoritosContexto.Provider value={favCtx}>
