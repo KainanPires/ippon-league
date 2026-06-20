@@ -81,18 +81,28 @@ export async function GET(req: Request) {
   // 2) Movimento + pontos + ações da TABELA (mantida fresca pelo cron).
   const { data: res } = await supabaseAdmin
     .from("resultados_atletas")
-    .select("id_person, nome, country_code, vitorias, derrotas, pontos, n_lutas, vencidos, acoes")
+    .select("id_person, nome, country_code, vitorias, derrotas, pontos, n_lutas, vencidos, lutas, acoes")
     .eq("id_competicao", comp)
     .eq("weight_category", cat);
   const resultados: ResultadosPorId = {};
   const identidades: IdentidadesPorId = {};
   const infos: Record<string, { pontos: number; nLutas: number; acoes: unknown }> = {};
+  // Índice de ações POR LUTA: acoesPar[`${atleta}->${adversario}`] = ações do atleta nesse confronto.
+  const acoesPar: Record<string, { i: number; w: number; y: number; s: number }> = {};
   for (const r of res || []) {
     const id = String(r.id_person);
     const venc = Array.isArray(r.vencidos) ? (r.vencidos as unknown[]).map((x) => String(x)) : [];
     resultados[id] = { vitorias: Number(r.vitorias) || 0, derrotas: Number(r.derrotas) || 0, vencidos: venc };
     identidades[id] = { nome: r.nome ? String(r.nome) : undefined, pais: r.country_code ? String(r.country_code) : undefined };
     infos[id] = { pontos: Number(r.pontos) || 0, nLutas: Number(r.n_lutas) || 0, acoes: r.acoes ?? null };
+    const lutas = Array.isArray(r.lutas) ? (r.lutas as Array<Record<string, unknown>>) : [];
+    for (const lt of lutas) {
+      const adv = lt?.adv != null ? String(lt.adv) : "";
+      if (!adv) continue;
+      acoesPar[`${id}->${adv}`] = {
+        i: Number(lt.i) || 0, w: Number(lt.w) || 0, y: Number(lt.y) || 0, s: Number(lt.s) || 0,
+      };
+    }
   }
 
   // 3) Nomes de TODOS os inscritos (cache) — para byes/quem ainda não lutou.
@@ -114,6 +124,23 @@ export async function GET(req: Request) {
 
   // 4) Corre o motor.
   const chave = desenharChave(moldura, resultados, identidades);
+
+  // 5) Anexa a cada lado de cada luta as ações DAQUELE confronto (selos no cartão).
+  const aplicar = (luta: { azul: { id: string | null; acoes?: unknown }; branco: { id: string | null; acoes?: unknown } } | null) => {
+    if (!luta) return;
+    const a = luta.azul?.id, b = luta.branco?.id;
+    if (a && b) {
+      const av = acoesPar[`${a}->${b}`];
+      const bv = acoesPar[`${b}->${a}`];
+      if (av) luta.azul.acoes = av;
+      if (bv) luta.branco.acoes = bv;
+    }
+  };
+  for (const p of ["A", "B", "C", "D"] as PoolId[]) for (const l of chave.pools[p].lutas) aplicar(l);
+  for (const l of chave.meias) aplicar(l);
+  aplicar(chave.final);
+  for (const l of chave.repescagens) aplicar(l);
+  for (const l of chave.bronzes) aplicar(l);
 
   return NextResponse.json({
     ok: true,
