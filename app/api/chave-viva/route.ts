@@ -42,6 +42,8 @@ async function vivoDoAtleta(idPerson: string, comp: string) {
   let vitorias = 0, derrotas = 0, pontos = 0;
   const vencidos: string[] = []; // ids dos adversários que ESTE atleta venceu (head-to-head)
   const acoes = acoesVazias();
+  // Ações POR LUTA, para mostrar selos no cartão da chave (não a soma).
+  const lutas: Array<{ adv: string; venceu: boolean; i: number; w: number; y: number; s: number }> = [];
   for (const f of desta) {
     const azul = String(f.id_person_blue ?? "");
     const branco = String(f.id_person_white ?? "");
@@ -53,10 +55,11 @@ async function vivoDoAtleta(idPerson: string, comp: string) {
     pontos += scoreContestForPerson(f, idPerson);
     const lado: "b" | "w" | null = azul === idPerson ? "b" : branco === idPerson ? "w" : null;
     if (lado) {
+      const desta_luta = { adv: adversario, venceu: venc === idPerson, i: 0, w: 0, y: 0, s: 0 };
       for (const act of contestActions(f, lado)) {
-        if (act === "ippon_feito") acoes.ippon++;
-        else if (act === "waza_ari_feito") acoes.waza++;
-        else if (act === "yuko_feito") acoes.yuko++;
+        if (act === "ippon_feito") { acoes.ippon++; desta_luta.i++; }
+        else if (act === "waza_ari_feito") { acoes.waza++; desta_luta.w++; }
+        else if (act === "yuko_feito") { acoes.yuko++; desta_luta.y++; }
         else if (act === "ippon_sofrido") acoes.ippon_sof++;
         else if (act === "waza_ari_sofrido") acoes.waza_sof++;
         else if (act === "yuko_sofrido") acoes.yuko_sof++;
@@ -64,10 +67,13 @@ async function vivoDoAtleta(idPerson: string, comp: string) {
       const opp = lado === "b" ? "w" : "b";
       const ff = f as unknown as Record<string, unknown>;
       acoes.shido_provocado += n(ff[`penalty_${opp}`]);
-      acoes.shido_sof += n(ff[`penalty_${lado}`]);
+      const shidosSofridos = n(ff[`penalty_${lado}`]);
+      acoes.shido_sof += shidosSofridos;
+      desta_luta.s = shidosSofridos;
+      if (adversario) lutas.push(desta_luta);
     }
   }
-  return { vitorias, derrotas, nLutas: desta.length, pontos: Math.round(pontos * 10) / 10, vencidos, acoes };
+  return { vitorias, derrotas, nLutas: desta.length, pontos: Math.round(pontos * 10) / 10, vencidos, acoes, lutas };
 }
 
 export async function GET(req: Request) {
@@ -150,6 +156,7 @@ export async function GET(req: Request) {
         n_lutas: v.nLutas,
         pontos: v.pontos,
         vencidos: v.vencidos,
+        lutas: v.lutas,
         acoes: v.acoes,
       });
     }
