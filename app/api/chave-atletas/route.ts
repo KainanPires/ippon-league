@@ -1,19 +1,25 @@
 // app/api/chave-atletas/route.ts
 //
-// CHAVE DE ATLETAS (Pro Max) — devolve a chave de uma categoria já DESENHADA.
+// CHAVE DE ATLETAS — devolve a chave de uma categoria já DESENHADA, COM PAYWALL
+// NO SERVIDOR. A decisão de "o que cada nível pode ver" é feita AQUI, antes de
+// qualquer dado sair do servidor:
 //
-// FONTE DO MOVIMENTO: a tabela resultados_atletas, que é mantida FRESCA pelo
-// cron /api/chave-viva (lê o JudoBase por atleta a cada poucos minutos e grava
-// vitórias/derrotas + pontos + ações). Assim a página é instantânea e ESCALA
-// para milhares de visitas — o JudoBase é consultado pelo cron, não por visita.
+//   - sem sessão / grátis -> acesso "negado", sem chave.
+//   - Pro    -> vê a moldura e o resultado FINAL (quando há campeão); enquanto a
+//               categoria está A DECORRER, NÃO recebe as lutas (estado "congelado").
+//   - Pro Max -> vê tudo, ao vivo.
 //
-// Devolve:
-//   chave    -> o quadro desenhado pelo motor
-//   moldura  -> { pools, byes } para a página reconstruir os ramos
-//   infos    -> por atleta: { pontos, nLutas, acoes } para o cartão (Pro Max)
+// VERIFICAÇÃO FORTE: o navegador envia o token de sessão no cabeçalho
+// Authorization: Bearer <token>. Com esse token confirmamos QUEM é o utilizador
+// (não dá para falsificar) e lemos is_pro / is_pro_max da tabela `users` (a fonte
+// segura — o utilizador não a edita). É isto que torna o bloqueio real, e não
+// apenas visual no navegador.
 //
-// Uso: GET /api/chave-atletas?comp=3149&cat=-73
+// FONTE DO MOVIMENTO: a tabela resultados_atletas, mantida fresca pelo cron.
+//
+// Uso: GET /api/chave-atletas?comp=3149&cat=-73  (com Authorization: Bearer ...)
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   desenharChave,
@@ -26,10 +32,58 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Nível de acesso resolvido a partir do token (no servidor).
+type Nivel = "promax" | "pro" | "gratis";
+
+// Confirma a sessão pelo token e devolve o nível REAL (lido da tabela users).
+// Sem token válido -> "gratis" (tratado como sem acesso).
+async function nivelDoPedido(req: Request): Promise<Nivel> {
+  try {
+    const auth = req.headers.get("authorization") || "";
+    const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+    if (!token) return "gratis";
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+    if (!url || !pub) return "gratis";
+
+    // Cliente "do utilizador": serve só para confirmar a identidade do token.
+    // (Diferente do supabaseAdmin, que lê os dados da chave.)
+    const sb = createClient(url, pub, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: userData, error } = await sb.auth.getUser();
+    const uid = userData?.user?.id;
+    if (error || !uid) return "gratis";
+
+    // A VERDADE do nível está na tabela users (fonte segura). Lemos com o admin.
+    if (!supabaseAdmin) return "gratis";
+    const { data: row } = await supabaseAdmin
+      .from("users")
+      .select("is_pro, is_pro_max")
+      .eq("id", uid)
+      .maybeSingle();
+    if (row?.is_pro_max) return "promax";
+    if (row?.is_pro) return "pro";
+    return "gratis";
+  } catch {
+    return "gratis";
+  }
+}
+
 export async function GET(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
   }
+
+  // ---- PAYWALL: quem está a pedir? ----
+  const nivel = await nivelDoPedido(req);
+  if (nivel === "gratis") {
+    // Sem acesso: não devolvemos dados nenhuns da chave.
+    return NextResponse.json({ ok: true, acesso: "negado", nivel: "gratis" }, { status: 200 });
+  }
+
   const { searchParams } = new URL(req.url);
   const comp = (searchParams.get("comp") || "").trim();
   const cat = (searchParams.get("cat") || "").trim();
@@ -52,7 +106,8 @@ export async function GET(req: Request) {
   }
   if (!linha || !linha.pools) {
     return NextResponse.json({
-      ok: true, comp, cat, genero: null, existeMoldura: false, chave: null, moldura: null, infos: {},
+      ok: true, acesso: "ok", nivel, comp, cat, genero: null, existeMoldura: false,
+      estado: "naoComecou", chave: null, moldura: null, infos: {},
       atualizado_em: new Date().toISOString(),
     });
   }
@@ -125,6 +180,35 @@ export async function GET(req: Request) {
   // 4) Corre o motor.
   const chave = desenharChave(moldura, resultados, identidades);
 
+  // Estado da categoria (derivado da chave), também calculado no SERVIDOR:
+  //  - "terminada": há campeão; "aDecorrer": há lutas decididas mas sem campeão;
+  //  - "naoComecou": nenhuma luta decidida ainda.
+  const todasLutas = [
+    ...(["A", "B", "C", "D"] as PoolId[]).flatMap((p) => chave.pools[p].lutas),
+    ...chave.meias,
+    ...(chave.final ? [chave.final] : []),
+    ...chave.repescagens,
+    ...chave.bronzes,
+  ];
+  const estado: "naoComecou" | "aDecorrer" | "terminada" =
+    chave.campeao ? "terminada"
+      : todasLutas.some((l) => l && l.vencedor) ? "aDecorrer"
+        : "naoComecou";
+
+  // ---- PAYWALL (parte 2): o Pro NÃO vê o decorrer ao vivo ----
+  // Se é Pro (não Pro Max) e a categoria está a decorrer, NÃO enviamos a chave.
+  // O resultado completo só sai quando a categoria termina (estado "terminada").
+  // Assim os dados ao vivo nunca chegam ao navegador de um Pro.
+  if (nivel === "pro" && estado === "aDecorrer") {
+    return NextResponse.json({
+      ok: true, acesso: "ok", nivel, comp, cat,
+      genero: linha.genero ? String(linha.genero) : null,
+      existeMoldura: true, estado, bloqueado: true,
+      chave: null, moldura: { pools, byes: byes ?? null }, infos: {},
+      atualizado_em: new Date().toISOString(),
+    });
+  }
+
   // 5) Anexa a cada lado de cada luta as ações DAQUELE confronto (selos no cartão).
   const aplicar = (luta: { azul: { id: string | null; acoes?: unknown }; branco: { id: string | null; acoes?: unknown } } | null) => {
     if (!luta) return;
@@ -144,10 +228,13 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true,
+    acesso: "ok",
+    nivel,
     comp,
     cat,
     genero: linha.genero ? String(linha.genero) : null,
     existeMoldura: true,
+    estado,
     chave,
     moldura: { pools, byes: byes ?? null },
     infos,
