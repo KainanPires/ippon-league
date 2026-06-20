@@ -667,7 +667,7 @@ function LinhaLado({ lado, esmaecido, decidida, semEstrela }: { lado: Lado; esma
   const ac = !esmaecido ? lado.acoes : undefined;
   const selos: Array<{ t: string; cor: string }> = [];
   if (ac) {
-    if (ac.i > 0) selos.push({ t: `I:${ac.i}`, cor: GOLD });
+    if (ac.i > 0) selos.push({ t: `I:${ac.i}`, cor: "#5fd38a" });
     if (ac.w > 0) selos.push({ t: `W:${ac.w}`, cor: "#5fd38a" });
     if (ac.y > 0) selos.push({ t: `Y:${ac.y}`, cor: "#5fd38a" });
     if (ac.s > 0) selos.push({ t: `S:-${ac.s}`, cor: "#e0796d" });
