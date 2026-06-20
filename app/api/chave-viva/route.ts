@@ -40,13 +40,15 @@ async function vivoDoAtleta(idPerson: string, comp: string) {
   if (!todas) return null;
   const desta = todas.filter((f) => String(f.id_competition) === comp);
   let vitorias = 0, derrotas = 0, pontos = 0;
+  const vencidos: string[] = []; // ids dos adversários que ESTE atleta venceu (head-to-head)
   const acoes = acoesVazias();
   for (const f of desta) {
     const azul = String(f.id_person_blue ?? "");
     const branco = String(f.id_person_white ?? "");
     if (azul !== idPerson && branco !== idPerson) continue;
     const venc = String(f.id_winner ?? "");
-    if (venc === idPerson) vitorias++;
+    const adversario = azul === idPerson ? branco : azul;
+    if (venc === idPerson) { vitorias++; if (adversario) vencidos.push(adversario); }
     else if (venc) derrotas++;
     pontos += scoreContestForPerson(f, idPerson);
     const lado: "b" | "w" | null = azul === idPerson ? "b" : branco === idPerson ? "w" : null;
@@ -65,7 +67,7 @@ async function vivoDoAtleta(idPerson: string, comp: string) {
       acoes.shido_sof += n(ff[`penalty_${lado}`]);
     }
   }
-  return { vitorias, derrotas, nLutas: desta.length, pontos: Math.round(pontos * 10) / 10, acoes };
+  return { vitorias, derrotas, nLutas: desta.length, pontos: Math.round(pontos * 10) / 10, vencidos, acoes };
 }
 
 export async function GET(req: Request) {
@@ -147,6 +149,7 @@ export async function GET(req: Request) {
         derrotas: v.derrotas,
         n_lutas: v.nLutas,
         pontos: v.pontos,
+        vencidos: v.vencidos,
         acoes: v.acoes,
       });
     }
