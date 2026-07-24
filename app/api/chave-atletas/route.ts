@@ -28,9 +28,70 @@ import {
   type IdentidadesPorId,
   type PoolId,
 } from "@/lib/motorChave";
+import { focoMercado, CALENDARIO_2026 } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+// Milissegundos em 24h — janela em que já mostramos a PRÓXIMA competição.
+const VINTE_QUATRO_H = 24 * 3600 * 1000;
+
+// Converte a data "YYYY/MM/DD" do calendário em milissegundos (início do dia).
+function dataMs(de?: string): number {
+  if (!de) return 0;
+  const t = Date.parse(de.replace(/\//g, "-"));
+  return isNaN(t) ? 0 : t;
+}
+
+// Decide QUAL competição a chave deve mostrar quando a página não indica uma.
+// Regra (por prioridade):
+//   1) Se há uma a decorrer COM molduras -> essa (ao vivo).
+//   2) Se falta < 24h para a próxima REAL (não clássico) e ela tem molduras -> essa.
+//   3) Caso contrário -> a competição COM molduras mais recente no tempo
+//      (a "última com chave"), para se poder rever durante a semana.
+// `idsComMolduras` = competições que têm molduras na tabela chave_atletas.
+// Devolve o id da competição a mostrar, ou "" se não houver nenhuma com chave.
+function escolherCompeticao(idsComMolduras: Set<string>): string {
+  if (idsComMolduras.size === 0) return "";
+
+  let foco: ReturnType<typeof focoMercado> | null = null;
+  try { foco = focoMercado(); } catch { foco = null; }
+
+  // 1) A decorrer com molduras.
+  const aDecorrer = foco?.aDecorrer?.idCompeticao;
+  if (aDecorrer && idsComMolduras.has(String(aDecorrer))) return String(aDecorrer);
+
+  // 2) Próxima real dentro de 24h, com molduras (o alvo já salta clássicos).
+  const alvo = foco?.alvo;
+  if (alvo && !alvo.classico && idsComMolduras.has(String(alvo.idCompeticao))) {
+    const faltam = dataMs(alvo.de) - Date.now();
+    if (faltam <= VINTE_QUATRO_H) return String(alvo.idCompeticao);
+  }
+
+  // 3) A última COM molduras, por data do calendário (mais recente já começada).
+  //    Ordena as entradas do calendário que têm molduras por data desc e escolhe
+  //    a primeira cuja data de início já passou. Se nenhuma tiver começado (caso
+  //    raro), escolhe a mais recente à mesma.
+  const comMoldura = CALENDARIO_2026
+    .filter((c) => idsComMolduras.has(String(c.idCompeticao)))
+    .map((c) => ({ id: String(c.idCompeticao), ms: dataMs(c.de) }))
+    .sort((a, b) => b.ms - a.ms);
+  if (comMoldura.length > 0) {
+    const agora = Date.now();
+    const jaComecou = comMoldura.find((c) => c.ms <= agora);
+    return (jaComecou || comMoldura[0]).id;
+  }
+
+  // Molduras existem mas nenhuma está no calendário: mostra uma qualquer (a
+  // primeira do conjunto) para não deixar o ecrã vazio.
+  return Array.from(idsComMolduras)[0];
+}
+
+// Nome legível da competição (do calendário), para a página mostrar no rótulo.
+function nomeDaCompeticao(id: string): string | null {
+  const c = CALENDARIO_2026.find((x) => String(x.idCompeticao) === String(id));
+  return c ? c.nome : null;
+}
 
 // Nível de acesso resolvido a partir do token (no servidor).
 type Nivel = "promax" | "pro" | "gratis";
@@ -85,11 +146,25 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const comp = (searchParams.get("comp") || "").trim();
+  let comp = (searchParams.get("comp") || "").trim();
   const cat = (searchParams.get("cat") || "").trim();
+
+  // Se a página não indicou a competição, a API escolhe qual mostrar (a que está
+  // a decorrer, a próxima dentro de 24h, ou a última com chave). Para isso lê os
+  // ids que têm molduras na base e aplica a regra.
+  let compAuto = false;
+  if (!comp) {
+    const { data: idsRows } = await supabaseAdmin
+      .from("chave_atletas")
+      .select("id_competicao");
+    const ids = new Set<string>((idsRows || []).map((r) => String(r.id_competicao)));
+    comp = escolherCompeticao(ids);
+    compAuto = true;
+  }
+
   if (!comp || !cat) {
     return NextResponse.json(
-      { ok: false, erro: "Faltam ?comp= e ?cat=. Ex.: /api/chave-atletas?comp=3149&cat=-73" },
+      { ok: false, erro: "Faltam dados. Indica ?cat= (a competição é escolhida automaticamente).", semChave: !comp },
       { status: 400 }
     );
   }
@@ -106,7 +181,7 @@ export async function GET(req: Request) {
   }
   if (!linha || !linha.pools) {
     return NextResponse.json({
-      ok: true, acesso: "ok", nivel, comp, cat, genero: null, existeMoldura: false,
+      ok: true, acesso: "ok", nivel, comp, compAuto, compNome: nomeDaCompeticao(comp), cat, genero: null, existeMoldura: false,
       estado: "naoComecou", chave: null, moldura: null, infos: {},
       atualizado_em: new Date().toISOString(),
     });
@@ -203,7 +278,7 @@ export async function GET(req: Request) {
   if (nivel === "pro" && estado === "aDecorrer") {
     const chaveInicial = desenharChave(moldura, {}, identidades);
     return NextResponse.json({
-      ok: true, acesso: "ok", nivel, comp, cat,
+      ok: true, acesso: "ok", nivel, comp, compAuto, compNome: nomeDaCompeticao(comp), cat,
       genero: linha.genero ? String(linha.genero) : null,
       existeMoldura: true, estado, bloqueado: true,
       chave: chaveInicial, moldura: { pools, byes: byes ?? null }, infos: {},
@@ -233,6 +308,8 @@ export async function GET(req: Request) {
     acesso: "ok",
     nivel,
     comp,
+    compAuto,
+    compNome: nomeDaCompeticao(comp),
     cat,
     genero: linha.genero ? String(linha.genero) : null,
     existeMoldura: true,
