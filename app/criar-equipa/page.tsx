@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
-import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, setAthletePool, carryOver, loadLatestSavedCloudExcept, temNomeProprio, type TeamState } from "@/lib/team";
+import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, setAthletePool, carryOver, loadLatestSavedCloudExcept, temNomeProprio, loadIdentityCloudFor, type TeamState } from "@/lib/team";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
@@ -25,6 +25,18 @@ const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
 // Competição vinda do Calendário Oficial. A "atual" é a da semana; se o mercado dela
 // já fechou (início - 1h), escala-se para a "próxima". Ver focoMercado em lib/calendario.
+
+// Junta a identidade da CONTA (nuvem) por cima da que temos em memória.
+// A nuvem é a fonte de verdade do nome/escudo: o localStorage perde-se ao mudar
+// de aparelho ou limpar o browser.
+function juntarIdentidade(prev: Identity, idc: { name?: string; escudo?: Record<string, unknown> | null } | null): Identity {
+  if (!idc) return prev;
+  return {
+    ...prev,
+    ...(idc.escudo ? (idc.escudo as Partial<Identity>) : {}),
+    ...(idc.name ? { name: idc.name } : {}),
+  };
+}
 
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
 type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" | "leave" | "precisaNome" } | { kind: "athlete"; a: Athlete } | null;
@@ -137,6 +149,13 @@ export default function CriarEquipa() {
         }
         setDraft(localDraft);
       } catch {}
+      // IDENTIDADE DA CONTA (nuvem) por cima da local. Sem isto, abrir a app num
+      // browser/telemóvel novo mostrava "A minha equipa" — e ao guardar pedia o
+      // nome outra vez a quem já o tinha (e gravava o nome por omissão na conta).
+      loadIdentityCloudFor(idAlvo).then((idc) => {
+        if (!active || !idc) return;
+        setIdentity((prev) => juntarIdentidade(prev, idc));
+      }).catch(() => {});
       loadSavedCloudFor(idAlvo).then((cloud) => {
         if (!active || !cloud || cloud.ids.length === 0) return;
         setSaved(cloud);
@@ -187,7 +206,15 @@ export default function CriarEquipa() {
     if (!(await temSessao())) { setModal({ kind: "login" }); return; }
     if (!isComplete(draft)) { setModal({ kind: "missing" }); return; }
     setSavingCloud(true);
-    const res = await commitSavedCloudFor(alvo.idCompeticao, draft, identity);
+    // Antes de gravar: se a identidade em memória ainda é a por omissão, vai
+    // confirmar à CONTA. Evita gravar "A minha equipa" por cima do nome real e
+    // evita pedir o nome a quem já o definiu noutro aparelho.
+    let ident = identity;
+    if (!temNomeProprio(ident)) {
+      const idc = await loadIdentityCloudFor(alvo.idCompeticao);
+      if (idc) { ident = juntarIdentidade(ident, idc); setIdentity(ident); }
+    }
+    const res = await commitSavedCloudFor(alvo.idCompeticao, draft, ident);
     setSaved(draft);
     // Sincroniza o rascunho local com o guardado, para não ficar um rascunho
     // "fantasma" que faria o meu-time pedir para guardar sem haver alterações.
@@ -199,7 +226,7 @@ export default function CriarEquipa() {
     // próprio (é "A minha equipa" ou vazio), a pessoa TEM de o definir — é a sua
     // identidade na liga. Mostramos uma notificação de saída única que a leva
     // obrigatoriamente ao /escudo. Se já tem nome, segue o fluxo normal.
-    if (!temNomeProprio(identity)) {
+    if (!temNomeProprio(ident)) {
       setModal({ kind: "precisaNome" });
     } else if (res.ok && devePedirAvaliacao()) {
       // Fim da jornada (conta + equipa + nome): pede avaliação se for altura.
