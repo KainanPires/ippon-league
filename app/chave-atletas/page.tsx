@@ -475,13 +475,23 @@ export default function ChaveAtletasPage() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0 8px", flexWrap: "wrap" }}>
-          <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
-          <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#e2655a" }}>Ao vivo</span>
-          {quando && <span style={{ fontSize: 11, color: "#7c8a82" }}>· atualizado às {quando}</span>}
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDE, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: "#7c8a82" }}>próxima luta de cada bloco</span>
-          </span>
+          {bloquearPro ? (
+            <>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#7fb8f5" }} />
+              <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7fb8f5" }}>Quadro inicial</span>
+              <span style={{ fontSize: 11, color: "#7c8a82" }}>· sem acompanhamento ao vivo</span>
+            </>
+          ) : (
+            <>
+              <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
+              <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#e2655a" }}>Ao vivo</span>
+              {quando && <span style={{ fontSize: 11, color: "#7c8a82" }}>· atualizado às {quando}</span>}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDE, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: "#7c8a82" }}>próxima luta de cada bloco</span>
+              </span>
+            </>
+          )}
         </div>
 
         {nivel === "pro" && (
@@ -501,21 +511,24 @@ export default function ChaveAtletasPage() {
           <Tela texto="A chave desta categoria ainda não está disponível." />
         ) : !chave ? (
           <Tela texto="A carregar a chave…" />
-        ) : bloquearPro ? (
-          <div style={{ textAlign: "center", padding: "48px 24px", marginTop: 8, borderRadius: 12, background: "rgba(127,184,245,0.06)", border: "1px solid #243a52" }}>
-            <div style={{ fontSize: 30, marginBottom: 10 }}>⏳</div>
-            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>Categoria a decorrer</h2>
-            <p style={{ fontSize: 14, lineHeight: 1.55, color: "#bcc7c0", maxWidth: 440, margin: "0 auto 18px" }}>
-              Com o Pro Max acompanhas o chaveamento ao vivo e recebes uma notificação a cada luta do
-              teu atleta favorito — quando vai lutar, quando vence e quando avança. Sem Pro Max, vês o
-              resultado completo desta categoria assim que ela terminar.
-            </p>
-            <a href="/ippon-pro-max" style={{ display: "inline-block", background: GOLD, color: "#10130f", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 20px", borderRadius: 10, textDecoration: "none" }}>
-              Seja Pro Max
-            </a>
-          </div>
         ) : (
           <>
+            {/* Pro, categoria a decorrer: vê o QUADRO INICIAL (confrontos, byes),
+                sem progressão. O resultado completo abre quando a categoria acabar. */}
+            {bloquearPro && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 8, marginBottom: 4, padding: "12px 14px", borderRadius: 11, background: "rgba(127,184,245,0.06)", border: "1px solid #243a52" }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>⏸️</span>
+                <span style={{ flex: 1, minWidth: 200, fontSize: 13, lineHeight: 1.5, color: "#bcc7c0" }}>
+                  Estás a ver o <strong style={{ color: "#e7dcc2" }}>quadro inicial</strong> desta categoria — quem enfrenta quem.
+                  Ela está a decorrer agora: o acompanhamento ao vivo é do Pro Max. Quando a categoria
+                  terminar, vês aqui a chave toda preenchida.
+                </span>
+                <a href="/ippon-pro-max" style={{ flexShrink: 0, background: GOLD, color: "#10130f", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "9px 16px", borderRadius: 9, textDecoration: "none", whiteSpace: "nowrap" }}>
+                  Seja Pro Max
+                </a>
+              </div>
+            )}
+
             {/* Pódio (se houver) */}
             {(chave.campeao || chave.vice || chave.terceiros.length > 0) && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8, marginBottom: 6, padding: "10px 12px", borderRadius: 10, background: "rgba(217,164,65,0.08)", border: `1px solid ${GOLD}` }}>
@@ -530,21 +543,21 @@ export default function ChaveAtletasPage() {
               const ordem = moldura?.pools?.[p] || [];
               const byes = moldura?.byes?.[p] || [];
               const { arvores, arestas } = arvorePool(p, chave.pools[p] || { vencedor: null, lutas: [] }, ordem, byes, nomes);
-              const proxima = proximaLutaId(chave.pools[p]?.lutas || []);
+              const proxima = bloquearPro ? null : proximaLutaId(chave.pools[p]?.lutas || []);
               return <Bloco key={p} titulo={`Pool ${p}`} arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="Vence o pool" />;
             })}
 
             {/* Repescagem + Bronze (antes da final) */}
             {(() => {
               const { arvores, arestas } = arvoreRepBronze(chave);
-              const proxima = proximaLutaId([...(chave.repescagens || []), ...(chave.bronzes || [])]);
+              const proxima = bloquearPro ? null : proximaLutaId([...(chave.repescagens || []), ...(chave.bronzes || [])]);
               return <Bloco titulo="Repescagem e Bronzes" arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="🥉 Bronze" />;
             })()}
 
             {/* Meias + Final (a final é a última luta da categoria) */}
             {(() => {
               const { arvores, arestas } = arvoreMeiasFinal(chave);
-              const proxima = proximaLutaId([...(chave.meias || []), chave.final]);
+              const proxima = bloquearPro ? null : proximaLutaId([...(chave.meias || []), chave.final]);
               return <Bloco titulo="Meias-finais e Final" arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="🥇 Campeão" />;
             })()}
           </>
