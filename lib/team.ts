@@ -363,11 +363,20 @@ export async function commitSavedCloudFor(idComp: string, t: TeamState, identity
       precos: pricesOf(t), // preço de compra de cada atleta, para o património
       atualizado_em: new Date().toISOString(),
     };
-    // Só escreve a identidade se for MESMO um nome escolhido pela pessoa.
-    if (identity && temNomeProprio(identity)) {
-      payload.nome = (identity.name || "").toString().trim();
-      payload.escudo = identity;
+    // IDENTIDADE: nunca gravar o nome por omissão POR CIMA do nome real. Se o
+    // que temos em memória não é um nome próprio (aparelho novo, cache limpa),
+    // vamos buscar o nome verdadeiro à CONTA antes de gravar. Só escrevemos o
+    // valor por omissão quando a conta ainda não tem nome nenhum — a coluna
+    // `nome` é obrigatória na tabela, por isso tem sempre de ir preenchida.
+    let ident: TeamIdentity = identity ? { ...identity } : {};
+    if (!temNomeProprio(ident)) {
+      const daConta = await loadIdentityCloudFor(idComp);
+      if (daConta?.name) {
+        ident = { ...ident, ...(daConta.escudo || {}), name: daConta.name };
+      }
     }
+    payload.nome = temNomeProprio(ident) ? (ident.name as string).trim() : "A minha equipa";
+    payload.escudo = ident;
 
     const { error } = await supabase.from("equipas").upsert(payload, { onConflict: "user_id,id_competicao" });
     if (error) return { ok: false, error: error.message };
@@ -474,7 +483,8 @@ export async function commitSavedCloud(t: TeamState, identity?: TeamIdentity): P
       capitao: t.captain,
       atualizado_em: new Date().toISOString(),
     };
-    // Mesma rede de segurança: nunca gravar o nome por omissão.
+    // Mesma rede de segurança: só escreve a identidade quando é um nome próprio,
+    // para nunca apagar o nome real com o valor por omissão.
     if (identity && temNomeProprio(identity)) {
       payload.nome = (identity.name || "").toString().trim();
       payload.escudo = identity;
