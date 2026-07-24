@@ -30,7 +30,6 @@ import {
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { uid } from "@/lib/team";
-import { focoMercado } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -284,15 +283,19 @@ const PontosContexto = createContext<Record<string, InfoAtleta> | null>(null);
 export default function ChaveAtletasPage() {
   const [nivel, setNivel] = useState<"verificar" | "promax" | "pro" | "gratis">("verificar");
 
-  const foco = useMemo(() => focoMercado(), []);
-  const compInicial = foco.aDecorrer?.idCompeticao || foco.atual?.idCompeticao || (foco as { alvo?: { idCompeticao?: string } }).alvo?.idCompeticao || "";
-  const [comp] = useState<string>(String(compInicial));
+  // A competição a mostrar é decidida pela API (regra: a decorrer -> próxima em
+  // 24h -> última com chave). A página começa SEM comp e adota o que a API
+  // devolver; assim a chave da última competição fica visível toda a semana, em
+  // vez de dar "indisponível" quando a próxima é um clássico ou não tem molduras.
+  const [comp, setComp] = useState<string>("");
+  const [compNome, setCompNome] = useState<string | null>(null);
   const [cat, setCat] = useState<string>(CAT_INICIAL);
 
   const [chave, setChave] = useState<Chave | null>(null);
   const [infos, setInfos] = useState<Record<string, InfoAtleta>>({});
   const [moldura, setMoldura] = useState<Moldura | null>(null);
   const [existeMoldura, setExisteMoldura] = useState<boolean | null>(null);
+  const [semChave, setSemChave] = useState(false); // não há nenhuma competição com molduras
   const [aCarregar, setACarregar] = useState(false);
   const [quando, setQuando] = useState("");
   // O bloqueio do Pro (categoria a decorrer) é decidido pelo SERVIDOR (Paywall).
@@ -373,9 +376,16 @@ export default function ChaveAtletasPage() {
       const token = sess?.session?.access_token;
       const headers: Record<string, string> = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
-      const r = await fetch(`/api/chave-atletas?comp=${encodeURIComponent(comp)}&cat=${encodeURIComponent(cat)}`, { cache: "no-store", headers });
+      // comp só vai no pedido quando já sabemos qual é (a página adotou o que a
+      // API escolheu). Na 1ª chamada vai vazio e a API decide (regra da semana).
+      const qComp = comp ? `comp=${encodeURIComponent(comp)}&` : "";
+      const r = await fetch(`/api/chave-atletas?${qComp}cat=${encodeURIComponent(cat)}`, { cache: "no-store", headers });
       const j = await r.json();
       if (j?.ok && j.acesso !== "negado") {
+        // Adota a competição escolhida pela API (e o nome, para o rótulo).
+        if (j.comp && j.comp !== comp) setComp(String(j.comp));
+        setCompNome(j.compNome ?? null);
+        setSemChave(false);
         setExisteMoldura(!!j.existeMoldura);
         setChave(j.chave || null);
         setInfos(j.infos || {});
@@ -386,6 +396,9 @@ export default function ChaveAtletasPage() {
         // A API recusou (grátis/sem sessão). A página não devia chegar aqui com
         // Pro/Pro Max, mas por segurança limpamos a chave.
         setChave(null); setExisteMoldura(null); setBloqueadoSrv(false);
+      } else if (j?.semChave) {
+        // Não há NENHUMA competição com molduras montadas.
+        setSemChave(true); setChave(null); setExisteMoldura(null);
       }
     } catch { /* silencioso */ }
     setACarregar(false);
@@ -458,7 +471,7 @@ export default function ChaveAtletasPage() {
                 <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, lineHeight: 1.05 }}>Chave ao vivo</h1>
                 <span style={{ fontSize: 10, fontWeight: 700, color: "#7fb8f5", border: "1px solid #7fb8f5", borderRadius: 4, padding: "1px 6px", letterSpacing: 0.5 }}>{nivel === "promax" ? "PRO MAX" : "PRO"}</span>
               </div>
-              <div style={{ fontSize: 12, color: "#93a39a", marginTop: 1 }}>O quadro monta-se sozinho conforme os resultados chegam · {cat} kg {generoCat}</div>
+              <div style={{ fontSize: 12, color: "#93a39a", marginTop: 1 }}>{compNome ? `${compNome} · ` : ""}{cat} kg {generoCat}</div>
             </div>
           </div>
           <button onClick={carregar} style={{ background: "#141a17", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "8px 13px", borderRadius: 9, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -507,8 +520,10 @@ export default function ChaveAtletasPage() {
           </div>
         )}
 
-        {existeMoldura === false ? (
-          <Tela texto="A chave desta categoria ainda não está disponível." />
+        {semChave ? (
+          <Tela texto="Ainda não há nenhuma chave disponível. Quando a próxima competição tiver o quadro montado, aparece aqui." />
+        ) : existeMoldura === false ? (
+          <Tela texto="Esta categoria ainda não tem quadro nesta competição. Experimenta outra categoria acima." />
         ) : !chave ? (
           <Tela texto="A carregar a chave…" />
         ) : (
