@@ -17,17 +17,33 @@ import { contestActionsForPerson, type IjfContest } from "@/lib/ijf";
 /** Preço máximo de um atleta (os de elite chegam aqui). */
 export const MAX_PRICE = 20;
 
+/**
+ * Expectativa (pontos por competição) que corresponde ao PREÇO MÁXIMO.
+ * É a única constante a afinar se os preços ficarem apertados em cima ou em
+ * baixo. Medida em dados reais: os melhores do mundo andam pelos 25-35 pontos
+ * por competição (ex.: Abuladze ~33, Nagayama ~25), por isso 32 põe o topo da
+ * elite nos 20 JC e deixa espaço para distinguir quem está mesmo acima.
+ */
+export const EXPECTATIVA_TOPO = 32;
+
 const DOZE_MESES_MS = 365 * 24 * 3600 * 1000;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
 /**
  * Converte a expectativa de pontos por competição num preço (JC).
- * Escala decidida com dados reais: 3 + expectativa × 1,1, entre 2 e 20.
- *   exp 0 -> ~3 JC · exp 5 -> ~8,5 · exp 10 -> ~14 · exp 14 -> ~18,4 · exp 15+ -> 20
+ *
+ * Escala LINEAR entre o mínimo e o máximo, ancorada em EXPECTATIVA_TOPO:
+ *   exp 0 -> 2 JC · exp 8 -> ~6,5 · exp 16 -> ~11 · exp 24 -> ~15,5 · exp 32+ -> 20
+ *
+ * Isto substitui a escala antiga (3 + exp × 1,1), que saturava aos 15,5 pontos
+ * de expectativa: na prática TODOS os atletas bons ficavam colados nos 20 JC e
+ * deixava de haver decisão ao montar equipa. Com esta, as faixas do projeto
+ * voltam a fazer sentido — elite 15-20, fortes 10-14, médios 6-9, apostas 3-5.
  */
 export function precoDeExpectativa(expectativa: number): number {
-  return clamp(round1(3 + expectativa * 1.1), MIN_PRICE, MAX_PRICE);
+  const fatia = (MAX_PRICE - MIN_PRICE) * (expectativa / EXPECTATIVA_TOPO);
+  return clamp(round1(MIN_PRICE + fatia), MIN_PRICE, MAX_PRICE);
 }
 
 /** Lê a data de uma luta (campos do JudoBase) sem depender do tipo IjfContest. */
@@ -74,8 +90,8 @@ export function calcularForma(fights: IjfContest[], idPerson: string): FormaResu
 
   const agora = Date.now();
   const recentes = lista.filter((c) => c.data > 0 && agora - c.data <= DOZE_MESES_MS);
-
   const media12m = recentes.length > 0 ? round1(avg(recentes.map((c) => c.pontos))) : 0;
+
   const ult3 = lista.slice(0, 3);
   const mediaUltimas3 = ult3.length > 0 ? round1(avg(ult3.map((c) => c.pontos))) : 0;
   const ultima = lista.length > 0 ? lista[0].pontos : 0;
