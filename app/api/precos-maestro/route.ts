@@ -41,9 +41,10 @@ const COMBOS: Array<{ cat: string; gender: "M" | "F" }> = [
 ];
 
 // Só começa uma categoria nova enquanto estivermos abaixo disto. Uma categoria
-// demora ~12-15s (uma chamada ao JudoBase por atleta), por isso 35s garante que
-// mesmo a última a arrancar acaba bem dentro dos 60s da função.
-const ORCAMENTO_MS = 35000;
+// demora ~10-12s (uma chamada ao JudoBase por atleta). Com 50s de orçamento
+// cabem ~4-5 por passagem, e mesmo que a última arranque perto do limite acaba
+// dentro dos 60s da função (maxDuration). Medido: 4 categorias ~47s.
+const ORCAMENTO_MS = 50000;
 
 const IJF = "https://data.ijf.org/api/get_json";
 const TIMEOUT_MS = 15000;
