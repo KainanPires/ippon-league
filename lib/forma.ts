@@ -20,11 +20,15 @@ export const MAX_PRICE = 20;
 /**
  * Expectativa (pontos por competição) que corresponde ao PREÇO MÁXIMO.
  * É a única constante a afinar se os preços ficarem apertados em cima ou em
- * baixo. Medida em dados reais: os melhores do mundo andam pelos 25-35 pontos
- * por competição (ex.: Abuladze ~33, Nagayama ~25), por isso 32 põe o topo da
- * elite nos 20 JC e deixa espaço para distinguir quem está mesmo acima.
+ * baixo. AFINADA COM DADOS REAIS: numa competição inteira (415 atletas), o p90
+ * da expectativa ficou ~20 e o máximo ~43 (um outlier). Ancoramos o topo em 22
+ * (logo acima do p90) para os melhores chegarem aos 20 JC sem que o outlier
+ * puxe toda a escala para baixo. Assim a mediana fica barata (aposta) e montar
+ * uma equipa só de estrelas estoura o orçamento de 100 JC — que é a decisão que
+ * torna o jogo interessante. Se um dia os pontos mudarem muito, remede o p90 e
+ * põe esse valor +2 aqui.
  */
-export const EXPECTATIVA_TOPO = 32;
+export const EXPECTATIVA_TOPO = 22;
 
 const DOZE_MESES_MS = 365 * 24 * 3600 * 1000;
 const round1 = (n: number) => Math.round(n * 10) / 10;
