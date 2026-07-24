@@ -339,6 +339,14 @@ type TeamIdentity = { name?: string; [k: string]: unknown };
 /**
  * Grava a equipa oficial de uma competição: primeiro no dispositivo (rápido),
  * depois na conta do jogador (tabela `equipas`, uma por user+competição).
+ *
+ * REDE DE SEGURANÇA DA IDENTIDADE: só gravamos `nome`/`escudo` quando a
+ * identidade tem NOME PRÓPRIO. Se o aparelho ainda não sabe o nome (browser
+ * novo, cache limpa, outro telemóvel), a identidade em memória é a por omissão
+ * ("A minha equipa") — e gravá-la apagava o nome verdadeiro da conta. Deixando
+ * as colunas de fora, a linha nova fica sem nome e o loadIdentityCloudFor herda
+ * a identidade real de outra equipa da conta. (Bug real: uma equipa guardada
+ * noutro aparelho ficou com "A minha equipa" por cima do nome verdadeiro.)
  */
 export async function commitSavedCloudFor(idComp: string, t: TeamState, identity?: TeamIdentity): Promise<CloudResult> {
   commitSavedFor(idComp, t);
@@ -355,8 +363,9 @@ export async function commitSavedCloudFor(idComp: string, t: TeamState, identity
       precos: pricesOf(t), // preço de compra de cada atleta, para o património
       atualizado_em: new Date().toISOString(),
     };
-    if (identity) {
-      if (identity.name) payload.nome = identity.name;
+    // Só escreve a identidade se for MESMO um nome escolhido pela pessoa.
+    if (identity && temNomeProprio(identity)) {
+      payload.nome = (identity.name || "").toString().trim();
       payload.escudo = identity;
     }
 
@@ -422,16 +431,23 @@ export async function loadIdentityCloudFor(idComp: string): Promise<IdentidadeCl
     let nome = (r1.data as { nome?: unknown } | null)?.nome;
     let escudo = (r1.data as { escudo?: unknown } | null)?.escudo;
 
-    // 2) Se esta linha não trouxe identidade, aceita a de qualquer equipa da conta.
-    if (!nome && !escudo) {
+    // 2) Se esta linha não trouxe identidade PRÓPRIA, aceita a de qualquer
+    //    equipa da conta. Nota: tratamos "A minha equipa" como ausência de nome
+    //    — é o valor por omissão, não uma escolha — para linhas antigas que o
+    //    tenham gravado não bloquearem a herança do nome verdadeiro.
+    const ehProprio = typeof nome === "string" && nome.trim() && nome.trim().toLowerCase() !== "a minha equipa";
+    if (!ehProprio) {
       const r2 = await supabase
         .from("equipas")
         .select("nome, escudo")
         .eq("user_id", userId)
+        .not("nome", "is", null)
+        .neq("nome", "A minha equipa")
         .limit(1)
         .maybeSingle();
-      nome = (r2.data as { nome?: unknown } | null)?.nome;
-      escudo = (r2.data as { escudo?: unknown } | null)?.escudo;
+      const n2 = (r2.data as { nome?: unknown } | null)?.nome;
+      const e2 = (r2.data as { escudo?: unknown } | null)?.escudo;
+      if (typeof n2 === "string" && n2.trim()) { nome = n2; escudo = e2 ?? escudo; }
     }
 
     const out: IdentidadeCloud = {};
@@ -458,8 +474,9 @@ export async function commitSavedCloud(t: TeamState, identity?: TeamIdentity): P
       capitao: t.captain,
       atualizado_em: new Date().toISOString(),
     };
-    if (identity) {
-      if (identity.name) payload.nome = identity.name;
+    // Mesma rede de segurança: nunca gravar o nome por omissão.
+    if (identity && temNomeProprio(identity)) {
+      payload.nome = (identity.name || "").toString().trim();
       payload.escudo = identity;
     }
     const { error } = await supabase.from("equipas").upsert(payload, { onConflict: "user_id" });
