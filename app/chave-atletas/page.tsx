@@ -59,6 +59,7 @@ type Chave = {
   pools: Record<string, { vencedor: string | null; lutas: Luta[] }>;
   meias: Luta[]; final: Luta | null; repescagens: Luta[]; bronzes: Luta[];
   campeao: string | null; vice: string | null; terceiros: string[];
+  podio?: { lugar: "1º" | "2º" | "3º"; id: string | null; estado: "preenchido" | "aDecidir" | "indisponivel" }[];
 };
 type Moldura = { pools: Record<string, string[]>; byes?: Record<string, string[]> | null };
 
@@ -544,12 +545,20 @@ export default function ChaveAtletasPage() {
               </div>
             )}
 
-            {/* Pódio (se houver) */}
-            {(chave.campeao || chave.vice || chave.terceiros.length > 0) && (
+            {/* Pódio: usa o `podio` do motor, que já sabe o estado de cada degrau.
+                Bronzes em falta aparecem como "A decidir" (a decorrer) ou
+                "Bronze não disponível" (terminou mas a fonte não deu o combate),
+                em vez de um lugar vazio que parecia um erro. */}
+            {chave.podio && chave.podio.some((d) => d.estado !== "aDecidir" || d.id) && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8, marginBottom: 6, padding: "10px 12px", borderRadius: 10, background: "rgba(217,164,65,0.08)", border: `1px solid ${GOLD}` }}>
-                {chave.campeao && <Medalha cor={GOLD} txt="1º" nome={nomeDe(chave.campeao)} />}
-                {chave.vice && <Medalha cor="#c8ccd2" txt="2º" nome={nomeDe(chave.vice)} />}
-                {chave.terceiros.map((t, i) => <Medalha key={i} cor="#cd7f32" txt="3º" nome={nomeDe(t)} />)}
+                {chave.podio.map((d, i) => {
+                  const cor = d.lugar === "1º" ? GOLD : d.lugar === "2º" ? "#c8ccd2" : "#cd7f32";
+                  if (d.estado === "preenchido") return <Medalha key={i} cor={cor} txt={d.lugar} nome={nomeDe(d.id)} />;
+                  if (d.estado === "aDecidir") return <Medalha key={i} cor={cor} txt={d.lugar} nome="A decidir" esbatido />;
+                  // indisponivel
+                  const txtFalta = d.lugar === "3º" ? "Bronze não disponível" : "Não disponível";
+                  return <Medalha key={i} cor={cor} txt={d.lugar} nome={txtFalta} esbatido />;
+                })}
               </div>
             )}
 
@@ -818,11 +827,11 @@ function BotaoCat({ c, g, ativo, onClick }: { c: string; g: string; ativo: boole
   );
 }
 
-function Medalha({ cor, txt, nome }: { cor: string; txt: string; nome: string }) {
+function Medalha({ cor, txt, nome, esbatido }: { cor: string; txt: string; nome: string; esbatido?: boolean }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <span style={{ width: 22, height: 22, borderRadius: "50%", background: cor, color: "#0c0e0d", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 800 }}>{txt}</span>
-      <span style={{ fontWeight: 700, fontSize: 14 }}>{nome}</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, opacity: esbatido ? 0.6 : 1 }}>
+      <span style={{ width: 22, height: 22, borderRadius: "50%", background: esbatido ? "transparent" : cor, border: esbatido ? `1.5px dashed ${cor}` : "none", color: esbatido ? cor : "#0c0e0d", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 800 }}>{txt}</span>
+      <span style={{ fontWeight: 700, fontSize: 14, fontStyle: esbatido ? "italic" : "normal", color: esbatido ? "#93a39a" : "#f1ede2" }}>{nome}</span>
     </div>
   );
 }
