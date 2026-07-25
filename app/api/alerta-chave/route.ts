@@ -7,8 +7,9 @@
 //   1) Confirma a key (mesmo segredo do URL no cron-job.org).
 //   2) focoMercado().aDecorrer — há competição a decorrer? Se não, sai (custo ~0).
 //   3) Lê os favoritos (atletas_favoritos): que id_person são seguidos e por quem.
-//   4) Para cada categoria, chama /api/chave (a MESMA verdade que a página mostra),
-//      calcula a PRÓXIMA luta de cada bloco (zonas, repescagem/bronze, meias/final).
+//   4) Para cada categoria, lê a chave pela biblioteca montarChaveDaBase (a
+//      MESMA verdade que a página mostra, direto da base — sem passar pela API
+//      nem furar o Paywall), e calcula a PRÓXIMA luta de cada bloco.
 //   5) Se um lado dessa próxima luta é um atleta seguido, avisa os seguidores —
 //      exceto os já avisados sobre essa luta (alertas_enviados, anti-repetição).
 //
@@ -20,6 +21,7 @@ import { NextResponse } from "next/server";
 import { focoMercado } from "@/lib/calendario";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
+import { montarChaveDaBase } from "@/lib/montarChave";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,33 +39,31 @@ function autorizado(key: string | null): boolean {
   return (!!a && key === a) || (!!b && key === b);
 }
 
-function baseUrl(req: Request): string {
-  try { const u = new URL(req.url); return `${u.protocol}//${u.host}`; }
-  catch { return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : ""; }
+// --- Tipos mínimos da chave que a biblioteca devolve (só o que usamos) ---
+// (a estrutura vem de motorChave via montarChaveDaBase)
+interface LadoChave { id: string | null; nome?: string; pais?: string }
+interface LutaChave { chaveId?: string; azul: LadoChave; branco: LadoChave; vencedor: string | null }
+interface ChaveNova {
+  pools: Record<string, { lutas: LutaChave[] }>;
+  meias: LutaChave[];
+  final: LutaChave | null;
+  repescagens: LutaChave[];
+  bronzes: LutaChave[];
 }
 
-// --- Tipos mínimos do que /api/chave devolve (só o que usamos) ---
-interface LadoChave { id: string; nome: string; pais: string }
-interface LutaChave { id: string; round: number; ordem: number; azul: LadoChave; branco: LadoChave; decidida: boolean }
-interface ChaveResp {
-  ok: boolean; vazio?: boolean; nome_competicao?: string;
-  zonas?: { zona: number; lutas: LutaChave[] }[];
-  meias?: LutaChave[]; final?: LutaChave | null; bronzes?: LutaChave[];
-}
-
-// A próxima luta de um conjunto: 1ª não decidida com AMBOS os lados definidos,
-// menor round e depois menor ordem. (Mesma regra do pontinho da página.)
+// A próxima luta de um conjunto: 1ª ainda SEM vencedor com AMBOS os lados
+// definidos. (Mesma regra do pontinho da página.) A ordem já vem correta da
+// biblioteca (as lutas são geradas por ronda), por isso basta a primeira.
 function proximaLuta(lutas: LutaChave[]): LutaChave | null {
-  const cand = lutas.filter((l) => !l.decidida && !!l.azul?.id && !!l.branco?.id);
-  if (cand.length === 0) return null;
-  cand.sort((a, b) => (Number(a.round) - Number(b.round)) || (Number(a.ordem) - Number(b.ordem)));
-  return cand[0];
+  return lutas.find((l) => !l.vencedor && !!l.azul?.id && !!l.branco?.id) || null;
 }
 
 // Junta todos os "blocos" de uma categoria, cada um com a sua próxima luta.
-function blocosDaChave(c: ChaveResp): LutaChave[] {
+// Blocos: cada pool (A-D), as repescagens, os bronzes, e as meias+final.
+function blocosDaChave(c: ChaveNova): LutaChave[] {
   const blocos: LutaChave[][] = [];
-  for (const z of c.zonas || []) blocos.push(z.lutas || []);
+  for (const p of ["A", "B", "C", "D"]) blocos.push(c.pools?.[p]?.lutas || []);
+  blocos.push(c.repescagens || []);
   blocos.push(c.bronzes || []);
   const mf = [...(c.meias || [])];
   if (c.final) mf.push(c.final);
@@ -114,28 +114,27 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, a_decorrer: nomeComp, nota: "Ninguém segue atletas.", ms: Date.now() - t0 });
   }
 
-  // (4) Lê a chave de cada categoria (a mesma verdade da página).
-  // OTIMIZAÇÃO FUTURA: só pedir as categorias onde há favoritos — por agora,
-  // com poucos utilizadores, pedir as 14 é leve e simples.
-  const base = baseUrl(req);
+  // (4) Lê a chave de cada categoria pela biblioteca (a mesma verdade da página,
+  // direto da base). OTIMIZAÇÃO FUTURA: só as categorias com favoritos — por
+  // agora, com poucos utilizadores, as 14 são leves.
   const avisos: { user_id: string; id_person: string; nome: string; id_fight: string }[] = [];
 
   for (const cat of CATS) {
-    let chave: ChaveResp | null = null;
-    try {
-      const r = await fetch(`${base}/api/chave?comp=${comp}&cat=${encodeURIComponent(cat)}`, { cache: "no-store" });
-      chave = await r.json();
-    } catch { chave = null; }
-    if (!chave || !chave.ok || chave.vazio) continue;
+    const m = await montarChaveDaBase(comp, cat);
+    // Só interessa se a categoria existe e está a decorrer (há próximas lutas).
+    if (!m.existeMoldura || !m.chave || m.estado !== "aDecorrer") continue;
+    const chave = m.chave as unknown as ChaveNova;
 
     // (5) Próxima luta de cada bloco; se um lado é seguido, marca aviso.
     for (const luta of blocosDaChave(chave)) {
+      // id_fight único por competição: categoria + posição na chave (chaveId).
+      const idFight = `${cat}#${luta.chaveId || `${luta.azul?.id}-${luta.branco?.id}`}`;
       for (const lado of [luta.azul, luta.branco]) {
         if (!lado?.id) continue;
         const seguidores = seguidoresDe.get(String(lado.id));
         if (!seguidores) continue;
         for (const uid of seguidores) {
-          avisos.push({ user_id: uid, id_person: String(lado.id), nome: lado.nome, id_fight: String(luta.id) });
+          avisos.push({ user_id: uid, id_person: String(lado.id), nome: lado.nome || "", id_fight: idFight });
         }
       }
     }
@@ -184,7 +183,7 @@ export async function GET(req: Request) {
         tipo: "proxima_luta",
         titulo: `🥋 ${apelido(a.nome)} é já a seguir!`,
         corpo: `Em ${nomeComp}, ${apelido(a.nome)} é a próxima luta no seu bloco. Fica atento — vai a entrar no tatame.`,
-        link: "/chave",
+        link: "/chave-atletas",
       });
       enviados++;
     } catch { /* push de um não bloqueia os outros */ }
