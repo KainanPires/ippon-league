@@ -21,13 +21,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import {
-  desenharChave,
-  type MolduraCategoria,
-  type ResultadosPorId,
-  type IdentidadesPorId,
-  type PoolId,
-} from "@/lib/motorChave";
+import { montarChaveDaBase } from "@/lib/montarChave";
 import { focoMercado, CALENDARIO_2026 } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
@@ -169,139 +163,29 @@ export async function GET(req: Request) {
     );
   }
 
-  // 1) Moldura da categoria.
-  const { data: linha, error: errMold } = await supabaseAdmin
-    .from("chave_atletas")
-    .select("genero, pools")
-    .eq("id_competicao", comp)
-    .eq("weight_category", cat)
-    .maybeSingle();
-  if (errMold) {
-    return NextResponse.json({ ok: false, erro: "Erro a ler a moldura." }, { status: 500 });
-  }
-  if (!linha || !linha.pools) {
-    return NextResponse.json({
-      ok: true, acesso: "ok", nivel, comp, compAuto, compNome: nomeDaCompeticao(comp), cat, genero: null, existeMoldura: false,
-      estado: "naoComecou", chave: null, moldura: null, infos: {},
-      atualizado_em: new Date().toISOString(),
-    });
-  }
+  // ---- Monta a chave a partir da base (lógica partilhada com o alerta-chave) ----
+  const m = await montarChaveDaBase(comp, cat);
 
-  // Normaliza a moldura.
-  const poolsRaw = linha.pools as Record<string, unknown>;
-  const pools = {} as Record<PoolId, string[]>;
-  for (const p of ["A", "B", "C", "D"] as PoolId[]) {
-    const arr = Array.isArray(poolsRaw?.[p]) ? (poolsRaw[p] as unknown[]) : [];
-    pools[p] = arr.map((x) => String(x));
-  }
-  let byes: Partial<Record<PoolId, string[]>> | undefined;
-  const byesRaw = (poolsRaw?.["byes"] ?? null) as Record<string, unknown> | null;
-  if (byesRaw) {
-    byes = {};
-    for (const p of ["A", "B", "C", "D"] as PoolId[]) {
-      const arr = Array.isArray(byesRaw?.[p]) ? (byesRaw[p] as unknown[]) : [];
-      if (arr.length) byes[p] = arr.map((x) => String(x));
-    }
-  }
-  const moldura: MolduraCategoria = { pools, byes };
-
-  const todosIds = new Set<string>();
-  for (const p of ["A", "B", "C", "D"] as PoolId[]) for (const id of pools[p]) todosIds.add(id);
-
-  // 2) Movimento + pontos + ações da TABELA (mantida fresca pelo cron).
-  const { data: res } = await supabaseAdmin
-    .from("resultados_atletas")
-    .select("id_person, nome, country_code, vitorias, derrotas, pontos, n_lutas, vencidos, lutas, acoes")
-    .eq("id_competicao", comp)
-    .eq("weight_category", cat);
-  const resultados: ResultadosPorId = {};
-  const identidades: IdentidadesPorId = {};
-  const infos: Record<string, { pontos: number; nLutas: number; acoes: unknown }> = {};
-  // Índice de ações POR LUTA: acoesPar[`${atleta}->${adversario}`] = ações do atleta nesse confronto.
-  const acoesPar: Record<string, { i: number; w: number; y: number; s: number }> = {};
-  for (const r of res || []) {
-    const id = String(r.id_person);
-    const venc = Array.isArray(r.vencidos) ? (r.vencidos as unknown[]).map((x) => String(x)) : [];
-    resultados[id] = { vitorias: Number(r.vitorias) || 0, derrotas: Number(r.derrotas) || 0, vencidos: venc };
-    identidades[id] = { nome: r.nome ? String(r.nome) : undefined, pais: r.country_code ? String(r.country_code) : undefined };
-    infos[id] = { pontos: Number(r.pontos) || 0, nLutas: Number(r.n_lutas) || 0, acoes: r.acoes ?? null };
-    const lutas = Array.isArray(r.lutas) ? (r.lutas as Array<Record<string, unknown>>) : [];
-    for (const lt of lutas) {
-      const adv = lt?.adv != null ? String(lt.adv) : "";
-      if (!adv) continue;
-      acoesPar[`${id}->${adv}`] = {
-        i: Number(lt.i) || 0, w: Number(lt.w) || 0, y: Number(lt.y) || 0, s: Number(lt.s) || 0,
-      };
-    }
-  }
-
-  // 3) Nomes de TODOS os inscritos (cache) — para byes/quem ainda não lutou.
-  try {
-    const { data: cacheRow } = await supabaseAdmin
-      .from("atletas_cache").select("atletas").eq("id_competition", comp).maybeSingle();
-    const lista = Array.isArray(cacheRow?.atletas)
-      ? (cacheRow!.atletas as Array<{ id?: unknown; name?: unknown; countryIso?: unknown }>)
-      : [];
-    for (const a of lista) {
-      const id = a?.id != null ? String(a.id) : "";
-      if (!id || !todosIds.has(id)) continue;
-      const atual = identidades[id] || {};
-      if (!atual.nome && a?.name) atual.nome = String(a.name);
-      if (!atual.pais && a?.countryIso) atual.pais = String(a.countryIso);
-      identidades[id] = atual;
-    }
-  } catch { /* segue com o que houver */ }
-
-  // 4) Corre o motor.
-  const chave = desenharChave(moldura, resultados, identidades);
-
-  // Estado da categoria (derivado da chave), também calculado no SERVIDOR:
-  //  - "terminada": há campeão; "aDecorrer": há lutas decididas mas sem campeão;
-  //  - "naoComecou": nenhuma luta decidida ainda.
-  const todasLutas = [
-    ...(["A", "B", "C", "D"] as PoolId[]).flatMap((p) => chave.pools[p].lutas),
-    ...chave.meias,
-    ...(chave.final ? [chave.final] : []),
-    ...chave.repescagens,
-    ...chave.bronzes,
-  ];
-  const estado: "naoComecou" | "aDecorrer" | "terminada" =
-    chave.campeao ? "terminada"
-      : todasLutas.some((l) => l && l.vencedor) ? "aDecorrer"
-        : "naoComecou";
-
-  // ---- PAYWALL (parte 2): o Pro vê o quadro INICIAL, nunca o decorrer ----
-  // Se é Pro (não Pro Max) e a categoria está a decorrer, corremos o motor OUTRA
-  // VEZ mas SEM resultados: sai o quadro tal como começou (quem enfrenta quem,
-  // byes no sítio), sem vencedores, sem progressão e sem pontos. Assim o Pro vê a
-  // chave inicial — e nenhum dado do decorrer sai do servidor.
-  if (nivel === "pro" && estado === "aDecorrer") {
-    const chaveInicial = desenharChave(moldura, {}, identidades);
+  if (!m.existeMoldura) {
     return NextResponse.json({
       ok: true, acesso: "ok", nivel, comp, compAuto, compNome: nomeDaCompeticao(comp), cat,
-      genero: linha.genero ? String(linha.genero) : null,
-      existeMoldura: true, estado, bloqueado: true,
-      chave: chaveInicial, moldura: { pools, byes: byes ?? null }, infos: {},
+      genero: null, existeMoldura: false, estado: "naoComecou",
+      chave: null, moldura: null, infos: {},
       atualizado_em: new Date().toISOString(),
     });
   }
 
-  // 5) Anexa a cada lado de cada luta as ações DAQUELE confronto (selos no cartão).
-  const aplicar = (luta: { azul: { id: string | null; acoes?: unknown }; branco: { id: string | null; acoes?: unknown } } | null) => {
-    if (!luta) return;
-    const a = luta.azul?.id, b = luta.branco?.id;
-    if (a && b) {
-      const av = acoesPar[`${a}->${b}`];
-      const bv = acoesPar[`${b}->${a}`];
-      if (av) luta.azul.acoes = av;
-      if (bv) luta.branco.acoes = bv;
-    }
-  };
-  for (const p of ["A", "B", "C", "D"] as PoolId[]) for (const l of chave.pools[p].lutas) aplicar(l);
-  for (const l of chave.meias) aplicar(l);
-  aplicar(chave.final);
-  for (const l of chave.repescagens) aplicar(l);
-  for (const l of chave.bronzes) aplicar(l);
+  // ---- PAYWALL (parte 2): o Pro vê o quadro INICIAL, nunca o decorrer ----
+  // Pro (não Pro Max) numa categoria a decorrer recebe o quadro inicial (sem
+  // vencedores) — os dados do decorrer não saem do servidor.
+  if (nivel === "pro" && m.estado === "aDecorrer") {
+    return NextResponse.json({
+      ok: true, acesso: "ok", nivel, comp, compAuto, compNome: nomeDaCompeticao(comp), cat,
+      genero: m.genero, existeMoldura: true, estado: m.estado, bloqueado: true,
+      chave: m.chaveInicial, moldura: m.moldura, infos: {},
+      atualizado_em: new Date().toISOString(),
+    });
+  }
 
   return NextResponse.json({
     ok: true,
@@ -311,12 +195,12 @@ export async function GET(req: Request) {
     compAuto,
     compNome: nomeDaCompeticao(comp),
     cat,
-    genero: linha.genero ? String(linha.genero) : null,
+    genero: m.genero,
     existeMoldura: true,
-    estado,
-    chave,
-    moldura: { pools, byes: byes ?? null },
-    infos,
+    estado: m.estado,
+    chave: m.chave,
+    moldura: m.moldura,
+    infos: m.infos,
     atualizado_em: new Date().toISOString(),
   });
 }
