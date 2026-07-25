@@ -449,6 +449,7 @@ export default function ChaveAtletasPage() {
       <style>{`
         @keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.35}}
         .ilpulse{animation:ilpulse 1.2s ease-in-out infinite}
+        @keyframes ilspin{to{transform:rotate(360deg)}}
         @keyframes ilpontopulse{0%{box-shadow:0 0 0 0 rgba(95,211,138,0.55)}70%{box-shadow:0 0 0 6px rgba(95,211,138,0)}100%{box-shadow:0 0 0 0 rgba(95,211,138,0)}}
         .ilponto{animation:ilpontopulse 1.4s ease-out infinite}
         @media (prefers-reduced-motion: reduce){.ilpulse{animation:none}.ilponto{animation:none}.ildesliza{animation:none}}
@@ -475,8 +476,9 @@ export default function ChaveAtletasPage() {
               <div style={{ fontSize: 12, color: "#93a39a", marginTop: 1 }}>{compNome ? `${compNome} · ` : ""}{cat} kg {generoCat}</div>
             </div>
           </div>
-          <button onClick={carregar} style={{ background: "#141a17", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "8px 13px", borderRadius: 9, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-            Atualizar
+          <button onClick={carregar} disabled={aCarregar} style={{ background: "#141a17", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "8px 13px", borderRadius: 9, cursor: aCarregar ? "default" : "pointer", whiteSpace: "nowrap", flexShrink: 0, opacity: aCarregar ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", border: `2px solid ${GOLD}`, borderTopColor: "transparent", animation: aCarregar ? "ilspin 0.6s linear infinite" : "none" }} />
+            {aCarregar ? "A atualizar…" : "Atualizar"}
           </button>
         </header>
 
