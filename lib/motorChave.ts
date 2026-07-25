@@ -44,7 +44,8 @@ export type ResultadosPorId = Record<string, ResultadoAtleta>;
 export interface IdentidadeAtleta { nome?: string; pais?: string; }
 export type IdentidadesPorId = Record<string, IdentidadeAtleta>;
 
-export interface LugarChave { id: string | null; nome?: string; pais?: string; }
+export interface AcoesLuta { i: number; w: number; y: number; s: number }
+export interface LugarChave { id: string | null; nome?: string; pais?: string; acoes?: AcoesLuta; }
 export type EstadoLuta = "por_definir" | "agendada" | "decidida";
 
 export interface Luta {
@@ -59,6 +60,17 @@ export interface Luta {
   ambigua?: boolean;
 }
 
+// Um degrau do pódio, já resolvido para a página mostrar diretamente.
+//  - preenchido: temos o atleta (id).
+//  - "aDecidir": o lugar ainda vai ser lutado (categoria a decorrer).
+//  - "indisponivel": a categoria terminou mas a fonte (JudoBase) não deu este
+//    combate — honestidade em vez de um lugar vazio que parece um erro.
+export interface DegrauPodio {
+  lugar: "1º" | "2º" | "3º";
+  id: string | null;
+  estado: "preenchido" | "aDecidir" | "indisponivel";
+}
+
 export interface ChaveDesenhada {
   pools: Record<PoolId, { vencedor: string | null; lutas: Luta[] }>;
   meias: Luta[];
@@ -68,6 +80,8 @@ export interface ChaveDesenhada {
   campeao: string | null;
   vice: string | null;
   terceiros: string[];
+  // Pódio já com o estado de cada degrau (inclui os 2 bronzes, mesmo em falta).
+  podio: DegrauPodio[];
 }
 
 const POOLS: PoolId[] = ["A", "B", "C", "D"];
@@ -234,6 +248,22 @@ export function desenharChave(
   const vice = final.vencedor ? (final.azul.id === final.vencedor ? final.branco.id : final.azul.id) : null;
   const terceiros = [bronze1.vencedor, bronze2.vencedor].filter((x): x is string => !!x);
 
+  // A categoria considera-se TERMINADA quando há campeão (final decidida). Nesse
+  // caso, um bronze sem vencedor não vai chegar (a fonte não o deu) -> "indisponivel".
+  // Enquanto não há campeão, um bronze em aberto ainda pode ser lutado -> "aDecidir".
+  const terminada = !!campeao;
+  const degrauBronze = (id: string | null): DegrauPodio => ({
+    lugar: "3º",
+    id,
+    estado: id ? "preenchido" : (terminada ? "indisponivel" : "aDecidir"),
+  });
+  const podio: DegrauPodio[] = [
+    { lugar: "1º", id: campeao, estado: campeao ? "preenchido" : (terminada ? "indisponivel" : "aDecidir") },
+    { lugar: "2º", id: vice, estado: vice ? "preenchido" : (terminada ? "indisponivel" : "aDecidir") },
+    degrauBronze(bronze1.vencedor),
+    degrauBronze(bronze2.vencedor),
+  ];
+
   return {
     pools: poolsOut,
     meias: [meia1, meia2],
@@ -241,5 +271,6 @@ export function desenharChave(
     repescagens: [rep1, rep2],
     bronzes: [bronze1, bronze2],
     campeao, vice, terceiros,
+    podio,
   };
 }
