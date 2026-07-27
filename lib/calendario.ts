@@ -276,7 +276,7 @@ export function textoFecho(s: SemanaCalendario, agora: Date = new Date()): strin
 // ===========================================================================
 
 export const HORAS_ATE_FECHO_COPA = 60;
-const HORAS_FALLBACK_SEM_FUSO = 72; // margem extra quando não sabemos o fuso
+const HORAS_FALLBACK_SEM_FUSO = 60; // alinhado com a regra (60h): cobre competições
 
 // Fuso horário (offset base em horas vs UTC) das cidades do CALENDARIO_2026.
 // Offsets-BASE (sem horário de verão): a margem de 60h absorve a diferença de
