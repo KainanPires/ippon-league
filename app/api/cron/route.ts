@@ -9,26 +9,60 @@ import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { mensagensModaisDeHoje } from "@/lib/mensagensEspeciais";
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 
-// CRON — prepara sozinho os preços/forma da competição que se aproxima.
-// Corre 1x/dia (vercel.json). Com Fluid Compute, uma função corre até 300s — as
-// 14 categorias (~18s cada ≈ 252s) cabem numa só execução, em sequência.
+// CRON — o motor automático da Ippon League.
 //
-//   /api/cron                  -> prepara a competição que se aproxima (14 categorias)
-//   /api/cron?comp=ID          -> força uma competição específica
+// DESENHO (mudou: ler antes de mexer)
+// -----------------------------------
+// Antes, o cron preparava os preços primeiro (14 categorias, ~18s cada ≈ 252s)
+// e só depois congelava os resultados. Numa função com 300s de teto, isso punha
+// a parte CRÍTICA — a que dá pontos e património às pessoas — a correr com o
+// orçamento quase gasto. Se os preços se arrastassem, o congelamento morria.
+//
+// Agora é ao contrário, e com três travões:
+//
+//   1. ORDEM. Primeiro o que não pode falhar (congelar, apurar, notificar).
+//      Os preços vão para o FIM, com o tempo que sobrar. Preços atrasados umas
+//      horas são um incómodo; pontos por congelar são um jogo partido.
+//
+//   2. CURSOR nos preços. Cada corrida faz as categorias que couberem e guarda
+//      onde ficou (linha _cursor_precos no atletas_cache). A corrida seguinte
+//      continua dali. O cursor reinicia quando muda a competição-alvo OU quando
+//      muda o dia — garante uma passagem completa por dia, fatiada.
+//
+//   3. ORÇAMENTO. Nenhuma etapa nova arranca depois de MS_ORCAMENTO menos a sua
+//      margem. O cron termina sempre com resposta, nunca a meio.
+//
+// PRESSUPOSTO: este cron passa a correr DE HORA A HORA (cron-job.org), não 1x/dia.
+// Com ~5 categorias por corrida, a passagem completa dos preços fecha em ~3h.
+// Todas as outras etapas são idempotentes (congelar tem retoma; mercado e datas
+// têm travão por dia/competição; faixas só notificam quem muda mesmo), por isso
+// correr de hora a hora não duplica nada.
+//
+//   /api/cron                  -> corrida normal (congelar → apurar → avisar → preços)
+//   /api/cron?comp=ID          -> força a competição-alvo dos preços
 //   /api/cron?key=SEGREDO      -> disparo MANUAL para teste (em vez do cabeçalho da Vercel)
-//   /api/cron?congelar=ID      -> força CONGELAR uma competição específica (teste)
-//   /api/cron?datas=1          -> força SÓ as notificações de datas especiais (teste)
+//   /api/cron?congelar=ID      -> força CONGELAR uma competição específica
+//   /api/cron?recongelar=ID    -> limpa e volta a congelar do zero
+//   /api/cron?precos=1         -> força as 14 categorias de uma vez (ignora cursor e orçamento)
+//   /api/cron?diag=1           -> NÃO congela: mostra as contas do filtro de candidatas
+//   /api/cron?datas=1          -> força SÓ as notificações de datas especiais
+//   /api/cron?mercado=1        -> força SÓ as notificações de mercado
+//   /api/cron?melhores=ID      -> força os Melhores da Rodada de uma competição
+//   /api/cron?encerrar=1       -> força SÓ o encerramento de ligas terminadas
+//   /api/cron?apurar=LEAGUE_ID -> força apurar uma copa
+//   /api/cron?fecharano=AAAA   -> fecha a época de um ano JÁ TERMINADO
 //
-// Etapas:
+// Etapas, pela ordem em que correm:
 //   (A) atualiza "a competir agora" (aviso no Mercado)
-//   (B) prepara preços da competição que se aproxima (14 categorias via /api/calcular)
-//   (C) CONGELA as competições recentes terminadas (motor lib/congelar): preenche
-//       resultados_atletas, resultados_rodada, precos_atletas, pontuacoes,
-//       users.patrimony_jc — com a FONTE CORRETA (competitor.contests por atleta).
-//   (D) no início do mês (dia 1), recalcula as faixas do mês anterior (users.belt)
+//   (C) CONGELA as competições recentes terminadas (motor lib/congelar)
+//   (C-quater) MELHORES DA RODADA das competições recém-congeladas
+//   (C-bis) APURA as copas ativas (mata-mata)
+//   (C-ter) ENCERRA as ligas de pontos corridos cuja janela acabou
+//   (D) no dia 1, recalcula as faixas do mês anterior (users.belt)
+//   (D-bis) a 1 de janeiro, fecha a época oficial do ano anterior
 //   (E) notificações de mercado (aberto/fechado)
-//   (F) notificações de DATAS ESPECIAIS por push: aniversário (por utilizador) e
-//       Dia Mundial do Judô (a todos). Sino + push, idempotente por dia.
+//   (F) notificações de DATAS ESPECIAIS (aniversário, Dia do Judô)
+//   (B) PREÇOS da competição que se aproxima — por cursor, com o que sobrar
 //
 // Protegido por CRON_SECRET: a Vercel envia "Authorization: Bearer <CRON_SECRET>"
 // automaticamente; em alternativa aceitamos ?key=<CRON_SECRET> para testares à mão.
@@ -46,11 +80,31 @@ const CATS: { cat: string; gender: "M" | "F" }[] = [
 
 // Linha especial no cache que guarda quem está a competir AGORA.
 const CHAVE_AO_VIVO = "_a_competir_agora";
+// Linha especial no cache que guarda o CURSOR dos preços: { comp, dia, indice }.
+// Vive no atletas_cache para não precisar de tabela nova (mesmo padrão do ao-vivo).
+const CHAVE_CURSOR_PRECOS = "_cursor_precos";
 
 // A partir de quantos jogadores ativos os percentis de faixa "ligam".
 const MIN_JOGADORES = 100;
 // Janela (dias) para procurar competições recém-terminadas a congelar.
 const JANELA_DIAS = 21;
+
+// ---------------------------------------------------------------------------
+// ORÇAMENTO DE TEMPO
+// A função tem maxDuration=300s. Trabalhamos até 240s e guardamos 60s de folga
+// para a resposta e para o arranque frio. Cada etapa tem a sua MARGEM: é o
+// tempo que essa etapa precisa, no pior caso, para não ficar a meio.
+// ---------------------------------------------------------------------------
+const MS_ORCAMENTO = 240_000;
+const MS_MARGEM_ETAPA = 20_000;        // etapas curtas (notificações, faixas)
+const MS_MARGEM_CATEGORIA = 30_000;    // uma categoria de preços (~18s + folga)
+const MS_MARGEM_COMPETICAO = 45_000;   // congelar uma competição
+
+/** Ainda há tempo para começar uma etapa que precisa de `margem` ms? */
+function haTempo(t0: number, margem: number): boolean {
+  return Date.now() - t0 < MS_ORCAMENTO - margem;
+}
+
 // Faixas por ordem (melhor → pior). 5+10+15+20+20+20 = 90%; resto (~10%) = branca.
 const ESCADA: { faixa: string; fatia: number }[] = [
   { faixa: "preta", fatia: 0.05 }, { faixa: "marrom", fatia: 0.10 }, { faixa: "roxa", fatia: 0.15 },
@@ -75,11 +129,59 @@ function baseUrl(req: Request): string {
   }
 }
 
+/** Chave do dia ("AAAA-MM-DD") para o cursor reiniciar todos os dias. */
+function chaveDia(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // Diz se uma competição (pela data do calendário) já começou — está a decorrer.
 function jaComecou(c: SemanaCalendario, hoje: Date): boolean {
   const ini = new Date(c.de.replace(/\//g, "-") + "T00:00:00");
   const fim = new Date(ini.getTime() + 6 * 86400000);
   return hoje >= ini && hoje <= fim;
+}
+
+// ---------------------------------------------------------------------------
+// CURSOR DOS PREÇOS — onde ficámos na última corrida.
+// Guardado como { comp, dia, indice } na linha _cursor_precos do atletas_cache.
+//   comp   = competição-alvo (se mudar, recomeça do zero)
+//   dia    = "AAAA-MM-DD" (se mudar, recomeça: uma passagem completa por dia)
+//   indice = próxima categoria a fazer (0..CATS.length)
+// ---------------------------------------------------------------------------
+async function lerCursorPrecos(): Promise<{ comp: string; dia: string; indice: number } | null> {
+  if (!supabaseAdmin) return null;
+  try {
+    const { data } = await supabaseAdmin
+      .from("atletas_cache")
+      .select("atletas")
+      .eq("id_competition", CHAVE_CURSOR_PRECOS)
+      .maybeSingle();
+    const a = data?.atletas as { comp?: unknown; dia?: unknown; indice?: unknown } | null;
+    if (!a || typeof a !== "object" || Array.isArray(a)) return null;
+    const indice = Number(a.indice);
+    return {
+      comp: String(a.comp ?? ""),
+      dia: String(a.dia ?? ""),
+      indice: Number.isFinite(indice) && indice >= 0 ? indice : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function gravarCursorPrecos(comp: string, dia: string, indice: number): Promise<void> {
+  if (!supabaseAdmin) return;
+  try {
+    await supabaseAdmin.from("atletas_cache").upsert(
+      {
+        id_competition: CHAVE_CURSOR_PRECOS,
+        atletas: { comp, dia, indice },
+        total: indice,
+        atualizado_em: new Date().toISOString(),
+      },
+      { onConflict: "id_competition" }
+    );
+  } catch { /* o cursor é uma otimização: se falhar, na próxima recomeça do zero */ }
 }
 
 // Guarda (ou limpa) a lista de IDs de quem está a competir agora.
@@ -113,7 +215,13 @@ async function atualizarAoVivo(hoje: Date): Promise<{ ao_vivo: string | null; at
 // (C) CONGELA as competições recentes que já TERMINARAM (regra das 60h).
 // Usa o motor lib/congelar (fonte correta competitor.contests). Idempotente:
 // o motor tem retoma e não incha. Devolve um resumo por competição.
-async function congelarRecentes(hoje: Date): Promise<{ comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean }[]> {
+//
+// ORÇAMENTO: não começa uma competição nova sem MS_MARGEM_COMPETICAO de folga.
+// Se parar a meio, `parouPorTempo` fica true e a corrida seguinte apanha o resto
+// (a competição continua na janela dos 21 dias, e o motor retoma onde ficou).
+type ResumoCongelamento = { comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean };
+
+async function congelarRecentes(hoje: Date, t0: number): Promise<{ feitos: ResumoCongelamento[]; parouPorTempo: boolean }> {
   const agora = hoje.getTime();
   const janelaMs = JANELA_DIAS * 24 * 60 * 60 * 1000;
   const candidatas = CALENDARIO_2026.filter((s) => {
@@ -122,25 +230,27 @@ async function congelarRecentes(hoje: Date): Promise<{ comp: string; nome: strin
     return dentroDaJanela && competicaoFechada(s, hoje); // só as JÁ TERMINADAS (60h)
   });
 
-  const out: { comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean }[] = [];
+  const feitos: ResumoCongelamento[] = [];
+  let parouPorTempo = false;
   for (const s of candidatas) {
+    if (!haTempo(t0, MS_MARGEM_COMPETICAO)) { parouPorTempo = true; break; }
     const mes = s.de.slice(0, 7).replace("/", "-");
     const anoEpoca = parseInt(s.de.slice(0, 4), 10);
     try {
       const r = await congelarCompeticao(s.idCompeticao, mes, anoEpoca);
-      out.push({ comp: s.idCompeticao, nome: s.nome, processados: r.atletasProcessados, faltam: r.atletasEmFalta, utilizadores: r.utilizadores, completa: r.completa });
-    } catch (e) {
-      out.push({ comp: s.idCompeticao, nome: s.nome, processados: 0, faltam: -1, utilizadores: 0, completa: false });
+      feitos.push({ comp: s.idCompeticao, nome: s.nome, processados: r.atletasProcessados, faltam: r.atletasEmFalta, utilizadores: r.utilizadores, completa: r.completa });
+    } catch {
+      feitos.push({ comp: s.idCompeticao, nome: s.nome, processados: 0, faltam: -1, utilizadores: 0, completa: false });
     }
   }
-  return out;
+  return { feitos, parouPorTempo };
 }
 
 // (C-bis) APURA as copas ativas (mata-mata). Depois de congelar as competições,
 // chama o /api/copa/apurar de cada liga que é copa e está a decorrer/sorteada.
 // O apurar lê de resultados_atletas (já congelado acima), por isso decide bem.
 // É o que torna o mata-mata AUTOMÁTICO (já não depende de alguém abrir a página).
-async function apurarCopasAtivas(base: string): Promise<{ league_id: string; nome: string; apurou: boolean }[]> {
+async function apurarCopasAtivas(base: string, t0: number): Promise<{ league_id: string; nome: string; apurou: boolean }[]> {
   if (!supabaseAdmin) return [];
   const { data: copas } = await supabaseAdmin
     .from("leagues")
@@ -150,6 +260,7 @@ async function apurarCopasAtivas(base: string): Promise<{ league_id: string; nom
 
   const out: { league_id: string; nome: string; apurou: boolean }[] = [];
   for (const liga of copas || []) {
+    if (!haTempo(t0, MS_MARGEM_ETAPA)) break;
     try {
       const r = await fetch(`${base}/api/copa/apurar`, {
         method: "POST",
@@ -333,7 +444,8 @@ function mesAnteriorDe(d: Date): string {
 //  • Aniversário: só a quem faz anos hoje.
 //
 // Idempotente por dia: antes de enviar, vê quem já recebeu HOJE esse tipo (via
-// tabela notificacoes), para um re-disparo manual não duplicar.
+// tabela notificacoes), para um re-disparo manual não duplicar. É isto que
+// permite o cron correr de hora a hora sem inundar ninguém.
 //
 // Escala (nota honesta): o envio do Dia do Judô percorre todos os utilizadores
 // um a um. Para uma base grande, isto deve passar a um envio em lote / fila.
@@ -679,6 +791,38 @@ export async function GET(req: Request) {
   const t0 = Date.now();
   const hoje = new Date();
 
+  // DIAGNÓSTICO das candidatas a congelar: ?diag=1
+  // Não congela nada — mostra, para cada semana perto de hoje, as contas do
+  // filtro (horas desde o início, dentro da janela, terminada). É a resposta a
+  // "porque é que a competição X não congelou sozinha?", sem adivinhar.
+  const soDiag = (searchParams.get("diag") || "").trim();
+  if (soDiag) {
+    const agora = hoje.getTime();
+    const janelaMs = JANELA_DIAS * 24 * 60 * 60 * 1000;
+    const linhas = CALENDARIO_2026.map((s) => {
+      const inicio = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
+      const horas = Math.round(((agora - inicio) / 3600000) * 10) / 10;
+      const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
+      const terminada = competicaoFechada(s, hoje);
+      return {
+        id: s.idCompeticao, nome: s.nome, de: s.de,
+        inicio_iso: new Date(inicio).toISOString(),
+        horas_desde_inicio: horas,
+        dentroDaJanela, terminada,
+        candidata: dentroDaJanela && terminada,
+      };
+    }).filter((l) => l.horas_desde_inicio > -720 && l.horas_desde_inicio < 1440);
+    return NextResponse.json({
+      feito: true, modo: "diagnostico",
+      servidor_agora_iso: hoje.toISOString(),
+      servidor_agora_local: hoje.toString(),
+      fuso_offset_min: hoje.getTimezoneOffset(), // 0 na Vercel = UTC
+      cursor_precos: await lerCursorPrecos(),
+      candidatas: linhas.filter((l) => l.candidata).map((l) => l.id),
+      linhas, ms_total: Date.now() - t0,
+    });
+  }
+
   // Disparo manual de APURAR uma copa específica (teste): ?apurar=LEAGUE_ID
   const apurarId = (searchParams.get("apurar") || "").trim();
   if (apurarId) {
@@ -723,7 +867,6 @@ export async function GET(req: Request) {
   }
 
   // Disparo manual SÓ das notificações de mercado (teste rápido): ?mercado=1
-  // Corre apenas a etapa (E) e responde de imediato, sem as 14 categorias.
   const soMercado = (searchParams.get("mercado") || "").trim();
   if (soMercado) {
     let r: { aberto: string | null; fechado: string | null } | null = null;
@@ -732,7 +875,6 @@ export async function GET(req: Request) {
   }
 
   // Disparo manual SÓ das notificações de DATAS ESPECIAIS (teste): ?datas=1
-  // Corre apenas a etapa (F) (aniversário + Dia do Judô) e responde de imediato.
   const soDatas = (searchParams.get("datas") || "").trim();
   if (soDatas) {
     let r: { dia_do_judo: number; aniversarios: number; outras_globais: number } = { dia_do_judo: 0, aniversarios: 0, outras_globais: 0 };
@@ -786,6 +928,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ feito: true, modo: "fechar_ano_forcado", fecho: r, ms_total: Date.now() - t0 });
   }
 
+  // =========================================================================
+  // CORRIDA NORMAL — pela ordem de importância. O que dá pontos vem primeiro;
+  // os preços ficam para o fim, com o tempo que sobrar.
+  // =========================================================================
+
   // (A) Atualiza a lista de "a competir agora" (para o aviso no Mercado).
   let aoVivo: { ao_vivo: string | null; atletas_ao_vivo: number } = { ao_vivo: null, atletas_ao_vivo: 0 };
   try {
@@ -794,21 +941,115 @@ export async function GET(req: Request) {
     aoVivo = { ao_vivo: `erro: ${(e as { message?: string })?.message || "falha"}`, atletas_ao_vivo: 0 };
   }
 
-  // (B) Prepara os preços da competição que se aproxima (14 categorias).
+  // (C) CONGELA as competições recentes terminadas (motor lib/congelar).
+  // Preenche resultados_atletas, resultados_rodada, precos_atletas, pontuacoes
+  // e users.patrimony_jc — com a fonte correta. Idempotente.
+  let congelamentos: ResumoCongelamento[] = [];
+  let congelamentoParou = false;
+  try {
+    const r = await congelarRecentes(hoje, t0);
+    congelamentos = r.feitos;
+    congelamentoParou = r.parouPorTempo;
+  } catch { /* não bloqueia o resto do cron */ }
+
+  // (C-quater) MELHORES DA RODADA: para cada competição recém-congelada e COMPLETA,
+  // grava o(s) vencedor(es) da rodada (mundial combinado + continentais) e notifica.
+  // Uma vez por competição (idempotente). Só quando o congelamento está completo,
+  // para não premiar com dados parciais.
+  const melhoresRodada: { comp: string; nome: string; gravados: number; jaExistia: boolean; push: number }[] = [];
+  try {
+    for (const c of congelamentos) {
+      if (!c.completa) continue;
+      if (!haTempo(t0, MS_MARGEM_ETAPA)) break;
+      const r = await registrarMelhoresRodada(c.comp, c.nome);
+      melhoresRodada.push({ comp: c.comp, nome: c.nome, ...r });
+    }
+  } catch { /* não bloqueia */ }
+
+  // (C-bis) APURA as copas ativas (mata-mata) com os dados já congelados.
+  let copas: { league_id: string; nome: string; apurou: boolean }[] = [];
+  try {
+    if (haTempo(t0, MS_MARGEM_ETAPA)) copas = await apurarCopasAtivas(base, t0);
+  } catch { /* não bloqueia */ }
+
+  // (C-ter) ENCERRA as ligas de pontos corridos cuja janela início→fim acabou.
+  let ligasEncerradas: { encerradas: number; ids: string[] } = { encerradas: 0, ids: [] };
+  try {
+    if (haTempo(t0, MS_MARGEM_ETAPA)) ligasEncerradas = await encerrarLigasTerminadas(hoje);
+  } catch { /* não bloqueia */ }
+
+  // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
+  //     também forçar via ?faixas=AAAA-MM para teste manual.
+  let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number> } | null = null;
+  const forcarFaixas = (searchParams.get("faixas") || "").trim();
+  try {
+    if (forcarFaixas) {
+      const r = await recalcularFaixas(forcarFaixas);
+      faixas = { mes: forcarFaixas, ...r };
+    } else if (hoje.getDate() === 1 && haTempo(t0, MS_MARGEM_ETAPA)) {
+      const mes = mesAnteriorDe(hoje);
+      const r = await recalcularFaixas(mes);
+      faixas = { mes, ...r };
+    }
+  } catch { /* não bloqueia */ }
+
+  // (D-bis) FECHO DA ÉPOCA OFICIAL: no dia 1 de JANEIRO, fecha o ano que acabou
+  //         (grava o pódio anual mundial + continentais no livro de campeões).
+  let fechoAnual: { ano: number; mundial: number; continentais: Record<string, number> } | null = null;
+  try {
+    if (hoje.getDate() === 1 && hoje.getMonth() === 0 && haTempo(t0, MS_MARGEM_ETAPA)) { // 1 de janeiro
+      fechoAnual = await fecharAnoOficial(hoje.getFullYear() - 1);
+    }
+  } catch { /* não bloqueia */ }
+
+  // (E) Notificações de MERCADO (aberto/fechado), idempotentes. Uma vez por
+  //     competição. Não bloqueia o resto do cron se falhar.
+  let mercado: { aberto: string | null; vespera: string | null; fechado: string | null } | null = null;
+  try {
+    if (haTempo(t0, MS_MARGEM_ETAPA)) mercado = await notificarMercado(hoje);
+  } catch { /* não bloqueia */ }
+
+  // (F) Notificações de DATAS ESPECIAIS por push (aniversário + Dia do Judô).
+  //     Idempotente por dia. Não bloqueia o resto do cron se falhar.
+  let datas: { dia_do_judo: number; aniversarios: number; outras_globais: number } | null = null;
+  try {
+    if (haTempo(t0, MS_MARGEM_ETAPA)) datas = await notificarDatasEspeciais(hoje);
+  } catch { /* não bloqueia */ }
+
+  // -------------------------------------------------------------------------
+  // (B) PREÇOS da competição que se aproxima — POR CURSOR, no fim.
+  //
   // IMPORTANTE: calcula a competição que o MERCADO vai mostrar — focoMercado().alvo
   // — e não competicaoDaSemana(). Quando o mercado da competição da semana já
   // fechou, o mercado salta para a PRÓXIMA (alvo); se o cron calculasse a "da
-  // semana", a competição que se escala ficava sem preços (média 0.0). Alinhar
-  // os dois resolve isso.
-  let comp = searchParams.get("comp");
+  // semana", a competição que se escala ficava sem preços (média 0.0).
+  //
+  // O cursor guarda a próxima categoria a fazer. Reinicia quando muda a
+  // competição-alvo ou quando muda o dia. Com ?precos=1 faz as 14 de uma vez,
+  // ignorando cursor e orçamento (para testes à mão).
+  // -------------------------------------------------------------------------
+  // comp começa como string (não string|null): o cursor precisa de a comparar
+  // e de a gravar, e um null aqui rebentava a tipagem.
+  let comp = (searchParams.get("comp") || "").trim();
   let alvo: SemanaCalendario | null = null;
   if (!comp) {
     alvo = focoMercado(hoje).alvo;
     comp = alvo.idCompeticao;
   }
 
+  const forcarPrecos = (searchParams.get("precos") || "").trim() === "1";
+  const diaHoje = chaveDia(hoje);
+  let inicio = 0;
+  if (!forcarPrecos) {
+    const cur = await lerCursorPrecos();
+    if (cur && cur.comp === comp && cur.dia === diaHoje) inicio = Math.min(cur.indice, CATS.length);
+  }
+
   const passos: Array<{ categoria: string; ok: boolean; atualizados?: number; ms?: number; nota?: string }> = [];
-  for (const { cat, gender } of CATS) {
+  let i = inicio;
+  while (i < CATS.length) {
+    if (!forcarPrecos && !haTempo(t0, MS_MARGEM_CATEGORIA)) break;
+    const { cat, gender } = CATS[i];
     const catUrl = encodeURIComponent(cat);
     const url = `${base}/api/calcular?comp=${comp}&cat=${catUrl}&gender=${gender}`;
     try {
@@ -824,81 +1065,15 @@ export async function GET(req: Request) {
     } catch (e) {
       passos.push({ categoria: `${cat} ${gender}`, ok: false, nota: (e as { message?: string })?.message || "falha" });
     }
+    i++;
   }
+
+  // Grava onde ficámos. Se chegou ao fim, o índice fica em CATS.length e as
+  // corridas seguintes de hoje não repetem trabalho (só amanhã, com dia novo).
+  if (!forcarPrecos) await gravarCursorPrecos(comp, diaHoje, i);
 
   const totalAtualizados = passos.reduce((s, p) => s + (p.atualizados || 0), 0);
   const ok = passos.filter((p) => p.ok).length;
-
-  // (C) CONGELA as competições recentes terminadas (motor lib/congelar).
-  // Preenche resultados_atletas, resultados_rodada, precos_atletas, pontuacoes
-  // e users.patrimony_jc — com a fonte correta. Idempotente.
-  let congelamentos: { comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean }[] = [];
-  try {
-    congelamentos = await congelarRecentes(hoje);
-  } catch { /* não bloqueia o resto do cron */ }
-
-  // (C-quater) MELHORES DA RODADA: para cada competição recém-congelada e COMPLETA,
-  // grava o(s) vencedor(es) da rodada (mundial combinado + continentais) e notifica.
-  // Uma vez por competição (idempotente). Só quando o congelamento está completo,
-  // para não premiar com dados parciais.
-  const melhoresRodada: { comp: string; nome: string; gravados: number; jaExistia: boolean; push: number }[] = [];
-  try {
-    for (const c of congelamentos) {
-      if (!c.completa) continue;
-      const r = await registrarMelhoresRodada(c.comp, c.nome);
-      melhoresRodada.push({ comp: c.comp, nome: c.nome, ...r });
-    }
-  } catch { /* não bloqueia */ }
-
-  // (C-bis) APURA as copas ativas (mata-mata) com os dados já congelados.
-  let copas: { league_id: string; nome: string; apurou: boolean }[] = [];
-  try {
-    copas = await apurarCopasAtivas(base);
-  } catch { /* não bloqueia */ }
-
-  // (C-ter) ENCERRA as ligas de pontos corridos cuja janela início→fim acabou.
-  let ligasEncerradas: { encerradas: number; ids: string[] } = { encerradas: 0, ids: [] };
-  try {
-    ligasEncerradas = await encerrarLigasTerminadas(hoje);
-  } catch { /* não bloqueia */ }
-
-  // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
-  //     também forçar via ?faixas=AAAA-MM para teste manual.
-  let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number> } | null = null;
-  const forcarFaixas = (searchParams.get("faixas") || "").trim();
-  try {
-    if (forcarFaixas) {
-      const r = await recalcularFaixas(forcarFaixas);
-      faixas = { mes: forcarFaixas, ...r };
-    } else if (hoje.getDate() === 1) {
-      const mes = mesAnteriorDe(hoje);
-      const r = await recalcularFaixas(mes);
-      faixas = { mes, ...r };
-    }
-  } catch { /* não bloqueia */ }
-
-  // (D-bis) FECHO DA ÉPOCA OFICIAL: no dia 1 de JANEIRO, fecha o ano que acabou
-  //         (grava o pódio anual mundial + continentais no livro de campeões).
-  let fechoAnual: { ano: number; mundial: number; continentais: Record<string, number> } | null = null;
-  try {
-    if (hoje.getDate() === 1 && hoje.getMonth() === 0) { // 1 de janeiro
-      fechoAnual = await fecharAnoOficial(hoje.getFullYear() - 1);
-    }
-  } catch { /* não bloqueia */ }
-
-  // (E) Notificações de MERCADO (aberto/fechado), idempotentes. Uma vez por
-  //     competição. Não bloqueia o resto do cron se falhar.
-  let mercado: { aberto: string | null; vespera: string | null; fechado: string | null } | null = null;
-  try {
-    mercado = await notificarMercado(hoje);
-  } catch { /* não bloqueia */ }
-
-  // (F) Notificações de DATAS ESPECIAIS por push (aniversário + Dia do Judô).
-  //     Idempotente por dia. Não bloqueia o resto do cron se falhar.
-  let datas: { dia_do_judo: number; aniversarios: number; outras_globais: number } | null = null;
-  try {
-    datas = await notificarDatasEspeciais(hoje);
-  } catch { /* não bloqueia */ }
 
   return NextResponse.json({
     feito: true,
@@ -907,9 +1082,8 @@ export async function GET(req: Request) {
     classico: alvo ? alvo.classico : undefined,
     a_competir_agora: aoVivo.ao_vivo,
     atletas_a_competir_agora: aoVivo.atletas_ao_vivo,
-    categorias_ok: `${ok}/${CATS.length}`,
-    total_atletas_atualizados: totalAtualizados,
     congelamentos,
+    congelamento_parou_por_tempo: congelamentoParou,
     melhores_rodada: melhoresRodada,
     copas,
     ligas_encerradas: ligasEncerradas,
@@ -917,6 +1091,17 @@ export async function GET(req: Request) {
     fecho_anual: fechoAnual,
     mercado,
     datas,
+    // Estado dos preços nesta corrida (cursor): de onde partiu, onde ficou.
+    precos: {
+      dia: diaHoje,
+      de_categoria: inicio,
+      ate_categoria: i,
+      total_categorias: CATS.length,
+      passagem_completa: i >= CATS.length,
+      forcado: forcarPrecos,
+      categorias_ok: `${ok}/${passos.length}`,
+      total_atletas_atualizados: totalAtualizados,
+    },
     ms_total: Date.now() - t0,
     passos,
   });
