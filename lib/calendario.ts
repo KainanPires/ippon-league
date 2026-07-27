@@ -229,8 +229,15 @@ export function focoMercado(agora: Date = new Date()): FocoMercado {
   const atual = competicaoDaSemana(agora);
   const estadoAtual = estadoMercado(atual, agora);
   const fechado = estadoAtual.estado === "fechado";
-  const alvo = fechado ? proximaDepoisDe(atual) : atual;
-  const aDecorrer = fechado ? atual : null;
+  // A competição da semana já TERMINOU (passaram as 60h do início)? Se sim, deixa
+  // de estar "a decorrer" e o foco avança para a próxima — mesmo dentro da mesma
+  // semana. Sem isto, uma competição ficava presa em "a decorrer" o resto da
+  // semana (mercado fechado mas a seguinte ainda não tinha começado), o que
+  // impedia o congelamento de a apanhar (o caso do clássico de Osaka).
+  const terminada = competicaoFechada(atual, agora);
+  const alvo = (fechado || terminada) ? proximaDepoisDe(atual) : atual;
+  // "A decorrer" só enquanto o mercado fechou E ainda não passaram as 60h.
+  const aDecorrer = (fechado && !terminada) ? atual : null;
   const estadoAlvo = estadoMercado(alvo, agora);
   return { atual, alvo, aDecorrer, estadoAtual, estadoAlvo };
 }
