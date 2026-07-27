@@ -11,11 +11,19 @@
 // Tudo é montado a partir dos endpoints que JÁ existem (mesmos números do resto
 // da app): /api/liga/minhas, /api/copa/chave, /api/liga/geral, /api/liga/campeoes
 // e /api/liga/melhores-rodada?historico=1.
+//
+// DOIS TIPOS DE TÍTULO — não confundir:
+//   • RODADA (variante "rodada") — foste o nº1 do mundo (ou do teu continente)
+//     NUMA competição. Sai a cada rodada. O certificado tem de dizer QUAL rodada
+//     e QUAL competição, senão não se distingue do título de época.
+//   • ANO   (variante "anual" vinda de /api/liga/campeoes) — foste campeão da
+//     ÉPOCA inteira. Só existe depois de 31 de dezembro, quando o cron corre o
+//     fecharAnoOficial. Ver TRAVA DO ANO na secção 2.
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { focoMercado } from "@/lib/calendario";
+import { focoMercado, rotuloRodada } from "@/lib/calendario";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -34,7 +42,7 @@ interface Positivo {
   // Para o cartão da lista:
   medalha: string;
   cor: string;
-  rotulo: string;               // ex. "Campeão", "3º lugar", "Mundial + Europa"
+  rotulo: string;               // ex. "Campeão", "3º lugar", "Rodada 24 · Mundial + Europa"
   contexto: string;             // ex. "Copa do Dojo", "Liga Mundial 2026", nome da competição
   pontos: number | null;
 }
@@ -95,21 +103,33 @@ export function ResultadosConteudo() {
       }
 
       // 1) MELHOR DA RODADA (histórico): cada vitória de rodada é um certificado.
+      //    O certificado TEM de identificar a rodada e a competição — senão
+      //    confunde-se com o título de época. O número da rodada sai do
+      //    calendário (rotuloRodada), pelo id_competicao; não há nada a guardar
+      //    na base de dados por causa disto.
       const mr = await getJSON(`/api/liga/melhores-rodada?historico=1&user_id=${uid}`);
       if (mr && Array.isArray(mr.historico)) {
         for (const r of mr.historico as Array<Record<string, unknown>>) {
+          const nomeComp = String(r.nome_competicao || "");
+          const rodada = rotuloRodada(String(r.id_competicao));       // "Rodada 24" ou ""
+          const escopo = String(r.rotulo || "Melhor da Rodada");      // "Mundial + Europa"
+          // No CERTIFICADO: rodada + competição (o que o Kainan pediu).
+          const nomeNoCertificado = rodada ? `${rodada} · ${nomeComp}` : nomeComp;
+          // No CARTÃO da lista: a rodada vai na linha pequena, com o âmbito, e o
+          // nome da competição fica na linha grande (não corta com reticências).
+          const rotuloCartao = rodada ? `${rodada} · ${escopo}` : escopo;
           pos.push({
             chave: `rod-${String(r.id_competicao)}-${String(r.escopo)}-${String(r.continente)}`,
             variante: "rodada",
             posicao: "campeao",
-            tituloRodada: String(r.rotulo || "Melhor da Rodada"),
+            tituloRodada: escopo,
             identity: ident(r.escudo as Identity | null, String(r.nome_time || "Equipa")),
-            nomeCertificado: String(r.nome_competicao || ""),
+            nomeCertificado: nomeNoCertificado,
             nParticipantes: Number(r.n_participantes || 0),
             medalha: "🥇",
             cor: GOLD,
-            rotulo: String(r.rotulo || "Melhor da Rodada"),
-            contexto: String(r.nome_competicao || ""),
+            rotulo: rotuloCartao,
+            contexto: nomeComp,
             pontos: Number(r.pontos || 0),
           });
         }
@@ -118,10 +138,21 @@ export function ResultadosConteudo() {
       // 2) CAMPEÃO DO ANO (Mundial e Continental). Só entra se estiver no top 3.
       //    O nº de participantes vem do ranking do ano (geral) — uma chamada por
       //    âmbito, só quando há de facto um título a mostrar.
+      //
+      //    TRAVA DO ANO: o título de campeão da época só existe depois de a época
+      //    FECHAR. O cron grava o pódio anual no fecharAnoOficial, a 1 de janeiro,
+      //    sempre para o ano ANTERIOR (e recusa fechar o ano em curso). Por isso
+      //    aqui só mostramos anos JÁ TERMINADOS: ano < ano atual. Enquanto 2026
+      //    decorre, ninguém é "Campeão 2026" — a posição em curso vê-se no ranking
+      //    da liga oficial, não num certificado. A partir de 1/jan/2027 o título de
+      //    2026 aparece aqui sozinho.
+      const anoAtual = new Date().getFullYear();
       for (const tipo of ["mundial", "continental"] as const) {
         const c = await getJSON(`/api/liga/campeoes?tipo=${tipo}&user_id=${uid}`);
         if (!c || !c.ok || !Array.isArray(c.podio)) continue;
         const ano = c.ano != null ? Number(c.ano) : null;
+        // Sem ano conhecido não conseguimos provar que a época fechou: não mostra.
+        if (ano == null || !Number.isFinite(ano) || ano >= anoAtual) continue;
         const eu = (c.podio as Array<Record<string, unknown>>).find((p) => String(p.user_id) === uid);
         if (!eu) continue;
         const posPodio = posicaoDePodio(Number(eu.posicao));
@@ -132,18 +163,18 @@ export function ResultadosConteudo() {
         if (g && Array.isArray(g.membros)) nPart = (g.membros as unknown[]).length;
         const m = metaPosicao(posPodio);
         const nomeLiga = tipo === "mundial"
-          ? `Liga Mundial${ano ? ` ${ano}` : ""}`
-          : `Liga Continental${ano ? ` ${ano}` : ""}`;
+          ? `Liga Mundial ${ano}`
+          : `Liga Continental ${ano}`;
         pos.push({
           chave: `ano-${tipo}-${ano}`,
           variante: "anual",
           posicao: posPodio,
           identity: ident(eu.escudo as Identity | null, String(eu.nome_time || "Equipa")),
-          nomeCertificado: nomeLiga,
+          nomeCertificado: `${nomeLiga} · Época completa`,
           nParticipantes: nPart,
           medalha: m.medalha,
           cor: m.cor,
-          rotulo: m.rotulo,
+          rotulo: `${m.rotulo} do ano`,
           contexto: nomeLiga,
           pontos: Number(eu.pontos || 0),
         });
