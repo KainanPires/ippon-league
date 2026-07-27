@@ -69,8 +69,32 @@ async function pontuarAtletasDaCompeticao(
   if (!supabaseAdmin) return { processados: 0, faltam: 0 };
 
   // Lista de inscritos da competição (com identidade: nome, país, categoria...).
-  const raw = await getCompetitionCompetitorsRaw(idComp);
-  const inscritos = mapCompetitorsToAthletes(raw);
+  let inscritos = mapCompetitorsToAthletes(await getCompetitionCompetitorsRaw(idComp));
+
+  // FALLBACK PARA CLÁSSICOS: o JudoBase ao vivo não devolve inscritos para
+  // competições antigas revividas (ex.: Osaka 2018 = id 1601 devolve vazio).
+  // Nesse caso, usamos os inscritos já guardados em atletas_cache (a lista que
+  // foi montada quando a competição entrou no jogo). As lutas de cada atleta
+  // continuam a vir por competitor.contests (funciona por atleta, mesmo em
+  // clássicos) — só a LISTA de quem participa é que vem do cache.
+  if (inscritos.length === 0 && supabaseAdmin) {
+    const { data: cacheRow } = await supabaseAdmin
+      .from("atletas_cache")
+      .select("atletas")
+      .eq("id_competition", idComp)
+      .maybeSingle();
+    const doCache = Array.isArray(cacheRow?.atletas) ? (cacheRow!.atletas as Array<Record<string, unknown>>) : [];
+    inscritos = doCache
+      .filter((a) => a?.id != null)
+      .map((a) => ({
+        id: String(a.id),
+        name: a.name != null ? String(a.name) : "",
+        countryIso: a.countryIso != null ? String(a.countryIso) : "",
+        category: a.category != null ? String(a.category) : "",
+        gender: a.gender != null ? String(a.gender) : "",
+      })) as typeof inscritos;
+  }
+
   if (inscritos.length === 0) return { processados: 0, faltam: 0 };
 
   // Quais já estão congelados (para retomar sem repetir).
