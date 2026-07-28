@@ -7,10 +7,12 @@ import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/compone
 import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
-import { focoMercado, numeroDaRodada, CALENDARIO_2026 } from "@/lib/calendario";
+import { focoMercado, numeroDaRodada, nomeCompeticao, pontosVisiveisPorId, CALENDARIO_2026 } from "@/lib/calendario";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
-import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, type TutKey } from "@/lib/tutorials";
+import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, deveMostrarTutorial, type TutKey } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
+import { AvisoEquipaGuardada } from "@/components/AvisoEquipaGuardada";
+import { useFaixa } from "@/lib/useFaixa";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
 import { useTatame } from "@/components/TatameProvider";
@@ -18,8 +20,14 @@ import { useTatame } from "@/components/TatameProvider";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-const BELT = "Branca";
-const BELT_HEX = "#efeadd";
+
+// FAIXA: vem do useFaixa() — a faixa REAL do jogador, a mesma em toda a app.
+//
+// Antes havia aqui `const BELT = "Branca"` e `BELT_HEX = "#efeadd"` fixos, e este
+// ecrã dizia "Faixa Branca" e pintava o Dôdo de branco a TODA A GENTE, mesmo a
+// quem fosse preta. O cartão de partilha saía igualmente com "Branca". Era o
+// sítio mais errado da app quanto a isto — e o mais visível, porque é onde o
+// jogador passa mais tempo.
 
 const TICK_AO_VIVO_MS = 15000;
 
@@ -153,10 +161,10 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   const [temResultados, setTemResultados] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null);
   const [modal, setModal] = useState<Athlete | null>(null);
-  // Partilha da equipa desta rodada (só quando o dojo é meu). A faixa mostrada no
-  // cartão é a minha atual; "Branca" enquanto não a carregamos (ou se não houver).
   const [partilhar, setPartilhar] = useState(false);
-  const [minhaFaixa, setMinhaFaixa] = useState<string>("Branca");
+  // A MINHA faixa (do hook partilhado). Serve para o Dôdo e para o cartão de
+  // partilha — que só aparece quando o dojo é meu, por isso é sempre a certa.
+  const { cor: corFaixa, nome: nomeFaixa } = useFaixa();
 
   const foco = focoMercado();
   const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp;
@@ -173,6 +181,13 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
     return `${partes[2]}/${partes[1]}/${partes[0]}`;
   })();
   const linhaRodada = [rodadaNum ? `Rodada ${rodadaNum}` : "", dataRodada].filter(Boolean).join(" · ");
+  // Nome a MOSTRAR desta competição: esconde a cidade se for um clássico ainda
+  // por abrir. Importa sobretudo no ecrã "mercado ainda aberto" — seria absurdo
+  // dizer "ainda não podes ver" e no mesmo fôlego revelar a cidade de 2018.
+  const nomeCompMostrar = (() => {
+    const ent = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
+    return ent ? nomeCompeticao(ent) : nomeComp;
+  })();
 
   // 1) Sessão (exige login) + equipa do alvo (servidor) + pool da competição.
   useEffect(() => {
@@ -188,14 +203,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
       if (euMesmo) {
         const meta = (sess as { user?: { user_metadata?: { is_pro?: boolean; is_pro_max?: boolean } } }).user?.user_metadata;
         setMeuNivel(meta?.is_pro_max ? "pro_max" : meta?.is_pro ? "pro" : "normal");
-      }
-      // Se o dojo é meu, vou buscar a minha faixa atual (para o cartão de partilha).
-      if (euMesmo && meuId) {
-        supabase.from("users").select("belt").eq("id", meuId).maybeSingle()
-          .then(({ data: row }) => {
-            const b = (row as { belt?: unknown } | null)?.belt;
-            if (active && typeof b === "string" && b.trim()) setMinhaFaixa(b.trim());
-          });
       }
 
       const poolP = fetch(`/api/atletas?id=${idComp}`).then((r) => r.json()).catch(() => null);
@@ -306,7 +313,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
 
         {fase === "carregando" && (
           <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
-            <div style={{ width: 80, height: 80, margin: "0 auto 8px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
+            <div style={{ width: 80, height: 80, margin: "0 auto 8px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>A abrir o dojo…</div>
           </div>
         )}
@@ -320,7 +327,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
 
         {fase === "sem-equipa" && (
           <div style={{ textAlign: "center", padding: "26px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
-            <div style={{ width: 90, height: 90, margin: "0 auto 6px" }}><Mascot belt={BELT_HEX} expression="indicando" /></div>
+            <div style={{ width: 90, height: 90, margin: "0 auto 6px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Sem equipa nesta rodada</h2>
             <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{souEu ? "Não escalaste equipa nesta competição." : "Este treinador não escalou equipa nesta competição."}</p>
           </div>
@@ -331,7 +338,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
             <div style={{ fontSize: 32, marginBottom: 6 }}>🔒</div>
             <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Mercado ainda aberto</h2>
             <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>
-              As equipas {nomeComp ? <>de <strong style={{ color: "#f1ede2" }}>{nomeComp}</strong> </> : "desta rodada "}
+              As equipas {nomeCompMostrar ? <>de <strong style={{ color: "#f1ede2" }}>{nomeCompMostrar}</strong> </> : "desta rodada "}
               só ficam visíveis quando o mercado fechar. Assim ninguém copia a escalação antes da hora — volta quando a competição começar.
             </p>
           </div>
@@ -344,7 +351,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.06em" }}>Dojo de</div>
                 <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeTime}</div>
-                {nomeComp && <div style={{ fontSize: 11, color: "#7fd1a3", marginTop: 1 }}>{nomeComp}</div>}
+                {nomeCompMostrar && <div style={{ fontSize: 11, color: "#7fd1a3", marginTop: 1 }}>{nomeCompMostrar}</div>}
                 {linhaRodada && <div style={{ fontSize: 11, color: "#93a39a", marginTop: 1 }}>{linhaRodada}</div>}
               </div>
             </div>
@@ -392,7 +399,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={BELT_HEX} expression={phase === "ao-vivo" ? "determinado" : "feliz"} /></div>
+                <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={corFaixa} expression={phase === "ao-vivo" ? "determinado" : "feliz"} /></div>
                 <div>
                   <div style={{ fontSize: 12, color: "#93a39a" }}>{aDecorrerAgora ? "A rodada está a decorrer!" : "Resultado da rodada"}</div>
                   {squadValue && <div style={{ fontSize: 12, color: "#7fd1a3", fontWeight: 700, marginTop: 2 }}>{`Valor da equipa: JC ${squadValue}`}</div>}
@@ -448,7 +455,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
       {partilhar && (
         <CartaoEquipa
           identity={escudoAlvo || DEFAULT_IDENTITY}
-          faixa={minhaFaixa}
+          faixa={nomeFaixa}
           atletas={itens.map((i) => i.athlete || ({ id: i.id, name: i.nome, countryIso: i.pais, category: i.categoria } as Athlete))}
           capitao={capitao}
           nivel={meuNivel}
@@ -486,12 +493,17 @@ function MeuTimeInner() {
   // reaparece sempre por causa do timing). {} = já sabemos e não há nenhum visto.
   const [vistosConta, setVistosConta] = useState<Record<string, boolean> | null>(null);
   const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
+  // Aviso "e agora?" logo depois de guardar (uma vez, com não-mostrar-mais).
+  const [avisoGuardada, setAvisoGuardada] = useState(false);
   const [isPro, setIsPro] = useState(false);
   // Personalização Pro Max: cor do tatame — agora via TatameProvider, para mudar
   // na hora em todo o lado (Meu Time, central). seletorTatame abre/fecha o painel.
   const { tatameId, isProMax, setTatame } = useTatame();
   const [seletorTatame, setSeletorTatame] = useState(false);
   const router = useRouter();
+  // Faixa REAL do jogador: cor para o Dôdo, nome para o cabeçalho e para o
+  // cartão de partilha. Substitui os antigos BELT/BELT_HEX fixos.
+  const { cor: corFaixa, nome: nomeFaixa } = useFaixa();
   // Marca "montar" (?montar=1): ativada pelo lixo. Enquanto está no ciclo
   // mercado<->meu-time, o meu-time mostra VAZIO (ignora a equipa salva) para a
   // pessoa montar uma nova. Sair do ciclo (link sem o param) restaura a antiga;
@@ -630,10 +642,22 @@ function MeuTimeInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pontos reais + tick ao vivo (igual ao original).
+  // Pontos reais + tick ao vivo.
+  //
+  // PORTÃO ANTI-ESPREITADELA (cliente): enquanto o mercado desta competição
+  // estiver ABERTO não pedimos pontos nenhuns. Nos clássicos, as lutas de 2018 já
+  // existem no JudoBase — sem este travão, bastava escalar um atleta, tocar nele
+  // e ver quanto fez, para depois o trocar. O servidor já recusa (/api/resultados
+  // e /api/atleta-rodada devolvem vazio), mas parar aqui evita 4 pedidos por
+  // minuto que nunca dariam nada, e deixa o ecrã coerente.
   useEffect(() => {
     let active = true;
     if (!idComp) return;
+    if (!pontosVisiveisPorId(idComp)) {
+      setPontos({});
+      setTemResultados(false);
+      return () => { active = false; };
+    }
     const buscarPontos = () => {
       // Pontuamos os atletas DESTA equipa via competitor.contests (por atleta),
       // que traz as lutas completas mesmo quando competition.contests está
@@ -781,6 +805,14 @@ function MeuTimeInner() {
     setModal(null);
     router.push("/mercado?montar=1");
   }
+
+  // Depois de fechar o aviso "e agora?": não voltamos a mostrar o modal "Equipa
+  // salva" (o aviso já o disse, e melhor). Só a avaliação, se for altura.
+  function fecharAvisoGuardada() {
+    setAvisoGuardada(false);
+    if (temNomeProprio(identity) && devePedirAvaliacao()) setMostrarAvaliacao(true);
+  }
+
   async function salvar(destino?: string | null) {
     if (!isComplete(team)) { setModal({ kind: "missing" }); return; }
     setSavingCloud(true);
@@ -802,6 +834,13 @@ function MeuTimeInner() {
       setModal(null);
       setLeaveTo(null);
       router.push(destino);
+      return;
+    }
+    // AVISO "E AGORA?": explica que agora é aguardar a competição, quantos dias
+    // faltam, e convida a chamar um amigo. Uma vez só (tem "não mostrar mais").
+    // Substitui o modal "Equipa salva", que não dizia o que vinha a seguir.
+    if (res.ok && (await deveMostrarTutorial("ippon_aviso_pos_guardar"))) {
+      setAvisoGuardada(true);
       return;
     }
     // Fim da jornada: conta + equipa escalada + nome próprio. Se for altura (1x/semana
@@ -861,14 +900,14 @@ function MeuTimeInner() {
 
         {(!temEquipa || equipaIrresoluvel) ? (
           <div style={{ textAlign: "center", padding: "26px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
-            <div style={{ width: 96, height: 96, margin: "0 auto 6px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
+            <div style={{ width: 96, height: 96, margin: "0 auto 6px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Ainda não tens equipa</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 18px" }}>Monta 8 atletas com 100 Judocoins, escolhe o teu capitão e vê-os aqui prontos a competir.</p>
             <a href={montar ? "/mercado?montar=1" : "/criar-equipa"} style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px 22px", borderRadius: 12, fontSize: 15, textDecoration: "none" }}>Montar a minha equipa</a>
           </div>
         ) : aCarregarAtletas ? (
           <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
-            <div style={{ width: 80, height: 80, margin: "0 auto 8px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
+            <div style={{ width: 80, height: 80, margin: "0 auto 8px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>A carregar a tua equipa…</div>
           </div>
         ) : (
@@ -878,7 +917,10 @@ function MeuTimeInner() {
                 <div style={{ flexShrink: 0 }}><Escudo config={identity} size={40} /></div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name}</div>
-                  <div style={{ fontSize: 12, color: GOLD }}>Faixa {BELT}</div>
+                  <div style={{ fontSize: 12, color: GOLD, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 3, background: corFaixa, border: "1px solid rgba(255,255,255,0.25)", flexShrink: 0 }} />
+                    Faixa {nomeFaixa}
+                  </div>
                 </div>
               </div>
               <div className={destaque === "topo" ? "ilglow" : undefined} style={{ display: "flex", gap: 8, padding: 2 }}>
@@ -894,7 +936,7 @@ function MeuTimeInner() {
                 a equipa não parecer mais pequena, e explicamos o que fazer. */}
             {ausentesIds.length > 0 && (
               <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a1f1c,#10160f)", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "11px 13px", marginBottom: 12 }}>
-                <div style={{ width: 30, height: 30, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
+                <div style={{ width: 30, height: 30, flexShrink: 0 }}><Mascot belt={corFaixa} expression="indicando" /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: "#e2655a" }}>
                     {ausentesIds.length === 1 ? "1 atleta indisponível" : `${ausentesIds.length} atletas indisponíveis`}
@@ -970,7 +1012,7 @@ function MeuTimeInner() {
 
             <div className={destaque === "total" ? "ilglow" : undefined} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={BELT_HEX} expression={emCompeticao ? "determinado" : "feliz"} /></div>
+                <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={corFaixa} expression={emCompeticao ? "determinado" : "feliz"} /></div>
                 <div>
                   <div style={{ fontSize: 12, color: "#93a39a" }}>
                     {emCompeticao ? "A rodada está a decorrer!" : "Mercado aberto"}
@@ -1051,7 +1093,7 @@ function MeuTimeInner() {
       {modal?.kind === "missing" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Falta pouco!</h2>
             <p style={{ fontSize: 13, color: "#c7d0c9", margin: "0 0 12px" }}>Para guardares a equipa ainda precisas de:</p>
             <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
@@ -1070,7 +1112,7 @@ function MeuTimeInner() {
       {modal?.kind === "saved" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="feliz" /></div>
+            <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Equipa salva!</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
               {cloudWarn
@@ -1085,7 +1127,7 @@ function MeuTimeInner() {
       {modal?.kind === "trash" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="determinado" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="determinado" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Limpar a equipa?</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Isto remove todos os atletas e vais ter de escalar de novo.</p>
             <button onClick={limparTudo} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>Sim, limpar tudo</button>
@@ -1097,7 +1139,7 @@ function MeuTimeInner() {
       {modal?.kind === "leave" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="indicando" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Cuidado — não percas as alterações</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Tens alterações por guardar. Salva agora para não perderes o teu time.</p>
             <button onClick={() => salvar(leaveTo)} disabled={savingCloud} style={{ ...primaryBtn, opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar alterações"}</button>
@@ -1109,7 +1151,7 @@ function MeuTimeInner() {
       {modal?.kind === "share" && (
         <CartaoEquipa
           identity={identity}
-          faixa="Branca"
+          faixa={nomeFaixa}
           atletas={resolve(team.ids)}
           capitao={team.captain}
           nivel={isProMax ? "pro_max" : isPro ? "pro" : "normal"}
@@ -1121,7 +1163,7 @@ function MeuTimeInner() {
       {modal?.kind === "incompleta" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={BELT_HEX} expression="indicando" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Equipa incompleta</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
               {isComplete(saved)
@@ -1140,11 +1182,15 @@ function MeuTimeInner() {
         <Avaliacao nomeTime={identity.name} onClose={() => setMostrarAvaliacao(false)} />
       )}
 
+      {/* AVISO "e agora?" — logo depois de guardar a equipa, uma vez. */}
+      {avisoGuardada && <AvisoEquipaGuardada onFechar={fecharAvisoGuardada} />}
+
       {guide !== null && passoAtual && (
         <TutorialMeuTime
           passos={passos}
           step={guide}
           setStep={setGuide}
+          cor={corFaixa}
           onClose={() => {
             // Marca como visto EXATAMENTE a chave que abriu este tutorial.
             // (Usar tutKeyAberta — não recalcular por emCompeticao — evita o bug
@@ -1187,6 +1233,10 @@ const sinal = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
 function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onCaptain, onSell, onClose }: { a: Athlete; captain: boolean; score: number; temResultados: boolean; editavel: boolean; idComp: string; onCaptain: () => void; onSell: () => void; onClose: () => void }) {
   const up = a.variation >= 0;
   const [detalhe, setDetalhe] = useState<EstadoDetalhe>({ fase: "carregando" });
+  // Mercado ainda aberto? Então não há detalhe nenhum a mostrar — nem sequer
+  // pedimos. (Ver o portão anti-espreitadela no MeuTimeInner e no servidor.)
+  const podeVerPontos = pontosVisiveisPorId(idComp);
+  const mostrarResultados = temResultados && podeVerPontos;
 
   // Resumo de lutas (para o card "Desempenho" durante a competição). Conta
   // vitórias/derrotas a partir do detalhe já carregado — sem chamadas extra.
@@ -1201,9 +1251,10 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
   })();
 
   // Busca a decomposição luta-a-luta só quando há resultados (competição a
-  // decorrer ou encerrada). Sem resultados não faz sentido (e poupa a chamada).
+  // decorrer ou encerrada) E o mercado já fechou. Sem isso não faz sentido
+  // (e poupa a chamada).
   useEffect(() => {
-    if (!temResultados) return;
+    if (!mostrarResultados) return;
     let active = true;
     setDetalhe({ fase: "carregando" });
     fetch(`/api/atleta-rodada?comp=${encodeURIComponent(idComp)}&person=${encodeURIComponent(a.id)}`)
@@ -1221,7 +1272,7 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
       })
       .catch(() => { if (active) setDetalhe({ fase: "erro" }); });
     return () => { active = false; };
-  }, [a.id, idComp, temResultados]);
+  }, [a.id, idComp, mostrarResultados]);
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.78)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 100 }}>
@@ -1245,7 +1296,7 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
             <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: GOLD }}>JC {a.priceJc.toFixed(1)}</div>
           </div>
           <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "10px 12px" }}>
-            {temResultados ? (
+            {mostrarResultados ? (
               <>
                 <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>Desempenho</div>
                 {resumoLutas ? (
@@ -1268,7 +1319,7 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
           </div>
         </div>
 
-        {temResultados ? (
+        {mostrarResultados ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "12px 14px", marginBottom: editavel ? 16 : 0 }}>
             <div>
               <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase" }}>Pontos na rodada</div>
@@ -1277,13 +1328,15 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
             <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>{score >= 0 ? "+" : ""}{score} pts</div>
           </div>
         ) : (
-          <div style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "14px", textAlign: "center", fontSize: 12.5, color: "#93a39a", marginBottom: editavel ? 16 : 0 }}>
-            A competição ainda não começou. Os pontos deste atleta aparecem aqui durante a rodada.
+          <div style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "14px", textAlign: "center", fontSize: 12.5, color: "#93a39a", marginBottom: editavel ? 16 : 0, lineHeight: 1.5 }}>
+            {podeVerPontos
+              ? "A competição ainda não começou. Os pontos deste atleta aparecem aqui durante a rodada."
+              : "🔒 Os pontos só aparecem depois de o mercado fechar. Assim ninguém escolhe a equipa a olhar para os resultados."}
           </div>
         )}
 
-        {/* DECOMPOSIÇÃO luta-a-luta — só quando há resultados. */}
-        {temResultados && (
+        {/* DECOMPOSIÇÃO luta-a-luta — só quando há resultados E se podem ver. */}
+        {mostrarResultados && (
           <DetalheLutas estado={detalhe} captain={captain} />
         )}
 
@@ -1503,13 +1556,14 @@ function cancelarLembreteSalvarAgora(userId: string | null, idComp: string) {
 // Tutorial do Meu Time (edição ou competição). Balão em baixo, seta SEMPRE para
 // cima (os elementos destacados estão acima do balão). O elemento citado pulsa
 // via a classe ilglow aplicada no corpo da página (controlada por `destaque`).
-function TutorialMeuTime({ passos, step, setStep, onClose }: { passos: { t: string; x: string; target: string }[]; step: number; setStep: (s: number | null) => void; onClose: () => void }) {
+// `cor` = cor da faixa do jogador, para o Dôdo aparecer com a faixa certa.
+function TutorialMeuTime({ passos, step, setStep, onClose, cor }: { passos: { t: string; x: string; target: string }[]; step: number; setStep: (s: number | null) => void; onClose: () => void; cor: string }) {
   const s = passos[step];
   const total = passos.length;
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 20, padding: "0 12px", zIndex: 100 }}>
       <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
-        <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
+        <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt={cor} expression="indicando" /></div>
         <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
           <div className="ilseta" style={{ display: "flex", justifyContent: "center", color: GOLD, margin: "0 0 6px" }}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
