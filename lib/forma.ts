@@ -50,6 +50,35 @@ export const MAX_PRICE = 20;
  * põe esse valor +2 aqui.
  */
 export const EXPECTATIVA_TOPO = 22;
+
+/**
+ * O mesmo, mas para os CLÁSSICOS. É mais alto de propósito.
+ *
+ * Porquê: a janela de um clássico é um ano civil de AUGE do atleta, sem os meses
+ * fracos que diluem uma média móvel de 12 meses. As médias saem naturalmente mais
+ * altas. Medido no The Hague 2018: nos -90kg apareceram médias de 21,6 / 23,3 /
+ * 32,8 — com o topo em 22, os três colavam-se aos 20 JC e escolher entre eles
+ * deixava de ser uma decisão. Com 32, o campeão mundial fica no topo e os outros
+ * distribuem-se por baixo, como deve ser.
+ */
+export const EXPECTATIVA_TOPO_CLASSICO = 32;
+
+/**
+ * Nº de competições no ano que dá direito à média "cheia" num clássico.
+ *
+ * O problema que isto resolve: numa janela de ano civil, um atleta pouco ativo
+ * pode ter UMA só competição. Se correu bem, a "média" é o resultado dessa vez —
+ * e ele vale o preço máximo por uma atuação isolada. (Visto no The Hague 2018:
+ * Terumi Otsuji com média 50 e última 50 — o mesmo número, sinal de competição
+ * única — a valer 20 JC.)
+ *
+ * Com menos competições do que isto, a expectativa é reduzida na proporção: 1 em
+ * 3 conta um terço, 2 em 3 contam dois terços. Não é castigo — é reconhecer que
+ * uma amostra pequena diz pouco. Numa média móvel de 12 meses o problema quase
+ * não aparece (apanha sempre várias), por isso só se aplica aos clássicos.
+ */
+export const MIN_COMPS_CLASSICO = 3;
+
 const DOZE_MESES_MS = 365 * 24 * 3600 * 1000;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -95,8 +124,9 @@ export function janelaDoAnoCivil(ano: number): JanelaForma {
  * deixava de haver decisão ao montar equipa. Com esta, as faixas do projeto
  * voltam a fazer sentido — elite 15-20, fortes 10-14, médios 6-9, apostas 3-5.
  */
-export function precoDeExpectativa(expectativa: number): number {
-  const fatia = (MAX_PRICE - MIN_PRICE) * (expectativa / EXPECTATIVA_TOPO);
+export function precoDeExpectativa(expectativa: number, topo: number = EXPECTATIVA_TOPO): number {
+  const alvo = topo > 0 ? topo : EXPECTATIVA_TOPO;
+  const fatia = (MAX_PRICE - MIN_PRICE) * (expectativa / alvo);
   return clamp(round1(MIN_PRICE + fatia), MIN_PRICE, MAX_PRICE);
 }
 /** Lê a data de uma luta (campos do JudoBase) sem depender do tipo IjfContest. */
@@ -162,9 +192,20 @@ export function calcularForma(fights: IjfContest[], idPerson: string, janela?: J
   const ultima = historico.length > 0 ? historico[0].pontos : 0;
   // Se não houver nada dentro da janela, cai para as últimas 3 competições
   // (já cortadas na data de referência, quando há janela).
-  const expectativa = recentes.length > 0
+  let expectativa = recentes.length > 0
     ? round1(expectedPerformance(media12m, mediaUltimas3))
     : mediaUltimas3;
+
+  // AMOSTRA PEQUENA (só clássicos): com poucas competições no ano, a "média" é
+  // pouco mais do que um resultado avulso. Reduz-se na proporção, para uma boa
+  // atuação isolada não valer o mesmo que um ano inteiro de consistência.
+  if (janela && recentes.length > 0 && recentes.length < MIN_COMPS_CLASSICO) {
+    expectativa = round1(expectativa * (recentes.length / MIN_COMPS_CLASSICO));
+  }
+
+  // O topo da escala é mais alto nos clássicos (ver EXPECTATIVA_TOPO_CLASSICO).
+  const topo = janela ? EXPECTATIVA_TOPO_CLASSICO : EXPECTATIVA_TOPO;
+
   return {
     totalComps: historico.length,
     comps12m: recentes.length,
@@ -173,7 +214,7 @@ export function calcularForma(fights: IjfContest[], idPerson: string, janela?: J
     ultima,
     ultimaData: historico[0]?.data ? new Date(historico[0].data).toISOString().slice(0, 10) : null,
     expectativa,
-    preco: precoDeExpectativa(expectativa),
+    preco: precoDeExpectativa(expectativa, topo),
   };
 }
 function avg(arr: number[]): number {
