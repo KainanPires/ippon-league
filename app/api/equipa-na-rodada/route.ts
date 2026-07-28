@@ -19,17 +19,25 @@
 // Assim que o mercado fecha (competição a decorrer e, depois, encerrada), a
 // escalação fica visível normalmente.
 //
+// NOME DA COMPETIÇÃO: usa nomeCompeticao() de lib/calendario, que esconde a
+// CIDADE dos clássicos enquanto o mercado está aberto. Isto é essencial aqui:
+// a resposta `bloqueado` é mostrada ao utilizador com o nome da competição, e
+// devolver "Grand Prix The Hague 2018" seria entregar, na própria mensagem que
+// diz "ainda não podes ver", a informação que permite ir ao JudoBase buscar os
+// resultados de 2018. Era um buraco dentro da própria trave.
+//
 // Uso: /api/equipa-na-rodada?user=<uuid>&comp=<id_competicao>
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { CALENDARIO_2026, estadoMercado } from "@/lib/calendario";
+import { CALENDARIO_2026, estadoMercado, nomeCompeticao } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-function nomeCompeticao(id: string): string {
+// Nome a MOSTRAR desta competição (cidade escondida se for clássico por abrir).
+function nomeParaMostrar(id: string): string {
   const s = CALENDARIO_2026.find((c) => c.idCompeticao === id);
-  return s ? s.nome : `Competição ${id}`;
+  return s ? nomeCompeticao(s) : `Competição ${id}`;
 }
 
 export async function GET(req: Request) {
@@ -50,7 +58,7 @@ export async function GET(req: Request) {
       ok: true,
       bloqueado: true,
       mercado_aberto: true,
-      competicao: { id: comp, nome: nomeCompeticao(comp) },
+      competicao: { id: comp, nome: nomeParaMostrar(comp) },
     });
   }
 
@@ -66,7 +74,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       tem_equipa: false,
-      competicao: { id: comp, nome: nomeCompeticao(comp) },
+      competicao: { id: comp, nome: nomeParaMostrar(comp) },
     });
   }
 
@@ -139,7 +147,7 @@ export async function GET(req: Request) {
     nome_time: String(eq.nome || "Equipa"),
     escudo: eq.escudo ?? null,
     capitao,
-    competicao: { id: comp, nome: nomeCompeticao(comp) },
+    competicao: { id: comp, nome: nomeParaMostrar(comp) },
     atletas,
     total,
   });
