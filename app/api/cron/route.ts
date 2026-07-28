@@ -94,9 +94,17 @@ const CHAVE_CURSOR_PRECOS = "_cursor_precos";
 // Por isso o mínimo é configurável: põe FAIXAS_MIN_JOGADORES=2 nas variáveis de
 // ambiente da Vercel para testar a virada do mês com as contas de teste, e
 // apaga a variável no lançamento para voltar aos 100. Sem redeploy de código.
+//
+// LEITURA TOLERANTE: extraímos o primeiro número que aparecer no valor, em vez
+// de exigir que ele seja um número puro. Motivo prático: é fácil guardar 2 com
+// aspas ("2") ou colado a outra coisa, e Number('"2"') dá NaN — o cron caía em
+// silêncio nos 100 e a virada do mês passava sem faixas. Assim, "2", '2', ' 2 '
+// e =2 funcionam todos.
 const MIN_JOGADORES = (() => {
-  const v = Number(process.env.FAIXAS_MIN_JOGADORES);
-  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 100;
+  const bruto = String(process.env.FAIXAS_MIN_JOGADORES ?? "");
+  const achado = bruto.match(/\d+/);
+  const v = achado ? parseInt(achado[0], 10) : NaN;
+  return Number.isFinite(v) && v > 0 ? v : 100;
 })();
 // Janela (dias) para procurar competições recém-terminadas a congelar.
 const JANELA_DIAS = 21;
@@ -340,11 +348,15 @@ function fimEfetivoDaLiga(liga: { fim_tipo?: unknown; fim_valor?: unknown; fim_d
 }
 
 // (D) Recalcula as faixas de um mês por percentil e grava em users.belt.
-async function recalcularFaixas(mes: string): Promise<{ jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; minJogadores: number; minVindoDoAmbiente: boolean }> {
+async function recalcularFaixas(mes: string): Promise<{ jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; minJogadores: number; minVindoDoAmbiente: boolean; minBruto: string | null }> {
   // minJogadores/minVindoDoAmbiente vão na resposta do cron para se poder VER que
   // limiar está mesmo a ser usado — sem isto, uma variável de ambiente que não
   // chega à função é indistinguível de uma que chega (ambas dão 'branca' a todos).
-  const minInfo = { minJogadores: MIN_JOGADORES, minVindoDoAmbiente: !!process.env.FAIXAS_MIN_JOGADORES };
+  const minInfo = {
+    minJogadores: MIN_JOGADORES,
+    minVindoDoAmbiente: !!process.env.FAIXAS_MIN_JOGADORES,
+    minBruto: process.env.FAIXAS_MIN_JOGADORES ?? null, // valor cru, para depurar
+  };
   if (!supabaseAdmin) return { jogadores: 0, percentilAtivo: false, distribuicao: {}, ...minInfo };
 
   const { data: linhas } = await supabaseAdmin.from("pontuacoes").select("user_id, pontos").eq("mes", mes);
@@ -1079,7 +1091,7 @@ export async function GET(req: Request) {
 
   // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
   //     também forçar via ?faixas=AAAA-MM para teste manual.
-  let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; minJogadores: number; minVindoDoAmbiente: boolean } | null = null;
+  let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; minJogadores: number; minVindoDoAmbiente: boolean; minBruto: string | null } | null = null;
   const forcarFaixas = (searchParams.get("faixas") || "").trim();
   try {
     if (forcarFaixas) {
