@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes, type IjfContest } from "@/lib/ijf";
-import { calcularForma, janelaDoAnoCivil, type JanelaForma } from "@/lib/forma";
+import { calcularForma, janelaDoAnoCivil, EXPECTATIVA_TOPO, EXPECTATIVA_TOPO_CLASSICO, type JanelaForma } from "@/lib/forma";
+import { MIN_PRICE } from "@/lib/engine";
 import { CALENDARIO_2026 } from "@/lib/calendario";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import type { Athlete, AthleteStatus } from "@/lib/athletes";
@@ -66,9 +67,30 @@ function extractFights(data: any): IjfContest[] {
   return [];
 }
 // Estado simples a partir do preço real (afinamos Em alta/Em baixa quando houver rodadas).
-function estadoDoPreco(preco: number): AthleteStatus {
-  if (preco >= 14) return "Elite";
-  if (preco >= 7) return "Barganha";
+//
+// CORTES QUE ACOMPANHAM A ESCALA. Num clássico, o topo da expectativa é mais
+// alto (EXPECTATIVA_TOPO_CLASSICO), por isso o mesmo desempenho dá um preço
+// menor. Com os cortes fixos de sempre, categorias inteiras ficavam sem um único
+// "Elite" — visto nos -57kg do The Hague 2018, onde até a mais cara aparecia
+// como "Barganha" e o rótulo deixava de dizer nada.
+//
+// Em vez de escolher números novos à mão, converte-se o corte para a escala do
+// clássico com a mesma conta que gera os preços:
+//     preço = MIN_PRICE + (MAX-MIN) × (expectativa / topo)
+//   => preço' = MIN_PRICE + (preço - MIN_PRICE) × (topo / topo_clássico)
+// Assim, se um dia afinares EXPECTATIVA_TOPO_CLASSICO, os rótulos seguem
+// sozinhos e não voltam a ficar dessincronizados.
+const CORTE_ELITE = 14;
+const CORTE_BARGANHA = 7;
+
+function corteNaEscala(corte: number, classico: boolean): number {
+  if (!classico) return corte;
+  return MIN_PRICE + (corte - MIN_PRICE) * (EXPECTATIVA_TOPO / EXPECTATIVA_TOPO_CLASSICO);
+}
+
+function estadoDoPreco(preco: number, classico: boolean): AthleteStatus {
+  if (preco >= corteNaEscala(CORTE_ELITE, classico)) return "Elite";
+  if (preco >= corteNaEscala(CORTE_BARGANHA, classico)) return "Barganha";
   return "Aposta";
 }
 export async function GET(req: Request) {
@@ -111,7 +133,7 @@ export async function GET(req: Request) {
       avg: forma.media12m,
       last: forma.ultima,
       variation: 0, // a variação real só aparece com rodadas ao vivo
-      status: estadoDoPreco(forma.preco),
+      status: estadoDoPreco(forma.preco, !!janela),
     });
   }
   // 3) Lê o cache atual (lista inteira dos 488).
