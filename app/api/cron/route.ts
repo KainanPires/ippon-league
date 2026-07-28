@@ -340,8 +340,12 @@ function fimEfetivoDaLiga(liga: { fim_tipo?: unknown; fim_valor?: unknown; fim_d
 }
 
 // (D) Recalcula as faixas de um mês por percentil e grava em users.belt.
-async function recalcularFaixas(mes: string): Promise<{ jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number> }> {
-  if (!supabaseAdmin) return { jogadores: 0, percentilAtivo: false, distribuicao: {} };
+async function recalcularFaixas(mes: string): Promise<{ jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; minJogadores: number; minVindoDoAmbiente: boolean }> {
+  // minJogadores/minVindoDoAmbiente vão na resposta do cron para se poder VER que
+  // limiar está mesmo a ser usado — sem isto, uma variável de ambiente que não
+  // chega à função é indistinguível de uma que chega (ambas dão 'branca' a todos).
+  const minInfo = { minJogadores: MIN_JOGADORES, minVindoDoAmbiente: !!process.env.FAIXAS_MIN_JOGADORES };
+  if (!supabaseAdmin) return { jogadores: 0, percentilAtivo: false, distribuicao: {}, ...minInfo };
 
   const { data: linhas } = await supabaseAdmin.from("pontuacoes").select("user_id, pontos").eq("mes", mes);
   const soma = new Map<string, number>();
@@ -349,7 +353,7 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
 
   const jogadores = [...soma.entries()].map(([user_id, total]) => ({ user_id, total }));
   const n = jogadores.length;
-  if (n === 0) return { jogadores: 0, percentilAtivo: false, distribuicao: {} };
+  if (n === 0) return { jogadores: 0, percentilAtivo: false, distribuicao: {}, ...minInfo };
 
   jogadores.sort((a, b) => b.total - a.total);
   const percentilAtivo = n >= MIN_JOGADORES;
@@ -442,7 +446,7 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
     }
   }
 
-  return { jogadores: n, percentilAtivo, distribuicao };
+  return { jogadores: n, percentilAtivo, distribuicao, ...minInfo };
 }
 
 // A faixa imediatamente ACIMA desta na escada. "" se já for a melhor (preta).
@@ -1075,7 +1079,7 @@ export async function GET(req: Request) {
 
   // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
   //     também forçar via ?faixas=AAAA-MM para teste manual.
-  let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number> } | null = null;
+  let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; minJogadores: number; minVindoDoAmbiente: boolean } | null = null;
   const forcarFaixas = (searchParams.get("faixas") || "").trim();
   try {
     if (forcarFaixas) {
