@@ -7,7 +7,7 @@ import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLe
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
-import { focoMercado, textoFecho, numeroDaRodada } from "@/lib/calendario";
+import { focoMercado, textoFecho, numeroDaRodada, nomeCompeticao } from "@/lib/calendario";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 import { supabase } from "@/lib/supabase";
@@ -25,6 +25,11 @@ const fmt = (n: number) => String(Math.round(n * 10) / 10);
 
 // Competição vinda do Calendário Oficial. A "atual" é a da semana; se o mercado dela
 // já fechou (início - 1h), escala-se para a "próxima". Ver focoMercado em lib/calendario.
+//
+// NOME DA COMPETIÇÃO: usar SEMPRE nomeCompeticao(s) e nunca s.nome cru. Num
+// clássico, o nome cru revela a cidade ("Grand Prix The Hague 2018") — e quem a
+// vê antes de escalar vai ao JudoBase buscar os resultados de 2018 e monta a
+// equipa perfeita. A função esconde a cidade enquanto o mercado está aberto.
 
 // Junta a identidade da CONTA (nuvem) por cima da que temos em memória.
 // A nuvem é a fonte de verdade do nome/escudo: o localStorage perde-se ao mudar
@@ -69,6 +74,9 @@ export default function CriarEquipa() {
   const emAndamento = foco.aDecorrer !== null;
   const alvo = foco.alvo; // a competição para a qual se ESCALA agora
   const rodadaAlvo = numeroDaRodada(alvo.idCompeticao); // nº da rodada no calendário (1..52) ou null
+  // Nomes a MOSTRAR (cidade escondida nos clássicos com mercado aberto).
+  const nomeAlvo = nomeCompeticao(alvo);
+  const nomeAtual = nomeCompeticao(atual);
 
   useEffect(() => {
     let active = true;
@@ -299,22 +307,23 @@ export default function CriarEquipa() {
             <span className="ilpulse" style={{ width: 9, height: 9, borderRadius: "50%", background: "#e2655a", marginTop: 4, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#e2655a" }}>A decorrer agora{atual.classico ? " · Clássico" : ""}</div>
-              <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, lineHeight: 1.1, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{atual.nome}</div>
+              <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, lineHeight: 1.1, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeAtual}</div>
               <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "6px 0 0" }}>
-                O mercado desta competição já fechou — os preços podem oscilar enquanto os atletas competem. <strong style={{ color: "#f1ede2" }}>Já podes escalar para a próxima:</strong> {alvo.nome} — {textoFecho(alvo)}.
+                O mercado desta competição já fechou — os preços podem oscilar enquanto os atletas competem. <strong style={{ color: "#f1ede2" }}>Já podes escalar para a próxima:</strong> {nomeAlvo} — {textoFecho(alvo)}.
               </p>
             </div>
           </div>
         )}
 
-        {/* Cabeçalho: a competição para a qual se está a escalar (alvo). */}
+        {/* Cabeçalho: a competição para a qual se está a escalar (alvo).
+            NOTA: nomeAlvo esconde a cidade se for um clássico de mercado aberto. */}
         <div style={{ display: "flex", alignItems: "center", gap: 11, background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "10px 13px", marginBottom: 14 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: GOLD, color: "#1b211e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <TrophyIcon />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>A escalar para{rodadaAlvo ? ` · Rodada ${rodadaAlvo}` : ""}{alvo.classico ? " · Clássico" : ""}</div>
-            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{alvo.nome}</div>
+            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeAlvo}</div>
             <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{textoFecho(alvo)}</div>
           </div>
           <span style={{ background: "#1b211e", color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{alvo.nivel}</span>
