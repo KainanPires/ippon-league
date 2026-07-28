@@ -362,3 +362,53 @@ export function competicaoFechada(s: SemanaCalendario, agora: Date = new Date())
   const fim = inicioUtcMs + HORAS_FALLBACK_SEM_FUSO * 3600 * 1000;
   return agora.getTime() >= fim;
 }
+
+// ===========================================================================
+// NOME A MOSTRAR — esconde a CIDADE dos clássicos até à hora certa.
+//
+// PORQUÊ: um clássico é uma competição antiga revivida. Se o utilizador vir
+// "Grand Prix The Hague 2018" antes de escalar, vai ao JudoBase buscar os
+// resultados reais e monta a equipa perfeita. O jogo morre.
+//
+// REGRA (decidida com o Kainan): a cidade só aparece quando já não há nada a
+// ganhar em procurá-la —
+//   (a) a competição JÁ TERMINOU (regra das 60h), ou
+//   (b) é a que está a decorrer e o MERCADO JÁ FECHOU.
+// Nos clássicos FUTUROS e no atual com mercado ainda aberto, a cidade esconde-se.
+//
+// COMO: nada de recortar a cidade da string — seria frágil ("The Hague" e
+// "Tel Aviv" têm duas palavras, e "Guangzhou Masters" tem a cidade à frente do
+// tipo). O nome escondido é MONTADO a partir dos campos estruturados que já
+// temos: `nivel` + `anoOriginal`. Zero parsing, zero surpresas.
+//
+//   "Grand Prix The Hague 2018 — Clássico"  ->  "Grand Prix 2018 — Clássico"
+//   "Guangzhou Masters 2018 — Clássico"     ->  "Masters 2018 — Clássico"
+//
+// As competições REAIS (classico:false) nunca são tocadas: o calendário da IJF
+// é público, não há nada a esconder.
+//
+// USAR ISTO EM TODO O LADO onde se mostra o nome de uma competição ao
+// utilizador (montar equipa, mercado, ligas oficiais, início, calendário).
+// Mostrar `s.nome` cru revela a cidade.
+// ===========================================================================
+
+/** Nome a mostrar de uma competição, com a cidade escondida se for cedo demais. */
+export function nomeCompeticao(s: SemanaCalendario, agora: Date = new Date()): string {
+  if (!s.classico) return s.nome;                       // competição real: nome tal e qual
+  const terminada = competicaoFechada(s, agora);        // (a) já acabou
+  const mercadoFechado = estadoMercado(s, agora).estado === "fechado"; // (b) já fechou o mercado
+  if (terminada || mercadoFechado) return s.nome;       // já pode ver a cidade
+  const ano = s.anoOriginal ? ` ${s.anoOriginal}` : "";
+  return `${s.nivel}${ano} — Clássico`;                 // esconde a cidade
+}
+
+/** O mesmo, mas a partir do id da competição. "" se o id não estiver no calendário. */
+export function nomeCompeticaoPorId(idCompeticao: string, agora: Date = new Date()): string {
+  const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
+  return s ? nomeCompeticao(s, agora) : "";
+}
+
+/** A cidade desta competição está escondida agora? (para avisos na interface) */
+export function cidadeEscondida(s: SemanaCalendario, agora: Date = new Date()): boolean {
+  return s.classico && nomeCompeticao(s, agora) !== s.nome;
+}
