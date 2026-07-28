@@ -63,6 +63,15 @@ export async function GET(req: Request) {
   const userIds = (membros || []).map((m) => m.user_id);
   const nInscritos = userIds.length;
 
+  // Quem está REALMENTE na chave (saiu no sorteio). Pode ser menos do que os
+  // inscritos: quem entrou na liga DEPOIS do sorteio não tem lugar na chave.
+  const naChave = new Set<string>();
+  for (const c of lista) {
+    if (c.jogador_a) naChave.add(String(c.jogador_a));
+    if (c.jogador_b) naChave.add(String(c.jogador_b));
+  }
+  const nNaChave = naChave.size;
+
   // Identidade (nome do time + escudo) de cada jogador envolvido.
   // Junta os jogadores dos confrontos + os inscritos (para a sala de espera).
   const envolvidos = new Set<string>(userIds);
@@ -77,10 +86,8 @@ export async function GET(req: Request) {
   const totalRondas = tamanho >= 2 ? numeroDeRondas(tamanho) : 0;
 
   // Nº de PARTICIPANTES que REALMENTE jogaram (escalaram em alguma ronda da copa).
-  // Para o certificado anti-boicote: "Campeão entre N participantes". Conta
-  // jogadores DISTINTOS com equipa guardada (tabela equipas) em qualquer das
-  // competições desta copa. Quem entrou mas nunca escalou NÃO conta.
-  const nParticiparam = await contarParticipantes(lista);
+  // Para o certificado anti-boicote: "Campeão entre N participantes".
+  const nParticiparam = await contarParticipantes(lista, Array.from(naChave));
 
   // Pódio (só quando terminada).
   let podio: { campeao?: string; vice?: string; terceiro?: string } = {};
@@ -99,24 +106,32 @@ export async function GET(req: Request) {
     confrontos: lista,
     identidades,        // { user_id: { nome_time, escudo } }
     nInscritos,
+    nNaChave,           // quantos saíram no sorteio (<= nInscritos)
     nParticiparam,
     totalRondas,
     podio,
   });
 }
 
-// Conta jogadores DISTINTOS que escalaram (têm equipa na tabela equipas) em
-// alguma das competições desta copa. As competições são as dos confrontos.
+// Conta jogadores DISTINTOS DA CHAVE que escalaram (têm equipa na tabela
+// equipas) em alguma das competições desta copa.
+//
+// IMPORTANTE: filtra pelos jogadores da chave. Sem esse filtro, a consulta
+// contava TODOS os utilizadores da app que escalaram nessas competições — numa
+// copa de 4 amigos o certificado diria "Campeão entre 850 participantes".
+// Quem entrou na liga depois do sorteio também não conta: não disputou a copa.
 async function contarParticipantes(
-  confrontos: { id_competicao: string }[]
+  confrontos: { id_competicao: string }[],
+  jogadoresDaChave: string[]
 ): Promise<number> {
   if (!supabaseAdmin) return 0;
   const comps = Array.from(new Set(confrontos.map((c) => c.id_competicao).filter(Boolean)));
-  if (comps.length === 0) return 0;
+  if (comps.length === 0 || jogadoresDaChave.length === 0) return 0;
   const { data: eqs } = await supabaseAdmin
     .from("equipas")
     .select("user_id")
-    .in("id_competicao", comps);
+    .in("id_competicao", comps)
+    .in("user_id", jogadoresDaChave);
   const distintos = new Set<string>((eqs || []).map((e) => String(e.user_id)));
   return distintos.size;
 }
