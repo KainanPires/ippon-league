@@ -6,10 +6,11 @@ import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatu
 import { loadDraftFor, saveDraftFor, setAthletePool } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
-import { focoMercado } from "@/lib/calendario";
+import { focoMercado, nomeCompeticao } from "@/lib/calendario";
 import { supabase } from "@/lib/supabase";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
+import { useFaixa } from "@/lib/useFaixa";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -23,6 +24,10 @@ function competicaoAlvo(): string {
   return focoMercado().alvo.idCompeticao;
 }
 const COMPETICAO = competicaoAlvo();
+
+// NOTA sobre o Dôdo: a cor da faixa vem do useFaixa() — a faixa REAL do jogador,
+// a mesma em toda a app. Antes esta página pintava o Dôdo com #141110 fixo, por
+// isso um faixa-preta e um faixa-branca viam exatamente o mesmo mascote.
 
 const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Elite": ["#3a2f12", "#d9a441"],
@@ -97,6 +102,11 @@ function MercadoInner() {
   // Quem sou eu — para o lembrete "esqueceste de salvar" (hook). Guardado quando
   // a sessão é confirmada (mesma leitura que decide o is_pro).
   const [userId, setUserId] = useState<string | null>(null);
+
+  // Faixa REAL do jogador — a cor do Dôdo em todos os modais desta página.
+  // Declarado com os outros hooks, ANTES de qualquer return condicional (o ecrã
+  // de "mercado fechado" faz um return cedo; hooks têm de correr sempre).
+  const { cor: corFaixa } = useFaixa();
 
   // LEMBRETE "esqueceste de salvar o teu time" — hook reutilizável (o mesmo da
   // meu-time). É AQUI que ele mais conta: a edição real acontece no mercado, e
@@ -191,7 +201,11 @@ function MercadoInner() {
         const av = j?.a_competir_agora;
         if (competicaoADecorrer && av && Array.isArray(av.ids)) {
           setAoVivoIds(new Set(av.ids as string[]));
-          setAoVivoNome(av.nome ?? null);
+          // Nome a MOSTRAR: nomeCompeticao() esconde a cidade se for um clássico
+          // por abrir. Aqui o mercado já fechou (é o que decorre), por isso o
+          // nome sai por inteiro — mas passa pela função na mesma, para nunca
+          // haver um caminho que mostre o nome cru.
+          setAoVivoNome(competicaoADecorrer ? nomeCompeticao(competicaoADecorrer) : (av.nome ?? null));
         }
         setLoading(false);
         // NOTA: não limpamos aqui o rascunho dos atletas não-inscritos. Só ABRIR
@@ -271,14 +285,14 @@ function MercadoInner() {
           </div>
 
           <div style={{ textAlign: "center", padding: "30px 18px", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16 }}>
-            <div style={{ width: 92, height: 92, margin: "0 auto 10px" }}><Mascot belt="#141110" expression="determinado" /></div>
+            <div style={{ width: 92, height: 92, margin: "0 auto 10px" }}><Mascot belt={corFaixa} expression="determinado" /></div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 999, padding: "5px 13px", marginBottom: 12 }}>
               <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
               <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83" }}>Competição a decorrer</span>
             </div>
             <h2 style={{ fontFamily: FD, fontSize: 21, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>Mercado fechado</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 8px" }}>
-              {focoAgora.aDecorrer ? <><strong style={{ color: "#f1ede2" }}>{focoAgora.aDecorrer.nome}</strong> está a decorrer.</> : "Há uma competição a decorrer."} Durante a rodada, a tua equipa fica trancada — não há compras nem vendas.
+              {focoAgora.aDecorrer ? <><strong style={{ color: "#f1ede2" }}>{nomeCompeticao(focoAgora.aDecorrer)}</strong> está a decorrer.</> : "Há uma competição a decorrer."} Durante a rodada, a tua equipa fica trancada — não há compras nem vendas.
             </p>
             <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.5, margin: "0 0 20px" }}>
               O mercado reabre para a próxima competição assim que esta terminar. Acompanha a tua equipa ao vivo entretanto!
@@ -569,7 +583,7 @@ function MercadoInner() {
       {pedirLogin && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
           <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#141110" expression="indicando" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Entra para contratar</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Para contratares atletas e montares a tua equipa, entra na tua conta. É rápido — e ficas já a jogar!</p>
             <button onClick={() => exigirSessao("/mercado")} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Entrar / Criar conta</button>
@@ -581,7 +595,7 @@ function MercadoInner() {
       {avisoGenero && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
           <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#141110" expression="feliz" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>
               {avisoGenero.feito === "M" ? "4 masculinos prontos!" : "4 femininas prontas!"}
             </h2>
@@ -596,7 +610,7 @@ function MercadoInner() {
       {avisoCategoria && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
           <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#141110" expression="sabio" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="sabio" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Um por categoria</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Só podes ter <strong style={{ color: GOLD }}>1 atleta por categoria de peso</strong>. Monta 4 masculinos e 4 femininos, cada um de uma categoria diferente.</p>
             <button onClick={() => setAvisoCategoria(false)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Entendi</button>
@@ -605,7 +619,7 @@ function MercadoInner() {
         </div>
       )}
 
-      {guide !== null && <Tutorial step={guide} setStep={setGuide} onClose={finishTutorial} />}
+      {guide !== null && <Tutorial step={guide} setStep={setGuide} onClose={finishTutorial} cor={corFaixa} />}
     </main>
   );
 }
@@ -687,7 +701,9 @@ function SetaTutorial({ dir }: { dir: "up" | "down" }) {
   );
 }
 
-function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: number | null) => void; onClose: () => void }) {
+// `cor` = cor da faixa do jogador, para o Dôdo aparecer com a faixa certa (era
+// fixo em #141110, o que dava o mesmo mascote a toda a gente).
+function Tutorial({ step, setStep, onClose, cor }: { step: number; setStep: (s: number | null) => void; onClose: () => void; cor: string }) {
   const s = STEPS[step];
   const total = STEPS.length;
   const isLegend = s.target === "legend";
@@ -712,7 +728,7 @@ function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: numbe
           {skip}
           <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
             <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
-              <div style={{ width: 54, height: 54, flexShrink: 0 }}><Mascot belt="#141110" expression="sabio" /></div>
+              <div style={{ width: 54, height: 54, flexShrink: 0 }}><Mascot belt={cor} expression="sabio" /></div>
               <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase" }}>{s.t}</div>
             </div>
             {STATUS_LEGEND.map((l) => (
@@ -731,7 +747,7 @@ function Tutorial({ step, setStep, onClose }: { step: number; setStep: (s: numbe
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
       <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
-        <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
+        <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt={cor} expression="indicando" /></div>
         <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
           {/* No mercado, tudo o que se destaca está acima do balão: seta sempre para cima. */}
           <SetaTutorial dir="up" />
