@@ -8,7 +8,7 @@ import { Desempenho } from "@/components/Desempenho";
 import { GaleriaResumos } from "@/components/GaleriaResumos";
 import { desempenhosVistosConta, marcarDesempenhoVisto, aoVivoVistoConta, marcarAoVivoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
-import { focoMercado, textoFecho, competicaoDaSemana } from "@/lib/calendario";
+import { focoMercado, textoFecho, competicaoDaSemana, nomeCompeticao } from "@/lib/calendario";
 import { mensagensModaisDeHoje, type MensagemEspecial } from "@/lib/mensagensEspeciais";
 import { continenteDoPais } from "@/lib/continentes";
 import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
@@ -41,6 +41,29 @@ function targetForStep(step: number): TutTarget {
   if (idx === 3) return "ligas";
   if (idx === 4) return "belt";
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// LIGA TERMINADA? Mesma regra do ecrã /ligas (componente Ligas), de propósito:
+// os dois sítios têm de concordar sempre. Pontos corridos acabam com
+// estado='terminada'; uma copa acaba com copa_estado='terminada'.
+//
+// O cartão "As tuas ligas" do início mostra o que está A DECORRER. Uma copa já
+// decidida não é uma competição em curso — dizer que é engana o jogador (parecia
+// que o mata-mata ainda estava a jogar-se depois de haver campeão). O histórico
+// e os certificados vivem em /ligas → Resultados.
+// ---------------------------------------------------------------------------
+interface LigaBruta {
+  id: string;
+  name: string;
+  membros?: number;
+  formato?: string;
+  estado?: string | null;
+  copa_estado?: string | null;
+}
+function ligaTerminada(l: LigaBruta): boolean {
+  if (String(l.formato) === "copa") return l.copa_estado === "terminada";
+  return l.estado === "terminada";
 }
 
 function computeTeamInfo(saved: TeamState): { name: string; value: string; last: number } | null {
@@ -104,6 +127,11 @@ export default function Inicio() {
   const emAndamento = foco.aDecorrer !== null;
   const alvo = foco.alvo;
   const aDecorrer = foco.aDecorrer;
+  // Nomes a MOSTRAR. Num clássico com o mercado ainda aberto, nomeCompeticao()
+  // esconde a cidade ("Grand Prix 2018 — Clássico"): quem a visse ia ao JudoBase
+  // buscar os resultados de 2018 e montava a equipa perfeita.
+  const nomeComp = nomeCompeticao(comp);
+  const nomeADecorrer = aDecorrer ? nomeCompeticao(aDecorrer) : null;
 
   const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
   const temEquipaCompleta = !!savedTeam && savedTeam.ids.length === 8 && !!savedTeam.captain;
@@ -135,8 +163,12 @@ export default function Inicio() {
           .then((r) => r.json())
           .then((j) => {
             if (!active) return;
-            const ligas = Array.isArray(j?.ligas) ? j.ligas : [];
-            setMinhasLigas(ligas.map((l: { id: string; name: string; membros?: number }) => ({ id: l.id, name: l.name, membros: l.membros ?? 1 })));
+            const ligas: LigaBruta[] = Array.isArray(j?.ligas) ? j.ligas : [];
+            // Só as que ainda estão A DECORRER. As terminadas (copa com campeão,
+            // liga de pontos com a janela fechada) saem daqui — o seu lugar é em
+            // /ligas → Resultados, com o pódio e o certificado.
+            const ativas = ligas.filter((l) => !ligaTerminada(l));
+            setMinhasLigas(ativas.map((l) => ({ id: l.id, name: l.name, membros: l.membros ?? 1 })));
           })
           .catch(() => { if (active) setMinhasLigas([]); });
       }
@@ -169,7 +201,9 @@ export default function Inicio() {
                     continente: continenteDoPais(row?.country_code),
                   },
                   {
-                    nome: compSemana.nome,
+                    // nomeCompeticao por segurança: o motor não faz modais de
+                    // clássicos, mas se um dia fizer, não pode revelar a cidade.
+                    nome: nomeCompeticao(compSemana),
                     nivel: compSemana.nivel,
                     classico: compSemana.classico,
                     idCompeticao: (compSemana as { idCompeticao?: string }).idCompeticao,
@@ -244,7 +278,7 @@ export default function Inicio() {
             if (list.length > 0) setAthletePool(list as never);
           } catch {}
           if (!active) return;
-          const dados = construirDesempenho(aDecorrer.idCompeticao, aDecorrer.nome, teamComp, pontos);
+          const dados = construirDesempenho(aDecorrer.idCompeticao, nomeCompeticao(aDecorrer), teamComp, pontos);
           if (dados) {
             await carregarIdentidadeResumo(aDecorrer.idCompeticao);
             if (!active) return;
@@ -503,7 +537,7 @@ export default function Inicio() {
               <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#3a2f12", color: GOLD, fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.03em" }}>↻ Clássico</span>
             )}
           </div>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>{comp.nome}</div>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>{nomeComp}</div>
           <div style={{ fontSize: 12, color: "#93a39a", marginTop: 2 }}>
             {comp.nivel}{ehClassico ? " · rodada especial" : ""} · está a valer pontos
           </div>
@@ -534,7 +568,7 @@ export default function Inicio() {
               <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
               <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#e2655a" }}>Ao vivo agora</span>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>{aDecorrer?.nome ?? comp.nome}</div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{nomeADecorrer ?? nomeComp}</div>
             <div style={{ fontSize: 12, color: "#93a39a", marginTop: 3, lineHeight: 1.4 }}>
               A competição está a decorrer. Acompanha o chaveamento ao vivo e segue o caminho dos teus atletas na chave.
             </div>
@@ -579,7 +613,7 @@ export default function Inicio() {
               <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6 }}>A carregar as tuas ligas…</div>
             ) : minhasLigas.length === 0 ? (
               <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6, lineHeight: 1.4 }}>
-                Ainda não estás em nenhuma liga. Entra numa liga oficial ou cria uma com os teus amigos.
+                Não tens nenhuma liga a decorrer. Entra numa liga oficial, cria uma com os teus amigos — ou vê os teus títulos em Resultados.
               </div>
             ) : (
               minhasLigas.slice(0, 4).map((l) => (
