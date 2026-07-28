@@ -6,58 +6,120 @@
 //
 // PORQUÊ: feedback real de quem testou. A pessoa montava os 8 atletas, escolhia
 // o capitão, guardava... e ficava parada, sem saber o que fazer a seguir. O jogo
-// não lhe dizia que agora é esperar pela competição do fim de semana, nem que na
-// segunda-feira vai ver os pontos e comparar-se com os amigos. Sem isso, o fim
-// da montagem é um beco — e é justamente o momento em que a pessoa está mais
-// disponível para se entusiasmar.
+// não lhe dizia quando é a competição, nem que depois vai ver os pontos e
+// comparar-se com os amigos. Sem isso, o fim da montagem é um beco — e é
+// justamente o momento em que a pessoa está mais disponível para se entusiasmar.
+//
+// É também o melhor momento para CONVIDAR alguém: acabou de investir tempo a
+// montar a equipa, e um fantasy game sem adversários conhecidos é metade do
+// jogo. Por isso o botão de convite vive aqui, e não escondido num menu.
+//
+// AUTOSSUFICIENTE: descobre sozinho a competição-alvo (focoMercado().alvo), o
+// número da rodada e quantos dias faltam. Quem o usa não tem de calcular nada —
+// basta `<AvisoEquipaGuardada onFechar={...} />`. As props existem só para casos
+// em que se queira forçar outra competição.
 //
 // Aparece uma vez e tem "Não mostrar mais", guardado NA CONTA (não só neste
 // aparelho): quem já percebeu o ciclo não precisa de o rever noutro telemóvel.
-//
-// O Dôdo aparece com a FAIXA REAL do jogador (useFaixa), como em todo o lado.
 //
 // Uso:
 //   const [aviso, setAviso] = useState(false);
 //   // depois de guardar com sucesso:
 //   if (await deveMostrarTutorial("ippon_aviso_pos_guardar")) setAviso(true);
 //   ...
-//   {aviso && <AvisoEquipaGuardada nomeCompeticao={nomeAlvo} rodada={rodadaAlvo}
-//                                  onFechar={() => { setAviso(false); router.push("/meu-time"); }} />}
+//   {aviso && <AvisoEquipaGuardada onFechar={() => { setAviso(false); router.push("/meu-time"); }} />}
 
+import { useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { useFaixa } from "@/lib/useFaixa";
 import { marcarTutorialVisto } from "@/lib/tutorials";
+import { focoMercado, nomeCompeticao, numeroDaRodada, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
+const VERDE = "#3f8f5a";
+
+// Quantos dias faltam até a competição COMEÇAR. 0 = é hoje.
+// Usa a hora oficial quando existe (inicioUTC); senão, o dia do calendário.
+function diasAteInicio(s: SemanaCalendario): number {
+  const inicio = s.inicioUTC
+    ? new Date(s.inicioUTC)
+    : new Date(s.de.replace(/\//g, "-") + "T00:00:00");
+  const ms = inicio.getTime() - Date.now();
+  if (ms <= 0) return 0;
+  return Math.ceil(ms / 86400000);
+}
+
+// "é já hoje" / "é já amanhã" / "é daqui a 4 dias" — em linguagem natural, que
+// é o que a pessoa quer saber ("quando é que vejo os meus pontos?").
+function textoQuando(dias: number): string {
+  if (dias <= 0) return "é já hoje";
+  if (dias === 1) return "é já amanhã";
+  return `é daqui a ${dias} dias`;
+}
 
 export function AvisoEquipaGuardada({
-  nomeCompeticao,
-  rodada,
+  nomeCompeticao: nomeProp,
+  rodada: rodadaProp,
+  idCompeticao,
   onFechar,
 }: {
-  /** Nome a mostrar da competição para a qual escalou (já com a cidade escondida, se for clássico). */
+  /** Nome a mostrar (já com a cidade escondida, se for clássico). Opcional. */
   nomeCompeticao?: string | null;
-  /** Número da rodada no calendário (1..52), se conhecido. */
+  /** Número da rodada no calendário (1..52). Opcional. */
   rodada?: number | null;
+  /** Forçar outra competição que não a alvo do momento. Opcional. */
+  idCompeticao?: string | null;
   /** Fechar o aviso. O chamador decide para onde vai a seguir. */
   onFechar: () => void;
 }) {
   const { cor } = useFaixa();
+  const [copiado, setCopiado] = useState(false);
 
-  const alvo = rodada
-    ? `a Rodada ${rodada}${nomeCompeticao ? ` · ${nomeCompeticao}` : ""}`
-    : (nomeCompeticao || "a próxima rodada");
+  // Competição para a qual se acabou de escalar. Por omissão, a alvo do momento.
+  const alvo = idCompeticao
+    ? (CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao)) ?? focoMercado().alvo)
+    : focoMercado().alvo;
+
+  const nome = nomeProp ?? nomeCompeticao(alvo);
+  const rodada = rodadaProp ?? numeroDaRodada(alvo.idCompeticao);
+  const dias = diasAteInicio(alvo);
+
+  const rotuloAlvo = rodada
+    ? `a Rodada ${rodada}${nome ? ` · ${nome}` : ""}`
+    : (nome || "a próxima rodada");
 
   async function naoMostrarMais() {
     await marcarTutorialVisto("ippon_aviso_pos_guardar");
     onFechar();
   }
 
+  // CONVIDAR: usa a partilha nativa do telemóvel quando existe (WhatsApp,
+  // Instagram, o que a pessoa tiver); no computador, copia para a área de
+  // transferência e diz que copiou. Nunca deixa o utilizador sem saída.
+  async function convidar() {
+    const url = typeof window !== "undefined" ? window.location.origin : "https://ipponleague.com";
+    const texto = `Acabei de montar a minha equipa na Ippon League 🥋 Monta a tua e vamos ver quem pontua mais${nome ? ` em ${nome}` : ""}!`;
+    try {
+      const nav = navigator as Navigator & { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
+      if (nav.share) {
+        await nav.share({ title: "Ippon League", text: texto, url });
+        return;
+      }
+    } catch {
+      return; // cancelou a partilha: não faz mais nada
+    }
+    try {
+      await navigator.clipboard.writeText(`${texto} ${url}`);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch { /* sem área de transferência: o botão apenas não reage */ }
+  }
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 120 }}>
-      <div style={{ width: "100%", maxWidth: 340, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "20px 18px", fontFamily: FB }}>
+      <div style={{ width: "100%", maxWidth: 340, maxHeight: "92vh", overflowY: "auto", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "20px 18px", fontFamily: FB }}>
         <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}>
           <Mascot belt={cor} expression="comemorando" />
         </div>
@@ -66,9 +128,9 @@ export function AvisoEquipaGuardada({
           Equipa guardada! E agora?
         </h2>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 11, marginBottom: 18 }}>
-          <Passo n="1" titulo="Agora é aguardar">
-            A tua equipa está escalada para <strong style={{ color: "#f1ede2" }}>{alvo}</strong>. A competição é ao fim de semana — até lá não tens de fazer nada.
+        <div style={{ display: "flex", flexDirection: "column", gap: 11, marginBottom: 16 }}>
+          <Passo n="1" titulo={dias <= 1 ? "É já a seguir" : `Faltam ${dias} dias`}>
+            A tua equipa está escalada para <strong style={{ color: "#f1ede2" }}>{rotuloAlvo}</strong>. A competição <strong style={{ color: GOLD }}>{textoQuando(dias)}</strong> — até lá não tens de fazer nada.
           </Passo>
           <Passo n="2" titulo="Os teus atletas pontuam">
             Cada <strong style={{ color: "#f1ede2" }}>ippon</strong>, <strong style={{ color: "#f1ede2" }}>waza-ari</strong> e <strong style={{ color: "#f1ede2" }}>shido provocado</strong> conta para ti. O teu capitão pontua a dobrar.
@@ -78,7 +140,34 @@ export function AvisoEquipaGuardada({
           </Passo>
         </div>
 
-        <p style={{ fontSize: 12, color: "#93a39a", lineHeight: 1.5, textAlign: "center", margin: "0 0 16px" }}>
+        {/* CONVITE — o momento certo para chamar alguém: a pessoa acabou de
+            montar a equipa e ainda não tem com quem competir. */}
+        <div style={{ background: "#101511", border: "1px dashed #2f4a3c", borderRadius: 12, padding: "12px 13px", marginBottom: 16 }}>
+          <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "#aee9c9", marginBottom: 4 }}>
+            Mais divertido a dois
+          </div>
+          <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 10px" }}>
+            Convida um amigo para montar a equipa dele. Ao fim de semana, comparam pontuações — e podem criar uma liga só vossa.
+          </p>
+          <button
+            onClick={convidar}
+            style={{ width: "100%", padding: 11, borderRadius: 10, border: "none", background: copiado ? "#1c3a2e" : VERDE, color: copiado ? "#aee9c9" : "#06140d", fontFamily: FD, fontSize: 13.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+          >
+            {copiado ? (
+              <>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
+                Convite copiado!
+              </>
+            ) : (
+              <>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
+                Convidar um amigo
+              </>
+            )}
+          </button>
+        </div>
+
+        <p style={{ fontSize: 12, color: "#93a39a", lineHeight: 1.5, textAlign: "center", margin: "0 0 14px" }}>
           Podes voltar e mudar a equipa até o mercado fechar.
         </p>
 
