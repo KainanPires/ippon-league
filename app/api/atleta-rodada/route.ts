@@ -23,6 +23,19 @@
 // ações é só para EXIBIÇÃO. Por isso a soma "visual" das ações pode não bater
 // ao cêntimo em lutas com shido/hansoku — o número que manda é o `pontos` da luta.
 //
+// ---------------------------------------------------------------------------
+// PORTÃO ANTI-ESPREITADELA (servidor) — LER ANTES DE MEXER
+//
+// Esta rota é a MAIS sensível do jogo: devolve, luta a luta, exatamente como um
+// atleta pontuou. Num CLÁSSICO, essas lutas já aconteceram em 2018 e estão no
+// JudoBase — por isso, sem portão, qualquer pessoa via o desempenho de qualquer
+// atleta ANTES de escalar e montava a equipa perfeita.
+//
+// Regra: nada é devolvido enquanto o mercado dessa competição estiver ABERTO.
+// A guarda vive no SERVIDOR porque um bloqueio só na interface seria contornado
+// escrevendo o URL à mão. Mesma regra do /api/resultados e do /api/equipa-na-rodada.
+// ---------------------------------------------------------------------------
+//
 // Uso: GET /api/atleta-rodada?comp=3295&person=4143
 // Devolve: { comp, person, tem_resultados, total, lutas: [...] }
 
@@ -36,6 +49,7 @@ import {
 import { getCompetitorResults } from "@/lib/scout";
 import { estadoDoAtleta, textoEstado, type EstadoAtleta } from "@/lib/estado-atleta";
 import { POINTS, type ActionType } from "@/lib/engine";
+import { CALENDARIO_2026, pontosVisiveisPorId } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -179,6 +193,26 @@ export async function GET(req: Request) {
 
   if (!comp || !person) {
     return NextResponse.json({ erro: "Faltam parâmetros (comp e person)." }, { status: 400 });
+  }
+
+  // PORTÃO ANTI-ESPREITADELA: com o mercado aberto, não se vê nada. Devolve a
+  // MESMA forma de um atleta sem lutas, para o cliente não precisar de saber
+  // nada de novo (mostra "ainda não tem lutas registadas").
+  const noCalendario = CALENDARIO_2026.some((c) => c.idCompeticao === comp);
+  if (noCalendario && !pontosVisiveisPorId(comp)) {
+    return NextResponse.json({
+      comp,
+      person,
+      bloqueado: true,
+      mercado_aberto: true,
+      tem_resultados: false,
+      total: 0,
+      n_lutas: 0,
+      lutas: [],
+      estado: "a_aguardar",
+      estado_texto: "Os pontos desta rodada aparecem quando o mercado fechar.",
+      place: null,
+    });
   }
 
   // FONTE: lutas DO ATLETA (competitor.contests), filtradas pela competição-alvo.
