@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { focoMercado } from "@/lib/calendario";
+import { focoMercado, numeroDaRodada, rotuloRodada } from "@/lib/calendario";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -32,9 +32,15 @@ interface RespostaChave {
   confrontos: ConfrontoAPI[];
   identidades: Record<string, Identidade>;
   nInscritos: number;
+  nNaChave?: number;      // quantos saíram no sorteio (pode ser < nInscritos)
   nParticiparam: number;
   totalRondas: number;
   podio: { campeao?: string; vice?: string; terceiro?: string };
+}
+
+// Ordem cronológica de uma competição (semana do calendário). 0 se desconhecida.
+function ordemComp(id: string): number {
+  return numeroDaRodada(String(id)) ?? 0;
 }
 
 // Nome da ronda pelo nº de jogadores nela (a última ronda "normal" é a semi).
@@ -160,7 +166,10 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
 }) {
   const { confrontos, totalRondas, podio, liga, nInscritos, nParticiparam } = dados;
   const terminada = liga.copa_estado === "terminada";
-  const chaveGrande = nInscritos >= 8; // repescagem em cadeia só com 8+
+  // Quem está REALMENTE na chave. Quem entrou na liga depois do sorteio conta
+  // como inscrito mas não disputa — o tamanho da chave é o dos sorteados.
+  const naChave = dados.nNaChave ?? nInscritos;
+  const chaveGrande = naChave >= 8; // repescagem em cadeia só com 8+
   // Já existem confrontos de repescagem gerados pelo motor? Se sim, mostram-se
   // nas rondas (a sério); se não (início da copa), mostra-se a nota explicativa.
   const temRepescagemReal = confrontos.some((c) => c.fase === "repescagem");
@@ -172,6 +181,19 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
   // Agrupa os confrontos por ronda. A final e o bronze estão na última ronda.
   const rondas = Array.from(new Set(confrontos.map((c) => c.ronda))).sort((a, b) => a - b);
 
+  // JANELA DO ACUMULADO DA FINAL. Os finalistas ficam conhecidos antes de a
+  // repescagem acabar; durante essa espera continuam a somar pontos. A janela
+  // vai da competição da final (inclusive) até à última competição usada por
+  // qualquer confronto da copa — a mesma conta que o /api/copa/apurar faz.
+  const confrontoFinal = confrontos.find((c) => c.fase === "final") || null;
+  let janelaFinal: string[] = [];
+  if (confrontoFinal) {
+    const ordFinal = ordemComp(confrontoFinal.id_competicao);
+    janelaFinal = Array.from(new Set(confrontos.map((c) => c.id_competicao).filter(Boolean)))
+      .filter((id) => ordemComp(id) >= ordFinal)
+      .sort((a, b) => ordemComp(a) - ordemComp(b));
+  }
+
   return (
     <>
       {/* Pódio (no topo) quando a copa terminou. */}
@@ -179,15 +201,22 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
         <Podio podio={podio} nome={nome} escudoDe={escudoDe} meuId={meuId} nomeCopa={liga.name} nParticipantes={nParticiparam} />
       )}
 
-      {/* Cabeçalho da liga + nº de inscritos. */}
+      {/* Cabeçalho da liga + nº de equipas na chave. */}
       <div style={{ display: "flex", alignItems: "center", gap: 11, background: "#0f1411", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px", marginBottom: 14 }}>
         <div style={{ flexShrink: 0 }}><Escudo config={liga.escudo || DEFAULT_IDENTITY} size={38} /></div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{liga.name}</div>
-          <div style={{ fontSize: 11, color: "#93a39a" }}>{nInscritos} {nInscritos === 1 ? "equipa" : "equipas"} · {chaveGrande ? "com repescagem" : "mata-mata simples"}</div>
+          <div style={{ fontSize: 11, color: "#93a39a" }}>{naChave} {naChave === 1 ? "equipa" : "equipas"} · {chaveGrande ? "com repescagem" : "mata-mata simples"}</div>
         </div>
         <button onClick={onAbrirTutorial} style={{ flexShrink: 0, background: "transparent", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", padding: "7px 11px", borderRadius: 9, cursor: "pointer" }}>Como funciona</button>
       </div>
+
+      {/* Aviso: entraram na liga depois do sorteio e não disputam esta copa. */}
+      {nInscritos > naChave && (
+        <div style={{ background: "#101511", border: "1px dashed #2f4a3c", borderRadius: 12, padding: "10px 12px", marginBottom: 14, fontSize: 12, color: "#a9b4ac", lineHeight: 1.5 }}>
+          {nInscritos - naChave} {nInscritos - naChave === 1 ? "equipa entrou" : "equipas entraram"} na liga depois do sorteio, por isso não {nInscritos - naChave === 1 ? "está" : "estão"} nesta chave. {nInscritos - naChave === 1 ? "Entra" : "Entram"} na próxima copa.
+        </div>
+      )}
 
       {/* Eliminação principal: uma secção por ronda. A ronda das semifinais traz
           a repescagem em paralelo; a última traz a final e os dois bronzes. */}
@@ -227,7 +256,7 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
 
             {/* Bloco final: a final em destaque + os dois bronzes (cruzados). */}
             {final && (
-              <CartaoConfronto c={final} nome={nome} escudoDe={escudoDe} destaque="final" idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} />
+              <CartaoConfronto c={final} nome={nome} escudoDe={escudoDe} destaque="final" idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} janelaFinal={janelaFinal} />
             )}
             {bronzes.map((c) => (
               <CartaoConfronto key={c.id} c={c} nome={nome} escudoDe={escudoDe} destaque="bronze" idADecorrer={idADecorrer} onVerEquipa={onVerEquipa} />
@@ -256,7 +285,7 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
       )}
 
       <div style={{ marginTop: 8, fontSize: 11, color: "#5f6f67", textAlign: "center", lineHeight: 1.5 }}>
-        Cada ronda é uma competição real. Os pontos do confronto são os pontos da tua equipa nessa competição (capitão a dobrar).
+        Cada ronda é uma competição real. Os pontos do confronto são os pontos da tua equipa nessa competição (capitão a dobrar). Na <strong style={{ color: "#8b9a92" }}>final</strong> somam-se as rodadas desde que chegaste a ela até ao dia do bronze.
       </div>
     </>
   );
@@ -264,13 +293,16 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
 
 // Um cartão de confronto: dois jogadores, escudo + nome + pontos, vencedor
 // destacado. `destaque` muda a moldura (final dourada, bronze acobreado).
-function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa }: {
+// `janelaFinal` (só na final) diz que rodadas entraram na soma — sem isto, um
+// "+70" ao lado de uma equipa que fez -59 naquela competição parece um erro.
+function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa, janelaFinal }: {
   c: ConfrontoAPI;
   nome: (uid: string | null) => string;
   escudoDe: (uid: string | null) => Identity;
   destaque?: "final" | "bronze" | "repescagem";
   idADecorrer: string | null;
   onVerEquipa: (uid: string, comp: string) => void;
+  janelaFinal?: string[];
 }) {
   const decidido = c.estado === "decidido";
   const bye = c.jogador_b === null;
@@ -281,6 +313,18 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa
 
   const cor = destaque === "final" ? GOLD : destaque === "bronze" ? "#c87f43" : destaque === "repescagem" ? "#5b8f73" : "#243029";
   const etiqueta = destaque === "final" ? "Final" : destaque === "bronze" ? "Disputa de bronze" : null;
+
+  // Texto da janela do acumulado (só na final e só quando há pontos a explicar).
+  let notaJanela: string | null = null;
+  if (destaque === "final" && janelaFinal && janelaFinal.length > 0 && !bye) {
+    const de = rotuloRodada(janelaFinal[0]);
+    const ate = rotuloRodada(janelaFinal[janelaFinal.length - 1]);
+    if (janelaFinal.length > 1 && de && ate) {
+      notaJanela = `Soma de ${de} a ${ate} — os finalistas continuam a pontuar enquanto a repescagem decorre.`;
+    } else if (de) {
+      notaJanela = `Pontos de ${de}.`;
+    }
+  }
 
   return (
     <div style={{ background: "#121815", border: `1px solid ${cor}`, borderRadius: 13, padding: "10px 12px", marginBottom: 9 }}>
@@ -299,6 +343,11 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa
           </div>
           <LinhaJogador uid={c.jogador_b} pontos={c.pontos_b} venceu={venceuB} perdeu={decidido && !venceuB} trancado={trancado} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_b && onVerEquipa(c.jogador_b, c.id_competicao)} />
         </>
+      )}
+      {notaJanela && (
+        <div style={{ marginTop: 8, paddingTop: 7, borderTop: "1px solid #1a221d", fontSize: 10.5, color: "#8b9a92", lineHeight: 1.45 }}>
+          {notaJanela}
+        </div>
       )}
     </div>
   );
@@ -437,6 +486,10 @@ function TutorialChave({ onClose }: { onClose: () => void }) {
       x: "Vais avançando enquanto venceres. Em caso de empate, decide quem teve o capitão com mais pontos; se ainda empatar, sorteio. Chega às semifinais quem vencer todos os confrontos do seu lado da chave.",
     },
     {
+      t: "Esqueceste-te de escalar?",
+      x: "Não ficas a zeros: mantens a última equipa que guardaste, e continuas com ela até salvares uma nova. Só pontuam os atletas dessa equipa que lutaram na competição da ronda.",
+    },
+    {
       t: "A repescagem (8+ equipas)",
       x: "No judô, quem perde para um semifinalista não está fora! Os derrotados de cada semifinalista lutam entre si, em cadeia, até sair um campeão de repescagem. É a tua segunda chance.",
     },
@@ -446,7 +499,7 @@ function TutorialChave({ onClose }: { onClose: () => void }) {
     },
     {
       t: "A final é por pontos",
-      x: "Os dois finalistas não decidem o título numa só competição: acumulam pontos a partir do momento em que chegam à final, até ao dia do bronze. Quem somar mais é o campeão. Assim o título não se decide pela sorte de uma rodada.",
+      x: "Os dois finalistas não decidem o título numa só competição: acumulam pontos a partir do momento em que chegam à final, até ao dia do bronze. O que fizeram nas rondas anteriores não conta — a contagem começa do zero na final. Quem somar mais é o campeão.",
     },
   ];
   const s = passos[passo];
