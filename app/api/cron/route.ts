@@ -85,7 +85,19 @@ const CHAVE_AO_VIVO = "_a_competir_agora";
 const CHAVE_CURSOR_PRECOS = "_cursor_precos";
 
 // A partir de quantos jogadores ativos os percentis de faixa "ligam".
-const MIN_JOGADORES = 100;
+//
+// Com poucos jogadores, um percentil não significa nada ("top 5%" de 4 pessoas
+// é zero pessoas), por isso o normal é 100 e, abaixo disso, fica toda a gente na
+// branca. MAS isso torna as faixas impossíveis de TESTAR antes do lançamento —
+// a virada do mês passava em silêncio e ninguém sabia se o motor funcionava.
+//
+// Por isso o mínimo é configurável: põe FAIXAS_MIN_JOGADORES=2 nas variáveis de
+// ambiente da Vercel para testar a virada do mês com as contas de teste, e
+// apaga a variável no lançamento para voltar aos 100. Sem redeploy de código.
+const MIN_JOGADORES = (() => {
+  const v = Number(process.env.FAIXAS_MIN_JOGADORES);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 100;
+})();
 // Janela (dias) para procurar competições recém-terminadas a congelar.
 const JANELA_DIAS = 21;
 
@@ -343,13 +355,18 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
   const percentilAtivo = n >= MIN_JOGADORES;
   const distribuicao: Record<string, number> = {};
   const atualizacoes: { user_id: string; faixa: string }[] = [];
+  // Pontos de cada jogador no mês (para dizer quanto falta para a faixa acima).
+  const totalDe = new Map<string, number>();
+  for (const j of jogadores) totalDe.set(j.user_id, j.total);
+  // Cortes de cada faixa (índice a partir do qual já não se pertence a ela).
+  // Declarado FORA do if para as notificações o poderem usar.
+  const limites: { faixa: string; ate: number }[] = [];
 
   if (!percentilAtivo) {
     for (const j of jogadores) atualizacoes.push({ user_id: j.user_id, faixa: "branca" });
     distribuicao["branca"] = n;
   } else {
     let acum = 0;
-    const limites: { faixa: string; ate: number }[] = [];
     for (const passo of ESCADA) { acum += passo.fatia; limites.push({ faixa: passo.faixa, ate: Math.round(acum * n) }); }
     for (let i = 0; i < n; i++) {
       const cap = limites.find((l) => i < l.ate);
@@ -377,35 +394,92 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
     await supabaseAdmin.from("users").update({ belt: a.faixa }).eq("id", a.user_id);
   }
 
-  // Notificação de SUBIDA / DESCIDA de faixa. Só quando o percentil está ativo
-  // (≥ MIN_JOGADORES) e só a quem REALMENTE mudou de faixa. Subida = festa;
-  // descida = motivação sem desânimo. (Decidido com o Kainan.)
+  // Notificação de fecho do mês. TODA A GENTE recebe uma — subiu, desceu ou
+  // manteve. Antes só havia subida e descida, e quem mantinha a faixa não sabia
+  // de nada: virava o mês e ficava sem perceber como tinha corrido. (Pedido do
+  // Kainan.) Só quando o percentil está ativo (≥ MIN_JOGADORES); abaixo disso
+  // está toda a gente na branca e não há nada de real a dizer.
   if (percentilAtivo) {
     for (const a of atualizacoes) {
       const antes = faixaAntiga.get(a.user_id) ?? "branca";
-      if (antes === a.faixa) continue; // não mudou: não notifica
-      const subiu = ordemFaixa(a.faixa) > ordemFaixa(antes);
-      if (subiu) {
-        await criarNotificacaoServidor({
-          paraUserId: a.user_id,
-          tipo: "faixa_subiu",
-          titulo: `🥋 Subiste para a faixa ${nomeFaixa(a.faixa)}!`,
-          corpo: `Parabéns! O teu desempenho levou-te à faixa ${nomeFaixa(a.faixa)}. Estás entre os melhores — continua assim e vai mais longe!`,
-          link: "/inicio",
-        });
-      } else {
-        await criarNotificacaoServidor({
-          paraUserId: a.user_id,
-          tipo: "faixa_desceu",
-          titulo: `Faixa ${nomeFaixa(a.faixa)} — a próxima é tua`,
-          corpo: `Desta vez desceste para a faixa ${nomeFaixa(a.faixa)}, mas isto faz parte do jogo. Monta uma boa equipa na próxima rodada e recupera o teu lugar — acreditamos em ti!`,
-          link: "/inicio",
-        });
+      if (antes !== a.faixa) {
+        const subiu = ordemFaixa(a.faixa) > ordemFaixa(antes);
+        if (subiu) {
+          await criarNotificacaoServidor({
+            paraUserId: a.user_id,
+            tipo: "faixa_subiu",
+            titulo: `🥋 Subiste para a faixa ${nomeFaixa(a.faixa)}!`,
+            corpo: `Parabéns! O teu desempenho levou-te à faixa ${nomeFaixa(a.faixa)}. Estás entre os melhores — continua assim e vai mais longe!`,
+            link: "/inicio",
+          });
+        } else {
+          await criarNotificacaoServidor({
+            paraUserId: a.user_id,
+            tipo: "faixa_desceu",
+            titulo: `Faixa ${nomeFaixa(a.faixa)} — a próxima é tua`,
+            corpo: `Desta vez desceste para a faixa ${nomeFaixa(a.faixa)}, mas isto faz parte do jogo. Monta uma boa equipa na próxima rodada e recupera o teu lugar — acreditamos em ti!`,
+            link: "/inicio",
+          });
+        }
+        continue;
       }
+
+      // MANTEVE a faixa. Dizemos quanto faltou para a seguinte, para o mês não
+      // acabar num vazio. Quem já é preta está no topo: não há "seguinte".
+      const falta = pontosParaFaixaAcima(a.faixa, a.user_id, jogadores, limites, totalDe);
+      const corpo = falta === null
+        ? `Fechaste o mês na faixa ${nomeFaixa(a.faixa)} — o topo da Ippon League. Agora é aguentar lá em cima: no próximo mês há quem venha atrás do teu lugar.`
+        : falta <= 0
+          ? `Fechaste o mês na faixa ${nomeFaixa(a.faixa)}, mesmo à porta da seguinte. No próximo mês é tua.`
+          : `Fechaste o mês na faixa ${nomeFaixa(a.faixa)}. Faltaram ${falta} pontos para a ${nomeFaixa(faixaAcimaDe(a.faixa))} — dá para ir buscá-los no próximo mês!`;
+      await criarNotificacaoServidor({
+        paraUserId: a.user_id,
+        tipo: "faixa_mantida",
+        titulo: `🥋 Mantiveste a faixa ${nomeFaixa(a.faixa)}`,
+        corpo,
+        link: "/inicio",
+      });
     }
   }
 
   return { jogadores: n, percentilAtivo, distribuicao };
+}
+
+// A faixa imediatamente ACIMA desta na escada. "" se já for a melhor (preta).
+function faixaAcimaDe(faixa: string): string {
+  const d = degrauDaFaixa(faixa);
+  if (d <= 0) return ""; // preta: não há acima
+  return ESCADA[d - 1].faixa;
+}
+
+// Posição de uma faixa na ESCADA (0 = preta, ... 5 = azul). A branca não está
+// na escada (é o resto), por isso fica no degrau a seguir ao último.
+function degrauDaFaixa(faixa: string): number {
+  const i = ESCADA.findIndex((e) => e.faixa === faixa);
+  return i >= 0 ? i : ESCADA.length;
+}
+
+// Quantos PONTOS faltaram a este jogador para chegar à faixa acima da sua.
+// Devolve null se já é a melhor faixa (preta) ou se não der para calcular.
+//
+// Como: para entrar na faixa acima é preciso estar dentro do corte dela
+// (`ate`). Quem estivesse na última posição desse corte fez `pontosDoCorte`;
+// a diferença para os pontos deste jogador é o que lhe faltou.
+function pontosParaFaixaAcima(
+  faixa: string,
+  userId: string,
+  jogadores: { user_id: string; total: number }[],
+  limites: { faixa: string; ate: number }[],
+  totalDe: Map<string, number>
+): number | null {
+  const d = degrauDaFaixa(faixa);
+  if (d <= 0) return null;                 // preta: está no topo
+  const alvo = limites[d - 1];             // o corte da faixa acima
+  if (!alvo || alvo.ate <= 0) return null;
+  const idxCorte = Math.min(alvo.ate - 1, jogadores.length - 1);
+  const pontosDoCorte = jogadores[idxCorte]?.total ?? 0;
+  const meus = totalDe.get(userId) ?? 0;
+  return Math.round((pontosDoCorte - meus) * 10) / 10;
 }
 
 // Ordem das faixas (maior nº = melhor). Para distinguir subida de descida.
@@ -784,7 +858,28 @@ export async function GET(req: Request) {
   const key = searchParams.get("key");
 
   if (!autorizado(req, key)) {
-    return NextResponse.json({ erro: "Não autorizado." }, { status: 401 });
+    // DIAGNÓSTICO do 401. Não revela o segredo — só tamanhos e sim/não. Chega
+    // para distinguir as três causas possíveis de "Não autorizado":
+    //   tem_segredo:false          -> a variável CRON_SECRET não está a chegar à
+    //                                 função (não existe, ou está definida noutro
+    //                                 ambiente/âmbito que este deployment não vê)
+    //   tamanhos diferentes        -> a chave enviada no ?key= não é a mesma
+    //                                 (valor trocado, ou o URL cortou-a num
+    //                                 caractere especial como & # + %)
+    //   segredo_com_espacos:true   -> ficou um espaço/newline colado ao valor ao
+    //                                 guardar; invisível na Vercel, mas quebra a
+    //                                 comparação exata
+    const seg = process.env.CRON_SECRET || "";
+    return NextResponse.json({
+      erro: "Não autorizado.",
+      diag: {
+        tem_segredo: !!process.env.CRON_SECRET,
+        tamanho_segredo: seg.length,
+        tamanho_chave_recebida: (key || "").length,
+        segredo_com_espacos: seg !== seg.trim(),
+        recebeu_cabecalho: !!req.headers.get("authorization"),
+      },
+    }, { status: 401 });
   }
 
   const base = baseUrl(req);
