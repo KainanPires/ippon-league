@@ -8,8 +8,10 @@ import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/compone
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
 import { focoMercado, textoFecho, numeroDaRodada, nomeCompeticao } from "@/lib/calendario";
-import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
+import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, deveMostrarTutorial } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
+import { AvisoEquipaGuardada } from "@/components/AvisoEquipaGuardada";
+import { useFaixa } from "@/lib/useFaixa";
 import { supabase } from "@/lib/supabase";
 import { PRECO } from "@/lib/precos";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -58,6 +60,8 @@ export default function CriarEquipa() {
   const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null });
   const [modal, setModal] = useState<Modal>(null);
   const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
+  // Aviso "e agora?" logo depois de guardar (uma vez, com não-mostrar-mais).
+  const [avisoGuardada, setAvisoGuardada] = useState(false);
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [savingCloud, setSavingCloud] = useState(false);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
@@ -66,6 +70,8 @@ export default function CriarEquipa() {
   const [isPro, setIsPro] = useState(false);
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const router = useRouter();
+  // Faixa REAL do jogador (cor para o Dôdo, nome para o cartão de partilha).
+  const { cor: corFaixa, nome: nomeFaixa } = useFaixa();
 
   // Foco do mercado (regra única no calendário): competição-alvo (mercado aberto),
   // a que está a decorrer (mercado fechado) e o estado para a contagem.
@@ -236,16 +242,34 @@ export default function CriarEquipa() {
     // obrigatoriamente ao /escudo. Se já tem nome, segue o fluxo normal.
     if (!temNomeProprio(ident)) {
       setModal({ kind: "precisaNome" });
-    } else if (res.ok && devePedirAvaliacao()) {
+      return;
+    }
+    // AVISO "E AGORA?": o momento mais importante do fluxo. A pessoa acabou de
+    // montar a equipa e, sem isto, ficava sem saber o que esperar — foi um
+    // feedback real de quem testou. Uma vez só; quem já percebeu o ciclo tem
+    // "não mostrar mais".
+    if (res.ok && (await deveMostrarTutorial("ippon_aviso_pos_guardar"))) {
+      setAvisoGuardada(true);
+      return;
+    }
+    if (res.ok && devePedirAvaliacao()) {
       // Fim da jornada (conta + equipa + nome): pede avaliação se for altura.
       // Ao fechar a avaliação, segue para a vista de gestão (/meu-time).
       setMostrarAvaliacao(true);
-    } else {
-      // Equipa guardada e com nome: vai para a vista de gestão da equipa
-      // (/meu-time), com património, valor e "Ver Mercado" — em vez de ficar
-      // preso na vista de montagem.
-      router.push("/meu-time");
+      return;
     }
+    // Equipa guardada e com nome: vai para a vista de gestão da equipa
+    // (/meu-time), com património, valor e "Ver Mercado" — em vez de ficar
+    // preso na vista de montagem.
+    router.push("/meu-time");
+  }
+
+  // Depois de fechar o aviso "e agora?": segue o mesmo caminho que seguiria se
+  // ele não existisse (avaliação, se for altura; senão, a vista de gestão).
+  function fecharAvisoGuardada() {
+    setAvisoGuardada(false);
+    if (devePedirAvaliacao()) { setMostrarAvaliacao(true); return; }
+    router.push("/meu-time");
   }
   const all = resolve(draft.ids);
   const males = all.filter((a) => a.gender === "M");
@@ -286,7 +310,7 @@ export default function CriarEquipa() {
             nesta competição sairam; o JC deles já voltou pelo preço atual. */}
         {carry && (
           <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a2410,#10160f)", border: "1px solid #5a4a18", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", marginBottom: 10 }}>
-            <div style={{ width: 34, height: 34, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
+            <div style={{ width: 34, height: 34, flexShrink: 0 }}><Mascot belt={corFaixa} expression="indicando" /></div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Reescala o teu time</div>
               <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "5px 0 0" }}>
@@ -348,7 +372,7 @@ export default function CriarEquipa() {
               <div style={{ fontSize: 11.5, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
               <span style={{ display: "inline-block", marginTop: 8, background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8 }}>Ver Ippon Pro</span>
             </div>
-            <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt="#141110" expression="sabio" /></div>
+            <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt={corFaixa} expression="sabio" /></div>
           </a>
         )}
       </div>
@@ -374,7 +398,7 @@ export default function CriarEquipa() {
       {guide === "welcome" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 90, height: 90, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="feliz" /></div>
+            <div style={{ width: 90, height: 90, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Vamos montar a tua equipa</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 20px" }}>Eu guio-te! Toca onde eu indicar e, em segundos, tens a tua equipa de 8 atletas pronta para competir.</p>
             <button onClick={() => setGuide("counter")} style={primaryBtn}>Vamos!</button>
@@ -383,28 +407,28 @@ export default function CriarEquipa() {
         </div>
       )}
       {guide === "counter" && (
-        <CoachBubble dir="down">
+        <CoachBubble dir="down" cor={corFaixa}>
           <p style={coachP}>Aqui em baixo, o <strong style={{ color: GOLD }}>{total}/8</strong> mostra quantos atletas já tens. Vais preenchendo até teres 8.</p>
           <button onClick={() => setGuide("slot")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
           <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
         </CoachBubble>
       )}
       {guide === "slot" && (
-        <CoachBubble dir="up">
+        <CoachBubble dir="up" cor={corFaixa}>
           <p style={coachP}>Toca no <strong style={{ color: "#7fb8f5" }}>lugar destacado</strong> para abrir o Mercado e contratar um atleta.</p>
           <button onClick={() => setGuide("captain")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
           <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
         </CoachBubble>
       )}
       {guide === "captain" && (
-        <CoachBubble dir="up">
+        <CoachBubble dir="up" cor={corFaixa}>
           <p style={coachP}>Toca num atleta já escalado para o <strong style={{ color: "#FF8F00" }}>tornares capitão</strong> (pontua a dobrar) ou para o <strong style={{ color: "#ef8d83" }}>venderes</strong>.</p>
           <button onClick={() => setGuide("actions")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
           <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
         </CoachBubble>
       )}
       {guide === "actions" && (
-        <CoachBubble dir="down">
+        <CoachBubble dir="down" cor={corFaixa}>
           <p style={coachP}>Em baixo: <strong style={{ color: "#ef8d83" }}>🗑 limpa</strong> a equipa, <strong style={{ color: GOLD }}>partilha</strong> o teu time e <strong style={{ color: GOLD }}>Salvar equipa</strong> guarda a escalação. Boa sorte!</p>
           <button onClick={naoMostrarMais} style={{ ...nextBtn, marginTop: 10 }}>Concluir</button>
         </CoachBubble>
@@ -412,7 +436,7 @@ export default function CriarEquipa() {
       {modal?.kind === "missing" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="feliz" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Falta pouco!</h2>
             <p style={{ fontSize: 13, color: "#c7d0c9", margin: "0 0 12px" }}>Para guardares a equipa ainda precisas de:</p>
             <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
@@ -430,7 +454,7 @@ export default function CriarEquipa() {
       {modal?.kind === "login" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#141110" expression="indicando" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Entra para guardar</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Para guardares a tua equipa e competires, entra na tua conta. É rápido — e ficas já a jogar!</p>
             <button onClick={() => exigirSessao("/criar-equipa")} style={primaryBtn}>Entrar / Criar conta</button>
@@ -441,10 +465,18 @@ export default function CriarEquipa() {
       {mostrarAvaliacao && (
         <Avaliacao nomeTime={identity.name} onClose={() => { setMostrarAvaliacao(false); router.push("/meu-time"); }} />
       )}
+      {/* AVISO "e agora?" — logo depois de guardar a equipa, uma vez. */}
+      {avisoGuardada && (
+        <AvisoEquipaGuardada
+          nomeCompeticao={nomeAlvo}
+          rodada={rodadaAlvo}
+          onFechar={fecharAvisoGuardada}
+        />
+      )}
       {modal?.kind === "saved" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="feliz" /></div>
+            <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Equipa salva!</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
               {cloudWarn
@@ -458,7 +490,7 @@ export default function CriarEquipa() {
       {modal?.kind === "precisaNome" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="feliz" /></div>
+            <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Equipa salva!</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 8px" }}>
               Falta só um passo: <strong style={{ color: "#f1ede2" }}>dá um nome ao teu time</strong>. É a tua identidade na liga — sem ele, apareces como “A minha equipa” e ninguém te distingue.
@@ -471,7 +503,7 @@ export default function CriarEquipa() {
       {modal?.kind === "trash" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="determinado" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="determinado" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Limpar a equipa?</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Isto remove todos os atletas e vais ter de escalar de novo.</p>
             <button onClick={clearAll} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>Sim, limpar tudo</button>
@@ -482,7 +514,7 @@ export default function CriarEquipa() {
       {modal?.kind === "share" && (
         <CartaoEquipa
           identity={identity}
-          faixa="Branca"
+          faixa={nomeFaixa}
           atletas={resolve(draft.ids)}
           capitao={draft.captain}
           pro={isPro}
@@ -492,7 +524,7 @@ export default function CriarEquipa() {
       {modal?.kind === "leave" && (
         <div style={overlayBg}>
           <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt="#efeadd" expression="indicando" /></div>
+            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
             <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Sair sem guardar?</h2>
             <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Tens alterações por guardar. Se saíres agora, não ficam guardadas na tua conta.</p>
             <button onClick={() => { const to = leaveTo; setModal(null); setLeaveTo(null); if (to) router.push(to); }} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>Sair sem guardar</button>
@@ -539,11 +571,13 @@ function SetaCoach({ dir }: { dir: "up" | "down" }) {
     </div>
   );
 }
-function CoachBubble({ children, dir = "down" }: { children: React.ReactNode; dir?: "up" | "down" }) {
+// `cor` = cor da faixa do jogador, para o Dôdo do balão aparecer com a faixa
+// certa (era fixo em #efeadd, o que dava um Dôdo branco a toda a gente).
+function CoachBubble({ children, dir = "down", cor }: { children: React.ReactNode; dir?: "up" | "down"; cor: string }) {
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 134, display: "flex", justifyContent: "center", padding: "0 14px", zIndex: 90 }}>
       <div style={{ width: "100%", maxWidth: 432, display: "flex", alignItems: "flex-end", gap: 10 }}>
-        <div style={{ width: 64, height: 64, flexShrink: 0 }}><Mascot belt="#efeadd" expression="feliz" /></div>
+        <div style={{ width: 64, height: 64, flexShrink: 0 }}><Mascot belt={cor} expression="feliz" /></div>
         <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", display: "flex", flexDirection: "column", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
           {dir === "up" && <SetaCoach dir="up" />}
           {children}
