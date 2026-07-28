@@ -412,3 +412,25 @@ export function nomeCompeticaoPorId(idCompeticao: string, agora: Date = new Date
 export function cidadeEscondida(s: SemanaCalendario, agora: Date = new Date()): boolean {
   return s.classico && nomeCompeticao(s, agora) !== s.nome;
 }
+
+/**
+ * Os RESULTADOS desta competição já podem ser mostrados ao utilizador?
+ *
+ * PORTÃO ANTI-ESPREITADELA. Só depois de o mercado FECHAR. É crítico nos
+ * clássicos: as lutas de 2018 já existem todas no JudoBase, por isso a API
+ * devolve pontos mesmo antes da rodada "começar" no jogo. Sem este portão,
+ * bastava escalar um atleta, tocar nele e ver quanto fez — e trocar se fosse
+ * mau. O jogo deixava de ter mérito.
+ *
+ * A mesma regra do /api/equipa-na-rodada (que devolve `bloqueado`) e do
+ * podeVerEquipa da chave da Copa. Aqui fica a versão partilhada.
+ */
+export function pontosVisiveis(s: SemanaCalendario, agora: Date = new Date()): boolean {
+  return estadoMercado(s, agora).estado === "fechado";
+}
+
+/** O mesmo, pelo id da competição. Desconhecida => false (fecha por omissão). */
+export function pontosVisiveisPorId(idCompeticao: string, agora: Date = new Date()): boolean {
+  const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
+  return s ? pontosVisiveis(s, agora) : false;
+}
