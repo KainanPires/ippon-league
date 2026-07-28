@@ -21,6 +21,24 @@
 // As ações de valor fixo vêm de contestActions() (que já trata o ippon fantasma
 // do hansoku); os shidos vêm dos penalty_, igual ao scoreContestSide.
 //
+// ---------------------------------------------------------------------------
+// PORTÃO ANTI-ESPREITADELA (servidor) — LER ANTES DE MEXER
+//
+// Esta rota NÃO devolve pontos de uma competição cujo mercado ainda está ABERTO.
+//
+// Porquê: nos CLÁSSICOS (competições antigas revividas), as lutas já existem
+// todas no JudoBase desde 2018/2019. Sem este portão, bastava abrir o "Meu Time",
+// tocar num atleta e ver quanto ele fez — e trocá-lo se fosse mau. Quem escalasse
+// com calma montava a equipa perfeita. O jogo não teria mérito nenhum.
+//
+// A guarda vive no SERVIDOR, e não só no clique do cliente, porque escrever o URL
+// à mão (/api/resultados?comp=1598&persons=...) contornaria qualquer bloqueio de
+// interface. Mesma regra e mesmo espírito do /api/equipa-na-rodada.
+//
+// Competições fora do CALENDARIO_2026 passam à frente: não são rodadas geridas
+// pelo jogo, não há mercado para respeitar.
+// ---------------------------------------------------------------------------
+//
 // Uso:
 //   /api/resultados?comp=3295&persons=4143,67160,32250   (pontua só estes — recomendado)
 //   /api/resultados?comp=3131                            (todos — modo antigo)
@@ -34,6 +52,7 @@ import {
   isHansokuMake,
   type IjfContest,
 } from "@/lib/ijf";
+import { CALENDARIO_2026, pontosVisiveisPorId } from "@/lib/calendario";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -95,6 +114,24 @@ export async function GET(req: Request) {
       { status: 400 }
     );
   }
+
+  // PORTÃO ANTI-ESPREITADELA: mercado ainda aberto -> não há pontos para ver.
+  // (Ver a explicação no cabeçalho. Competições fora do calendário passam.)
+  const noCalendario = CALENDARIO_2026.some((c) => c.idCompeticao === comp);
+  if (noCalendario && !pontosVisiveisPorId(comp)) {
+    return NextResponse.json({
+      comp,
+      modo: "bloqueado",
+      bloqueado: true,
+      mercado_aberto: true,
+      tem_resultados: false,
+      n_lutas: 0,
+      n_atletas: 0,
+      pontos: {},
+      acoes: {},
+    });
+  }
+
   // MODO POR ATLETA (recomendado): pontua só os atletas pedidos, buscando as
   // lutas de cada um (competitor.contests) filtradas pela competição.
   if (personsParam) {
