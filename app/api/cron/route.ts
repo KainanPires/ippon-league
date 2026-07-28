@@ -348,7 +348,7 @@ function fimEfetivoDaLiga(liga: { fim_tipo?: unknown; fim_valor?: unknown; fim_d
 }
 
 // (D) Recalcula as faixas de um mês por percentil e grava em users.belt.
-async function recalcularFaixas(mes: string): Promise<{ jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; minJogadores: number; minVindoDoAmbiente: boolean; minBruto: string | null }> {
+async function recalcularFaixas(mes: string): Promise<{ jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; gravadas: number; falhadas: number; primeiroErro: string | null; minJogadores: number; minVindoDoAmbiente: boolean; minBruto: string | null }> {
   // minJogadores/minVindoDoAmbiente vão na resposta do cron para se poder VER que
   // limiar está mesmo a ser usado — sem isto, uma variável de ambiente que não
   // chega à função é indistinguível de uma que chega (ambas dão 'branca' a todos).
@@ -357,7 +357,7 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
     minVindoDoAmbiente: !!process.env.FAIXAS_MIN_JOGADORES,
     minBruto: process.env.FAIXAS_MIN_JOGADORES ?? null, // valor cru, para depurar
   };
-  if (!supabaseAdmin) return { jogadores: 0, percentilAtivo: false, distribuicao: {}, ...minInfo };
+  if (!supabaseAdmin) return { jogadores: 0, percentilAtivo: false, distribuicao: {}, gravadas: 0, falhadas: 0, primeiroErro: null, ...minInfo };
 
   const { data: linhas } = await supabaseAdmin.from("pontuacoes").select("user_id, pontos").eq("mes", mes);
   const soma = new Map<string, number>();
@@ -365,7 +365,7 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
 
   const jogadores = [...soma.entries()].map(([user_id, total]) => ({ user_id, total }));
   const n = jogadores.length;
-  if (n === 0) return { jogadores: 0, percentilAtivo: false, distribuicao: {}, ...minInfo };
+  if (n === 0) return { jogadores: 0, percentilAtivo: false, distribuicao: {}, gravadas: 0, falhadas: 0, primeiroErro: null, ...minInfo };
 
   jogadores.sort((a, b) => b.total - a.total);
   const percentilAtivo = n >= MIN_JOGADORES;
@@ -406,9 +406,28 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
     }
   }
 
+  // GRAVA a faixa de cada jogador — VERIFICANDO o resultado.
+  //
+  // Antes isto era um `await update(...)` sem olhar para o erro. Se a escrita
+  // falhasse (constraint, id inexistente, permissões), o código seguia e mandava
+  // à mesma a notificação "subiste para roxa" — enquanto a base ficava noutra
+  // faixa. Foi assim que apareceram notificações que não batiam certo com o que
+  // a app mostrava, sem nada nos registos a explicar porquê.
+  //
+  // Agora: quem falha a gravação NÃO é notificado (seria mentira), e a resposta
+  // do cron diz quantas gravaram, quantas falharam e qual foi o primeiro erro.
+  let faixasGravadas = 0;
+  const faixasFalhadas: { user_id: string; faixa: string; erro: string }[] = [];
   for (const a of atualizacoes) {
-    await supabaseAdmin.from("users").update({ belt: a.faixa }).eq("id", a.user_id);
+    const { error } = await supabaseAdmin.from("users").update({ belt: a.faixa }).eq("id", a.user_id);
+    if (error) {
+      faixasFalhadas.push({ user_id: a.user_id, faixa: a.faixa, erro: String(error.message || "falha") });
+      continue;
+    }
+    faixasGravadas++;
   }
+  // Quem não ficou gravado não recebe notificação nenhuma.
+  const naoGravou = new Set(faixasFalhadas.map((f) => f.user_id));
 
   // Notificação de fecho do mês. TODA A GENTE recebe uma — subiu, desceu ou
   // manteve. Antes só havia subida e descida, e quem mantinha a faixa não sabia
@@ -417,6 +436,7 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
   // está toda a gente na branca e não há nada de real a dizer.
   if (percentilAtivo) {
     for (const a of atualizacoes) {
+      if (naoGravou.has(a.user_id)) continue; // a gravação falhou: não se anuncia
       const antes = faixaAntiga.get(a.user_id) ?? "branca";
       if (antes !== a.faixa) {
         const subiu = ordemFaixa(a.faixa) > ordemFaixa(antes);
@@ -458,7 +478,15 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
     }
   }
 
-  return { jogadores: n, percentilAtivo, distribuicao, ...minInfo };
+  return {
+    jogadores: n,
+    percentilAtivo,
+    distribuicao,
+    gravadas: faixasGravadas,
+    falhadas: faixasFalhadas.length,
+    primeiroErro: faixasFalhadas[0]?.erro ?? null,
+    ...minInfo,
+  };
 }
 
 // A faixa imediatamente ACIMA desta na escada. "" se já for a melhor (preta).
@@ -1091,7 +1119,7 @@ export async function GET(req: Request) {
 
   // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
   //     também forçar via ?faixas=AAAA-MM para teste manual.
-  let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; minJogadores: number; minVindoDoAmbiente: boolean; minBruto: string | null } | null = null;
+  let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; gravadas: number; falhadas: number; primeiroErro: string | null; minJogadores: number; minVindoDoAmbiente: boolean; minBruto: string | null } | null = null;
   const forcarFaixas = (searchParams.get("faixas") || "").trim();
   try {
     if (forcarFaixas) {
