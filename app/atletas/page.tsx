@@ -362,6 +362,9 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
   const [erro, setErro] = useState("");
   const [aEnviar, setAEnviar] = useState(false);
   const [temSessao, setTemSessao] = useState<boolean | null>(null);
+  // Código já fora de prazo? Então oferece-se um novo em vez de deixar a pessoa
+  // a tentar um que já não serve.
+  const [expirado, setExpirado] = useState(false);
 
   // Estado deste atleta para ESTE utilizador (já pediu? já verificou?).
   useEffect(() => {
@@ -378,7 +381,7 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
         }).then((x) => x.json());
         if (!vivo || !j?.ok) return;
         if (j.meuEstado === "verificado") setFase("feito");
-        else if (j.meuEstado === "pendente") setFase("aguardar");
+        else if (j.meuEstado === "pendente") { setFase("aguardar"); setExpirado(!!j.codigoExpirado); }
       } catch { /* fica no estado inicial */ }
     })();
     return () => { vivo = false; };
@@ -406,11 +409,26 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
     finally { setAEnviar(false); }
   }
 
+  async function novoCodigo() {
+    setErro(""); setAEnviar(true);
+    try {
+      const j = await chamar({ acao: "novo-codigo" });
+      if (!j?.ok) { setErro(String(j?.erro || "Não foi possível gerar um código novo.")); return; }
+      setExpirado(false); setCodigo("");
+      setErro("Enviámos um código novo. O anterior deixou de servir.");
+    } catch { setErro("Não foi possível gerar um código novo."); }
+    finally { setAEnviar(false); }
+  }
+
   async function verificar() {
     setErro(""); setAEnviar(true);
     try {
       const j = await chamar({ acao: "verificar", codigo });
-      if (!j?.ok) { setErro(String(j?.erro || "Código errado.")); return; }
+      if (!j?.ok) {
+        if (j?.expirado) setExpirado(true);
+        setErro(String(j?.erro || "Código errado."));
+        return;
+      }
       setFase("feito");
       onVerificado(r.id);
     } catch { setErro("Não foi possível verificar."); }
@@ -458,7 +476,13 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
           <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#7fb8f5", marginBottom: 6 }}>Pedido registado</div>
           <p style={{ fontSize: 12.5, color: "#cdd9e6", lineHeight: 1.5, margin: "0 0 12px" }}>
             Vamos enviar-te um código por mensagem direta no Instagram. Quando o receberes, escreve-o aqui.
+            <span style={{ color: "#7c8a82" }}> O código serve durante 48 horas.</span>
           </p>
+          {expirado && (
+            <div style={{ background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 9, padding: "9px 11px", marginBottom: 10, fontSize: 12, color: "#ef8d83", lineHeight: 1.45 }}>
+              O código que tinhas já expirou. Pede um novo aqui em baixo.
+            </div>
+          )}
           <input
             value={codigo}
             onChange={(e) => setCodigo(e.target.value.toUpperCase())}
@@ -470,7 +494,11 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
             style={{ width: "100%", background: "#2f6fb3", color: "#fff", border: "none", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", padding: "11px", borderRadius: 9, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar || codigo.length < 4 ? 0.6 : 1 }}>
             {aEnviar ? "A verificar…" : "Confirmar código"}
           </button>
-          <button onClick={() => { setFase("forma"); setErro(""); }}
+          <button onClick={novoCodigo} disabled={aEnviar}
+            style={{ width: "100%", marginTop: 8, background: "transparent", border: "1px solid #24364a", color: "#7fb8f5", fontFamily: FD, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", padding: "9px", borderRadius: 9, cursor: aEnviar ? "default" : "pointer" }}>
+            Pedir um código novo
+          </button>
+          <button onClick={() => { setFase("forma"); setErro(""); setExpirado(false); }}
             style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: "#7c8a82", fontSize: 11.5, cursor: "pointer", fontFamily: FB }}>
             Mudar o Instagram
           </button>
