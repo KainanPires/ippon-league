@@ -16,6 +16,11 @@ import { PRECO } from "@/lib/precos";
 import { SinoNotificacoes } from "@/components/SinoNotificacoes";
 import { criarNotificacao } from "@/lib/notificacoes";
 import { normalizarFaixa, corDaFaixa, nomeDaFaixa, type Faixa } from "@/lib/faixas";
+// NÍVEL DE SUBSCRIÇÃO: vem do useNivel(), que lê da tabela `users` — a MESMA
+// fonte que o servidor usa para bloquear. Antes lia-se do user_metadata da
+// sessão, e desde que o trigger deixou de sincronizar o nível, essa cópia podia
+// estar desatualizada: alguém marcado como Pro na tabela via "Sê Pro" na app.
+import { useNivel } from "@/lib/useNivel";
 import { CartaoInstalarApp } from "@/components/InstalarApp";
 import { LembreteNotificacoes } from "@/components/NotificacoesPush";
 import { reconciliarPush } from "@/lib/push";
@@ -95,8 +100,8 @@ export default function Inicio() {
   const [phase, setPhase] = useState<"tutorial" | null>(null);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
-  const [isPro, setIsPro] = useState(false);
-  const [isProMax, setIsProMax] = useState(false);
+  // ehPro é verdadeiro para Pro E para Pro Max (os níveis são cumulativos).
+  const { ehPro: isPro, ehProMax: isProMax } = useNivel();
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
   const [modaisFila, setModaisFila] = useState<MensagemEspecial[]>([]);
   const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
@@ -179,9 +184,7 @@ export default function Inicio() {
         if (metaName) setName(String(metaName).split(" ")[0]);
         else if (savedName) setName(savedName);
         else setName("Campeão");
-        const meta = (data.session.user?.user_metadata ?? {}) as { is_pro?: boolean; is_pro_max?: boolean };
-        setIsPro(Boolean(meta.is_pro));
-        setIsProMax(Boolean(meta.is_pro_max));
+        // O nível já vem do useNivel() (tabela `users`) — não se lê do metadata.
         if (userId) {
           supabase.from("users").select("belt, data_nascimento, country_code").eq("id", userId).maybeSingle()
             .then(({ data: row }) => {
@@ -635,12 +638,12 @@ export default function Inicio() {
         <Tab label="Pro" icon={<BoltIcon />} href={isProMax ? "/pro-max-central" : isPro ? "/pro" : "/ippon-pro"} />
       </nav>
 
-      {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || "Campeão"} target={tutTarget} />}
+      {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || "Campeão"} target={tutTarget} cor={corDaFaixa(faixaJogo)} />}
 
       {/* Modais de evento (aniversário, grande competição, etc.). Aparecem 1x por
           evento; em sequência quando coincidem; ao fechar vão para o sino. */}
       {podeMostrarModalEvento && modalEvento && (
-        <ModalEvento msg={modalEvento} onClose={fecharModalEvento} />
+        <ModalEvento msg={modalEvento} onClose={fecharModalEvento} cor={corDaFaixa(faixaJogo)} />
       )}
 
       {desempenho && (
@@ -789,7 +792,9 @@ function Overlay({ children }: { children: React.ReactNode }) {
 
 // Modal de evento (estilo tutorial, com o Dôdo). Um botão único; ao fechar, o
 // chamador marca como visto, grava no sino e avança para o próximo da fila.
-function ModalEvento({ msg, onClose }: { msg: MensagemEspecial; onClose: () => void }) {
+// `cor` = a faixa REAL do jogador. Era fixa em #141110 (quase preto), o que dava
+// o mesmo Dôdo a toda a gente — inclusive a um faixa-branca.
+function ModalEvento({ msg, onClose, cor }: { msg: MensagemEspecial; onClose: () => void; cor: string }) {
   const expr: React.ComponentProps<typeof Mascot>["expression"] =
     msg.tipo === "aniversario" ? "comemorando"
       : msg.tipo === "fim_de_ano" || msg.tipo === "comeco_de_ano" || msg.tipo === "dia_do_judo" ? "feliz"
@@ -798,7 +803,7 @@ function ModalEvento({ msg, onClose }: { msg: MensagemEspecial; onClose: () => v
     <Overlay>
       <div className="ilmodalin" style={{ background: "#121815", border: `1px solid ${msg.cor}`, borderRadius: 16, padding: 20, textAlign: "center" }}>
         <div style={{ width: 76, height: 76, margin: "0 auto 4px" }}>
-          <Mascot belt="#141110" expression={expr} />
+          <Mascot belt={cor} expression={expr} />
         </div>
         <div style={{ fontSize: 30, lineHeight: 1, marginBottom: 8 }} aria-hidden="true">{msg.emoji}</div>
         <div style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.15, marginBottom: 9, color: msg.cor }}>{msg.titulo}</div>
@@ -811,7 +816,10 @@ function ModalEvento({ msg, onClose }: { msg: MensagemEspecial; onClose: () => v
   );
 }
 
-function Tutorial({ step, setStep, onClose, name, target }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string; target: TutTarget }) {
+// `cor` = a faixa REAL do jogador (ver a nota do ModalEvento).
+// CUIDADO: a variável `isPro` aqui dentro é LOCAL e significa "este é o passo do
+// Ippon Pro" — não tem nada a ver com a subscrição do utilizador.
+function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string; target: TutTarget; cor: string }) {
   const total = STEPS.length + 2;
   const isWelcome = step === 0;
   const isPro = step === STEPS.length + 1;
@@ -825,7 +833,7 @@ function Tutorial({ step, setStep, onClose, name, target }: { step: number; setS
     return (
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
         <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
-          <div style={{ width: 56, height: 56, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
+          <div style={{ width: 56, height: 56, flexShrink: 0 }}><Mascot belt={cor} expression="indicando" /></div>
           <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px" }}>
             <div style={{ textAlign: "right", marginBottom: 4 }}>
               <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB }}>Pular ✕</button>
@@ -858,7 +866,7 @@ function Tutorial({ step, setStep, onClose, name, target }: { step: number; setS
         <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
             <div style={{ width: 64, height: 64, flexShrink: 0 }}>
-              <Mascot belt="#141110" expression="comemorando" />
+              <Mascot belt={cor} expression="comemorando" />
             </div>
             <div>
               <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>Olá, {name}! Sou o Dôdo</div>
@@ -872,7 +880,7 @@ function Tutorial({ step, setStep, onClose, name, target }: { step: number; setS
       ) : isPro ? (
         <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 20, textAlign: "center" }}>
           <div style={{ width: 80, height: 80, margin: "0 auto 2px" }}>
-            <Mascot belt="#141110" expression="sabio" />
+            <Mascot belt={cor} expression="sabio" />
           </div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>Oferta de lançamento</div>
           <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0" }}>Ippon Pro</div>
@@ -897,7 +905,7 @@ function Tutorial({ step, setStep, onClose, name, target }: { step: number; setS
         <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
             <div style={{ width: 64, height: 64, flexShrink: 0 }}>
-              <Mascot belt="#141110" expression="indicando" />
+              <Mascot belt={cor} expression="indicando" />
             </div>
             <div>
               <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>{teach.title}</div>
