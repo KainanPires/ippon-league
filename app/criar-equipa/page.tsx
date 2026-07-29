@@ -12,6 +12,8 @@ import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, deveMost
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 import { AvisoEquipaGuardada } from "@/components/AvisoEquipaGuardada";
 import { useFaixa } from "@/lib/useFaixa";
+// Nível da tabela `users` (a mesma fonte do servidor), não do user_metadata.
+import { useNivel } from "@/lib/useNivel";
 import { supabase } from "@/lib/supabase";
 import { PRECO } from "@/lib/precos";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -67,7 +69,7 @@ export default function CriarEquipa() {
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const [cloudWarn, setCloudWarn] = useState(false);
   const [carry, setCarry] = useState<Carry>(null); // atletas que sairam no carry-over
-  const [isPro, setIsPro] = useState(false);
+  const { ehPro: isPro } = useNivel();
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const router = useRouter();
   // Faixa REAL do jogador (cor para o Dôdo, nome para o cartão de partilha).
@@ -184,15 +186,6 @@ export default function CriarEquipa() {
           commitSavedFor(idAlvo, cloud);
         }
       });
-    });
-    // Estado Pro: esconde a propaganda "Sê Pro" a quem já é Pro (lê da sessão,
-    // igual ao meu-time e ao inicio).
-    supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
-      if (!active) return;
-      try {
-        const meta = (data.session as { user?: { user_metadata?: { is_pro?: boolean } } } | null)?.user?.user_metadata;
-        setIsPro(!!meta?.is_pro);
-      } catch {}
     });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
