@@ -484,7 +484,10 @@ export default function ChaveAtletasPage() {
         </div>
         {aba === "confrontos" && (
           <div style={{ marginTop: 14 }}>
-            <AnaliseConfrontos comp={comp} cat={cat} />
+            {/* Sem `comp`: a análise segue a competição de MERCADO ABERTO (para onde se
+                escala agora), que pode não ser a que a chave mostra. Ver a nota no
+                componente — ele diz sempre qual está a analisar. */}
+            <AnaliseConfrontos cat={cat} />
           </div>
         )}
 
