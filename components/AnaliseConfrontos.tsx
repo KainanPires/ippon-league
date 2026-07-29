@@ -63,6 +63,15 @@ interface AtletaAnalise {
   favoraveis: Relacao[];
   desfavoraveis: Relacao[];
 }
+interface PossivelAdv { id: string; prob: number; nome: string; pais: string; h2h: { v: number; d: number } | null }
+interface FaseCaminho { fase: string; possiveis: PossivelAdv[] }
+interface CaminhoAtleta {
+  pool: string;
+  vencePool: number;
+  chegaFinal: number;
+  venceCategoria: number;
+  caminho: FaseCaminho[];
+}
 interface Resposta {
   ok: boolean;
   acesso?: "ok" | "negado";
@@ -74,6 +83,7 @@ interface Resposta {
   ano_base?: number | null;
   atletas?: AtletaAnalise[];
   modelo?: { k_confianca: number; s_forca: number };
+  chave?: { existe: boolean; porAtleta?: Record<string, CaminhoAtleta> };
   atualizado_em?: string | null;
 }
 
@@ -143,6 +153,17 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
   const atletas = dados.atletas || [];
   if (atletas.length === 0) return <Aviso texto="Sem atletas nesta categoria." />;
 
+  // CAMADA 2: há quadro montado? Se sim, a probabilidade que MANDA é a da chave
+  // — tem em conta quem apanha quem, e é isso que decide quem escalar. A da
+  // camada 1 (só força relativa) passa a ser a leitura de fundo.
+  const chave = dados.chave;
+  const temChave = !!chave?.existe && !!chave.porAtleta;
+  const comChave = (id: string): CaminhoAtleta | null => (temChave ? chave!.porAtleta![id] ?? null : null);
+  // Com quadro, ordenamos pela probabilidade REAL de ser campeão.
+  const ordenados = temChave
+    ? [...atletas].sort((a, b) => (comChave(b.id)?.venceCategoria ?? -1) - (comChave(a.id)?.venceCategoria ?? -1))
+    : atletas;
+
   // Total de confrontos conhecidos — dá a medida de quanto peso tem a análise.
   const totalLutas = atletas.reduce((s, a) => s + a.confrontos.lutas, 0) / 2; // cada luta conta 2x
   const comHistorico = atletas.filter((a) => a.confrontos.lutas > 0).length;
@@ -165,10 +186,18 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
             <> Só contam lutas até ao fim de <strong style={{ color: GOLD }}>{dados.ano_base}</strong> — é um clássico desse ano.</>
           ) : null}
         </div>
+        {/* A moldura só se monta depois da pesagem (as chaves da IJF saem 10-12h
+            antes). Dizemos em que estado estamos, para a ausência do caminho não
+            parecer uma falha. */}
+        <div style={{ fontSize: 11, color: temChave ? VERDE : "#7c8a82", marginTop: 6 }}>
+          {temChave
+            ? "✓ Quadro montado — as probabilidades já contam com quem apanha quem."
+            : "Quadro ainda não montado. As chaves saem depois da pesagem; até lá, a leitura é só por força e histórico."}
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {atletas.map((a, i) => {
+        {ordenados.map((a, i) => {
           const expandido = aberto === a.id;
           const semHistorico = a.confrontos.lutas === 0;
           return (
@@ -187,7 +216,9 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
                   </span>
                 </span>
                 <span style={{ flexShrink: 0, textAlign: "right" }}>
-                  <span style={{ display: "block", fontFamily: FD, fontSize: 16, fontWeight: 700, color: i === 0 ? GOLD : "#cfd8d2" }}>{a.probabilidade}%</span>
+                  <span style={{ display: "block", fontFamily: FD, fontSize: 16, fontWeight: 700, color: i === 0 ? GOLD : "#cfd8d2" }}>
+                    {comChave(a.id) ? comChave(a.id)!.venceCategoria : a.probabilidade}%
+                  </span>
                   {/* A AMOSTRA nunca é escondida. É o que distingue uma leitura
                       sólida de um palpite — e é ela que torna o número honesto. */}
                   <span style={{ display: "block", fontSize: 9.5, color: semHistorico ? "#7c8a82" : "#5f6f67" }}>
@@ -209,6 +240,7 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
                     <>
                       <Bloco titulo="Leva vantagem" cor={VERDE} linhas={a.favoraveis} />
                       <Bloco titulo="Costuma sofrer" cor={VERMELHO} linhas={a.desfavoraveis} />
+                      <Caminho dados={comChave(a.id)} />
                     </>
                   )}
                 </div>
@@ -245,6 +277,63 @@ function Bloco({ titulo, cor, linhas }: { titulo: string; cor: string; linhas: R
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// CAMINHO NA CHAVE — só aparece quando há moldura montada.
+// Mostra, fase a fase, quem pode aparecer do outro lado e com que hipótese de lá
+// chegar. Ao lado de cada nome vai o histórico direto, quando existe: é o que
+// transforma "podes apanhar o Kukolj" em "podes apanhar o Kukolj, e estás 0-2".
+function Caminho({ dados }: { dados: CaminhoAtleta | null }) {
+  if (!dados) return null;
+  return (
+    <div style={{ marginTop: 13, paddingTop: 11, borderTop: "1px solid #1a221d" }}>
+      <div style={{ fontFamily: FD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: AZUL_PROMAX, marginBottom: 8 }}>
+        Caminho na chave · Pool {dados.pool}
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <Marco rotulo="Vence o pool" valor={dados.vencePool} />
+        <Marco rotulo="Chega à final" valor={dados.chegaFinal} />
+        <Marco rotulo="Campeão" valor={dados.venceCategoria} destaque />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {dados.caminho.map((f, i) => (
+          <div key={i}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{f.fase}</div>
+            {f.possiveis.length === 0 ? (
+              <div style={{ fontSize: 11.5, color: "#5f6f67", fontStyle: "italic" }}>Passa sem adversário.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {f.possiveis.map((o) => (
+                  <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ flexShrink: 0, background: "#243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, fontSize: 8.5, padding: "2px 5px", borderRadius: 3 }}>{o.pais}</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#d6ddd6" }}>{o.nome}</span>
+                    {o.h2h && (
+                      <span style={{ flexShrink: 0, fontFamily: FD, fontSize: 11, fontWeight: 700, color: o.h2h.v > o.h2h.d ? VERDE : o.h2h.v < o.h2h.d ? VERMELHO : "#93a39a" }}>
+                        {o.h2h.v}–{o.h2h.d}
+                      </span>
+                    )}
+                    <span style={{ flexShrink: 0, fontFamily: FD, fontSize: 11, color: "#7c8a82", width: 44, textAlign: "right" }}>{o.prob}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <p style={{ fontSize: 10, color: "#5f6f67", lineHeight: 1.45, marginTop: 9, marginBottom: 0 }}>
+        A percentagem ao lado de cada nome é a hipótese de ELE chegar a essa fase. O V–D é o histórico direto entre os dois.
+      </p>
+    </div>
+  );
+}
+
+function Marco({ rotulo, valor, destaque }: { rotulo: string; valor: number; destaque?: boolean }) {
+  return (
+    <div style={{ flex: 1, background: destaque ? "rgba(217,164,65,0.08)" : "#141a17", border: `1px solid ${destaque ? GOLD : "#243029"}`, borderRadius: 9, padding: "7px 8px", textAlign: "center" }}>
+      <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: destaque ? GOLD : "#cfd8d2" }}>{valor}%</div>
+      <div style={{ fontSize: 9, color: "#7c8a82", textTransform: "uppercase", letterSpacing: "0.03em", marginTop: 1 }}>{rotulo}</div>
     </div>
   );
 }
