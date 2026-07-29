@@ -21,7 +21,6 @@ const INFO: { label: string; href?: string; soon?: boolean }[] = [
   { label: "Política de privacidade", href: "/privacidade" },
   { label: "Ajuda e contacto", href: "/ajuda" },
 ];
-
 type Conta = {
   id: string;
   nome: string;
@@ -32,7 +31,6 @@ type Conta = {
   faixaJudo: string;
   isPro: boolean;
 };
-
 export default function Perfil() {
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [conta, setConta] = useState<Conta | null>(null);
@@ -49,7 +47,6 @@ export default function Perfil() {
   const [edDialIso, setEdDialIso] = useState("PT");
   const [edContacto, setEdContacto] = useState("");
   const [emailPendente, setEmailPendente] = useState("");
-
   useEffect(() => {
     let active = true;
     try { setIdentity(loadIdentity()); } catch {}
@@ -80,14 +77,12 @@ export default function Perfil() {
     });
     return () => { active = false; };
   }, []);
-
   async function sair() {
     if (saindo) return;
     setSaindo(true);
     try { await supabase.auth.signOut(); } catch {}
     window.location.href = "/entrar";
   }
-
   function abrirEdicao() {
     if (!conta) return;
     setEdNome(conta.nome === "Campeão" ? "" : conta.nome);
@@ -109,7 +104,6 @@ export default function Perfil() {
     setEmailPendente("");
     setEditando(true);
   }
-
   async function guardar() {
     if (guardando || !conta) return;
     setGuardando(true);
@@ -118,7 +112,6 @@ export default function Perfil() {
     const pais = COUNTRIES.find((c) => c.iso2 === edPaisIso);
     const dial = COUNTRIES.find((c) => c.iso2 === edDialIso)?.dial ?? "";
     const telefone = edContacto.trim() ? `${dial} ${edContacto.trim()}`.trim() : "";
-
     // 1) Dados (nome, telefone, país) — guardam direto.
     const { error } = await supabase.auth.updateUser({
       data: {
@@ -133,7 +126,6 @@ export default function Perfil() {
       setGuardando(false);
       return;
     }
-
     // 2) Email — se mudou, exige confirmação no novo endereço (não muda no ecrã já).
     const novoEmail = edEmail.trim();
     const emailMudou = novoEmail && novoEmail.toLowerCase() !== conta.email.toLowerCase();
@@ -153,18 +145,15 @@ export default function Perfil() {
       }
       setEmailPendente(novoEmail);
     }
-
     setConta((c) => c ? { ...c, nome: edNome.trim() || "Campeão", telefone, pais: pais?.name ?? "", paisIso: edPaisIso } : c);
     try { localStorage.setItem("ippon_name", (edNome.trim().split(" ")[0]) || ""); } catch {}
     setGuardando(false);
     // Se houver email pendente, mantém o painel aberto para a pessoa ler o aviso.
     if (!emailMudou) setEditando(false);
   }
-
   const nomeMostrado = conta?.nome || "Campeão";
   const corFaixaJogo = corDaFaixa(faixaJogo);
   const nomeFaixaJogo = nomeDaFaixa(faixaJogo);
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 40px" }}>
@@ -174,7 +163,6 @@ export default function Perfil() {
           </a>
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Perfil</h1>
         </header>
-
         <button onClick={() => setAbertoDados((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: abertoDados ? 10 : 22, cursor: "pointer", color: "#f1ede2", fontFamily: FB }}>
           <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0, border: `2px solid ${corFaixaJogo}` }}>
             <Mascot belt={corFaixaJogo} expression="feliz" />
@@ -191,7 +179,6 @@ export default function Perfil() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
           </span>
         </button>
-
         {abertoDados && (
           <div style={{ marginBottom: 22 }}>
             {!ready ? (
@@ -218,7 +205,6 @@ export default function Perfil() {
               <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 16 }}>
                 <EditLabel>Nome</EditLabel>
                 <input value={edNome} onChange={(e) => setEdNome(e.target.value)} placeholder="O teu nome" style={inputStyle} />
-
                 <EditLabel>Email</EditLabel>
                 <input value={edEmail} onChange={(e) => { setEdEmail(e.target.value); setEmailPendente(""); }} type="email" inputMode="email" placeholder="email@exemplo.com" style={inputStyle} />
                 {emailPendente ? (
@@ -230,29 +216,22 @@ export default function Perfil() {
                     Se mudares o email, enviamos um link de confirmação para o novo endereço.
                   </div>
                 )}
-
                 <EditLabel>Telefone (opcional)</EditLabel>
                 <div style={{ display: "flex", gap: 8 }}>
                   <DialSelect value={edDialIso} onChange={setEdDialIso} />
                   <input value={edContacto} onChange={(e) => setEdContacto(e.target.value)} inputMode="tel" placeholder="Número" style={inputStyle} />
                 </div>
-
                 <EditLabel>País</EditLabel>
                 <CountryPicker value={edPaisIso} onChange={setEdPaisIso} />
-
                 {avisoGuardar && <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 10 }}>{avisoGuardar}</div>}
-
                 <button onClick={guardar} disabled={guardando} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 12, cursor: guardando ? "default" : "pointer", opacity: guardando ? 0.7 : 1 }}>{guardando ? "A guardar…" : "Guardar"}</button>
                 <button onClick={() => setEditando(false)} disabled={guardando} style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Fechar</button>
               </div>
             )}
           </div>
         )}
-
         {abertoDados && ready && conta && <SeletorJudogui />}
-
         {abertoDados && ready && conta && <AlterarSenha email={conta.email} />}
-
         {ready && conta && (
           <>
             <SectionTitle>Notificações</SectionTitle>
@@ -261,7 +240,6 @@ export default function Perfil() {
             </div>
           </>
         )}
-
         {abertoDados && ready && conta && (
           <>
             <SectionTitle>A minha assinatura</SectionTitle>
@@ -287,7 +265,6 @@ export default function Perfil() {
             </div>
           </>
         )}
-
         <SectionTitle>A minha equipa</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 14, background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 12 }}>
           <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={identity} size={52} /></div>
@@ -299,7 +276,6 @@ export default function Perfil() {
         <a href="/escudo" style={{ display: "block", textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 12, textDecoration: "none", marginBottom: 26 }}>
           Mudar escudo
         </a>
-
         <SectionTitle>Informações e políticas</SectionTitle>
         <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
           <LinhaInstalarApp />
@@ -319,18 +295,15 @@ export default function Perfil() {
               : <div key={it.label} style={{ ...rowStyle, opacity: 0.85, cursor: "default" }}>{inner}</div>;
           })}
         </div>
-
         <button onClick={sair} disabled={saindo} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: "transparent", border: "1px solid #5a2f2c", color: "#ef8d83", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 12, cursor: saindo ? "default" : "pointer", opacity: saindo ? 0.7 : 1 }}>
           <DoorIcon />
           {saindo ? "A sair…" : "Sair da conta"}
         </button>
-
         <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 22 }}>Ippon League · versão de testes</p>
       </div>
     </main>
   );
 }
-
 // Bloco de alteração de senha (logado). Pede a senha atual (reautentica) e a nova.
 function AlterarSenha({ email }: { email: string }) {
   const [aberto, setAberto] = useState(false);
@@ -341,11 +314,9 @@ function AlterarSenha({ email }: { email: string }) {
   const [guardando, setGuardando] = useState(false);
   const [erro, setErro] = useState("");
   const [ok, setOk] = useState(false);
-
   function limpar() {
     setAtual(""); setNova(""); setConfirma(""); setErro("");
   }
-
   async function alterar() {
     if (guardando) return;
     setErro(""); setOk(false);
@@ -374,7 +345,6 @@ function AlterarSenha({ email }: { email: string }) {
     setOk(true);
     setAberto(false);
   }
-
   return (
     <>
       <SectionTitle>Segurança</SectionTitle>
@@ -400,15 +370,11 @@ function AlterarSenha({ email }: { email: string }) {
                 </svg>
               </button>
             </div>
-
             <EditLabel>Nova senha</EditLabel>
             <input value={nova} onChange={(e) => { setNova(e.target.value); setErro(""); }} type={showPw ? "text" : "password"} placeholder="Mínimo 6 caracteres" style={inputStyle} />
-
             <EditLabel>Confirmar nova senha</EditLabel>
             <input value={confirma} onChange={(e) => { setConfirma(e.target.value); setErro(""); }} type={showPw ? "text" : "password"} placeholder="Repete a nova senha" style={inputStyle} />
-
             {erro && <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 10 }}>{erro}</div>}
-
             <button onClick={alterar} disabled={guardando} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 12, cursor: guardando ? "default" : "pointer", opacity: guardando ? 0.7 : 1 }}>{guardando ? "A alterar…" : "Alterar senha"}</button>
             <button onClick={() => { setAberto(false); limpar(); }} disabled={guardando} style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Cancelar</button>
           </div>
@@ -417,49 +383,54 @@ function AlterarSenha({ email }: { email: string }) {
     </>
   );
 }
-
-// Seletor de cor do judogui do Dôdo (Pro Max). Mostra o Dôdo nas duas cores;
-// Pro Max escolhe, não-Pro-Max vê bloqueado com convite. Lê/grava via o contexto
+// Seletor de cor do judogui do Dôdo (PRO). Mostra o Dôdo nas duas cores; quem
+// tem Pro (ou Pro Max, que herda tudo do Pro) escolhe, os outros veem bloqueado
+// com convite. Lê/grava via o contexto
+//
+// NOTA: mudou de nível — era exclusivo do Pro Max e passou a Pro (29/07). O
+// TATAME continua exclusivo do Pro Max; são duas personalizações diferentes.
+//
+// Repare que o contexto devolve `pode` e não `isProMax`: quem decide o nível é o
+// servidor, e a interface só quer saber se este utilizador consegue. Foi assim
+// que esta mudança se resolveu sem alterar a lógica de acesso aqui.
 // global (useJudogui), por isso a mudança aplica-se ao Dôdo em toda a app na hora.
-const MAX_AZUL = "#7fb8f5";
+// Dourado do Pro (o azul MAX_AZUL fica para o que é mesmo exclusivo do Pro Max,
+// como a cor do tatame).
+const PRO_DOURADO = "#d9a441";
 function SeletorJudogui() {
-  const { judogui, isProMax, setJudogui } = useJudogui();
+  const { judogui, pode, setJudogui } = useJudogui();
   const [aberto, setAberto] = useState(false);
-
   function escolher(cor: JudoguiCor) {
-    if (!isProMax) { window.location.href = "/pro-max"; return; }
+    if (!pode) { window.location.href = "/ippon-pro"; return; }
     void setJudogui(cor);
   }
-
   const opcoes: { id: JudoguiCor; nome: string }[] = [
     { id: "branco", nome: "Branco" },
     { id: "azul", nome: "Azul" },
   ];
-
   return (
     <>
       <SectionTitle>O judogui do Dôdo</SectionTitle>
-      <div style={{ background: "#121815", border: `1px solid ${isProMax ? "#2a4d3e" : "#243029"}`, borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
+      <div style={{ background: "#121815", border: `1px solid ${pode ? "#2a4d3e" : "#243029"}`, borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
         <button onClick={() => setAberto((v) => !v)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "14px 16px", background: "transparent", border: "none", color: "#f1ede2", fontFamily: FB, fontSize: 14, cursor: "pointer" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 30, height: 30, flexShrink: 0 }}><Mascot belt="#141110" expression="feliz" judogui={judogui} /></span>
             <span>Cor do judogui</span>
-            {!isProMax && <span style={{ fontSize: 9.5, color: MAX_AZUL, border: `1px solid #2f5478`, borderRadius: 999, padding: "2px 7px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro Max</span>}
+            {!pode && <span style={{ fontSize: 9.5, color: PRO_DOURADO, border: `1px solid #5a4a18`, borderRadius: 999, padding: "2px 7px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro</span>}
           </span>
           <span style={{ color: "#93a39a", transform: aberto ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
           </span>
         </button>
-
         {aberto && (
           <div style={{ padding: "0 16px 16px" }}>
-            {!isProMax && (
+            {!pode && (
               <div style={{ display: "flex", alignItems: "flex-start", gap: 9, background: "#0f1620", border: "1px solid #2f5478", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
-                <span style={{ color: MAX_AZUL, flexShrink: 0, marginTop: 1 }}>
+                <span style={{ color: PRO_DOURADO, flexShrink: 0, marginTop: 1 }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                 </span>
                 <div style={{ fontSize: 12, color: "#cdd9e6", lineHeight: 1.5 }}>
-                  Mudar a cor do judogui do Dôdo é exclusivo do <strong style={{ color: MAX_AZUL }}>Pro Max</strong>.
+                  Mudar a cor do judogui do Dôdo faz parte do <strong style={{ color: PRO_DOURADO }}>Ippon Pro</strong>.
                 </div>
               </div>
             )}
@@ -467,7 +438,7 @@ function SeletorJudogui() {
               {opcoes.map((o) => {
                 const escolhido = judogui === o.id;
                 return (
-                  <button key={o.id} onClick={() => escolher(o.id)} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#0c0e0d", border: `2px solid ${escolhido ? "#7fd1a3" : "#243029"}`, borderRadius: 12, padding: "12px 8px", cursor: "pointer", opacity: isProMax ? 1 : 0.85 }}>
+                  <button key={o.id} onClick={() => escolher(o.id)} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#0c0e0d", border: `2px solid ${escolhido ? "#7fd1a3" : "#243029"}`, borderRadius: 12, padding: "12px 8px", cursor: "pointer", opacity: pode ? 1 : 0.85 }}>
                     <span style={{ width: 56, height: 56 }}><Mascot belt="#141110" expression="feliz" judogui={o.id} /></span>
                     <span style={{ fontSize: 12, color: escolhido ? "#7fd1a3" : "#cfd8d2", fontWeight: 700 }}>{o.nome}</span>
                     {escolhido && (
@@ -475,7 +446,7 @@ function SeletorJudogui() {
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
                       </span>
                     )}
-                    {!isProMax && (
+                    {!pode && (
                       <span style={{ position: "absolute", top: 8, right: 8, color: "#93a39a" }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                       </span>
@@ -484,8 +455,8 @@ function SeletorJudogui() {
                 );
               })}
             </div>
-            {!isProMax && (
-              <a href="/pro-max" style={{ display: "block", textAlign: "center", marginTop: 12, background: MAX_AZUL, color: "#0a1828", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, textDecoration: "none" }}>Desbloquear com Pro Max</a>
+            {!pode && (
+              <a href="/ippon-pro" style={{ display: "block", textAlign: "center", marginTop: 12, background: PRO_DOURADO, color: "#1b211e", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, textDecoration: "none" }}>Desbloquear com o Ippon Pro</a>
             )}
           </div>
         )}
@@ -493,11 +464,9 @@ function SeletorJudogui() {
     </>
   );
 }
-
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 10 }}>{children}</div>;
 }
-
 function DataRow({ label, value, first }: { label: string; value: string; first?: boolean }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "13px 16px", borderTop: first ? "none" : "1px solid #1a221d" }}>
@@ -506,19 +475,15 @@ function DataRow({ label, value, first }: { label: string; value: string; first?
     </div>
   );
 }
-
 const inputStyle: React.CSSProperties = {
   width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: 11,
   background: "#0c0e0d", border: "1px solid #2a3a33", color: "#f1ede2",
   fontSize: 15, fontFamily: FB, outline: "none",
 };
-
 function EditLabel({ children }: { children: ReactNode }) {
   return <div style={{ fontSize: 12, color: "#b6c0b9", margin: "12px 0 6px", fontWeight: 700 }}>{children}</div>;
 }
-
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
 const panelStyle: React.CSSProperties = {
   position: "absolute", top: "calc(100% + 6px)", left: 0, background: "#0f1411",
   border: "1px solid #2a3a33", borderRadius: 12, zIndex: 30,
@@ -529,7 +494,6 @@ const optStyle = (active: boolean): React.CSSProperties => ({
   padding: "9px 12px", background: active ? "#16201b" : "transparent", border: "none",
   color: "#f1ede2", fontSize: 14, cursor: "pointer", fontFamily: FB,
 });
-
 function DialSelect({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -566,7 +530,6 @@ function DialSelect({ value, onChange }: { value: string; onChange: (iso: string
     </div>
   );
 }
-
 function CountryPicker({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -602,7 +565,6 @@ function CountryPicker({ value, onChange }: { value: string; onChange: (iso: str
     </div>
   );
 }
-
 function DoorIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
