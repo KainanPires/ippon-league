@@ -13,6 +13,8 @@ import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, deveMost
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 import { AvisoEquipaGuardada } from "@/components/AvisoEquipaGuardada";
 import { useFaixa } from "@/lib/useFaixa";
+// Nível da tabela `users` (a mesma fonte do servidor), não do user_metadata.
+import { useNivel } from "@/lib/useNivel";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
 import { useTatame } from "@/components/TatameProvider";
@@ -151,7 +153,9 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   const router = useRouter();
   const [fase, setFase] = useState<"carregando" | "sem-equipa" | "erro" | "ok" | "bloqueado">("carregando");
   const [souEu, setSouEu] = useState(false);
-  const [meuNivel, setMeuNivel] = useState<"normal" | "pro" | "pro_max">("normal");
+  // Nível para o cartão de partilha. Do useNivel() (tabela `users`).
+  const { ehPro: souPro, ehProMax: souProMax } = useNivel();
+  const meuNivel: "normal" | "pro" | "pro_max" = souProMax ? "pro_max" : souPro ? "pro" : "normal";
   const [nomeTime, setNomeTime] = useState("Equipa");
   const [escudoAlvo, setEscudoAlvo] = useState<Identity | null>(null);
   const [nomeComp, setNomeComp] = useState<string>("");
@@ -200,10 +204,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
       const meuId = sess.user?.id ?? "";
       const euMesmo = meuId === alvoUserId;
       setSouEu(euMesmo);
-      if (euMesmo) {
-        const meta = (sess as { user?: { user_metadata?: { is_pro?: boolean; is_pro_max?: boolean } } }).user?.user_metadata;
-        setMeuNivel(meta?.is_pro_max ? "pro_max" : meta?.is_pro ? "pro" : "normal");
-      }
+      // O nível vem do useNivel() (ver abaixo), não do metadata.
 
       const poolP = fetch(`/api/atletas?id=${idComp}`).then((r) => r.json()).catch(() => null);
       const eqP = fetch(`/api/equipa-na-rodada?user=${encodeURIComponent(alvoUserId)}&comp=${encodeURIComponent(idComp)}`).then((r) => r.json()).catch(() => null);
@@ -495,7 +496,7 @@ function MeuTimeInner() {
   const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
   // Aviso "e agora?" logo depois de guardar (uma vez, com não-mostrar-mais).
   const [avisoGuardada, setAvisoGuardada] = useState(false);
-  const [isPro, setIsPro] = useState(false);
+  const { ehPro: isPro } = useNivel();
   // Personalização Pro Max: cor do tatame — agora via TatameProvider, para mudar
   // na hora em todo o lado (Meu Time, central). seletorTatame abre/fecha o painel.
   const { tatameId, isProMax, setTatame } = useTatame();
@@ -587,10 +588,7 @@ function MeuTimeInner() {
         const uid = (data.session as { user?: { id?: string } } | null)?.user?.id;
         if (uid) setUserId(uid);
       } catch {}
-      try {
-        const meta = (data.session as { user?: { user_metadata?: { is_pro?: boolean } } } | null)?.user?.user_metadata;
-        setIsPro(!!meta?.is_pro);
-      } catch {}
+      // O nível vem do useNivel() (tabela `users`), não do metadata.
       // Tutoriais já vistos na CONTA — buscar uma vez (decide o tutorial só
       // depois disto chegar, para não reaparecer por causa do timing).
       tutoriaisVistosConta().then((v) => { if (active) setVistosConta(v || {}); }).catch(() => { if (active) setVistosConta({}); });
