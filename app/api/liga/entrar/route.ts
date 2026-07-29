@@ -29,64 +29,14 @@
 // continua a vê-la em /ligas → Resultados, com o pódio e o certificado.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+// A regra dos limites vive em lib/limitesLiga — um sítio só para os quatro
+// caminhos de entrada (criar, entrar, pedir, decidir). Ver o cabeçalho de lá.
+import { bloqueioPorLimite, ligaTerminada } from "@/lib/limitesLiga";
 import { focoMercado, numeroDaRodada } from "@/lib/calendario";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Quantas ligas de amigos ATIVAS este utilizador tem, separadas por formato.
-// As terminadas ficam de fora (já não ocupam lugar) e as oficiais também
-// (mundial/continental são automáticas).
-async function contarPorFormato(user_id: string): Promise<{ pontos: number; copa: number }> {
-  const zero = { pontos: 0, copa: 0 };
-  if (!supabaseAdmin) return zero;
-  try {
-    const { data: filiacoes } = await supabaseAdmin
-      .from("league_members")
-      .select("league_id")
-      .eq("user_id", user_id);
-    const ids = (filiacoes || []).map((f) => f.league_id);
-    if (ids.length === 0) return zero;
-    const { data: ligas } = await supabaseAdmin
-      .from("leagues")
-      .select("id, formato, estado, copa_estado")
-      .in("id", ids)
-      .eq("type", "amigos");
-    const out = { pontos: 0, copa: 0 };
-    for (const l of ligas || []) {
-      if (ligaTerminada(l)) continue; // acabou: não ocupa lugar
-      if (String(l.formato) === "copa") out.copa++;
-      else out.pontos++;
-    }
-    return out;
-  } catch {
-    return zero;
-  }
-}
-// Nível do utilizador. Lê da TABELA `users`, não do user_metadata: a tabela é a
-// fonte de verdade (o metadata é uma cache do lado do cliente e não serve para
-// decidir limites). Em caso de dúvida, trata como grátis — errar para o lado
-// mais restritivo é preferível a dar acesso a quem não pagou.
-async function nivelDoUtilizador(user_id: string): Promise<NivelUtilizador> {
-  if (!supabaseAdmin) return "gratis";
-  try {
-    const { data } = await supabaseAdmin
-      .from("users").select("is_pro, is_pro_max").eq("id", user_id).maybeSingle();
-    if (data?.is_pro_max) return "promax";
-    if (data?.is_pro) return "pro";
-    return "gratis";
-  } catch {
-    return "gratis";
-  }
-}
 
-// A liga JÁ TERMINOU? Mesma regra do ecrã /ligas, do cartão do /inicio e do
-// /api/liga/mercado — os quatro têm de concordar sempre.
-//   • pontos corridos → estado = 'terminada'
-//   • copa            → copa_estado = 'terminada'
-function ligaTerminada(liga: { formato?: unknown; estado?: unknown; copa_estado?: unknown }): boolean {
-  if (String(liga.formato) === "copa") return String(liga.copa_estado) === "terminada";
-  return String(liga.estado) === "terminada";
-}
 
 // As inscrições desta COPA já fecharam? Fechado = estado já não é "inscricao"
 // (já foi sorteada / a decorrer / terminada) OU o prazo de fecho já passou.
@@ -100,46 +50,7 @@ function copaInscricoesFechadas(liga: { formato?: unknown; copa_estado?: unknown
   return false;
 }
 
-// ---------------------------------------------------------------------------
-// LIMITES DE PARTICIPAÇÃO (regra do Kainan, 29/07/2026)
-//
-// Contam-se SEPARADAMENTE as ligas de pontos corridos e as copas: um jogador
-// grátis pode ter uma de cada, não uma no total. Antes o código somava tudo num
-// só saco de 2 — o que ao mesmo tempo dava ligas a mais ao grátis (2 em vez de
-// 1) e o impedia de ter uma liga E um mata-mata ao mesmo tempo.
-//
-// Ligas TERMINADAS não contam: já acabaram, não devem bloquear ninguém.
-// Ligas OFICIAIS (mundial/continental) também não — são automáticas e só Pro.
-//
-//   grátis  -> 1 liga + 1 mata-mata   (para trocar, tem de sair da atual)
-//   Pro     -> 5 + 5
-//   Pro Max -> 10 + 10
-// ---------------------------------------------------------------------------
-const LIMITES = {
-  gratis: { pontos: 1, copa: 1 },
-  pro: { pontos: 5, copa: 5 },
-  promax: { pontos: 10, copa: 10 },
-} as const;
-type NivelUtilizador = keyof typeof LIMITES;
 
-// Bateu no limite? Devolve a mensagem de erro, ou null se pode entrar.
-// A mensagem diz sempre QUANTAS tem, QUAL é o limite e o que ganha ao subir de
-// nível — um "não podes" sem explicação é a forma mais rápida de perder alguém.
-async function bloqueioPorLimite(user_id: string, ehCopa: boolean): Promise<string | null> {
-  const nivel = await nivelDoUtilizador(user_id);
-  const lim = LIMITES[nivel];
-  const atual = await contarPorFormato(user_id);
-  const usadas = ehCopa ? atual.copa : atual.pontos;
-  const maximo = ehCopa ? lim.copa : lim.pontos;
-  if (usadas < maximo) return null;
-  const oQue = ehCopa ? (maximo === 1 ? "num mata-mata" : `em ${maximo} mata-matas`) : (maximo === 1 ? "numa liga" : `em ${maximo} ligas`);
-  const sair = ehCopa
-    ? "Um mata-mata não se abandona a meio: espera que este termine para entrares noutro."
-    : "Para entrares noutra, sai primeiro da atual.";
-  if (nivel === "promax") return `Já estás ${oQue} — é o máximo, mesmo com Pro Max. ${sair}`;
-  if (nivel === "pro") return `Já estás ${oQue}. ${sair} Com o Pro Max sobes até ${ehCopa ? LIMITES.promax.copa + " mata-matas" : LIMITES.promax.pontos + " ligas"}.`;
-  return `Já estás ${oQue}. ${sair} Com o Ippon Pro sobes até ${ehCopa ? LIMITES.pro.copa + " mata-matas" : LIMITES.pro.pontos + " ligas"}.`;
-}
 
 
 export async function POST(req: Request) {
