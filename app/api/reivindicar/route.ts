@@ -41,6 +41,19 @@ export const runtime = "nodejs";
 /** Tentativas de código antes de bloquear o pedido. */
 const MAX_TENTATIVAS = 6;
 
+/**
+ * Quanto tempo um código serve.
+ *
+ * Sozinho o código não abre nada — só funciona na conta que fez o pedido. Mas um
+ * segredo sem prazo é um segredo que só piora: um código enviado ao Instagram
+ * errado, ou esquecido numa conversa antiga, continuaria a valer meses depois.
+ *
+ * 48h é tempo de sobra para ver um DM e responder, e curto o bastante para um
+ * engano não se arrastar. Passado o prazo pede-se outro — é um clique.
+ */
+const VALIDADE_HORAS = 48;
+const novaExpiracao = () => new Date(Date.now() + VALIDADE_HORAS * 3600 * 1000).toISOString();
+
 // ---------------------------------------------------------------------------
 // AVISO POR EMAIL — para os pedidos não ficarem à espera de alguém se lembrar
 // de espreitar a página de administração.
@@ -72,9 +85,12 @@ async function avisarPorEmail(d: { atleta: string; idPerson: string; instagram: 
       <hr style="border:none;border-top:1px solid #ddd;margin:14px 0" />
       <p style="margin:0 0 6px">Código a enviar por mensagem direta:</p>
       <p style="margin:0 0 14px;font-family:ui-monospace,monospace;font-size:22px;font-weight:700;letter-spacing:2px">${esc(d.codigo)}</p>
-      <p style="margin:0;color:#666;font-size:12px">
+      <p style="margin:0 0 8px;color:#666;font-size:12px">
         Confirma primeiro o perfil no Instagram (deve bater com o do site da IJF).
         Só depois envia o código — é ele que prova que a conta é da pessoa.
+      </p>
+      <p style="margin:0;color:#666;font-size:12px">
+        Válido ${VALIDADE_HORAS} horas. Passado esse tempo, a pessoa pode pedir outro na app.
       </p>
     </div>`;
   try {
@@ -150,7 +166,7 @@ export async function GET(req: Request) {
     }
     const { data } = await supabaseAdmin
       .from("atletas_reivindicacoes")
-      .select("id, id_person, nome_atleta, user_id, tipo_contacto, contacto, codigo, estado, tentativas, criado_em, verificado_em")
+      .select("id, id_person, nome_atleta, user_id, tipo_contacto, contacto, codigo, estado, tentativas, criado_em, verificado_em, codigo_expira_em")
       .order("criado_em", { ascending: false })
       .limit(200);
     return NextResponse.json({ ok: true, pedidos: data || [] });
@@ -173,7 +189,7 @@ export async function GET(req: Request) {
   const uid = await uidDoPedido(req);
   const { data } = await supabaseAdmin
     .from("atletas_reivindicacoes")
-    .select("user_id, estado, tentativas")
+    .select("user_id, estado, tentativas, codigo_expira_em")
     .eq("id_person", idPerson);
   const linhas = data || [];
   const verificado = linhas.some((r) => r.estado === "verificado");
@@ -184,6 +200,9 @@ export async function GET(req: Request) {
     // O que ESTE utilizador tem em curso, para o ecrã saber o que mostrar.
     meuEstado: meu ? String(meu.estado) : null,
     tentativasEsgotadas: meu ? Number(meu.tentativas) >= MAX_TENTATIVAS : false,
+    // Para o ecrã poder oferecer "pedir código novo" em vez de deixar a pessoa
+    // a tentar um código que já não serve.
+    codigoExpirado: meu?.codigo_expira_em ? Date.now() > Date.parse(String(meu.codigo_expira_em)) : false,
     temSessao: !!uid,
   });
 }
@@ -242,7 +261,7 @@ export async function POST(req: Request) {
       }
       await supabaseAdmin
         .from("atletas_reivindicacoes")
-        .update({ tipo_contacto: tipo, contacto, codigo, estado: "pendente", tentativas: 0, criado_em: new Date().toISOString() })
+        .update({ tipo_contacto: tipo, contacto, codigo, estado: "pendente", tentativas: 0, criado_em: new Date().toISOString(), codigo_expira_em: novaExpiracao() })
         .eq("id", existente.id);
       await avisarPorEmail({ atleta: (corpo.nome_atleta || "").trim(), idPerson, instagram: contacto, codigo });
       return NextResponse.json({ ok: true, pedido: true, reenviado: true });
@@ -255,6 +274,7 @@ export async function POST(req: Request) {
       tipo_contacto: tipo,
       contacto,
       codigo,
+      codigo_expira_em: novaExpiracao(),
     });
     if (error) {
       return NextResponse.json({ ok: false, erro: "Não foi possível registar o pedido." }, { status: 500 });
@@ -273,13 +293,21 @@ export async function POST(req: Request) {
 
     const { data: pedido } = await supabaseAdmin
       .from("atletas_reivindicacoes")
-      .select("id, codigo, estado, tentativas")
+      .select("id, codigo, estado, tentativas, codigo_expira_em")
       .eq("id_person", idPerson).eq("user_id", uid).maybeSingle();
     if (!pedido) {
       return NextResponse.json({ ok: false, erro: "Não há nenhum pedido teu para este atleta." }, { status: 404 });
     }
     if (String(pedido.estado) === "verificado") {
       return NextResponse.json({ ok: true, verificado: true, jaEra: true });
+    }
+    // Expirado? Não se compara sequer — pede-se um novo.
+    const expira = pedido.codigo_expira_em ? Date.parse(String(pedido.codigo_expira_em)) : 0;
+    if (expira > 0 && Date.now() > expira) {
+      return NextResponse.json({
+        ok: false, expirado: true,
+        erro: "Este código já expirou. Pede um código novo.",
+      }, { status: 410 });
     }
     if (Number(pedido.tentativas) >= MAX_TENTATIVAS) {
       return NextResponse.json({ ok: false, bloqueado: true, erro: "Demasiadas tentativas. Fala connosco para receberes um código novo." }, { status: 429 });
@@ -307,6 +335,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, erro: "Este perfil já foi verificado por outra conta." }, { status: 409 });
     }
     return NextResponse.json({ ok: true, verificado: true });
+  }
+
+  // ===================== NOVO CÓDIGO =====================
+  // Para quando o código se perde, expira, ou foi enviado ao sítio errado.
+  // Gerar um novo INVALIDA o anterior — é o mesmo campo. Também limpa as
+  // tentativas: o contador existe para travar quem adivinha, não para punir
+  // quem nunca chegou a receber o código.
+  if (corpo.acao === "novo-codigo") {
+    const { data: pedido } = await supabaseAdmin
+      .from("atletas_reivindicacoes")
+      .select("id, estado, contacto")
+      .eq("id_person", idPerson).eq("user_id", uid).maybeSingle();
+    if (!pedido) {
+      return NextResponse.json({ ok: false, erro: "Não há nenhum pedido teu para este atleta." }, { status: 404 });
+    }
+    if (String(pedido.estado) === "verificado") {
+      return NextResponse.json({ ok: true, jaEs: true });
+    }
+    const codigo = gerarCodigo();
+    const { error } = await supabaseAdmin
+      .from("atletas_reivindicacoes")
+      .update({ codigo, codigo_expira_em: novaExpiracao(), tentativas: 0, estado: "pendente" })
+      .eq("id", pedido.id);
+    if (error) {
+      return NextResponse.json({ ok: false, erro: "Não foi possível gerar um código novo." }, { status: 500 });
+    }
+    await avisarPorEmail({
+      atleta: (corpo.nome_atleta || "").trim(), idPerson,
+      instagram: String(pedido.contacto || ""), codigo,
+    });
+    return NextResponse.json({ ok: true, pedido: true, novo: true });
   }
 
   return NextResponse.json({ ok: false, erro: "Ação desconhecida." }, { status: 400 });
