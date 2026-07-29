@@ -41,6 +41,56 @@ export const runtime = "nodejs";
 /** Tentativas de código antes de bloquear o pedido. */
 const MAX_TENTATIVAS = 6;
 
+// ---------------------------------------------------------------------------
+// AVISO POR EMAIL — para os pedidos não ficarem à espera de alguém se lembrar
+// de espreitar a página de administração.
+//
+// Segue o mesmo padrão do /api/mensagens: chamada direta à API do Resend, sem
+// biblioteca partilhada (o projeto não tem uma). Se o RESEND_API_KEY não estiver
+// definido, não faz nada — e o pedido grava na mesma. O email é uma conveniência,
+// nunca uma condição.
+//
+// O email leva o CÓDIGO já dentro, para se poder copiar direto para o DM sem ter
+// de abrir mais nada.
+// ---------------------------------------------------------------------------
+const MAIL_TO = process.env.MAIL_TO || "support@ipponleague.com";
+const MAIL_FROM = process.env.MAIL_FROM || "Ippon League <support@ipponleague.com>";
+
+function esc(v: string): string {
+  return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+async function avisarPorEmail(d: { atleta: string; idPerson: string; instagram: string; codigo: string }): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#111">
+      <p style="margin:0 0 12px"><strong>Alguém diz ser ${esc(d.atleta || d.idPerson)}.</strong></p>
+      <p style="margin:0 0 4px"><strong>Instagram:</strong>
+        <a href="https://instagram.com/${esc(d.instagram)}">@${esc(d.instagram)}</a></p>
+      <p style="margin:0 0 4px"><strong>Atleta:</strong> ${esc(d.atleta)} (id ${esc(d.idPerson)})</p>
+      <hr style="border:none;border-top:1px solid #ddd;margin:14px 0" />
+      <p style="margin:0 0 6px">Código a enviar por mensagem direta:</p>
+      <p style="margin:0 0 14px;font-family:ui-monospace,monospace;font-size:22px;font-weight:700;letter-spacing:2px">${esc(d.codigo)}</p>
+      <p style="margin:0;color:#666;font-size:12px">
+        Confirma primeiro o perfil no Instagram (deve bater com o do site da IJF).
+        Só depois envia o código — é ele que prova que a conta é da pessoa.
+      </p>
+    </div>`;
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: MAIL_FROM,
+        to: [MAIL_TO],
+        subject: `[Ippon League] Reivindicação: ${d.atleta || d.idPerson}`,
+        html,
+      }),
+    });
+  } catch { /* o pedido já está gravado; o email é extra */ }
+}
+
 /** Gera um código curto e legível ao telefone: IPPON-7K3M. */
 function gerarCodigo(): string {
   // Sem 0/O nem 1/I: são os que se confundem a ler em voz alta ou num DM.
@@ -194,6 +244,7 @@ export async function POST(req: Request) {
         .from("atletas_reivindicacoes")
         .update({ tipo_contacto: tipo, contacto, codigo, estado: "pendente", tentativas: 0, criado_em: new Date().toISOString() })
         .eq("id", existente.id);
+      await avisarPorEmail({ atleta: (corpo.nome_atleta || "").trim(), idPerson, instagram: contacto, codigo });
       return NextResponse.json({ ok: true, pedido: true, reenviado: true });
     }
 
@@ -208,6 +259,8 @@ export async function POST(req: Request) {
     if (error) {
       return NextResponse.json({ ok: false, erro: "Não foi possível registar o pedido." }, { status: 500 });
     }
+    // Avisa por email, com o código pronto a copiar para o DM.
+    await avisarPorEmail({ atleta: (corpo.nome_atleta || "").trim(), idPerson, instagram: contacto, codigo });
     // Repare: o código NÃO vai na resposta. Quem pede não o pode saber — é
     // isso que faz dele uma prova.
     return NextResponse.json({ ok: true, pedido: true });
