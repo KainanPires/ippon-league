@@ -8,7 +8,18 @@
 // vê-se o quadro e vê-se logo quem tem vantagem sobre quem.
 //
 // AUTOSSUFICIENTE: trata da sessão, do pedido e de todos os estados (a carregar,
-// sem acesso, sem dados, ok). A página só precisa de lhe passar `comp` e `cat`.
+// sem acesso, sem dados, ok). A página só precisa de lhe passar a categoria.
+//
+// QUE COMPETIÇÃO ANALISA — e porque NÃO é a mesma da chave ao lado.
+//
+// A chave mostra a competição que tem QUADRO MONTADO (à mão, na tabela
+// chave_atletas) — normalmente a que está a decorrer ou a última com moldura.
+// A análise responde a outra pergunta: "para quem vou escalar AGORA?". Por isso
+// segue a competição de MERCADO ABERTO (focoMercado().alvo).
+//
+// São perguntas diferentes e as respostas podem ser competições diferentes. Como
+// isso confunde se não se disser, o nome da competição analisada aparece sempre
+// no topo do bloco — nunca se deixa o utilizador a supor.
 //
 // ---------------------------------------------------------------------------
 // HONESTIDADE DOS NÚMEROS — as regras que este ecrã não pode quebrar
@@ -30,6 +41,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { focoMercado, nomeCompeticao } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -65,7 +77,12 @@ interface Resposta {
   atualizado_em?: string | null;
 }
 
-export function AnaliseConfrontos({ comp, cat }: { comp: string; cat: string }) {
+export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat: string }) {
+  // Por omissão, a competição para a qual se escala agora. `comp` só se passa
+  // para forçar outra (útil em testes).
+  const alvo = focoMercado().alvo;
+  const comp = compProp || alvo.idCompeticao;
+  const nomeAlvo = compProp ? null : nomeCompeticao(alvo);
   const [dados, setDados] = useState<Resposta | null>(null);
   const [aCarregar, setACarregar] = useState(true);
   const [aberto, setAberto] = useState<string | null>(null);
@@ -118,7 +135,9 @@ export function AnaliseConfrontos({ comp, cat }: { comp: string; cat: string }) 
   }
 
   if (dados.semDados) {
-    return <Aviso texto="Esta categoria ainda não foi analisada. Assim que os preços forem recalculados, a análise aparece aqui." />;
+    return (
+      <Aviso texto={`Ainda não há análise para ${cat} kg${nomeAlvo ? ` em ${nomeAlvo}` : ""}. Assim que os preços desta categoria forem recalculados, aparece aqui.`} />
+    );
   }
 
   const atletas = dados.atletas || [];
@@ -133,6 +152,12 @@ export function AnaliseConfrontos({ comp, cat }: { comp: string; cat: string }) 
       {/* Cabeçalho: de onde vêm os números. Aparece SEMPRE — é o que separa uma
           análise honesta de um oráculo. */}
       <div style={{ background: "#101511", border: "1px dashed #2f4a3c", borderRadius: 12, padding: "10px 13px", marginBottom: 12 }}>
+        {/* QUAL competição está a ser analisada. Aparece sempre: pode não ser a
+            mesma que a aba da Chave mostra, e supor qual é seria pior do que
+            perguntar. */}
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, marginBottom: 4 }}>
+          A escalar para{dados.compNome || nomeAlvo ? ` · ${dados.compNome || nomeAlvo}` : ""}
+        </div>
         <div style={{ fontSize: 12, color: "#aee9c9", lineHeight: 1.5 }}>
           <strong style={{ color: "#f1ede2" }}>{Math.round(totalLutas)} confrontos</strong> conhecidos entre os{" "}
           {atletas.length} inscritos ({comHistorico} com histórico).
