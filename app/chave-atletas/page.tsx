@@ -1,5 +1,4 @@
 "use client";
-
 // app/chave-atletas/page.tsx
 //
 // CHAVE DE ATLETAS (Pro Max) — versão ÁRVORE.
@@ -22,7 +21,15 @@
 // Pontos Ippon por atleta no cartão: fica para fase seguinte (só país + nome).
 //
 // Acesso: só Pro Max. Pro normal e grátis são redirecionados.
-
+//
+// SEPARADORES: a página tem duas vistas sobre a mesma categoria —
+//   • CHAVE      : a árvore (esta página, sempre foi assim)
+//   • CONFRONTOS : quem já ganhou a quem entre os inscritos, e a probabilidade
+//                  de cada um chegar ao topo (components/AnaliseConfrontos)
+// Estão no mesmo sítio de propósito: é aqui que a decisão de escalar acontece,
+// e ver o quadro sem saber quem leva vantagem sobre quem é meia informação.
+// Separadores em vez de tudo empilhado porque a árvore é alta — juntas dariam
+// uma página interminável no telemóvel.
 import {
   useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect,
   createContext, useContext,
@@ -30,24 +37,21 @@ import {
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { uid } from "@/lib/team";
-
+import { AnaliseConfrontos } from "@/components/AnaliseConfrontos";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const LINHA = "#3a4a42";
 const VERDE = "#5fd38a";
 const FUNDO = "#0c0e0d";
-
 // 14 categorias olímpicas (M em cima, F em baixo).
 const CATS_M = ["-60", "-66", "-73", "-81", "-90", "-100", "+100"];
 const CATS_F = ["-48", "-52", "-57", "-63", "-70", "-78", "+78"];
 const CAT_INICIAL = "-73";
-
 // Espaçamentos da árvore.
 const COLGAP = 34;
 const ROWGAP = 12;
 const CAIXA_W = 184;
-
 // ---- tipos do motor ----
 type AcoesLuta = { i: number; w: number; y: number; s: number };
 type Lugar = { id: string | null; nome?: string; pais?: string; acoes?: AcoesLuta };
@@ -62,7 +66,6 @@ type Chave = {
   podio?: { lugar: "1º" | "2º" | "3º"; id: string | null; estado: "preenchido" | "aDecidir" | "indisponivel" }[];
 };
 type Moldura = { pools: Record<string, string[]>; byes?: Record<string, string[]> | null };
-
 // ---- tipos do desenho (árvore) ----
 type Lado = { id: string; nome: string; pais: string; vencedor: boolean; acoes?: AcoesLuta };
 type No =
@@ -70,7 +73,6 @@ type No =
   | { tipo: "bye"; key: string; lado: Lado };
 type Aresta = { de: string; para: string };
 type Arvore = { no: No; vencedor: { key: string; lado: Lado } | null };
-
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
@@ -82,12 +84,10 @@ function sobrenome(nome?: string): string {
   if (p.length === 1) return p[0];
   return p[0] + " " + p[p.length - 1];
 }
-
 function ladoDe(lugar: Lugar | undefined, vencedorId: string | null): Lado {
   const id = lugar?.id || "";
   return { id, nome: lugar?.nome || "—", pais: lugar?.pais || "", vencedor: !!id && id === vencedorId, acoes: lugar?.acoes };
 }
-
 // Mapa id -> { nome, pais } a partir de TODAS as lutas (para pódio e byes).
 function mapearNomes(chave: Chave): Record<string, { nome: string; pais: string }> {
   const m: Record<string, { nome: string; pais: string }> = {};
@@ -98,7 +98,6 @@ function mapearNomes(chave: Chave): Record<string, { nome: string; pais: string 
   }
   return m;
 }
-
 // Construção POSICIONAL dos slots da 1ª ronda — ESPELHA o motor (byes na posição
 // certa; empareia lutadores consecutivos). É isto que garante ramos iguais aos
 // do quadro real.
@@ -123,7 +122,6 @@ function construirSlots(ordem: string[], byes: string[]): Array<{ bye?: string; 
   });
   return slots;
 }
-
 // Esqueleto do bracket em ordem de EMISSÃO do motor (pré → quartos → meias → final).
 // Cada nó: { left, right } com refs { bye } | { leaf } | { node:idx }.
 type Ref = { bye?: string; leaf?: string; node?: number };
@@ -151,7 +149,6 @@ function buildSkeleton(ordem: string[], byes: string[]): NoFlat[] {
   if (nivel.length === 2) flat.push({ left: nivel[0], right: nivel[1] });
   return flat;
 }
-
 // Converte um Ref (e a sua sub-árvore) num No, ligando as lutas resolvidas por
 // índice e acumulando as arestas (ligações) para o SVG.
 function refToNo(
@@ -177,11 +174,9 @@ function refToNo(
   }
   return { tipo: "luta", key, luta, filhos };
 }
-
 function lutaNo(l: Luta, fallbackKey: string, filhos: No[] = []): No {
   return { tipo: "luta", key: l.chaveId || fallbackKey, luta: l, filhos };
 }
-
 // Árvore de um POOL (raiz = final do pool).
 function arvorePool(
   poolKey: string, pool: { vencedor: string | null; lutas: Luta[] },
@@ -208,7 +203,6 @@ function arvorePool(
   }
   return { arvores: [{ no, vencedor }], arestas };
 }
-
 // Árvore Meias + Final (raiz = final; filhos = as 2 meias).
 function arvoreMeiasFinal(chave: Chave): { arvores: Arvore[]; arestas: Aresta[] } {
   const arestas: Aresta[] = [];
@@ -227,7 +221,6 @@ function arvoreMeiasFinal(chave: Chave): { arvores: Arvore[]; arestas: Aresta[] 
   }
   return { arvores: [{ no: finalNo, vencedor }], arestas };
 }
-
 // Árvores Repescagem → Bronze (cada bronze tem a sua repescagem como filho;
 // o semifinalista perdedor aparece como nome dentro da caixa do bronze).
 function arvoreRepBronze(chave: Chave): { arvores: Arvore[]; arestas: Aresta[] } {
@@ -253,7 +246,6 @@ function arvoreRepBronze(chave: Chave): { arvores: Arvore[]; arestas: Aresta[] }
   }
   return { arvores, arestas };
 }
-
 // A próxima luta de um conjunto: a primeira "agendada" (ambos os lados definidos,
 // ainda por decidir), em ordem de bracket. Devolve o chaveId, ou null.
 function proximaLutaId(lutas: (Luta | null | undefined)[]): string | null {
@@ -261,7 +253,6 @@ function proximaLutaId(lutas: (Luta | null | undefined)[]): string | null {
   if (c.length === 0) return null;
   return c[0].chaveId || null;
 }
-
 // ----------------------------------------------------------------------------
 // Contextos (favoritos + próxima luta), iguais à /chave.
 // ----------------------------------------------------------------------------
@@ -273,17 +264,14 @@ interface FavCtx {
 }
 const FavoritosContexto = createContext<FavCtx | null>(null);
 const ProximaContexto = createContext<string | null>(null);
-
 // Pontos Ippon por atleta (id -> { pontos, nLutas }), para o badge no cartão.
 type InfoAtleta = { pontos: number; nLutas: number };
 const PontosContexto = createContext<Record<string, InfoAtleta> | null>(null);
-
 // ----------------------------------------------------------------------------
 // Página
 // ----------------------------------------------------------------------------
 export default function ChaveAtletasPage() {
   const [nivel, setNivel] = useState<"verificar" | "promax" | "pro" | "gratis">("verificar");
-
   // A competição a mostrar é decidida pela API (regra: a decorrer -> próxima em
   // 24h -> última com chave). A página começa SEM comp e adota o que a API
   // devolver; assim a chave da última competição fica visível toda a semana, em
@@ -291,7 +279,8 @@ export default function ChaveAtletasPage() {
   const [comp, setComp] = useState<string>("");
   const [compNome, setCompNome] = useState<string | null>(null);
   const [cat, setCat] = useState<string>(CAT_INICIAL);
-
+  // Vista atual: a árvore da chave, ou a análise de confrontos diretos.
+  const [aba, setAba] = useState<"chave" | "confrontos">("chave");
   const [chave, setChave] = useState<Chave | null>(null);
   const [infos, setInfos] = useState<Record<string, InfoAtleta>>({});
   const [moldura, setMoldura] = useState<Moldura | null>(null);
@@ -301,12 +290,10 @@ export default function ChaveAtletasPage() {
   const [quando, setQuando] = useState("");
   // O bloqueio do Pro (categoria a decorrer) é decidido pelo SERVIDOR (Paywall).
   const [bloqueadoSrv, setBloqueadoSrv] = useState(false);
-
   // Favoritos do utilizador (id_person).
   const [favoritos, setFavoritos] = useState<Set<string>>(new Set());
   const [pendentes, setPendentes] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string>("anon");
-
   // Nível do utilizador: Pro Max (vê tudo ao vivo), Pro (só início ou final),
   // grátis (não vê chave). Não redireciona — mostra na própria página.
   useEffect(() => {
@@ -320,7 +307,6 @@ export default function ChaveAtletasPage() {
     });
     return () => { vivo = false; };
   }, []);
-
   // Carregar favoritos.
   useEffect(() => {
     const u = uid();
@@ -336,7 +322,6 @@ export default function ChaveAtletasPage() {
       } catch { /* segue sem favoritos */ }
     })();
   }, []);
-
   const alternar = useCallback((lado: Lado) => {
     const u = userId;
     if (u === "anon" || !lado.id) return;
@@ -362,12 +347,10 @@ export default function ChaveAtletasPage() {
       }
     })();
   }, [userId]);
-
   const favCtx: FavCtx = useMemo(
     () => ({ favoritos, pendentes, alternar, ativo: userId !== "anon" }),
     [favoritos, pendentes, alternar, userId]
   );
-
   const carregar = useCallback(async () => {
     setACarregar(true);
     try {
@@ -404,7 +387,6 @@ export default function ChaveAtletasPage() {
     } catch { /* silencioso */ }
     setACarregar(false);
   }, [comp, cat]);
-
   useEffect(() => {
     if (nivel !== "promax" && nivel !== "pro") return;
     setChave(null); setMoldura(null); setExisteMoldura(null);
@@ -412,12 +394,9 @@ export default function ChaveAtletasPage() {
     const t = setInterval(carregar, 60000);
     return () => clearInterval(t);
   }, [nivel, carregar]);
-
   const nomes = useMemo(() => (chave ? mapearNomes(chave) : {}), [chave]);
   const nomeDe = useCallback((id: string | null) => (id && nomes[id] ? sobrenome(nomes[id].nome) : "—"), [nomes]);
-
   if (nivel === "verificar") return <Tela texto="A verificar acesso…" />;
-
   if (nivel === "gratis") {
     return (
       <main style={{ minHeight: "100vh", background: FUNDO, color: "#f1ede2", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -436,12 +415,10 @@ export default function ChaveAtletasPage() {
       </main>
     );
   }
-
   const generoCat = CATS_M.includes(cat) ? "masc." : "fem.";
   // O bloqueio do Pro a decorrer é decidido pelo SERVIDOR (Paywall). A página
   // apenas reflete: quando bloqueado, a API nem sequer enviou a chave.
   const bloquearPro = nivel === "pro" && bloqueadoSrv;
-
   return (
     <FavoritosContexto.Provider value={favCtx}>
     <PontosContexto.Provider value={infos}>
@@ -461,7 +438,6 @@ export default function ChaveAtletasPage() {
         @keyframes ildeslizax{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
         .ildesliza{animation:ildeslizax 1.6s ease-in-out infinite;display:inline-block}
       `}</style>
-
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "16px 14px 60px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -481,7 +457,6 @@ export default function ChaveAtletasPage() {
             {aCarregar ? "A atualizar…" : "Atualizar"}
           </button>
         </header>
-
         {/* Seletor: 2 filas (M em cima, F em baixo), 7 colunas. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginTop: 14 }}>
           {CATS_M.map((c) => <BotaoCat key={c} c={c} g="masc." ativo={c === cat} onClick={() => setCat(c)} />)}
@@ -489,7 +464,32 @@ export default function ChaveAtletasPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginTop: 6 }}>
           {CATS_F.map((c) => <BotaoCat key={c} c={c} g="fem." ativo={c === cat} onClick={() => setCat(c)} />)}
         </div>
+        {/* Separadores: mesma categoria, duas leituras. */}
+        <div style={{ display: "flex", gap: 8, marginTop: 14, borderBottom: "1px solid #1a221d" }}>
+          {([["chave", "Chave"], ["confrontos", "Confrontos diretos"]] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setAba(k)}
+              style={{
+                flex: 1, textAlign: "center", background: "transparent", border: "none",
+                borderBottom: `2px solid ${aba === k ? GOLD : "transparent"}`,
+                color: aba === k ? "#f1ede2" : "#7c8a82",
+                fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase",
+                letterSpacing: "0.04em", padding: "9px 0", cursor: "pointer",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {aba === "confrontos" && (
+          <div style={{ marginTop: 14 }}>
+            <AnaliseConfrontos comp={comp} cat={cat} />
+          </div>
+        )}
 
+        {aba === "chave" && (
+        <>
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0 8px", flexWrap: "wrap" }}>
           {bloquearPro ? (
             <>
@@ -509,7 +509,6 @@ export default function ChaveAtletasPage() {
             </>
           )}
         </div>
-
         {nivel === "pro" && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "0 0 10px", padding: "12px 14px", borderRadius: 11, background: "rgba(217,164,65,0.08)", border: `1px solid ${GOLD}` }}>
             <span style={{ fontSize: 20, flexShrink: 0 }}>⭐</span>
@@ -522,7 +521,6 @@ export default function ChaveAtletasPage() {
             </a>
           </div>
         )}
-
         {semChave ? (
           <Tela texto="Ainda não há nenhuma chave disponível. Quando a próxima competição tiver o quadro montado, aparece aqui." />
         ) : existeMoldura === false ? (
@@ -546,7 +544,6 @@ export default function ChaveAtletasPage() {
                 </a>
               </div>
             )}
-
             {/* Pódio: usa o `podio` do motor, que já sabe o estado de cada degrau.
                 Bronzes em falta aparecem como "A decidir" (a decorrer) ou
                 "Bronze não disponível" (terminou mas a fonte não deu o combate),
@@ -563,7 +560,6 @@ export default function ChaveAtletasPage() {
                 })}
               </div>
             )}
-
             {/* Pools A–D */}
             {(["A", "B", "C", "D"] as const).map((p) => {
               const ordem = moldura?.pools?.[p] || [];
@@ -572,14 +568,12 @@ export default function ChaveAtletasPage() {
               const proxima = bloquearPro ? null : proximaLutaId(chave.pools[p]?.lutas || []);
               return <Bloco key={p} titulo={`Pool ${p}`} arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="Vence o pool" />;
             })}
-
             {/* Repescagem + Bronze (antes da final) */}
             {(() => {
               const { arvores, arestas } = arvoreRepBronze(chave);
               const proxima = bloquearPro ? null : proximaLutaId([...(chave.repescagens || []), ...(chave.bronzes || [])]);
               return <Bloco titulo="Repescagem e Bronzes" arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="🥉 Bronze" />;
             })()}
-
             {/* Meias + Final (a final é a última luta da categoria) */}
             {(() => {
               const { arvores, arestas } = arvoreMeiasFinal(chave);
@@ -588,13 +582,14 @@ export default function ChaveAtletasPage() {
             })()}
           </>
         )}
+        </>
+        )}
       </div>
     </main>
     </PontosContexto.Provider>
     </FavoritosContexto.Provider>
   );
 }
-
 // ----------------------------------------------------------------------------
 // Bloco — desenha as árvores com conectores em cotovelo (SVG medido).
 // ----------------------------------------------------------------------------
@@ -606,17 +601,14 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
   const refs = useRef<Map<string, HTMLElement>>(new Map());
   const [paths, setPaths] = useState<string[]>([]);
   const [temScroll, setTemScroll] = useState(false);
-
   const medirScroll = useCallback(() => {
     const o = outerRef.current;
     if (o) setTemScroll(o.scrollWidth > o.clientWidth + 4);
   }, []);
-
   const setRef = useCallback((key: string) => (el: HTMLElement | null) => {
     const m = refs.current;
     if (el) m.set(key, el); else m.delete(key);
   }, []);
-
   const calcular = useCallback(() => {
     const inner = innerRef.current;
     if (!inner) return;
@@ -637,7 +629,6 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
     }
     setPaths(novos);
   }, [arestas]);
-
   useLayoutEffect(() => {
     calcular();
     medirScroll();
@@ -652,7 +643,6 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
     const t = setTimeout(() => { calcular(); medirScroll(); }, 80);
     return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", onR); clearTimeout(t); };
   }, [calcular, medirScroll, arvores]);
-
   const renderNo = (no: No): ReactNode => {
     if (no.tipo === "bye") {
       return <div key={no.key} ref={setRef(no.key)}><CaixaBye lado={no.lado} /></div>;
@@ -668,7 +658,6 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
       </div>
     );
   };
-
   return (
     <ProximaContexto.Provider value={proxima}>
     <section style={{ marginTop: 26 }}>
@@ -712,7 +701,6 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
     </ProximaContexto.Provider>
   );
 }
-
 // ----------------------------------------------------------------------------
 // Caixas e linhas
 // ----------------------------------------------------------------------------
@@ -734,7 +722,6 @@ function CaixaLuta({ luta }: { luta: Luta }) {
     </div>
   );
 }
-
 function CaixaBye({ lado }: { lado: Lado }) {
   return (
     <div style={{ width: CAIXA_W, background: "#0f1411", border: "1px dashed #2a3a33", borderRadius: 10 }}>
@@ -742,7 +729,6 @@ function CaixaBye({ lado }: { lado: Lado }) {
     </div>
   );
 }
-
 function CaixaVencedor({ lado, rotulo }: { lado: Lado; rotulo: string }) {
   const dourado = rotulo.includes("Campeão");
   const borda = dourado ? GOLD : rotulo.includes("Bronze") ? "#9a6b3a" : "#2f3d35";
@@ -753,7 +739,6 @@ function CaixaVencedor({ lado, rotulo }: { lado: Lado; rotulo: string }) {
     </div>
   );
 }
-
 function LinhaLado({ lado, esmaecido, decidida, semEstrela }: { lado: Lado; esmaecido?: boolean; decidida?: boolean; semEstrela?: boolean }) {
   const venceu = lado.vencedor;
   const vazio = !lado.id;
@@ -811,7 +796,6 @@ function LinhaLado({ lado, esmaecido, decidida, semEstrela }: { lado: Lado; esma
     </div>
   );
 }
-
 // ----------------------------------------------------------------------------
 // Auxiliares de UI
 // ----------------------------------------------------------------------------
@@ -828,7 +812,6 @@ function BotaoCat({ c, g, ativo, onClick }: { c: string; g: string; ativo: boole
     </button>
   );
 }
-
 function Medalha({ cor, txt, nome, esbatido }: { cor: string; txt: string; nome: string; esbatido?: boolean }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, opacity: esbatido ? 0.6 : 1 }}>
@@ -837,7 +820,6 @@ function Medalha({ cor, txt, nome, esbatido }: { cor: string; txt: string; nome:
     </div>
   );
 }
-
 function Tela({ texto }: { texto: string }) {
   return (
     <div style={{ minHeight: "40vh", display: "grid", placeItems: "center", padding: "48px 18px", color: "#7c8a82", fontFamily: FD, fontSize: 13, letterSpacing: "0.04em", textAlign: "center", lineHeight: 1.6 }}>
@@ -845,7 +827,6 @@ function Tela({ texto }: { texto: string }) {
     </div>
   );
 }
-
 function Vazio({ texto }: { texto: string }) {
   return (
     <div style={{ background: "#0f1411", border: "1px dashed #2a3a33", borderRadius: 12, padding: "14px", fontSize: 12.5, color: "#7c8a82", lineHeight: 1.5, width: "max-content", maxWidth: "100%" }}>
