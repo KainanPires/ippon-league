@@ -5,17 +5,23 @@
 // ---------------------------------------------------------------------------
 // COMO FUNCIONA
 //
-//   1. O atleta vê-se na app e clica em "És tu?". Deixa o Instagram ou WhatsApp.
+//   1. O atleta vê-se na app e clica em "És tu?". Deixa o INSTAGRAM.
 //      -> POST { acao: "pedir" }  ... fica um pedido PENDENTE com um código.
 //
 //   2. O Kainan vê a lista de pendentes (GET ?admin=1&key=) e envia o código
-//      por DM, da conta oficial, para o contacto indicado.
+//      por DM, da conta oficial, para o Instagram indicado.
 //
 //   3. O atleta introduz o código na app.
 //      -> POST { acao: "verificar" } ... se bater, fica VERIFICADO.
 //
 // O código NUNCA sai desta rota para quem pede — só na vista de administração.
 // É isso que o torna uma prova: quem o introduz recebeu-o naquele contacto.
+//
+// SÓ INSTAGRAM, e de propósito. Chegou a aceitar WhatsApp e foi retirado: um
+// número de telemóvel não prova nada — qualquer pessoa escreve um qualquer e
+// atende. Uma conta de Instagram de um atleta de topo, não: está ligada no
+// perfil da IJF, tem milhares de seguidores e publica das competições. Dá para
+// confirmar a olho antes sequer de enviar o código.
 //
 // ---------------------------------------------------------------------------
 // IDENTIDADE PELO TOKEN, NÃO PELO CORPO DO PEDIDO
@@ -153,17 +159,16 @@ export async function POST(req: Request) {
 
   // ===================== PEDIR =====================
   if (corpo.acao === "pedir") {
-    const tipo = (corpo.tipo_contacto || "").trim();
-    if (tipo !== "instagram" && tipo !== "whatsapp") {
-      return NextResponse.json({ ok: false, erro: "Escolhe Instagram ou WhatsApp." }, { status: 400 });
-    }
+    // Só Instagram (ver a nota no topo). O campo mantém-se na base para o caso
+    // de um dia entrar outra rede — mas aqui só se aceita este valor.
+    const tipo = "instagram";
     const cru = (corpo.contacto || "").trim();
     if (cru.length < 3) {
-      return NextResponse.json({ ok: false, erro: "Escreve o teu contacto." }, { status: 400 });
+      return NextResponse.json({ ok: false, erro: "Escreve o teu Instagram." }, { status: 400 });
     }
-    const contacto = tipo === "instagram" ? limparInstagram(cru) : cru.replace(/[^\d+]/g, "");
-    if (contacto.length < 3) {
-      return NextResponse.json({ ok: false, erro: "Esse contacto não parece válido." }, { status: 400 });
+    const contacto = limparInstagram(cru);
+    if (contacto.length < 3 || /\s/.test(contacto)) {
+      return NextResponse.json({ ok: false, erro: "Esse Instagram não parece válido." }, { status: 400 });
     }
 
     // Já há alguém verificado neste atleta? Então não se aceitam mais pedidos.
