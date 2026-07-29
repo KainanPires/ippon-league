@@ -30,6 +30,29 @@ import type { Athlete, AthleteStatus } from "@/lib/athletes";
 // Nas competições reais de 2026 nada muda — janela indefinida, comportamento
 // de sempre.
 // ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// MATRIZ DE CONFRONTOS DIRETOS — a matéria-prima da análise Pro Max.
+//
+// Já buscamos a CARREIRA INTEIRA de cada atleta (competitor.contests) para
+// calcular o preço, e depois deitamos fora tudo menos os pontos. Lá dentro está
+// quem ele enfrentou e quem ganhou — exatamente o que a análise de chaveamento
+// precisa.
+//
+// Por isso, no mesmo ciclo, guardamos o histórico RESTRITO aos outros inscritos
+// desta categoria. Nos -73 são 43 atletas, logo no máximo 43×43 pares: pequeno,
+// e é só isso que interessa para decidir quem escalar.
+//
+//   Custo em chamadas à API: ZERO. Custo em tempo de cron: desprezável.
+//
+// Fica numa linha própria do atletas_cache, com a chave `_confrontos_<comp>_<cat>`
+// — o mesmo padrão de `_a_competir_agora` e `_cursor_precos`, para não precisar
+// de tabela nova nem de migração.
+//
+// NOS CLÁSSICOS o corte de tempo também se aplica: um confronto de 2023 não
+// existe no mundo de 2018. Seria incoerente esconder a cidade e ajustar o preço
+// ao ano, e depois dizer que A ganhou a B numa luta que ainda não acontecera.
+// ---------------------------------------------------------------------------
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 const IJF = "https://data.ijf.org/api/get_json";
@@ -66,6 +89,16 @@ function extractFights(data: any): IjfContest[] {
   }
   return [];
 }
+// Data de uma luta em ms. Espelha a leitura do lib/forma.ts (os campos do
+// JudoBase são os mesmos). Serve para aplicar o corte de tempo dos clássicos
+// também à matriz de confrontos.
+function dataDaLuta(f: IjfContest): number {
+  const rec = f as unknown as Record<string, unknown>;
+  const raw = String(rec.competition_date || rec.date_raw || "").replace(/\//g, "-").slice(0, 10);
+  if (!raw) return 0;
+  const t = Date.parse(raw);
+  return isNaN(t) ? 0 : t;
+}
 // Estado simples a partir do preço real (afinamos Em alta/Em baixa quando houver rodadas).
 //
 // CORTES QUE ACOMPANHAM A ESCALA. Num clássico, o topo da expectativa é mais
@@ -93,6 +126,24 @@ function estadoDoPreco(preco: number, classico: boolean): AthleteStatus {
   if (preco >= corteNaEscala(CORTE_BARGANHA, classico)) return "Barganha";
   return "Aposta";
 }
+// ---- Matriz de confrontos: tipos e chave de gravação ----
+/** Registo de um atleta contra UM adversário: vitórias e derrotas. */
+export interface RegistoConfronto { v: number; d: number }
+/** Ficha de um atleta na matriz (tudo o que a análise precisa, sem ir buscar mais). */
+export interface FichaConfrontos {
+  nome: string;
+  pais: string;
+  preco: number;
+  /** Expectativa de pontos por competição — a "força" usada na probabilidade. */
+  expectativa: number;
+  /** Vitórias/derrotas por adversário, só entre os inscritos desta categoria. */
+  contra: Record<string, RegistoConfronto>;
+}
+/** Chave da linha no atletas_cache. Mesmo padrão de _a_competir_agora. */
+function chaveConfrontos(comp: string, cat: string): string {
+  return `_confrontos_${comp}_${cat}`;
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const comp = searchParams.get("comp") || "3131";
@@ -121,8 +172,15 @@ export async function GET(req: Request) {
   if (alvo.length === 0) {
     return NextResponse.json({ comp, cat, gender, atualizados: 0, nota: "Nenhum atleta nesta categoria/género." });
   }
+  // Conjunto dos inscritos DESTA categoria: é a ele que restringimos os
+  // confrontos. Um confronto contra alguém que não está aqui não ajuda a
+  // decidir a escalação desta rodada.
+  const idsAlvo = new Set(alvo.map((a) => a.id));
+
   // 2) Calcula forma/preço real de cada atleta da categoria.
   const calculados = new Map<string, Athlete>();
+  const fichas: Record<string, FichaConfrontos> = {};
+  let lutasContadas = 0;
   for (const a of alvo) {
     const data = await callRaw("competitor.contests", { id_person: a.id });
     const fights = extractFights(data);
@@ -135,6 +193,37 @@ export async function GET(req: Request) {
       variation: 0, // a variação real só aparece com rodadas ao vivo
       status: estadoDoPreco(forma.preco, !!janela),
     });
+
+    // 2-bis) CONFRONTOS DIRETOS deste atleta contra os outros inscritos.
+    // Percorre as MESMAS lutas que já temos em mãos — sem pedir nada de novo.
+    const contra: Record<string, RegistoConfronto> = {};
+    for (const f of fights) {
+      // Corte de tempo dos clássicos: nada depois do ano original conta.
+      if (janela) {
+        const d = dataDaLuta(f);
+        if (d <= 0 || d > janela.ate) continue;
+      }
+      const azul = String((f as { id_person_blue?: unknown }).id_person_blue ?? "");
+      const branco = String((f as { id_person_white?: unknown }).id_person_white ?? "");
+      let adversario = "";
+      if (azul === a.id) adversario = branco;
+      else if (branco === a.id) adversario = azul;
+      if (!adversario || adversario === a.id) continue;
+      if (!idsAlvo.has(adversario)) continue;      // não está inscrito: não interessa
+      const vencedor = String((f as { id_winner?: unknown }).id_winner ?? "");
+      if (!vencedor || vencedor === "0") continue; // sem vencedor conhecido: não conta
+      const reg = contra[adversario] || { v: 0, d: 0 };
+      if (vencedor === a.id) reg.v++; else reg.d++;
+      contra[adversario] = reg;
+      lutasContadas++;
+    }
+    fichas[a.id] = {
+      nome: a.name,
+      pais: a.countryIso,
+      preco: forma.preco,
+      expectativa: forma.expectativa,
+      contra,
+    };
   }
   // 3) Lê o cache atual (lista inteira dos 488).
   const { data: linha } = await supabaseAdmin
@@ -155,6 +244,28 @@ export async function GET(req: Request) {
     },
     { onConflict: "id_competition" }
   );
+  // 6) Grava a MATRIZ DE CONFRONTOS desta categoria (linha própria).
+  //    Se falhar, não estraga o cálculo dos preços — a matriz é um extra e a
+  //    próxima passagem volta a escrevê-la.
+  let confrontosGravados = false;
+  try {
+    const { error: errConf } = await supabaseAdmin.from("atletas_cache").upsert(
+      {
+        id_competition: chaveConfrontos(comp, cat),
+        atletas: {
+          comp, cat, gender,
+          classico: !!janela,
+          ano_base: janela ? semana?.anoOriginal ?? null : null,
+          n_atletas: alvo.length,
+          fichas,
+        },
+        total: alvo.length,
+        atualizado_em: new Date().toISOString(),
+      },
+      { onConflict: "id_competition" }
+    );
+    confrontosGravados = !errConf;
+  } catch { /* extra: não bloqueia */ }
   const ms = Date.now() - t0;
   if (error) {
     return NextResponse.json({ comp, cat, gender, erro: "Falha ao gravar no cache: " + error.message }, { status: 500 });
@@ -173,6 +284,14 @@ export async function GET(req: Request) {
     ano_base: janela ? semana?.anoOriginal ?? null : null,
     atualizados: calculados.size,
     total_no_cache: novaLista.length,
+    // Estado da matriz de confrontos desta categoria. `atletas_com_historico`
+    // é a medida que diz se a análise vai ter substância aqui ou não.
+    confrontos: {
+      gravados: confrontosGravados,
+      atletas_com_historico: Object.values(fichas).filter((f) => Object.keys(f.contra).length > 0).length,
+      de: alvo.length,
+      lutas_contabilizadas: lutasContadas,
+    },
     ms,
     amostra,
   });
