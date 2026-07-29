@@ -18,23 +18,50 @@
 //
 // SEGURANÇA: protegido por ?key=  (env CHAVE_CRON_KEY).
 //
+// ---------------------------------------------------------------------------
+// POR CURSOR — porque não dá para fazer tudo de uma vez
+//
+// São ~450 atletas por competição, cada um com uma chamada ao JudoBase. Medido:
+// cerca de 30 SEGUNDOS para a competição inteira. O cron-job.org corta aos 30 —
+// e foi provavelmente assim que este trabalho morreu em junho: falhava por
+// timeout até o serviço o desativar, e ninguém deu por isso.
+//
+// Agora cada corrida faz as CATEGORIAS que couberem no orçamento e guarda onde
+// ficou (linha _cursor_chaveviva_<comp> no atletas_cache — mesmo padrão do
+// cursor dos preços). A corrida seguinte continua dali, e o ciclo dá a volta.
+//
+// Com uma corrida a cada 2 minutos e ~5 categorias por corrida, as 14 dão a
+// volta em menos de 6 minutos. Para acompanhar uma chave ao vivo é de sobra —
+// e as categorias nunca decorrem todas ao mesmo tempo numa competição real.
+//
+// Só se processam categorias que TÊM moldura montada. Sem moldura não há chave
+// para alimentar.
+// ---------------------------------------------------------------------------
+//
 // Uso:
-//   GET /api/chave-viva?key=SEGREDO            -> competição a decorrer
-//   GET /api/chave-viva?key=SEGREDO&comp=3149  -> competição específica (teste)
+//   GET /api/chave-viva?key=SEGREDO             -> a decorrer, por cursor
+//   GET /api/chave-viva?key=SEGREDO&comp=3149   -> competição específica
+//   GET /api/chave-viva?key=SEGREDO&cat=-81     -> só esta categoria (ignora cursor)
+//   GET /api/chave-viva?key=SEGREDO&todas=1     -> todas de uma vez (teste; pode passar dos 30s)
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, contestActions } from "@/lib/ijf";
 import { focoMercado } from "@/lib/calendario";
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60; // fôlego para as chamadas (Vercel Pro; no hobby é 10s)
-
 const n = (v: unknown): number => { const x = parseInt(String(v ?? "0"), 10); return isNaN(x) ? 0 : x; };
 
+// ORÇAMENTO DE TEMPO. O cron-job.org corta aos 30s; trabalhamos até 22 e
+// guardamos o resto para a resposta. Uma categoria (~40 atletas) leva ~3s, por
+// isso a margem de 6s chega para nunca ficarmos a meio de uma.
+const MS_ORCAMENTO = 22_000;
+const MS_MARGEM_CATEGORIA = 6_000;
+
+/** Linha do cursor no atletas_cache. Uma por competição. */
+const chaveCursor = (comp: string) => `_cursor_chaveviva_${comp}`;
 type Acoes = { ippon: number; waza: number; yuko: number; shido_provocado: number; ippon_sof: number; waza_sof: number; yuko_sof: number; shido_sof: number };
 const acoesVazias = (): Acoes => ({ ippon: 0, waza: 0, yuko: 0, shido_provocado: 0, ippon_sof: 0, waza_sof: 0, yuko_sof: 0, shido_sof: 0 });
-
 async function vivoDoAtleta(idPerson: string, comp: string) {
   const todas = await getCompetitorContests(idPerson);
   if (!todas) return null;
@@ -75,7 +102,6 @@ async function vivoDoAtleta(idPerson: string, comp: string) {
   }
   return { vitorias, derrotas, nLutas: desta.length, pontos: Math.round(pontos * 10) / 10, vencidos, acoes, lutas };
 }
-
 export async function GET(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
@@ -85,7 +111,6 @@ export async function GET(req: Request) {
   if (!process.env.CHAVE_CRON_KEY || key !== process.env.CHAVE_CRON_KEY) {
     return NextResponse.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
   }
-
   // Competição: ?comp= (teste) ou a que está a decorrer.
   let comp = (searchParams.get("comp") || "").trim();
   if (!comp) {
@@ -97,31 +122,52 @@ export async function GET(req: Request) {
   if (!comp) {
     return NextResponse.json({ ok: true, comp: null, nada: "Nenhuma competição a decorrer." });
   }
-
-  // Categoria opcional: ?cat=-81 processa SÓ essa categoria (~40 atletas, cabe
-  // no limite de 10s do plano Hobby). Sem ?cat=, processa todas (plano Pro).
+  const t0 = Date.now();
+  // ?cat=-81 processa SÓ essa categoria (e ignora o cursor).
+  // ?todas=1 processa tudo de uma vez (teste; pode passar dos 30s do cron).
   const cat = (searchParams.get("cat") || "").trim();
+  const todas = (searchParams.get("todas") || "").trim() === "1";
 
-  // Molduras desta competição (filtradas por categoria, se pedida).
-  let q = supabaseAdmin
+  // Molduras desta competição. Trazemos TODAS (são poucas linhas) e escolhemos
+  // depois quais processar — assim o cursor sabe que categorias existem.
+  const { data: molduras } = await supabaseAdmin
     .from("chave_atletas")
     .select("weight_category, pools")
     .eq("id_competicao", comp);
-  if (cat) q = q.eq("weight_category", cat);
-  const { data: molduras } = await q;
   if (!molduras || molduras.length === 0) {
-    return NextResponse.json({ ok: true, comp, cat: cat || null, nada: "Sem molduras para esta competição/categoria." });
+    return NextResponse.json({ ok: true, comp, cat: cat || null, nada: "Sem molduras para esta competição." });
   }
-  const catDoAtleta = new Map<string, string>(); // id_person -> weight_category
-  for (const m of molduras) {
-    const poolsRaw = (m.pools || {}) as Record<string, unknown>;
-    for (const p of ["A", "B", "C", "D"]) {
-      const arr = Array.isArray(poolsRaw[p]) ? (poolsRaw[p] as unknown[]) : [];
-      for (const x of arr) catDoAtleta.set(String(x), String(m.weight_category));
-    }
-  }
-  const ids = [...catDoAtleta.keys()];
 
+  // Categorias COM moldura, por ordem estável (para o cursor ser previsível).
+  const categorias: string[] = Array.from(
+    new Set<string>(molduras.map((m) => String((m as { weight_category?: unknown }).weight_category)))
+  ).sort();
+
+  // ---- Que categorias fazer nesta corrida? ----
+  let aFazer: string[] = [];
+  let deIdx = 0;
+  if (cat) {
+    aFazer = categorias.includes(cat) ? [cat] : [];
+    if (aFazer.length === 0) {
+      return NextResponse.json({ ok: true, comp, cat, nada: "Sem moldura para esta categoria." });
+    }
+  } else if (todas) {
+    aFazer = categorias;
+  } else {
+    // MODO CURSOR: continua de onde a corrida anterior ficou.
+    try {
+      const { data: cur } = await supabaseAdmin
+        .from("atletas_cache").select("total").eq("id_competition", chaveCursor(comp)).maybeSingle();
+      const v = Number(cur?.total);
+      if (Number.isFinite(v) && v >= 0) deIdx = v % categorias.length;
+    } catch { /* sem cursor: começa do princípio */ }
+    // A lista roda: se o cursor está a meio, damos a volta pelo início.
+    aFazer = [...categorias.slice(deIdx), ...categorias.slice(0, deIdx)];
+  }
+
+  const catDoAtleta = new Map<string, string>(); // id_person -> weight_category
+  const molduraPorCat = new Map<string, Record<string, unknown>>();
+  for (const m of molduras) molduraPorCat.set(String(m.weight_category), (m.pools || {}) as Record<string, unknown>);
   // Identidades (nome/país/género) do cache de atletas.
   const ident = new Map<string, { nome: string; pais: string; gender: string }>();
   try {
@@ -138,18 +184,41 @@ export async function GET(req: Request) {
       });
     }
   } catch { /* segue sem identidades */ }
-
-  // Processa em lotes e faz upsert.
+  // ---- Processa CATEGORIA A CATEGORIA, dentro do orçamento ----
+  // Parar entre categorias (e não a meio de uma) mantém a base sempre coerente:
+  // ou uma categoria está toda atualizada, ou não foi tocada nesta corrida.
   const LOTE = 10;
   let atualizados = 0, comResultados = 0, falhas = 0;
   const linhas: Record<string, unknown>[] = [];
-  for (let i = 0; i < ids.length; i += LOTE) {
-    const lote = ids.slice(i, i + LOTE);
-    const res = await Promise.all(lote.map(async (id) => ({ id, v: await vivoDoAtleta(id, comp).catch(() => null) })));
-    for (const { id, v } of res) {
-      if (v === null) { falhas++; continue; }
-      if (v.nLutas > 0) comResultados++;
-      const info = ident.get(id);
+  const feitas: string[] = [];
+  let ids: string[] = [];
+
+  for (const c of aFazer) {
+    // Modo cursor: não começa uma categoria nova sem tempo para a acabar.
+    if (!cat && !todas && Date.now() - t0 > MS_ORCAMENTO - MS_MARGEM_CATEGORIA) break;
+
+    // Atletas desta categoria, a partir da moldura.
+    const poolsRaw = molduraPorCat.get(c) || {};
+    const idsCat: string[] = [];
+    for (const p of ["A", "B", "C", "D"]) {
+      const arr = Array.isArray(poolsRaw[p]) ? (poolsRaw[p] as unknown[]) : [];
+      for (const x of arr) {
+        const id = String(x);
+        if (!id) continue;
+        catDoAtleta.set(id, c);
+        idsCat.push(id);
+      }
+    }
+    if (idsCat.length === 0) { feitas.push(c); continue; }
+    ids = ids.concat(idsCat);
+
+    for (let i = 0; i < idsCat.length; i += LOTE) {
+      const lote = idsCat.slice(i, i + LOTE);
+      const res = await Promise.all(lote.map(async (id) => ({ id, v: await vivoDoAtleta(id, comp).catch(() => null) })));
+      for (const { id, v } of res) {
+        if (v === null) { falhas++; continue; }
+        if (v.nLutas > 0) comResultados++;
+        const info = ident.get(id);
       linhas.push({
         id_competicao: comp,
         id_person: id,
@@ -165,9 +234,10 @@ export async function GET(req: Request) {
         lutas: v.lutas,
         acoes: v.acoes,
       });
+      }
     }
+    feitas.push(c);
   }
-
   if (linhas.length > 0) {
     try {
       const { error } = await supabaseAdmin
@@ -181,9 +251,36 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, comp, erro: "Exceção ao gravar." }, { status: 500 });
     }
   }
+  // ---- Guarda o cursor: por onde continuar na próxima corrida ----
+  // Só em modo cursor. Com ?cat= ou ?todas=1 não se mexe, para um teste manual
+  // não desalinhar o ciclo que está a correr.
+  let proximoIdx = deIdx;
+  if (!cat && !todas && categorias.length > 0) {
+    proximoIdx = (deIdx + feitas.length) % categorias.length;
+    try {
+      await supabaseAdmin.from("atletas_cache").upsert(
+        {
+          id_competition: chaveCursor(comp),
+          atletas: { comp, indice: proximoIdx, categorias, feitas },
+          total: proximoIdx,
+          atualizado_em: new Date().toISOString(),
+        },
+        { onConflict: "id_competition" }
+      );
+    } catch { /* o cursor é uma otimização: se falhar, recomeça do princípio */ }
+  }
 
   return NextResponse.json({
-    ok: true, comp, cat: cat || "todas", atletas: ids.length, atualizados, com_resultados: comResultados, falhas_judobase: falhas,
+    ok: true, comp,
+    cat: cat || (todas ? "todas" : "cursor"),
+    // Estado do ciclo: que categorias esta corrida fez, e onde a próxima começa.
+    categorias_total: categorias.length,
+    feitas,
+    de_indice: deIdx,
+    proximo_indice: proximoIdx,
+    ciclo_completo: !cat && !todas ? feitas.length >= categorias.length : undefined,
+    atletas: ids.length, atualizados, com_resultados: comResultados, falhas_judobase: falhas,
+    ms: Date.now() - t0,
     atualizado_em: new Date().toISOString(),
   });
 }
