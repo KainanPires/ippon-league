@@ -35,14 +35,13 @@
 //   • ligas terminadas — já acabaram, não ocupam lugar
 //   • ligas oficiais (mundial/continental) — automáticas, e só Pro
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+// Os NÚMEROS vivem em lib/planos (sem imports), para o ecrã /ligas os poder
+// mostrar ao utilizador sem arrastar código de servidor para o browser.
+// Aqui ficam só as funções que precisam da base de dados.
+import { LIMITES, type NivelUtilizador } from "@/lib/planos";
 
-export const LIMITES = {
-  gratis: { pontos: 1, copa: 1 },
-  pro: { pontos: 5, copa: 5 },
-  promax: { pontos: 10, copa: 10 },
-} as const;
-
-export type NivelUtilizador = keyof typeof LIMITES;
+export { LIMITES };
+export type { NivelUtilizador };
 
 /**
  * Nível do utilizador.
