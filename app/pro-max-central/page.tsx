@@ -1,5 +1,4 @@
 "use client";
-
 // app/pro-max-central/page.tsx
 //
 // Central do Pro Max — onde quem é Pro Max cai ao tocar na sua aba. NÃO é vendas:
@@ -10,7 +9,6 @@
 // Acesso: só Pro Max. Se chegar um Pro -> /pro; um gratuito -> /ippon-pro. Segue
 // o padrão seguro da /pro (confirma com getUser antes de reencaminhar, para o
 // metadata "frio" do primeiro instante não expulsar um Pro Max por engano).
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
@@ -19,11 +17,9 @@ import { useTatame } from "@/components/TatameProvider";
 import { useJudogui, type JudoguiCor } from "@/components/JudoguiProvider";
 import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
 import { ScoutDoTime } from "@/components/ScoutDoTime";
-
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const MAX = "#7fb8f5";
-
 const VANTAGENS: string[] = [
   "Chave ao vivo nas competições de topo (Mundial, Grand Slam, Grand Prix, Masters, Olimpíadas)",
   "Análise da chave — quem tem mais hipótese de pontuar muito ou ser campeão",
@@ -33,26 +29,22 @@ const VANTAGENS: string[] = [
   "Layout e visual exclusivos Pro Max",
   "Tudo o que o Pro já te dá (scout, análise do time, dica de capitão)",
 ];
-
 export default function ProMaxCentral() {
   const router = useRouter();
   const [estado, setEstado] = useState<"carregando" | "ok">("carregando");
   const [nome, setNome] = useState("Campeão");
   const [verBoasVindas, setVerBoasVindas] = useState(true);
   const [verVantagens, setVerVantagens] = useState(true);
-
   useEffect(() => {
     try {
       if (localStorage.getItem("ippon_promax_boasvindas_fechada") === "1") setVerBoasVindas(false);
       if (localStorage.getItem("ippon_promax_vantagens_fechada") === "1") setVerVantagens(false);
     } catch {}
   }, []);
-
   function lerProMax(u: { user_metadata?: { is_pro?: boolean; is_pro_max?: boolean } } | null | undefined): { max: boolean; pro: boolean } {
     const m = u?.user_metadata || {};
     return { max: Boolean(m.is_pro_max), pro: Boolean(m.is_pro) };
   }
-
   useEffect(() => {
     let active = true;
     (async () => {
@@ -60,7 +52,6 @@ export default function ProMaxCentral() {
       if (!active) return;
       const u = data.session?.user;
       if (!u) { router.replace("/ippon-pro"); return; }
-
       let { max, pro } = lerProMax(u);
       // Confirmação com metadata fresco se a 1ª leitura não disser Pro Max.
       if (!max) {
@@ -72,7 +63,6 @@ export default function ProMaxCentral() {
         } catch { /* mantém a 1ª leitura */ }
       }
       if (!active) return;
-
       if (!max) {
         // Não é Pro Max: Pro -> central Pro; gratuito -> vendas.
         router.replace(pro ? "/pro" : "/ippon-pro");
@@ -84,7 +74,6 @@ export default function ProMaxCentral() {
     })();
     return () => { active = false; };
   }, [router]);
-
   function fecharBoasVindas() {
     setVerBoasVindas(false);
     try { localStorage.setItem("ippon_promax_boasvindas_fechada", "1"); } catch {}
@@ -93,7 +82,6 @@ export default function ProMaxCentral() {
     setVerVantagens(false);
     try { localStorage.setItem("ippon_promax_vantagens_fechada", "1"); } catch {}
   }
-
   if (estado === "carregando") {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -101,7 +89,6 @@ export default function ProMaxCentral() {
       </main>
     );
   }
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 48px" }}>
@@ -111,7 +98,6 @@ export default function ProMaxCentral() {
           </a>
           <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>A minha central Pro Max</h1>
         </header>
-
         {/* Boas-vindas Pro Max — fechável (permanente) */}
         {verBoasVindas && (
           <section style={{ position: "relative", textAlign: "center", background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 18, padding: "20px 18px", marginBottom: 18 }}>
@@ -122,7 +108,6 @@ export default function ProMaxCentral() {
             <p style={{ fontSize: 13.5, color: "#9fb3cc", lineHeight: 1.55, margin: 0 }}>Tens o pacote completo da Ippon League ativo. Sem anúncios, sem limites do Pro.</p>
           </section>
         )}
-
         {/* CHAVE DE ATLETAS — atalho para a chave ao vivo (Pro Max vê tudo em direto). */}
         <a href="/chave-atletas" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 14, padding: "13px 14px", marginBottom: 18, color: "#f1ede2" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1c3a2e", flexShrink: 0 }}>
@@ -134,7 +119,6 @@ export default function ProMaxCentral() {
           </div>
           <span style={{ color: MAX, fontSize: 20, flexShrink: 0 }}>›</span>
         </a>
-
         {/* Vantagens — fecháveis (permanente) */}
         {verVantagens && (
           <section style={{ position: "relative", background: "#101722", border: "1px solid #24364a", borderRadius: 16, padding: "16px 16px 14px", marginBottom: 18 }}>
@@ -153,19 +137,16 @@ export default function ProMaxCentral() {
             </p>
           </section>
         )}
-
         {/* PERSONALIZAÇÃO */}
         <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: MAX, marginBottom: 10 }}>Personalização</div>
         <SeletorTatameCentral />
         <SeletorJudoguiCentral />
-
         {/* SCOUT do time — o mesmo componente da /pro, aqui dentro (sem sair). */}
         <ScoutDoTime />
       </div>
     </main>
   );
 }
-
 // Seletor de tatame na central — usa o MESMO provider do Meu Time, por isso
 // mudar aqui muda em todo o lado na hora.
 function SeletorTatameCentral() {
@@ -211,10 +192,15 @@ function SeletorTatameCentral() {
     </div>
   );
 }
-
 // Seletor de judogui na central — usa o MESMO provider do perfil/Dôdo.
 function SeletorJudoguiCentral() {
-  const { judogui, isProMax, setJudogui } = useJudogui();
+  // `pode` (e não `isProMax`): o judogui passou a ser PRO — o servidor decide, a
+  // interface só quer saber se este utilizador consegue. Nesta página é sempre
+  // true, porque só o Pro Max cá chega; mas o nome tem de bater com o contexto.
+  //
+  // NOTA: o seletor de TATAME acima continua com `isProMax` de propósito — esse
+  // é mesmo exclusivo do Pro Max. São duas personalizações diferentes.
+  const { judogui, pode, setJudogui } = useJudogui();
   const [aberto, setAberto] = useState(false);
   const opcoes: { id: JudoguiCor; nome: string }[] = [
     { id: "branco", nome: "Branco" },
@@ -237,7 +223,7 @@ function SeletorJudoguiCentral() {
             {opcoes.map((o) => {
               const escolhido = judogui === o.id;
               return (
-                <button key={o.id} onClick={() => { if (isProMax) void setJudogui(o.id); }} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#0c0e0d", border: `2px solid ${escolhido ? "#7fd1a3" : "#24364a"}`, borderRadius: 12, padding: "12px 8px", cursor: "pointer" }}>
+                <button key={o.id} onClick={() => { if (pode) void setJudogui(o.id); }} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#0c0e0d", border: `2px solid ${escolhido ? "#7fd1a3" : "#24364a"}`, borderRadius: 12, padding: "12px 8px", cursor: "pointer" }}>
                   <span style={{ width: 56, height: 56 }}><Mascot belt="#141110" expression="feliz" judogui={o.id} /></span>
                   <span style={{ fontSize: 12, color: escolhido ? "#7fd1a3" : "#cfd8d2", fontWeight: 700 }}>{o.nome}</span>
                   {escolhido && (
