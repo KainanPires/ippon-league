@@ -40,6 +40,26 @@
 // houver dados de uso real, tal como se fez ao EXPECTATIVA_TOPO.
 // ---------------------------------------------------------------------------
 //
+// ---------------------------------------------------------------------------
+// DUAS CAMADAS
+//
+// 1) CONFRONTOS (sempre) — quem já ganhou a quem entre os inscritos, e uma
+//    probabilidade de vencer a categoria pela força relativa de cada um.
+//
+// 2) CAMINHO NA CHAVE (só quando existe moldura em chave_atletas) — a conta
+//    exata sobre a árvore: com este quadro, qual a hipótese REAL de cada um
+//    vencer o pool, chegar à final e ser campeão, e quem apanha pelo caminho.
+//
+// A diferença entre as duas é o que interessa a quem escala: a camada 1 diz
+// quem é mais forte, a camada 2 diz quem tem caminho fácil. Um atleta barato
+// que caiu num pool fraco pode valer mais do que um caro que apanha o favorito
+// nos quartos — e isso só se vê com a moldura.
+//
+// A moldura é montada à mão depois da pesagem (as chaves da IJF só saem 10-12h
+// antes). Enquanto não existir, a resposta traz `chave.existe: false` e o ecrã
+// mostra só a camada 1 — sem erro, sem promessa por cumprir.
+// ---------------------------------------------------------------------------
+//
 // PAYWALL (no servidor, antes de qualquer dado sair):
 //   grátis  -> nada
 //   Pro     -> nada (mas identificado como "pro", para o ecrã mostrar o convite
@@ -55,6 +75,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { CALENDARIO_2026, nomeCompeticao } from "@/lib/calendario";
+import { simularChave, POOLS, type PoolId, type MolduraPools, type ResultadoAtleta } from "@/lib/simularChave";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -256,6 +277,72 @@ export async function GET(req: Request) {
     };
   }).sort((a, b) => b.probabilidade - a.probabilidade);
 
+  // ---- 3) CAMINHO NA CHAVE (só se houver moldura montada) ----
+  // A mesma função de probabilidade alimenta a simulação: há UMA verdade sobre
+  // "quem ganha a quem", não duas.
+  const pDois = (x: string, y: string): number => {
+    const fx = m.fichas[x], fy = m.fichas[y];
+    if (!fx || !fy) return 0.5; // alguém na moldura sem ficha: sem opinião
+    return probFinal(fx.expectativa, fy.expectativa, fx.contra[y]);
+  };
+
+  let chave: {
+    existe: boolean;
+    porAtleta?: Record<string, unknown>;
+  } = { existe: false };
+
+  try {
+    const { data: mold } = await supabaseAdmin
+      .from("chave_atletas")
+      .select("pools")
+      .eq("id_competicao", comp)
+      .eq("weight_category", cat)
+      .maybeSingle();
+    const poolsRaw = (mold?.pools ?? null) as Record<string, unknown> | null;
+    if (poolsRaw) {
+      const pools = {} as Record<PoolId, string[]>;
+      for (const q of POOLS) {
+        const arr = Array.isArray(poolsRaw[q]) ? (poolsRaw[q] as unknown[]) : [];
+        pools[q] = arr.map((x) => String(x));
+      }
+      const byesRaw = (poolsRaw["byes"] ?? null) as Record<string, unknown> | null;
+      let byes: Partial<Record<PoolId, string[]>> | null = null;
+      if (byesRaw) {
+        byes = {};
+        for (const q of POOLS) {
+          const arr = Array.isArray(byesRaw[q]) ? (byesRaw[q] as unknown[]) : [];
+          if (arr.length) byes[q] = arr.map((x) => String(x));
+        }
+      }
+      const temAlguem = POOLS.some((q) => pools[q].length > 0);
+      if (temAlguem) {
+        const moldura: MolduraPools = { pools, byes };
+        const sim = simularChave(moldura, pDois);
+        // Anexa o nome/país a cada adversário do caminho — o ecrã não deve ter
+        // de cruzar ids à mão.
+        const enriquecido: Record<string, unknown> = {};
+        for (const [id, r] of Object.entries(sim.porAtleta) as [string, ResultadoAtleta][]) {
+          enriquecido[id] = {
+            ...r,
+            caminho: r.caminho.map((f) => ({
+              fase: f.fase,
+              possiveis: f.possiveis.slice(0, 4).map((o) => ({
+                ...o,
+                nome: m.fichas[o.id]?.nome ?? "—",
+                pais: m.fichas[o.id]?.pais ?? "",
+                // Histórico direto contra este possível adversário: é o que
+                // transforma "podes apanhar o X" em "podes apanhar o X, contra
+                // quem estás 0-2".
+                h2h: m.fichas[id]?.contra?.[o.id] ?? null,
+              })),
+            })),
+          };
+        }
+        chave = { existe: true, porAtleta: enriquecido };
+      }
+    }
+  } catch { /* sem moldura: a camada 1 chega */ }
+
   return NextResponse.json({
     ok: true, acesso: "ok", nivel, comp, cat,
     compNome: semana ? nomeCompeticao(semana) : null,
@@ -264,6 +351,9 @@ export async function GET(req: Request) {
     // números consegue, e nós conseguimos afinar sem caçar constantes no código.
     modelo: { k_confianca: K_CONFIANCA, s_forca: S_FORCA },
     atletas,
+    // Camada 2. `existe: false` = ainda não há quadro montado para esta
+    // categoria (normal antes da pesagem).
+    chave,
     atualizado_em: linha?.atualizado_em ?? null,
   });
 }
