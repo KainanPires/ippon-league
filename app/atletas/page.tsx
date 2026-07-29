@@ -1,22 +1,19 @@
 "use client";
-
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
 import { focoMercado } from "@/lib/calendario";
-
+import { supabase } from "@/lib/supabase";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-
 const IOC: Record<string, string> = {
   JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
   TR: "TUR", UZ: "UZB", RU: "AIN", DE: "GER", XK: "KOS", IT: "ITA", CA: "CAN",
   SI: "SLO", HR: "CRO", NL: "NED",
 };
 const code3 = (iso: string) => IOC[iso] || iso;
-
 // Uma linha do ranking. No modo CONGELADO traz também n_lutas/V/D/variação.
 type RankRow = {
   id: string;
@@ -32,7 +29,6 @@ type RankRow = {
   variacaoJc?: number;
   acoes?: Record<string, number>;
 };
-
 export default function AtletasPage() {
   return (
     <Suspense fallback={<Carregando />}>
@@ -40,7 +36,6 @@ export default function AtletasPage() {
     </Suspense>
   );
 }
-
 function Atletas() {
   const searchParams = useSearchParams();
   const foco = focoMercado();
@@ -48,18 +43,17 @@ function Atletas() {
   // Há competição a DECORRER? Então modo AO VIVO. Senão, modo CONGELADO.
   const aDecorrer = foco.aDecorrer;
   const aoVivo = aDecorrer !== null && !compParam;
-
   const [rows, setRows] = useState<RankRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [temResultados, setTemResultados] = useState(false);
   const [nomeComp, setNomeComp] = useState<string>(aDecorrer ? aDecorrer.nome : "");
   const [modo, setModo] = useState<"ao-vivo" | "congelado">(aoVivo ? "ao-vivo" : "congelado");
   const [sel, setSel] = useState<RankRow | null>(null);
-
+  // Atletas com perfil VERIFICADO (selo na lista). Uma consulta só, leve.
+  const [verificados, setVerificados] = useState<Set<string>>(new Set());
   useEffect(() => {
     let active = true;
     setLoading(true);
-
     (async () => {
       // ----- MODO AO VIVO (competição a decorrer): cálculo por atleta -----
       if (aoVivo && aDecorrer) {
@@ -70,11 +64,9 @@ function Atletas() {
           lista = Array.isArray(atl?.atletas) ? atl.atletas : [];
         } catch {}
         if (!active) return;
-
         const byId = new Map<string, Athlete>();
         for (const a of lista) byId.set(a.id, a);
         const ids = lista.map((a) => a.id).filter(Boolean);
-
         let pontos: Record<string, number> = {};
         let acoesMapa: Record<string, Record<string, number>> = {};
         let houve = false;
@@ -91,7 +83,6 @@ function Atletas() {
         setTemResultados(houve);
         setNomeComp(aDecorrer.nome);
         setModo("ao-vivo");
-
         const base = Object.entries(pontos)
           .filter(([, pts]) => typeof pts === "number")
           .map(([id, pts]) => {
@@ -117,8 +108,12 @@ function Atletas() {
         setLoading(false);
         return;
       }
-
       // ----- MODO CONGELADO (sem nada a decorrer): lê resultados_atletas -----
+      // Quem já provou ser quem diz. Não bloqueia o ranking se falhar.
+      fetch("/api/reivindicar?verificados=1")
+        .then((r) => r.json())
+        .then((j) => { if (j?.ok && Array.isArray(j.ids)) setVerificados(new Set(j.ids.map(String))); })
+        .catch(() => {});
       const url = compParam ? `/api/ranking-atletas?comp=${compParam}` : `/api/ranking-atletas`;
       let j: {
         nome?: string; tem_resultados?: boolean;
@@ -128,7 +123,6 @@ function Atletas() {
         j = await fetch(url).then((r) => r.json()).catch(() => null);
       } catch {}
       if (!active) return;
-
       setModo("congelado");
       setNomeComp(j?.nome || "");
       setTemResultados(!!(j && j.tem_resultados));
@@ -150,11 +144,9 @@ function Atletas() {
       setRows(ranked);
       setLoading(false);
     })();
-
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compParam]);
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 84px" }}>
@@ -173,7 +165,6 @@ function Atletas() {
             </span>
           )}
         </div>
-
         {loading ? (
           <Carregando inline />
         ) : !temResultados || rows.length === 0 ? (
@@ -190,14 +181,20 @@ function Atletas() {
               {rows.length} atletas com pontos · do melhor ao pior
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {rows.map((r) => <Row key={r.id} r={r} onClick={() => setSel(r)} />)}
+              {rows.map((r) => <Row key={r.id} r={r} verificado={verificados.has(r.id)} onClick={() => setSel(r)} />)}
             </div>
           </>
         )}
       </div>
-
-      {sel && <Detalhe r={sel} nomeComp={nomeComp} onClose={() => setSel(null)} />}
-
+      {sel && (
+        <Detalhe
+          r={sel}
+          nomeComp={nomeComp}
+          verificado={verificados.has(sel.id)}
+          onVerificado={(id) => setVerificados((v) => new Set([...v, id]))}
+          onClose={() => setSel(null)}
+        />
+      )}
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around", zIndex: 50 }}>
         <NavTab label="Início" href="/inicio" icon={<HomeIcon />} />
         <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} />
@@ -207,8 +204,7 @@ function Atletas() {
     </main>
   );
 }
-
-function Row({ r, onClick }: { r: RankRow; onClick: () => void }) {
+function Row({ r, verificado, onClick }: { r: RankRow; verificado?: boolean; onClick: () => void }) {
   const medal = r.posicao === 1 ? "#d9a441" : r.posicao === 2 ? "#c0c5cc" : r.posicao === 3 ? "#cd7f4d" : null;
   const negativo = r.pontos < 0;
   return (
@@ -220,7 +216,12 @@ function Row({ r, onClick }: { r: RankRow; onClick: () => void }) {
         <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 8, padding: "1px 3px", borderRadius: 2 }}>{code3(r.countryIso)}</div>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#f1ede2" }}>{r.name}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#f1ede2", display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+          {/* Selo de perfil verificado. É reconhecimento, não vantagem: não muda
+              preço nem pontos. Ver a nota em criar-tabela-reivindicacoes.sql. */}
+          {verificado && <SeloVerificado />}
+        </div>
         <div style={{ fontSize: 11, color: "#93a39a" }}>{code3(r.countryIso)}{r.category ? ` · ${r.category}kg` : ""}{r.gender ? ` · ${r.gender === "F" ? "Fem" : "Masc"}` : ""}</div>
       </div>
       <div style={{ flexShrink: 0, background: negativo ? "#3a2422" : "#1d3a2b", color: negativo ? "#ef8d83" : "#9be3bd", fontFamily: FD, fontWeight: 700, fontSize: 13, padding: "4px 11px", borderRadius: 999 }}>
@@ -229,7 +230,6 @@ function Row({ r, onClick }: { r: RankRow; onClick: () => void }) {
     </button>
   );
 }
-
 // Traduz o objeto de ações agregadas em linhas legíveis (a "razão" do ponto).
 // Positivas primeiro, depois as sofridas. Só as que existem.
 function linhasDeAcoes(a: Record<string, number>): { label: string; qtd: number; negativo: boolean }[] {
@@ -250,9 +250,8 @@ function linhasDeAcoes(a: Record<string, number>): { label: string; qtd: number;
   }
   return out;
 }
-
 // Popup do atleta — SIMPLIFICADO (#2): pontos + nº de lutas e V/D. Sem fases.
-function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClose: () => void }) {
+function Detalhe({ r, nomeComp, verificado, onVerificado, onClose }: { r: RankRow; nomeComp: string; verificado?: boolean; onVerificado: (id: string) => void; onClose: () => void }) {
   const temLutas = typeof r.nLutas === "number";
   const temVar = typeof r.variacaoJc === "number";
   return (
@@ -263,12 +262,13 @@ function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClo
             <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 10, padding: "1px 4px", borderRadius: 3 }}>{code3(r.countryIso)}</div>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{r.name}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+              {r.name}{verificado && <SeloVerificado />}
+            </div>
             <div style={{ fontSize: 12, color: "#93a39a" }}>{code3(r.countryIso)}{r.category ? ` · ${r.category}kg` : ""}</div>
           </div>
           <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
-
         {/* Cartões: Posição + Pontos */}
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "12px", textAlign: "center" }}>
@@ -280,7 +280,6 @@ function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClo
             <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: GOLD }}>{r.pontos >= 0 ? "+" : ""}{r.pontos}</div>
           </div>
         </div>
-
         {/* Cartões: Lutas (V/D) + Valorização — só no modo congelado, que tem estes dados */}
         {(temLutas || temVar) && (
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -304,10 +303,12 @@ function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClo
             )}
           </div>
         )}
-
         <div style={{ fontSize: 11.5, color: "#93a39a", textAlign: "center", lineHeight: 1.5 }}>
           Pontuação em <span style={{ color: "#cfd8d2" }}>{nomeComp}</span>, somada pelas ações nas lutas (ippons, waza-aris, shidos).
         </div>
+        {/* REIVINDICAR — o convite ao próprio atleta. Fica no fim: quem chega
+            aqui já viu os seus números, que é o argumento. */}
+        <Reivindicar r={r} verificado={!!verificado} onVerificado={onVerificado} />
 
         {/* A "razão" do ponto: resumo agregado das ações na competição (#scout). */}
         {r.acoes && Object.keys(r.acoes).length > 0 && linhasDeAcoes(r.acoes).length > 0 && (
@@ -329,6 +330,184 @@ function Detalhe({ r, nomeComp, onClose }: { r: RankRow; nomeComp: string; onClo
     </div>
   );
 }
+// Selo pequeno de perfil verificado.
+function SeloVerificado() {
+  return (
+    <span title="Perfil verificado" style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 15, height: 15, borderRadius: "50%", background: "#2f6fb3", color: "#fff" }}>
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// REIVINDICAR O PERFIL — "és tu? prova-o".
+//
+// O fluxo, do lado de quem clica:
+//   1. Deixa o Instagram ou o WhatsApp.
+//   2. Recebe o código por DM (enviado à mão, da conta oficial).
+//   3. Introduz o código aqui.
+//
+// O código NUNCA vem nesta resposta — é isso que faz dele uma prova. Quem o
+// introduz recebeu-o naquele contacto.
+//
+// E o selo não dá vantagem nenhuma no jogo: nem preço, nem pontos, nem acesso.
+// Sem vantagem, quem reivindica é só quem quer aparecer — que é exatamente quem
+// interessa. Com vantagem, haveria motivo para fingir.
+// ---------------------------------------------------------------------------
+function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: boolean; onVerificado: (id: string) => void }) {
+  const [aberto, setAberto] = useState(false);
+  const [fase, setFase] = useState<"forma" | "aguardar" | "feito">("forma");
+  const [tipo, setTipo] = useState<"instagram" | "whatsapp">("instagram");
+  const [contacto, setContacto] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [erro, setErro] = useState("");
+  const [aEnviar, setAEnviar] = useState(false);
+  const [temSessao, setTemSessao] = useState<boolean | null>(null);
+
+  // Estado deste atleta para ESTE utilizador (já pediu? já verificou?).
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!vivo) return;
+        setTemSessao(!!token);
+        if (!token) return;
+        const j = await fetch(`/api/reivindicar?id_person=${encodeURIComponent(r.id)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).then((x) => x.json());
+        if (!vivo || !j?.ok) return;
+        if (j.meuEstado === "verificado") setFase("feito");
+        else if (j.meuEstado === "pendente") setFase("aguardar");
+      } catch { /* fica no estado inicial */ }
+    })();
+    return () => { vivo = false; };
+  }, [r.id]);
+
+  async function chamar(corpo: Record<string, unknown>) {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error("sem sessão");
+    const res = await fetch("/api/reivindicar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ...corpo, id_person: r.id, nome_atleta: r.name }),
+    });
+    return res.json();
+  }
+
+  async function pedir() {
+    setErro(""); setAEnviar(true);
+    try {
+      const j = await chamar({ acao: "pedir", tipo_contacto: tipo, contacto });
+      if (!j?.ok) { setErro(String(j?.erro || "Não foi possível registar o pedido.")); return; }
+      setFase("aguardar");
+    } catch { setErro("Não foi possível registar o pedido."); }
+    finally { setAEnviar(false); }
+  }
+
+  async function verificar() {
+    setErro(""); setAEnviar(true);
+    try {
+      const j = await chamar({ acao: "verificar", codigo });
+      if (!j?.ok) { setErro(String(j?.erro || "Código errado.")); return; }
+      setFase("feito");
+      onVerificado(r.id);
+    } catch { setErro("Não foi possível verificar."); }
+    finally { setAEnviar(false); }
+  }
+
+  // Já verificado por alguém: não há nada a pedir.
+  if (verificado && fase !== "feito") return null;
+
+  if (fase === "feito") {
+    return (
+      <div style={{ marginTop: 16, background: "#0f1620", border: "1px solid #2f6fb3", borderRadius: 12, padding: "12px 14px", textAlign: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: "#7fb8f5" }}>
+          <SeloVerificado /> Perfil verificado
+        </div>
+        <p style={{ fontSize: 12, color: "#cdd9e6", lineHeight: 1.5, margin: "6px 0 0" }}>
+          Este perfil é teu. Falamos contigo em breve.
+        </p>
+      </div>
+    );
+  }
+
+  if (!aberto) {
+    return (
+      <button
+        onClick={() => setAberto(true)}
+        style={{ width: "100%", marginTop: 16, background: "transparent", border: "1px dashed #2f5478", color: "#7fb8f5", fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 11, cursor: "pointer" }}
+      >
+        És tu? Reivindica este perfil
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 16, background: "#0f1620", border: "1px solid #2f5478", borderRadius: 12, padding: "13px 14px" }}>
+      {temSessao === false ? (
+        <>
+          <p style={{ fontSize: 12.5, color: "#cdd9e6", lineHeight: 1.5, margin: "0 0 12px" }}>
+            Para reivindicares este perfil precisas de ter conta na Ippon League.
+          </p>
+          <a href="/entrar?voltar=/atletas" style={{ display: "block", textAlign: "center", background: "#2f6fb3", color: "#fff", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", padding: "10px", borderRadius: 9, textDecoration: "none" }}>Entrar</a>
+        </>
+      ) : fase === "aguardar" ? (
+        <>
+          <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#7fb8f5", marginBottom: 6 }}>Pedido registado</div>
+          <p style={{ fontSize: 12.5, color: "#cdd9e6", lineHeight: 1.5, margin: "0 0 12px" }}>
+            Vamos enviar-te um código pelo contacto que deixaste. Quando o receberes, escreve-o aqui.
+          </p>
+          <input
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+            placeholder="IPPON-XXXX"
+            style={{ width: "100%", boxSizing: "border-box", background: "#0c0e0d", border: "1px solid #24364a", borderRadius: 9, padding: "10px 12px", color: "#f1ede2", fontFamily: FD, fontSize: 15, letterSpacing: "0.08em", textAlign: "center", marginBottom: 10 }}
+          />
+          {erro && <div style={{ fontSize: 12, color: "#ef8d83", marginBottom: 10, lineHeight: 1.45 }}>{erro}</div>}
+          <button onClick={verificar} disabled={aEnviar || codigo.length < 4}
+            style={{ width: "100%", background: "#2f6fb3", color: "#fff", border: "none", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", padding: "11px", borderRadius: 9, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar || codigo.length < 4 ? 0.6 : 1 }}>
+            {aEnviar ? "A verificar…" : "Confirmar código"}
+          </button>
+          <button onClick={() => { setFase("forma"); setErro(""); }}
+            style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: "#7c8a82", fontSize: 11.5, cursor: "pointer", fontFamily: FB }}>
+            Mudar o contacto
+          </button>
+        </>
+      ) : (
+        <>
+          <p style={{ fontSize: 12.5, color: "#cdd9e6", lineHeight: 1.5, margin: "0 0 12px" }}>
+            Deixa o teu contacto. Enviamos-te um código para confirmar que és tu — e falamos contigo.
+          </p>
+          <div style={{ display: "flex", gap: 7, marginBottom: 9 }}>
+            {(["instagram", "whatsapp"] as const).map((t) => (
+              <button key={t} onClick={() => setTipo(t)}
+                style={{ flex: 1, background: tipo === t ? "#2f6fb3" : "transparent", border: `1px solid ${tipo === t ? "#2f6fb3" : "#24364a"}`, color: tipo === t ? "#fff" : "#93a39a", fontFamily: FD, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", padding: "8px", borderRadius: 8, cursor: "pointer" }}>
+                {t === "instagram" ? "Instagram" : "WhatsApp"}
+              </button>
+            ))}
+          </div>
+          <input
+            value={contacto}
+            onChange={(e) => setContacto(e.target.value)}
+            placeholder={tipo === "instagram" ? "@oteuinstagram" : "+351 900 000 000"}
+            style={{ width: "100%", boxSizing: "border-box", background: "#0c0e0d", border: "1px solid #24364a", borderRadius: 9, padding: "10px 12px", color: "#f1ede2", fontSize: 14, marginBottom: 10, fontFamily: FB }}
+          />
+          {erro && <div style={{ fontSize: 12, color: "#ef8d83", marginBottom: 10, lineHeight: 1.45 }}>{erro}</div>}
+          <button onClick={pedir} disabled={aEnviar || contacto.trim().length < 3}
+            style={{ width: "100%", background: "#2f6fb3", color: "#fff", border: "none", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", padding: "11px", borderRadius: 9, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar || contacto.trim().length < 3 ? 0.6 : 1 }}>
+            {aEnviar ? "A enviar…" : "Enviar pedido"}
+          </button>
+          <p style={{ fontSize: 10.5, color: "#5f6f67", lineHeight: 1.45, margin: "9px 0 0", textAlign: "center" }}>
+            O selo é só reconhecimento — não muda o teu preço nem os teus pontos no jogo.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
 
 function Carregando({ inline }: { inline?: boolean }) {
   const box = (
@@ -339,7 +518,6 @@ function Carregando({ inline }: { inline?: boolean }) {
   if (inline) return box;
   return <main style={{ minHeight: "100vh", background: "#0c0e0d", display: "flex", alignItems: "center", justifyContent: "center" }}>{box}</main>;
 }
-
 function NavTab({ label, icon, href, active }: { label: string; icon: React.ReactNode; href?: string; active?: boolean }) {
   const style: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? GOLD : "#6f7d76", textDecoration: "none" };
   const inner = <>{icon}<span style={{ fontSize: 11, fontWeight: active ? 700 : 400 }}>{label}</span></>;
