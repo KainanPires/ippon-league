@@ -14,6 +14,9 @@ import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { supabase } from "@/lib/supabase";
 import { useTatame } from "@/components/TatameProvider";
+// Nível da tabela `users` — a MESMA fonte que o servidor usa. Substitui a leitura
+// do user_metadata, que podia estar desatualizada.
+import { useNivel } from "@/lib/useNivel";
 import { useJudogui, type JudoguiCor } from "@/components/JudoguiProvider";
 import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
 import { ScoutDoTime } from "@/components/ScoutDoTime";
@@ -41,10 +44,11 @@ export default function ProMaxCentral() {
       if (localStorage.getItem("ippon_promax_vantagens_fechada") === "1") setVerVantagens(false);
     } catch {}
   }, []);
-  function lerProMax(u: { user_metadata?: { is_pro?: boolean; is_pro_max?: boolean } } | null | undefined): { max: boolean; pro: boolean } {
-    const m = u?.user_metadata || {};
-    return { max: Boolean(m.is_pro_max), pro: Boolean(m.is_pro) };
-  }
+  // Nível da tabela `users`. Substituiu uma dança de duas leituras ao
+  // user_metadata (a segunda "fresca", à espera que a primeira estivesse
+  // desatualizada) — que só existia porque o metadata não era de confiar.
+  const { ehPro, ehProMax, pronto } = useNivel();
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -52,20 +56,12 @@ export default function ProMaxCentral() {
       if (!active) return;
       const u = data.session?.user;
       if (!u) { router.replace("/ippon-pro"); return; }
-      let { max, pro } = lerProMax(u);
-      // Confirmação com metadata fresco se a 1ª leitura não disser Pro Max.
-      if (!max) {
-        try {
-          const { data: fresco } = await supabase.auth.getUser();
-          if (!active) return;
-          const r = lerProMax(fresco?.user);
-          max = r.max; pro = r.pro;
-        } catch { /* mantém a 1ª leitura */ }
-      }
-      if (!active) return;
-      if (!max) {
+      // Espera saber o nível antes de decidir. Sem isto, um Pro Max seria
+      // expulso desta página no instante em que ela abre.
+      if (!pronto) return;
+      if (!ehProMax) {
         // Não é Pro Max: Pro -> central Pro; gratuito -> vendas.
-        router.replace(pro ? "/pro" : "/ippon-pro");
+        router.replace(ehPro ? "/pro" : "/ippon-pro");
         return;
       }
       const m = u.user_metadata || {};
@@ -73,7 +69,7 @@ export default function ProMaxCentral() {
       setEstado("ok");
     })();
     return () => { active = false; };
-  }, [router]);
+  }, [router, pronto, ehPro, ehProMax]);
   function fecharBoasVindas() {
     setVerBoasVindas(false);
     try { localStorage.setItem("ippon_promax_boasvindas_fechada", "1"); } catch {}
