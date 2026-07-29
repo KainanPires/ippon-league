@@ -24,10 +24,41 @@ export type Nivel =
   | "Continental fraco" // Oceania, África
   | "Open";             // opens dos outros continentes
 
+// ---------------------------------------------------------------------------
+// PORQUE O `nome` NÃO TEM A CIDADE (decisão de 29/07/2026)
+//
+// Um CLÁSSICO é a reposição de uma competição antiga. Se o utilizador souber que
+// a rodada é o "Grand Prix The Hague 2018", vai ao JudoBase, lê os resultados de
+// 2018 e monta a equipa perfeita. O jogo acaba ali.
+//
+// Durante semanas tentámos resolver isto escondendo a cidade em cada sítio onde
+// o nome aparecia — mercado, criar-equipa, início, ligas, dojo, seletor de
+// rodadas... e continuavam a aparecer sítios novos. A pesquisa deu 43 ficheiros
+// a tocar em `.nome`. Caçar um a um era garantir que a próxima página voltava a
+// abrir o buraco, porque o caminho fácil (`s.nome`) era o inseguro.
+//
+// Por isso invertemos: agora o caminho fácil é o SEGURO.
+//
+//   s.nome          -> "Grand Prix 2018 — Clássico"            (sem cidade)
+//   s.nomeCompleto  -> "Grand Prix The Hague 2018 — Clássico"  (com cidade)
+//   nomeCompeticao(s) -> o completo SE já for seguro; senão, o curto
+//
+// Quem escrever `s.nome` por distração não revela nada. O pior que acontece é
+// um clássico já terminado mostrar o nome curto — cosmético, não uma fuga.
+//
+// As competições REAIS não têm `nomeCompleto`: o calendário da IJF é público e
+// não há nada a esconder.
+// ---------------------------------------------------------------------------
 export interface SemanaCalendario {
   semana: number;        // 1..52 (semana ISO de 2026)
   idCompeticao: string;  // id_competition no JudoBase
-  nome: string;          // nome para mostrar ao utilizador
+  // NOME SEGURO POR OMISSÃO — ler a nota abaixo antes de mexer.
+  // Nos clássicos, este campo NÃO tem a cidade ("Grand Prix 2018 — Clássico").
+  // É de propósito: é o que se mostra quando não se sabe se já se pode revelar.
+  nome: string;
+  // Nome completo, com cidade. SÓ deve chegar ao utilizador através de
+  // nomeCompeticao(), que decide se já é seguro mostrá-lo.
+  nomeCompleto?: string;
   nivel: Nivel;
   de: string;            // data de início (YYYY/MM/DD) — referência da rodada
   classico: boolean;     // true = competição antiga revivida
@@ -44,23 +75,23 @@ export interface SemanaCalendario {
 // confirmados via /api/diag e registados no BANCO_CLASSICOS.
 export const CALENDARIO_2026: SemanaCalendario[] = [
   // --- 3 primeiras semanas: pausa de inverno -> CLÁSSICOS ---
-  { semana: 1, idCompeticao: "1194", nome: "Grand Prix Dusseldorf 2015 — Clássico", nivel: "Grand Prix", de: "2026/01/01", classico: true, anoOriginal: 2015 },
-  { semana: 2, idCompeticao: "1220", nome: "Grand Slam Baku 2015 — Clássico", nivel: "Grand Slam", de: "2026/01/05", classico: true, anoOriginal: 2015 },
-  { semana: 3, idCompeticao: "1308", nome: "Grand Prix Havana 2016 — Clássico", nivel: "Grand Prix", de: "2026/01/12", classico: true, anoOriginal: 2016 },
+  { semana: 1, idCompeticao: "1194", nome: "Grand Prix 2015 — Clássico", nomeCompleto: "Grand Prix Dusseldorf 2015 — Clássico", nivel: "Grand Prix", de: "2026/01/01", classico: true, anoOriginal: 2015 },
+  { semana: 2, idCompeticao: "1220", nome: "Grand Slam 2015 — Clássico", nomeCompleto: "Grand Slam Baku 2015 — Clássico", nivel: "Grand Slam", de: "2026/01/05", classico: true, anoOriginal: 2015 },
+  { semana: 3, idCompeticao: "1308", nome: "Grand Prix 2016 — Clássico", nomeCompleto: "Grand Prix Havana 2016 — Clássico", nivel: "Grand Prix", de: "2026/01/12", classico: true, anoOriginal: 2016 },
 
   // --- competições reais de 2026 ---
   { semana: 4,  idCompeticao: "3136", nome: "Casablanca African Open",                 nivel: "Open",          de: "2026/01/25", classico: false },
   { semana: 5,  idCompeticao: "3152", nome: "Sofia European Open",                     nivel: "European Open", de: "2026/01/31", classico: false },
   { semana: 6,  idCompeticao: "3131", nome: "Paris Grand Slam 2026",                   nivel: "Grand Slam",    de: "2026/02/07", classico: false },
   { semana: 7,  idCompeticao: "3154", nome: "Ljubljana European Open",                 nivel: "European Open", de: "2026/02/14", classico: false },
-  { semana: 8, idCompeticao: "1338", nome: "Grand Slam Tyumen 2016 — Clássico", nivel: "Grand Slam", de: "2026/02/21", classico: true, anoOriginal: 2016 },
+  { semana: 8, idCompeticao: "1338", nome: "Grand Slam 2016 — Clássico", nomeCompleto: "Grand Slam Tyumen 2016 — Clássico", nivel: "Grand Slam", de: "2026/02/21", classico: true, anoOriginal: 2016 },
   { semana: 9,  idCompeticao: "3132", nome: "Tashkent Grand Slam",                     nivel: "Grand Slam",    de: "2026/02/27", classico: false },
   { semana: 10, idCompeticao: "3135", nome: "Grand Prix Upper Austria",               nivel: "Grand Prix",    de: "2026/03/06", classico: false },
   { semana: 11, idCompeticao: "3156", nome: "Warsaw European Open",                    nivel: "European Open", de: "2026/03/14", classico: false },
   { semana: 12, idCompeticao: "3134", nome: "Tbilisi Grand Slam",                      nivel: "Grand Slam",    de: "2026/03/20", classico: false },
   { semana: 13, idCompeticao: "3245", nome: "Dubrovnik Senior European Cup",           nivel: "European Cup",  de: "2026/03/28", classico: false },
-  { semana: 14, idCompeticao: "1658", nome: "Guangzhou Masters 2018 — Clássico", nivel: "Masters", de: "2026/04/04", classico: true, anoOriginal: 2018 },
-  { semana: 15, idCompeticao: "1457", nome: "Grand Slam Ekaterinburg 2017 — Clássico", nivel: "Grand Slam", de: "2026/04/09", classico: true, anoOriginal: 2017 },
+  { semana: 14, idCompeticao: "1658", nome: "Masters 2018 — Clássico", nomeCompleto: "Guangzhou Masters 2018 — Clássico", nivel: "Masters", de: "2026/04/04", classico: true, anoOriginal: 2018 },
+  { semana: 15, idCompeticao: "1457", nome: "Grand Slam 2017 — Clássico", nomeCompleto: "Grand Slam Ekaterinburg 2017 — Clássico", nivel: "Grand Slam", de: "2026/04/09", classico: true, anoOriginal: 2017 },
   { semana: 16, idCompeticao: "3163", nome: "Campeonato Europeu (Individuais)",        nivel: "Continental",   de: "2026/04/16", classico: false },
   { semana: 17, idCompeticao: "3171", nome: "Campeonato Africano (Individuais)",       nivel: "Continental fraco", de: "2026/04/24", classico: false },
   { semana: 18, idCompeticao: "3138", nome: "Dushanbe Grand Slam",                     nivel: "Grand Slam",    de: "2026/05/01", classico: false },
@@ -77,24 +108,24 @@ export const CALENDARIO_2026: SemanaCalendario[] = [
   { semana: 24, idCompeticao: "3295", nome: "Tahiti Oceanian Open",                    nivel: "Open",          de: "2026/06/13", classico: false, inicioUTC: "2026-06-13T09:00:00-10:00" },
   { semana: 25, idCompeticao: "3149", nome: "Ulaanbaatar Grand Slam",                  nivel: "Grand Slam",    de: "2026/06/19", classico: false },
   { semana: 26, idCompeticao: "3204", nome: "Qingdao Grand Prix",                      nivel: "Grand Prix",    de: "2026/06/26", classico: false },
-  { semana: 27, idCompeticao: "1460", nome: "Grand Prix Hohhot 2017 — Clássico", nivel: "Grand Prix", de: "2026/07/04", classico: true, anoOriginal: 2017 },
+  { semana: 27, idCompeticao: "1460", nome: "Grand Prix 2017 — Clássico", nomeCompleto: "Grand Prix Hohhot 2017 — Clássico", nivel: "Grand Prix", de: "2026/07/04", classico: true, anoOriginal: 2017 },
   { semana: 28, idCompeticao: "3173", nome: "Taipei Asian Open",                       nivel: "Open",          de: "2026/07/11", classico: false },
   { semana: 29, idCompeticao: "3168", nome: "Sarajevo European Open",                  nivel: "European Open", de: "2026/07/18", classico: false },
   // --- bloco de verão: 3 semanas sem competição -> CLÁSSICOS ---
-  { semana: 30, idCompeticao: "1601", nome: "Grand Slam Osaka 2018 — Clássico", nivel: "Grand Slam", de: "2026/07/25", classico: true, anoOriginal: 2018 },
-  { semana: 31, idCompeticao: "1598", nome: "Grand Prix The Hague 2018 — Clássico", nivel: "Grand Prix", de: "2026/08/01", classico: true, anoOriginal: 2018 },
-  { semana: 32, idCompeticao: "1746", nome: "Grand Prix Montreal 2019 — Clássico", nivel: "Grand Prix", de: "2026/08/08", classico: true, anoOriginal: 2019 },
+  { semana: 30, idCompeticao: "1601", nome: "Grand Slam 2018 — Clássico", nomeCompleto: "Grand Slam Osaka 2018 — Clássico", nivel: "Grand Slam", de: "2026/07/25", classico: true, anoOriginal: 2018 },
+  { semana: 31, idCompeticao: "1598", nome: "Grand Prix 2018 — Clássico", nomeCompleto: "Grand Prix The Hague 2018 — Clássico", nivel: "Grand Prix", de: "2026/08/01", classico: true, anoOriginal: 2018 },
+  { semana: 32, idCompeticao: "1746", nome: "Grand Prix 2019 — Clássico", nomeCompleto: "Grand Prix Montreal 2019 — Clássico", nivel: "Grand Prix", de: "2026/08/08", classico: true, anoOriginal: 2019 },
   { semana: 33, idCompeticao: "3205", nome: "Lima Grand Prix",                         nivel: "Grand Prix",    de: "2026/08/14", classico: false },
   { semana: 34, idCompeticao: "3335", nome: "Lima Panamerican Open",                   nivel: "Open",          de: "2026/08/18", classico: false },
   { semana: 35, idCompeticao: "3225", nome: "Lausanne Grand Slam",                     nivel: "Grand Slam",    de: "2026/08/28", classico: false },
   { semana: 36, idCompeticao: "3336", nome: "San Salvador Panamerican Open",           nivel: "Open",          de: "2026/09/05", classico: false },
   { semana: 37, idCompeticao: "3155", nome: "Hungary Grand Slam",                      nivel: "Grand Slam",    de: "2026/09/11", classico: false },
   { semana: 38, idCompeticao: "3250", nome: "Skopje Senior European Cup",              nivel: "European Cup",  de: "2026/09/19", classico: false },
-  { semana: 39, idCompeticao: "1837", nome: "Grand Slam Brasília 2019 — Clássico", nivel: "Grand Slam", de: "2026/09/26", classico: true, anoOriginal: 2019 },
+  { semana: 39, idCompeticao: "1837", nome: "Grand Slam 2019 — Clássico", nomeCompleto: "Grand Slam Brasília 2019 — Clássico", nivel: "Grand Slam", de: "2026/09/26", classico: true, anoOriginal: 2019 },
   { semana: 40, idCompeticao: "3151", nome: "Mundial de Baku (Individuais)",           nivel: "Mundial",       de: "2026/10/04", classico: false },
   { semana: 41, idCompeticao: "3251", nome: "Malaga Senior European Cup",              nivel: "European Cup",  de: "2026/10/10", classico: false },
-  { semana: 42, idCompeticao: "1702", nome: "Grand Prix Marrakech 2019 — Clássico", nivel: "Grand Prix", de: "2026/10/17", classico: true, anoOriginal: 2019 },
-  { semana: 43, idCompeticao: "2253", nome: "Grand Prix Zagreb 2021 — Clássico", nivel: "Grand Prix", de: "2026/10/22", classico: true, anoOriginal: 2021 },
+  { semana: 42, idCompeticao: "1702", nome: "Grand Prix 2019 — Clássico", nomeCompleto: "Grand Prix Marrakech 2019 — Clássico", nivel: "Grand Prix", de: "2026/10/17", classico: true, anoOriginal: 2019 },
+  { semana: 43, idCompeticao: "2253", nome: "Grand Prix 2021 — Clássico", nomeCompleto: "Grand Prix Zagreb 2021 — Clássico", nivel: "Grand Prix", de: "2026/10/22", classico: true, anoOriginal: 2021 },
   { semana: 44, idCompeticao: "3157", nome: "Abu Dhabi Grand Slam",                    nivel: "Grand Slam",    de: "2026/10/29", classico: false },
   { semana: 45, idCompeticao: "3169", nome: "Montreal Panamerican Open",               nivel: "Open",          de: "2026/11/07", classico: false },
   { semana: 46, idCompeticao: "3159", nome: "Zagreb Grand Prix",                       nivel: "Grand Prix",    de: "2026/11/13", classico: false },
@@ -103,7 +134,7 @@ export const CALENDARIO_2026: SemanaCalendario[] = [
   { semana: 49, idCompeticao: "3160", nome: "Tokyo Grand Slam",                        nivel: "Grand Slam",    de: "2026/12/05", classico: false },
   { semana: 50, idCompeticao: "3150", nome: "Dar Es Salaam African Open",              nivel: "Open",          de: "2026/12/13", classico: false },
   { semana: 51, idCompeticao: "3343", nome: "Dushanbe World Judo Masters",             nivel: "Masters",       de: "2026/12/18", classico: false },
-  { semana: 52, idCompeticao: "2284", nome: "Grand Slam Tel Aviv 2022 — Clássico", nivel: "Grand Slam", de: "2026/12/26", classico: true, anoOriginal: 2022 },
+  { semana: 52, idCompeticao: "2284", nome: "Grand Slam 2022 — Clássico", nomeCompleto: "Grand Slam Tel Aviv 2022 — Clássico", nivel: "Grand Slam", de: "2026/12/26", classico: true, anoOriginal: 2022 },
 ];
 
 /** Devolve a semana ISO (1..53) de uma data. */
@@ -392,14 +423,23 @@ export function competicaoFechada(s: SemanaCalendario, agora: Date = new Date())
 // Mostrar `s.nome` cru revela a cidade.
 // ===========================================================================
 
-/** Nome a mostrar de uma competição, com a cidade escondida se for cedo demais. */
+/**
+ * Nome a MOSTRAR de uma competição.
+ *
+ * Devolve o nome COMPLETO (com cidade) só quando já não há nada a ganhar em
+ * procurá-la: a competição terminou, ou é a que decorre e o mercado já fechou.
+ * Caso contrário devolve `s.nome`, que já vem sem cidade.
+ *
+ * Repare na inversão face ao que isto era antes: agora esta função ACRESCENTA
+ * informação em vez de a esconder. Quem se esquecer de a chamar fica com o nome
+ * curto — inofensivo. Antes, quem se esquecesse revelava a cidade.
+ */
 export function nomeCompeticao(s: SemanaCalendario, agora: Date = new Date()): string {
-  if (!s.classico) return s.nome;                       // competição real: nome tal e qual
-  const terminada = competicaoFechada(s, agora);        // (a) já acabou
-  const mercadoFechado = estadoMercado(s, agora).estado === "fechado"; // (b) já fechou o mercado
-  if (terminada || mercadoFechado) return s.nome;       // já pode ver a cidade
-  const ano = s.anoOriginal ? ` ${s.anoOriginal}` : "";
-  return `${s.nivel}${ano} — Clássico`;                 // esconde a cidade
+  if (!s.classico) return s.nome;                 // competição real: nada a esconder
+  if (!s.nomeCompleto) return s.nome;             // sem versão longa: fica o curto
+  const terminada = competicaoFechada(s, agora);                       // (a) já acabou
+  const mercadoFechado = estadoMercado(s, agora).estado === "fechado";  // (b) mercado fechado
+  return (terminada || mercadoFechado) ? s.nomeCompleto : s.nome;
 }
 
 /** O mesmo, mas a partir do id da competição. "" se o id não estiver no calendário. */
@@ -408,9 +448,10 @@ export function nomeCompeticaoPorId(idCompeticao: string, agora: Date = new Date
   return s ? nomeCompeticao(s, agora) : "";
 }
 
-/** A cidade desta competição está escondida agora? (para avisos na interface) */
+/** A cidade desta competição ainda está escondida? (para avisos na interface) */
 export function cidadeEscondida(s: SemanaCalendario, agora: Date = new Date()): boolean {
-  return s.classico && nomeCompeticao(s, agora) !== s.nome;
+  if (!s.classico || !s.nomeCompleto) return false;
+  return nomeCompeticao(s, agora) === s.nome;
 }
 
 /**
