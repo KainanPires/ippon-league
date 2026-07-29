@@ -42,9 +42,15 @@
 //
 // PAYWALL (no servidor, antes de qualquer dado sair):
 //   grátis  -> nada
-//   Pro     -> o RANKING FACTUAL de confrontos (V-D entre inscritos). É facto,
-//              não previsão — mostra valor sem dar a análise toda.
-//   Pro Max -> + probabilidades e os confrontos favoráveis/desfavoráveis
+//   Pro     -> nada (mas identificado como "pro", para o ecrã mostrar o convite
+//              certo: quem já paga Pro merece ouvir o que lhe falta, não uma
+//              porta anónima)
+//   Pro Max -> tudo: ranking factual, probabilidades e confrontos
+//              favoráveis/desfavoráveis
+//
+// Decisão do Kainan (29/07): a análise fica INTEIRA no Pro Max. Chegou a estar
+// desenhada com o ranking factual aberto ao Pro — se um dia se quiser abrir,
+// o bloco está preservado abaixo em `rankingFactual()`, basta voltar a ligá-lo.
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -142,9 +148,18 @@ export async function GET(req: Request) {
   }
 
   // ---- PAYWALL: quem está a pedir? ----
+  // Só o Pro Max passa. O nível vai na resposta para o ecrã distinguir quem
+  // nunca pagou de quem já é Pro — a mensagem de convite não deve ser a mesma.
   const nivel = await nivelDoPedido(req);
-  if (nivel === "gratis") {
-    return NextResponse.json({ ok: true, acesso: "negado", nivel: "gratis" });
+  if (nivel !== "promax") {
+    return NextResponse.json({
+      ok: true,
+      acesso: "negado",
+      nivel,
+      nota: nivel === "pro"
+        ? "A análise de confrontos diretos faz parte do Ippon Pro Max."
+        : "A análise de confrontos diretos faz parte do Ippon Pro Max.",
+    });
   }
 
   const { searchParams } = new URL(req.url);
@@ -194,23 +209,6 @@ export async function GET(req: Request) {
       },
     };
   });
-
-  if (nivel === "pro") {
-    // Pro: só o factual, ordenado por taxa de vitória (e depois por amostra).
-    const ordenado = [...base].sort((a, b) => {
-      const ta = a.confrontos.taxa ?? -1, tb = b.confrontos.taxa ?? -1;
-      if (tb !== ta) return tb - ta;
-      return b.confrontos.lutas - a.confrontos.lutas;
-    });
-    return NextResponse.json({
-      ok: true, acesso: "ok", nivel, comp, cat,
-      compNome: semana ? nomeCompeticao(semana) : null,
-      classico: m.classico, ano_base: m.ano_base,
-      atletas: ordenado,
-      atualizado_em: linha?.atualizado_em ?? null,
-      nota: "Histórico entre os inscritos desta categoria. As probabilidades fazem parte do Ippon Pro Max.",
-    });
-  }
 
   // ---- 2) PROBABILIDADES (só Pro Max) ----
   // Força relativa = soma das probabilidades de vencer cada um dos outros.
@@ -267,5 +265,22 @@ export async function GET(req: Request) {
     modelo: { k_confianca: K_CONFIANCA, s_forca: S_FORCA },
     atletas,
     atualizado_em: linha?.atualizado_em ?? null,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// RANKING FACTUAL — desligado por agora (a análise ficou inteira no Pro Max).
+//
+// Fica aqui porque é uma decisão de NEGÓCIO, não técnica, e essas mudam. Se um
+// dia se quiser dar ao Pro uma amostra do que existe (o histórico V-D é facto,
+// não previsão — não entrega o modelo), basta chamar isto no ramo do "pro".
+//
+// Não é código morto por esquecimento: é uma opção guardada de propósito.
+// ---------------------------------------------------------------------------
+export function rankingFactual<T extends { confrontos: { taxa: number | null; lutas: number } }>(base: T[]): T[] {
+  return [...base].sort((a, b) => {
+    const ta = a.confrontos.taxa ?? -1, tb = b.confrontos.taxa ?? -1;
+    if (tb !== ta) return tb - ta;
+    return b.confrontos.lutas - a.confrontos.lutas;
   });
 }
