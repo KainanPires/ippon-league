@@ -343,7 +343,7 @@ function SeloVerificado() {
 // REIVINDICAR O PERFIL — "és tu? prova-o".
 //
 // O fluxo, do lado de quem clica:
-//   1. Deixa o Instagram ou o WhatsApp.
+//   1. Deixa o Instagram.
 //   2. Recebe o código por DM (enviado à mão, da conta oficial).
 //   3. Introduz o código aqui.
 //
@@ -357,7 +357,6 @@ function SeloVerificado() {
 function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: boolean; onVerificado: (id: string) => void }) {
   const [aberto, setAberto] = useState(false);
   const [fase, setFase] = useState<"forma" | "aguardar" | "feito">("forma");
-  const [tipo, setTipo] = useState<"instagram" | "whatsapp">("instagram");
   const [contacto, setContacto] = useState("");
   const [codigo, setCodigo] = useState("");
   const [erro, setErro] = useState("");
@@ -400,7 +399,7 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
   async function pedir() {
     setErro(""); setAEnviar(true);
     try {
-      const j = await chamar({ acao: "pedir", tipo_contacto: tipo, contacto });
+      const j = await chamar({ acao: "pedir", tipo_contacto: "instagram", contacto });
       if (!j?.ok) { setErro(String(j?.erro || "Não foi possível registar o pedido.")); return; }
       setFase("aguardar");
     } catch { setErro("Não foi possível registar o pedido."); }
@@ -458,7 +457,7 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
         <>
           <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#7fb8f5", marginBottom: 6 }}>Pedido registado</div>
           <p style={{ fontSize: 12.5, color: "#cdd9e6", lineHeight: 1.5, margin: "0 0 12px" }}>
-            Vamos enviar-te um código pelo contacto que deixaste. Quando o receberes, escreve-o aqui.
+            Vamos enviar-te um código por mensagem direta no Instagram. Quando o receberes, escreve-o aqui.
           </p>
           <input
             value={codigo}
@@ -473,28 +472,28 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
           </button>
           <button onClick={() => { setFase("forma"); setErro(""); }}
             style={{ width: "100%", marginTop: 8, background: "transparent", border: "none", color: "#7c8a82", fontSize: 11.5, cursor: "pointer", fontFamily: FB }}>
-            Mudar o contacto
+            Mudar o Instagram
           </button>
         </>
       ) : (
         <>
           <p style={{ fontSize: 12.5, color: "#cdd9e6", lineHeight: 1.5, margin: "0 0 12px" }}>
-            Deixa o teu contacto. Enviamos-te um código para confirmar que és tu — e falamos contigo.
+            Deixa o teu Instagram. Enviamos-te um código por mensagem direta para confirmar que és tu — e falamos contigo.
           </p>
-          <div style={{ display: "flex", gap: 7, marginBottom: 9 }}>
-            {(["instagram", "whatsapp"] as const).map((t) => (
-              <button key={t} onClick={() => setTipo(t)}
-                style={{ flex: 1, background: tipo === t ? "#2f6fb3" : "transparent", border: `1px solid ${tipo === t ? "#2f6fb3" : "#24364a"}`, color: tipo === t ? "#fff" : "#93a39a", fontFamily: FD, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", padding: "8px", borderRadius: 8, cursor: "pointer" }}>
-                {t === "instagram" ? "Instagram" : "WhatsApp"}
-              </button>
-            ))}
+          {/* SÓ INSTAGRAM. Um número de telemóvel não prova nada — qualquer
+              pessoa escreve um e atende. Uma conta de Instagram de um atleta de
+              topo está ligada no perfil da IJF e é verificável a olho. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0c0e0d", border: "1px solid #24364a", borderRadius: 9, padding: "0 12px", marginBottom: 10 }}>
+            <span style={{ color: "#7fb8f5", flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg>
+            </span>
+            <input
+              value={contacto}
+              onChange={(e) => setContacto(e.target.value)}
+              placeholder="@oteuinstagram"
+              style={{ flex: 1, background: "transparent", border: "none", outline: "none", padding: "10px 0", color: "#f1ede2", fontSize: 14, fontFamily: FB }}
+            />
           </div>
-          <input
-            value={contacto}
-            onChange={(e) => setContacto(e.target.value)}
-            placeholder={tipo === "instagram" ? "@oteuinstagram" : "+351 900 000 000"}
-            style={{ width: "100%", boxSizing: "border-box", background: "#0c0e0d", border: "1px solid #24364a", borderRadius: 9, padding: "10px 12px", color: "#f1ede2", fontSize: 14, marginBottom: 10, fontFamily: FB }}
-          />
           {erro && <div style={{ fontSize: 12, color: "#ef8d83", marginBottom: 10, lineHeight: 1.45 }}>{erro}</div>}
           <button onClick={pedir} disabled={aEnviar || contacto.trim().length < 3}
             style={{ width: "100%", background: "#2f6fb3", color: "#fff", border: "none", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", padding: "11px", borderRadius: 9, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar || contacto.trim().length < 3 ? 0.6 : 1 }}>
