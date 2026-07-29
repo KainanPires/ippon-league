@@ -12,10 +12,11 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { focoMercado } from "@/lib/calendario";
-
+// O buraco que isto tapa: aprovar um pedido metia a pessoa na liga SEM verificar
+// o limite dela. Bastava pedir para entrar em dez ligas e ter os pedidos aceites.
+import { bloqueioPorLimite } from "@/lib/limitesLiga";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
 export async function POST(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
   // 2) Confirma que quem decide é o DONO da liga do pedido. (name para a notificação.)
   const { data: liga } = await supabaseAdmin
     .from("leagues")
-    .select("id, name, created_by")
+    .select("id, name, created_by, formato")
     .eq("id", pedido.league_id)
     .maybeSingle();
   if (!liga) return NextResponse.json({ ok: false, erro: "Liga não encontrada." }, { status: 404 });
@@ -81,6 +82,20 @@ export async function POST(req: Request) {
     .eq("user_id", pedido.user_id)
     .maybeSingle();
   if (!jaMembro) {
+    // LIMITE de QUEM PEDIU (não de quem aprova). Entre o pedido e a aprovação
+    // pode ter passado tempo e a pessoa pode ter entrado noutras ligas — por
+    // isso verifica-se AGORA, no momento em que ela entra mesmo.
+    const bloqueio = await bloqueioPorLimite(pedido.user_id, String(liga.formato) === "copa");
+    if (bloqueio) {
+      return NextResponse.json({
+        ok: false,
+        limite: true,
+        erro: `Não foi possível aceitar: ${bloqueio}`,
+        // O dono não tem culpa nem pode resolver — mas fica a saber porquê, e o
+        // pedido continua pendente para tentar mais tarde.
+        motivo: "limite_do_candidato",
+      }, { status: 409 });
+    }
     const entrouCompeticao = focoMercado().alvo.idCompeticao;
     const { error: erroMembro } = await supabaseAdmin
       .from("league_members")
