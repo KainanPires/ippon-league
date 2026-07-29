@@ -33,33 +33,49 @@ import { focoMercado, numeroDaRodada } from "@/lib/calendario";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-async function contarLigasAmigos(user_id: string): Promise<number> {
-  if (!supabaseAdmin) return 0;
+// Quantas ligas de amigos ATIVAS este utilizador tem, separadas por formato.
+// As terminadas ficam de fora (já não ocupam lugar) e as oficiais também
+// (mundial/continental são automáticas).
+async function contarPorFormato(user_id: string): Promise<{ pontos: number; copa: number }> {
+  const zero = { pontos: 0, copa: 0 };
+  if (!supabaseAdmin) return zero;
   try {
     const { data: filiacoes } = await supabaseAdmin
       .from("league_members")
       .select("league_id")
       .eq("user_id", user_id);
     const ids = (filiacoes || []).map((f) => f.league_id);
-    if (ids.length === 0) return 0;
-    const { count } = await supabaseAdmin
+    if (ids.length === 0) return zero;
+    const { data: ligas } = await supabaseAdmin
       .from("leagues")
-      .select("id", { count: "exact", head: true })
+      .select("id, formato, estado, copa_estado")
       .in("id", ids)
       .eq("type", "amigos");
-    return count ?? 0;
+    const out = { pontos: 0, copa: 0 };
+    for (const l of ligas || []) {
+      if (ligaTerminada(l)) continue; // acabou: não ocupa lugar
+      if (String(l.formato) === "copa") out.copa++;
+      else out.pontos++;
+    }
+    return out;
   } catch {
-    return 0;
+    return zero;
   }
 }
-async function ehPro(user_id: string): Promise<boolean> {
-  if (!supabaseAdmin) return false;
+// Nível do utilizador. Lê da TABELA `users`, não do user_metadata: a tabela é a
+// fonte de verdade (o metadata é uma cache do lado do cliente e não serve para
+// decidir limites). Em caso de dúvida, trata como grátis — errar para o lado
+// mais restritivo é preferível a dar acesso a quem não pagou.
+async function nivelDoUtilizador(user_id: string): Promise<NivelUtilizador> {
+  if (!supabaseAdmin) return "gratis";
   try {
-    const { data } = await supabaseAdmin.auth.admin.getUserById(user_id);
-    const meta = data?.user?.user_metadata as { is_pro?: boolean } | undefined;
-    return !!meta?.is_pro;
+    const { data } = await supabaseAdmin
+      .from("users").select("is_pro, is_pro_max").eq("id", user_id).maybeSingle();
+    if (data?.is_pro_max) return "promax";
+    if (data?.is_pro) return "pro";
+    return "gratis";
   } catch {
-    return false;
+    return "gratis";
   }
 }
 
@@ -84,8 +100,47 @@ function copaInscricoesFechadas(liga: { formato?: unknown; copa_estado?: unknown
   return false;
 }
 
-const LIMITE_PARTICIPAR_FREE = 2;
-const LIMITE_PARTICIPAR_PRO = 5;
+// ---------------------------------------------------------------------------
+// LIMITES DE PARTICIPAÇÃO (regra do Kainan, 29/07/2026)
+//
+// Contam-se SEPARADAMENTE as ligas de pontos corridos e as copas: um jogador
+// grátis pode ter uma de cada, não uma no total. Antes o código somava tudo num
+// só saco de 2 — o que ao mesmo tempo dava ligas a mais ao grátis (2 em vez de
+// 1) e o impedia de ter uma liga E um mata-mata ao mesmo tempo.
+//
+// Ligas TERMINADAS não contam: já acabaram, não devem bloquear ninguém.
+// Ligas OFICIAIS (mundial/continental) também não — são automáticas e só Pro.
+//
+//   grátis  -> 1 liga + 1 mata-mata   (para trocar, tem de sair da atual)
+//   Pro     -> 5 + 5
+//   Pro Max -> 10 + 10
+// ---------------------------------------------------------------------------
+const LIMITES = {
+  gratis: { pontos: 1, copa: 1 },
+  pro: { pontos: 5, copa: 5 },
+  promax: { pontos: 10, copa: 10 },
+} as const;
+type NivelUtilizador = keyof typeof LIMITES;
+
+// Bateu no limite? Devolve a mensagem de erro, ou null se pode entrar.
+// A mensagem diz sempre QUANTAS tem, QUAL é o limite e o que ganha ao subir de
+// nível — um "não podes" sem explicação é a forma mais rápida de perder alguém.
+async function bloqueioPorLimite(user_id: string, ehCopa: boolean): Promise<string | null> {
+  const nivel = await nivelDoUtilizador(user_id);
+  const lim = LIMITES[nivel];
+  const atual = await contarPorFormato(user_id);
+  const usadas = ehCopa ? atual.copa : atual.pontos;
+  const maximo = ehCopa ? lim.copa : lim.pontos;
+  if (usadas < maximo) return null;
+  const oQue = ehCopa ? (maximo === 1 ? "num mata-mata" : `em ${maximo} mata-matas`) : (maximo === 1 ? "numa liga" : `em ${maximo} ligas`);
+  const sair = ehCopa
+    ? "Um mata-mata não se abandona a meio: espera que este termine para entrares noutro."
+    : "Para entrares noutra, sai primeiro da atual.";
+  if (nivel === "promax") return `Já estás ${oQue} — é o máximo, mesmo com Pro Max. ${sair}`;
+  if (nivel === "pro") return `Já estás ${oQue}. ${sair} Com o Pro Max sobes até ${ehCopa ? LIMITES.promax.copa + " mata-matas" : LIMITES.promax.pontos + " ligas"}.`;
+  return `Já estás ${oQue}. ${sair} Com o Ippon Pro sobes até ${ehCopa ? LIMITES.pro.copa + " mata-matas" : LIMITES.pro.pontos + " ligas"}.`;
+}
+
 
 export async function POST(req: Request) {
   if (!supabaseAdmin) {
@@ -182,19 +237,11 @@ export async function POST(req: Request) {
   }
 
   // 4) Liga "aberta" ou "fechada": o código é o convite, entra direto.
-  //    Limite de participação (só ligas de amigos): 2 (free) / 5 (pro).
+  //    Limite de participação, contado SEPARADAMENTE por formato (ver LIMITES).
   if (liga.type === "amigos") {
-    const pro = await ehPro(user_id);
-    const limite = pro ? LIMITE_PARTICIPAR_PRO : LIMITE_PARTICIPAR_FREE;
-    const quantas = await contarLigasAmigos(user_id);
-    if (quantas >= limite) {
-      return NextResponse.json({
-        ok: false,
-        limite: true,
-        erro: pro
-          ? "Já estás em 5 ligas de amigos — é o máximo, mesmo com Ippon Pro."
-          : "Já estás em 2 ligas de amigos. Passa a Ippon Pro para entrares em até 5.",
-      }, { status: 403 });
+    const bloqueio = await bloqueioPorLimite(user_id, String(liga.formato) === "copa");
+    if (bloqueio) {
+      return NextResponse.json({ ok: false, limite: true, erro: bloqueio }, { status: 403 });
     }
   }
 
