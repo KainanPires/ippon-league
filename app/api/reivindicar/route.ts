@@ -69,11 +69,78 @@ const novaExpiracao = () => new Date(Date.now() + VALIDADE_HORAS * 3600 * 1000).
 const MAIL_TO = process.env.MAIL_TO || "support@ipponleague.com";
 const MAIL_FROM = process.env.MAIL_FROM || "Ippon League <support@ipponleague.com>";
 
+/**
+ * O que a app já sabe sobre quem está a reivindicar.
+ *
+ * PORQUÊ: sem isto, cada pedido era só "alguém diz ser o Shohei Ono" + um
+ * Instagram. Para responder era preciso investigar caso a caso. Com o nome, a
+ * idade e o país à frente, a maioria dos pedidos falsos cai à primeira vista —
+ * um "atleta" de 45 anos a reivindicar um júnior, ou um país que não bate com o
+ * do atleta, dispensa qualquer investigação.
+ *
+ * São dados que a pessoa já deu no registo. Não se pede nada de novo.
+ */
+interface FichaUtilizador {
+  nome: string;
+  email: string;
+  idade: number | null;
+  dataNascimento: string | null;
+  pais: string | null;
+  desdeQuando: string | null;
+  equipas: number;
+}
+
+function idadeDe(nasc: string | null): number | null {
+  if (!nasc) return null;
+  const d = new Date(nasc);
+  if (isNaN(d.getTime())) return null;
+  const hoje = new Date();
+  let anos = hoje.getFullYear() - d.getFullYear();
+  const m = hoje.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < d.getDate())) anos--;
+  return anos >= 0 && anos < 120 ? anos : null;
+}
+
+async function fichaDoUtilizador(uid: string): Promise<FichaUtilizador> {
+  const vazia: FichaUtilizador = { nome: "", email: "", idade: null, dataNascimento: null, pais: null, desdeQuando: null, equipas: 0 };
+  if (!supabaseAdmin) return vazia;
+  try {
+    const { data: u } = await supabaseAdmin
+      .from("users")
+      .select("name, email, data_nascimento, country_code")
+      .eq("id", uid).maybeSingle();
+    // Há quanto tempo tem conta, e quantas vezes jogou. Uma conta criada há
+    // cinco minutos, sem nenhuma equipa montada, é um sinal — não uma prova,
+    // mas ajuda a ordenar a fila de quem responder primeiro.
+    let desdeQuando: string | null = null;
+    try {
+      const { data: auth } = await supabaseAdmin.auth.admin.getUserById(uid);
+      desdeQuando = auth?.user?.created_at ?? null;
+    } catch { /* sem data de criação: segue */ }
+    let equipas = 0;
+    try {
+      const { count } = await supabaseAdmin
+        .from("equipas").select("user_id", { count: "exact", head: true }).eq("user_id", uid);
+      equipas = count ?? 0;
+    } catch { /* sem contagem: segue */ }
+    const nasc = u?.data_nascimento ? String(u.data_nascimento) : null;
+    return {
+      nome: String(u?.name || ""),
+      email: String(u?.email || ""),
+      idade: idadeDe(nasc),
+      dataNascimento: nasc,
+      pais: u?.country_code ? String(u.country_code) : null,
+      desdeQuando,
+      equipas,
+    };
+  } catch { return vazia; }
+}
+
 function esc(v: string): string {
   return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-async function avisarPorEmail(d: { atleta: string; idPerson: string; instagram: string; codigo: string }): Promise<void> {
+async function avisarPorEmail(d: { atleta: string; idPerson: string; instagram: string; codigo: string; ficha?: FichaUtilizador }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
   const html = `
@@ -82,6 +149,21 @@ async function avisarPorEmail(d: { atleta: string; idPerson: string; instagram: 
       <p style="margin:0 0 4px"><strong>Instagram:</strong>
         <a href="https://instagram.com/${esc(d.instagram)}">@${esc(d.instagram)}</a></p>
       <p style="margin:0 0 4px"><strong>Atleta:</strong> ${esc(d.atleta)} (id ${esc(d.idPerson)})</p>
+      ${d.ficha ? `
+      <hr style="border:none;border-top:1px solid #ddd;margin:14px 0" />
+      <p style="margin:0 0 8px;font-weight:700">O que a conta diz sobre esta pessoa</p>
+      <table style="border-collapse:collapse;font-size:13px">
+        <tr><td style="padding:2px 12px 2px 0;color:#666">Nome</td><td>${esc(d.ficha.nome) || "<em>não preenchido</em>"}</td></tr>
+        <tr><td style="padding:2px 12px 2px 0;color:#666">Email</td><td>${esc(d.ficha.email)}</td></tr>
+        <tr><td style="padding:2px 12px 2px 0;color:#666">Idade</td><td>${d.ficha.idade !== null ? `${d.ficha.idade} anos (${esc(d.ficha.dataNascimento || "")})` : "<em>não preenchida</em>"}</td></tr>
+        <tr><td style="padding:2px 12px 2px 0;color:#666">País</td><td>${esc(d.ficha.pais || "") || "<em>não preenchido</em>"}</td></tr>
+        <tr><td style="padding:2px 12px 2px 0;color:#666">Conta criada</td><td>${d.ficha.desdeQuando ? esc(new Date(d.ficha.desdeQuando).toLocaleDateString("pt-PT")) : "—"}</td></tr>
+        <tr><td style="padding:2px 12px 2px 0;color:#666">Equipas montadas</td><td>${d.ficha.equipas}</td></tr>
+      </table>
+      <p style="margin:10px 0 0;color:#666;font-size:12px">
+        Compara com o que sabes do atleta: a idade bate com a categoria? O país é o mesmo?
+        Se não bater, não vale a pena responder.
+      </p>` : ""}
       <hr style="border:none;border-top:1px solid #ddd;margin:14px 0" />
       <p style="margin:0 0 6px">Código a enviar por mensagem direta:</p>
       <p style="margin:0 0 14px;font-family:ui-monospace,monospace;font-size:22px;font-weight:700;letter-spacing:2px">${esc(d.codigo)}</p>
@@ -169,7 +251,13 @@ export async function GET(req: Request) {
       .select("id, id_person, nome_atleta, user_id, tipo_contacto, contacto, codigo, estado, tentativas, criado_em, verificado_em, codigo_expira_em")
       .order("criado_em", { ascending: false })
       .limit(200);
-    return NextResponse.json({ ok: true, pedidos: data || [] });
+    // Junta a ficha de cada pedinte — os mesmos dados que vão no email, para
+    // quem preferir ver a lista toda de uma vez em vez de abrir email a email.
+    const pedidos = [];
+    for (const p of data || []) {
+      pedidos.push({ ...p, quem: await fichaDoUtilizador(String(p.user_id)) });
+    }
+    return NextResponse.json({ ok: true, pedidos });
   }
 
   // --- Lista de atletas verificados (para mostrar o selo) ---
@@ -263,7 +351,7 @@ export async function POST(req: Request) {
         .from("atletas_reivindicacoes")
         .update({ tipo_contacto: tipo, contacto, codigo, estado: "pendente", tentativas: 0, criado_em: new Date().toISOString(), codigo_expira_em: novaExpiracao() })
         .eq("id", existente.id);
-      await avisarPorEmail({ atleta: (corpo.nome_atleta || "").trim(), idPerson, instagram: contacto, codigo });
+      await avisarPorEmail({ atleta: (corpo.nome_atleta || "").trim(), idPerson, instagram: contacto, codigo, ficha: await fichaDoUtilizador(uid) });
       return NextResponse.json({ ok: true, pedido: true, reenviado: true });
     }
 
@@ -279,8 +367,8 @@ export async function POST(req: Request) {
     if (error) {
       return NextResponse.json({ ok: false, erro: "Não foi possível registar o pedido." }, { status: 500 });
     }
-    // Avisa por email, com o código pronto a copiar para o DM.
-    await avisarPorEmail({ atleta: (corpo.nome_atleta || "").trim(), idPerson, instagram: contacto, codigo });
+    // Avisa por email, com o código pronto a copiar e a ficha de quem pediu.
+    await avisarPorEmail({ atleta: (corpo.nome_atleta || "").trim(), idPerson, instagram: contacto, codigo, ficha: await fichaDoUtilizador(uid) });
     // Repare: o código NÃO vai na resposta. Quem pede não o pode saber — é
     // isso que faz dele uma prova.
     return NextResponse.json({ ok: true, pedido: true });
@@ -364,6 +452,7 @@ export async function POST(req: Request) {
     await avisarPorEmail({
       atleta: (corpo.nome_atleta || "").trim(), idPerson,
       instagram: String(pedido.contacto || ""), codigo,
+      ficha: await fichaDoUtilizador(uid),
     });
     return NextResponse.json({ ok: true, pedido: true, novo: true });
   }
