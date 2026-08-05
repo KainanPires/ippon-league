@@ -1,17 +1,17 @@
 "use client";
-
 import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
+// Deteção de erros de escrita no domínio do email ("@gamil.com").
+// Não valida se o email existe — isso é impossível do lado do cliente. Aqui
+// apanha-se o engano de teclado, que é a causa mais comum de contas com email
+// morto: já houve uma na base com "@gamil.com" que nunca receberia nada.
+import { avisoDoEmail, type AvisoEmail } from "@/lib/emailSugestao";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
-
 const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
 const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-
 const BELTS = ["Branca", "Azul", "Amarela", "Verde", "Roxa", "Marrom", "Preta", "Ainda não tenho faixa"];
-
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
 type Form = {
   name: string;
   email: string;
@@ -22,23 +22,24 @@ type Form = {
   belt: string;
   countryIso: string;
 };
-
 const EMPTY: Form = { name: "", email: "", senha: "", dataNasc: "", contact: "", dialIso: "PT", belt: "", countryIso: "" };
-
 export default function Comecar() {
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [saving, setSaving] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [confirmSent, setConfirmSent] = useState(false);
+  // Aviso sobre o email: aparece ao sair do campo, e volta a ser mostrado como
+  // confirmação antes de criar a conta (ver `criar`). No registo o custo de um
+  // engano é alto — a conta fica sem receber nada e acaba apagada por inatividade.
+  const [aviso, setAviso] = useState<AvisoEmail | null>(null);
+  const [confirmarEmail, setConfirmarEmail] = useState(false);
   const [mostrarDeclaracao, setMostrarDeclaracao] = useState(false);
   const maxData = new Date().toISOString().slice(0, 10);
-
   function update(field: keyof Form, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
     setErrors((e) => ({ ...e, [field]: undefined }));
   }
-
   function validate(): boolean {
     const e: Partial<Record<keyof Form, string>> = {};
     if (!form.name.trim()) e.name = "Diz-nos o teu nome.";
@@ -54,8 +55,12 @@ export default function Comecar() {
     setErrors(e);
     return Object.keys(e).length === 0;
   }
-
   // Botão principal: valida os campos e abre a janela de declaração.
+  //
+  // Antes disso, se o email parecer ter um erro de escrita, pede-se confirmação.
+  // É o único momento em que vale a pena insistir: uma conta criada com o email
+  // errado nunca recebe nada — nem a confirmação, nem recuperação de senha, nem
+  // recibos — e acaba apagada por inatividade sem a pessoa perceber porquê.
   function abrirDeclaracao() {
     if (saving) return;
     if (!validate()) return;
@@ -63,18 +68,17 @@ export default function Comecar() {
       setErrors((e) => ({ ...e, email: "A ligação ao servidor não está configurada. Tenta mais tarde." }));
       return;
     }
+    const a = avisoDoEmail(form.email);
+    if (a && !confirmarEmail) { setAviso(a); setConfirmarEmail(true); return; }
     setMostrarDeclaracao(true);
   }
-
   // Confirmada a declaração, cria a conta de facto.
   async function confirmarCriacao() {
     if (saving) return;
-
     setSaving(true);
     const country = COUNTRIES.find((c) => c.iso2 === form.countryIso);
     const dial = COUNTRIES.find((c) => c.iso2 === form.dialIso)?.dial ?? "";
     const telefone = form.contact.trim() ? `${dial} ${form.contact.trim()}`.trim() : "";
-
     const { data, error } = await supabase.auth.signUp({
       email: form.email.trim(),
       password: form.senha,
@@ -90,7 +94,6 @@ export default function Comecar() {
         emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/inicio` : undefined,
       },
     });
-
     if (error) {
       const msg = error.message || "";
       if (/already registered|already exists|user already/i.test(msg)) {
@@ -103,12 +106,10 @@ export default function Comecar() {
       setSaving(false);
       return;
     }
-
     try {
       localStorage.setItem("ippon_onboarding", "pending");
       localStorage.setItem("ippon_name", form.name.trim().split(" ")[0] || "");
     } catch {}
-
     if (data.session) {
       window.location.href = "/inicio";
     } else {
@@ -116,24 +117,35 @@ export default function Comecar() {
       setConfirmSent(true);
     }
   }
-
   if (confirmSent) {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FONT_BODY, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}>
         <div style={{ width: "100%", maxWidth: 440 }}>
           <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 18, padding: 24, textAlign: "center" }}>
-            <div style={{ fontSize: 40, marginBottom: 8 }}>📩</div>
-            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>Confirma o teu email</h1>
-            <p style={{ fontSize: 14, color: "#93a39a", margin: "0 0 18px" }}>
-              Enviámos um link para <strong style={{ color: "#f1ede2" }}>{form.email.trim()}</strong>. Abre-o para ativar a conta e depois volta para entrar.
+            {/* A conta JÁ está criada e pode entrar agora — a confirmação do
+                Supabase está desligada de propósito (pôr alguém à espera de um
+                email no momento em que se entusiasmou é a forma mais rápida de
+                a perder). O email de verificação é NOSSO e chega a seguir; até
+                lá, joga-se na mesma.
+
+                Este ecrã dizia "abre o link para ativar a conta" — do tempo em
+                que a confirmação estava ligada. Ficou a mandar as pessoas
+                esperar por um email que já não existia. */}
+            <div style={{ fontSize: 40, marginBottom: 8 }}>🥋</div>
+            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>Conta criada!</h1>
+            <p style={{ fontSize: 14, color: "#93a39a", margin: "0 0 8px" }}>
+              Já podes entrar e montar a tua equipa.
             </p>
-            <a href="/entrar" style={{ display: "inline-block", padding: "12px 22px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>Ir para o login</a>
+            <p style={{ fontSize: 13, color: "#7c8a82", margin: "0 0 18px", lineHeight: 1.5 }}>
+              Vamos enviar-te um email para <strong style={{ color: "#c7d0c9" }}>{form.email.trim()}</strong> para confirmares o endereço.
+              Não é preciso esperar — mas confirma quando puderes, para não perderes avisos das rodadas.
+            </p>
+            <a href="/entrar" style={{ display: "inline-block", padding: "12px 22px", borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>Entrar agora</a>
           </div>
         </div>
       </main>
     );
   }
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FONT_BODY, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}>
       <div style={{ width: "100%", maxWidth: 440 }}>
@@ -144,15 +156,40 @@ export default function Comecar() {
           </div>
           <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 700, textTransform: "uppercase", margin: "0 0 4px" }}>Entra no jogo</h1>
           <p style={{ fontSize: 14, color: "#93a39a", margin: "0 0 20px" }}>Cria a tua conta para montares a equipa e disputares com fãs de judô do mundo todo.</p>
-
           <Field label="Nome" error={errors.name}>
             <input style={inputStyle(!!errors.name)} value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="O teu nome" />
           </Field>
-
           <Field label="Email" error={errors.email}>
-            <input style={inputStyle(!!errors.email)} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="email@exemplo.com" />
+            <input
+              style={inputStyle(!!errors.email)}
+              type="email"
+              value={form.email}
+              onChange={(e) => { update("email", e.target.value); setAviso(null); setConfirmarEmail(false); }}
+              onBlur={() => setAviso(avisoDoEmail(form.email))}
+              placeholder="email@exemplo.com"
+            />
+            {aviso && (
+              <div style={{ background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 9, padding: "9px 11px", marginTop: 6, fontSize: 12.5, color: "#e8d9a8", lineHeight: 1.45 }}>
+                {confirmarEmail && aviso.tipo === "sugestao"
+                  ? `Tens a certeza de que é ${form.email.trim()}?`
+                  : aviso.mensagem}
+                {aviso.corrigido && (
+                  <button
+                    type="button"
+                    onClick={() => { update("email", aviso.corrigido!); setAviso(null); setConfirmarEmail(false); }}
+                    style={{ display: "block", marginTop: 6, background: "transparent", border: "none", color: GOLD, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY, padding: 0, textDecoration: "underline" }}
+                  >
+                    Não, corrigir para {aviso.corrigido}
+                  </button>
+                )}
+                {confirmarEmail && (
+                  <div style={{ fontSize: 11.5, color: "#93a39a", marginTop: 6 }}>
+                    Se estiver certo, carrega outra vez em criar conta.
+                  </div>
+                )}
+              </div>
+            )}
           </Field>
-
           <Field label="Senha" error={errors.senha}>
             <div style={{ position: "relative" }}>
               <input style={{ ...inputStyle(!!errors.senha), paddingRight: 44 }} type={showPw ? "text" : "password"} value={form.senha} onChange={(e) => update("senha", e.target.value)} placeholder="Mínimo 6 caracteres" />
@@ -165,18 +202,15 @@ export default function Comecar() {
               </button>
             </div>
           </Field>
-
           <Field label="Data de nascimento" error={errors.dataNasc}>
             <input style={{ ...inputStyle(!!errors.dataNasc), colorScheme: "dark" }} type="date" max={maxData} value={form.dataNasc} onChange={(e) => update("dataNasc", e.target.value)} />
           </Field>
-
           <Field label="Contacto (opcional)" error={errors.contact}>
             <div style={{ display: "flex", gap: 8 }}>
               <CountrySelect value={form.dialIso} onChange={(iso) => update("dialIso", iso)} />
               <input style={inputStyle(!!errors.contact)} inputMode="tel" value={form.contact} onChange={(e) => update("contact", e.target.value)} placeholder="Número de telemóvel" />
             </div>
           </Field>
-
           <Field label="Faixa" error={errors.belt}>
             <select style={{ ...inputStyle(!!errors.belt), appearance: "none" }} value={form.belt} onChange={(e) => update("belt", e.target.value)}>
               <option value="" disabled>Seleciona a tua faixa</option>
@@ -185,24 +219,19 @@ export default function Comecar() {
               ))}
             </select>
           </Field>
-
           <Field label="País" error={errors.countryIso}>
             <CountryPicker value={form.countryIso} hasError={!!errors.countryIso} onChange={(iso) => update("countryIso", iso)} />
           </Field>
-
           <button onClick={abrirDeclaracao} disabled={saving} style={{ width: "100%", marginTop: 8, padding: "14px", borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
             Começar a jogar
           </button>
-
           <p style={{ fontSize: 13, color: "#93a39a", textAlign: "center", marginTop: 14 }}>
             Já tens conta?{" "}
             <a href="/entrar" style={{ color: "#f1ede2", fontWeight: 700, textDecoration: "none", borderBottom: `2px solid ${GOLD}`, paddingBottom: 1 }}>Entrar</a>
           </p>
-
           <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 10 }}>Ao continuar, aceitas receber novidades da Ippon League.</p>
         </div>
       </div>
-
       {mostrarDeclaracao && (
         <div onClick={() => !saving && setMostrarDeclaracao(false)} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 }}>
           <div onClick={(ev) => ev.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "24px 20px" }}>
@@ -225,7 +254,6 @@ export default function Comecar() {
     </main>
   );
 }
-
 function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: 14 }}>
@@ -235,7 +263,6 @@ function Field({ label, error, children }: { label: string; error?: string; chil
     </div>
   );
 }
-
 function inputStyle(hasError: boolean): CSSProperties {
   return {
     width: "100%",
@@ -250,7 +277,6 @@ function inputStyle(hasError: boolean): CSSProperties {
     boxSizing: "border-box",
   };
 }
-
 const panelStyle: CSSProperties = {
   position: "absolute",
   top: "calc(100% + 6px)",
@@ -262,7 +288,6 @@ const panelStyle: CSSProperties = {
   boxShadow: "0 12px 30px rgba(0,0,0,0.5)",
   overflow: "hidden",
 };
-
 const optionStyle = (active: boolean): CSSProperties => ({
   display: "flex",
   alignItems: "center",
@@ -277,13 +302,11 @@ const optionStyle = (active: boolean): CSSProperties => ({
   cursor: "pointer",
   fontFamily: FONT_BODY,
 });
-
 function CountrySelect({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement | null>(null);
   const selected = COUNTRIES.find((c) => c.iso2 === value) ?? COUNTRIES[0];
-
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -291,10 +314,8 @@ function CountrySelect({ value, onChange }: { value: string; onChange: (iso: str
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
-
   const q = norm(query.trim());
   const filtered = q ? COUNTRIES.filter((c) => norm(c.name).includes(q) || c.dial.includes(query.trim()) || c.iso2.toLowerCase().includes(q)) : COUNTRIES;
-
   return (
     <div ref={ref} style={{ position: "relative", width: 132, flexShrink: 0 }}>
       <button type="button" onClick={() => setOpen((o) => !o)} style={{ ...inputStyle(false), textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -319,13 +340,11 @@ function CountrySelect({ value, onChange }: { value: string; onChange: (iso: str
     </div>
   );
 }
-
 function CountryPicker({ value, hasError, onChange }: { value: string; hasError: boolean; onChange: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement | null>(null);
   const selected = COUNTRIES.find((c) => c.iso2 === value);
-
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -333,10 +352,8 @@ function CountryPicker({ value, hasError, onChange }: { value: string; hasError:
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
-
   const q = norm(query.trim());
   const filtered = q ? COUNTRIES.filter((c) => norm(c.name).includes(q) || c.iso2.toLowerCase().includes(q)) : COUNTRIES;
-
   return (
     <div ref={ref} style={{ position: "relative", width: "100%" }}>
       <button type="button" onClick={() => setOpen((o) => !o)} style={{ ...inputStyle(hasError), textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
