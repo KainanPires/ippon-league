@@ -63,13 +63,20 @@ export default function Comecar() {
   // recibos — e acaba apagada por inatividade sem a pessoa perceber porquê.
   function abrirDeclaracao() {
     if (saving) return;
+    // A VERIFICAÇÃO DO EMAIL VEM PRIMEIRO, antes do validate().
+    //
+    // Estava depois, e nunca chegava a correr: o validate() sai da função assim
+    // que encontra QUALQUER campo por preencher. Com o formulário incompleto —
+    // que é o caso normal enquanto se está a escrever — o aviso do email nunca
+    // aparecia. Só surgiria no clique em que tudo o resto já estivesse certo,
+    // e aí a janela da declaração já tinha aberto por cima.
+    const a = avisoDoEmail(form.email);
+    if (a && !confirmarEmail) { setAviso(a); setConfirmarEmail(true); return; }
     if (!validate()) return;
     if (!supabaseConfigured) {
       setErrors((e) => ({ ...e, email: "A ligação ao servidor não está configurada. Tenta mais tarde." }));
       return;
     }
-    const a = avisoDoEmail(form.email);
-    if (a && !confirmarEmail) { setAviso(a); setConfirmarEmail(true); return; }
     setMostrarDeclaracao(true);
   }
   // Confirmada a declaração, cria a conta de facto.
