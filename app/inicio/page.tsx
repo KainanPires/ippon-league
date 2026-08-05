@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
 import { loadSavedFor, resolve, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
@@ -24,11 +23,9 @@ import { useNivel } from "@/lib/useNivel";
 import { CartaoInstalarApp } from "@/components/InstalarApp";
 import { LembreteNotificacoes } from "@/components/NotificacoesPush";
 import { reconciliarPush } from "@/lib/push";
-
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-
 const STEPS = [
   { title: "Como funciona", text: "Vou mostrar-te o essencial em 1 minuto. Avança quando quiseres — ou pula." },
   { title: "Monta a tua equipa", text: "100 Judocoins, 8 atletas e 1 capitão (pontua a dobrar). É por aqui que começas." },
@@ -36,9 +33,7 @@ const STEPS = [
   { title: "Competições e ligas", text: "Cada Grand Slam ou Mundial é uma rodada. Dispute ligas mundial, nacional e de amigos." },
   { title: "Sobe de faixa", text: "O teu desempenho mensal muda a tua faixa — e o visual do jogo. Boa sorte!" },
 ];
-
 const PRO_BENEFITS = ["Scout avançado: histórico de cada atleta", "Análise do teu time e dica de capitão", "Maior possibilidade de valorização, pela análise", "Acompanhamento ao vivo no dia da competição"];
-
 type TutTarget = "team" | "ligas" | "belt" | "pro" | null;
 function targetForStep(step: number): TutTarget {
   const idx = step - 1;
@@ -47,7 +42,6 @@ function targetForStep(step: number): TutTarget {
   if (idx === 4) return "belt";
   return null;
 }
-
 // ---------------------------------------------------------------------------
 // LIGA TERMINADA? Mesma regra do ecrã /ligas (componente Ligas), de propósito:
 // os dois sítios têm de concordar sempre. Pontos corridos acabam com
@@ -70,7 +64,6 @@ function ligaTerminada(l: LigaBruta): boolean {
   if (String(l.formato) === "copa") return l.copa_estado === "terminada";
   return l.estado === "terminada";
 }
-
 function computeTeamInfo(saved: TeamState): { name: string; value: string; last: number } | null {
   if (saved.ids.length === 0) return null;
   const athletes = resolve(saved.ids);
@@ -79,7 +72,6 @@ function computeTeamInfo(saved: TeamState): { name: string; value: string; last:
   const last = athletes.reduce((s, a) => s + a.last + (a.id === saved.captain ? a.last : 0), 0);
   return { name: loadIdentity().name, value: resolvido ? String(value) : "—", last: resolvido ? last : 0 };
 }
-
 // ---------------------------------------------------------------------------
 // Modais de evento: controlo de "visto" (1x por evento) em localStorage, por
 // utilizador. A chave de cada modal vem do motor (comp-<id>, aniversario-<ano>…).
@@ -93,7 +85,6 @@ function modalVisto(chave: string, userId: string | null | undefined): boolean {
 function marcarModalVisto(chave: string, userId: string | null | undefined) {
   try { localStorage.setItem(modalKey(chave, userId), "1"); } catch {}
 }
-
 export default function Inicio() {
   const [ready, setReady] = useState(false);
   const [visitante, setVisitante] = useState(false);
@@ -103,6 +94,10 @@ export default function Inicio() {
   // ehPro é verdadeiro para Pro E para Pro Max (os níveis são cumulativos).
   const { ehPro: isPro, ehProMax: isProMax } = useNivel();
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
+  // PATRIMÓNIO REAL, de users.patrimony_jc. Não se calcula no ecrã: é o valor
+  // que o motor de congelamento escreve a cada rodada, com as valorizações e
+  // desvalorizações já aplicadas. Ver a nota em TeamBuilt.
+  const [patrimonio, setPatrimonio] = useState<number | null>(null);
   const [modaisFila, setModaisFila] = useState<MensagemEspecial[]>([]);
   const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
   const [minhasLigas, setMinhasLigas] = useState<{ id: string; name: string; membros: number }[] | null>(null);
@@ -120,12 +115,10 @@ export default function Inicio() {
   // equipa" + escudo cinza quando o localStorage não tinha a identidade carregada.
   const [identityResumo, setIdentityResumo] = useState<Identity>(loadIdentity());
   const [, bumpPool] = useState(0);
-
   const beltRef = useRef<HTMLAnchorElement | null>(null);
   const teamRef = useRef<HTMLDivElement | null>(null);
   const ligasRef = useRef<HTMLAnchorElement | null>(null);
   const tutTarget: TutTarget = phase === "tutorial" ? targetForStep(step) : null;
-
   const foco = focoMercado();
   const comp = foco.atual;
   const ehClassico = comp.classico;
@@ -137,24 +130,20 @@ export default function Inicio() {
   // buscar os resultados de 2018 e montava a equipa perfeita.
   const nomeComp = nomeCompeticao(comp);
   const nomeADecorrer = aDecorrer ? nomeCompeticao(aDecorrer) : null;
-
   const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
   const temEquipaCompleta = !!savedTeam && savedTeam.ids.length === 8 && !!savedTeam.captain;
   const destinoEscalar = temEquipaCompleta ? "/meu-time" : "/criar-equipa";
   const nomeMostrado = visitante ? "Campeão" : name;
-
   useEffect(() => {
     let active = true;
     supabase.auth.getSession().then(({ data }: { data: { session: { user?: { id?: string; user_metadata?: { nome?: string } } } | null } }) => {
       if (!active) return;
-
       if (!data.session) {
         setVisitante(true);
         setSavedTeam(null);
         setReady(true);
         return;
       }
-
       setVisitante(false);
       const userId = data.session.user?.id;
       if (userId) setUserIdState(userId);
@@ -186,10 +175,12 @@ export default function Inicio() {
         else setName("Campeão");
         // O nível já vem do useNivel() (tabela `users`) — não se lê do metadata.
         if (userId) {
-          supabase.from("users").select("belt, data_nascimento, country_code").eq("id", userId).maybeSingle()
+          supabase.from("users").select("belt, data_nascimento, country_code, patrimony_jc").eq("id", userId).maybeSingle()
             .then(({ data: row }) => {
               if (!active) return;
               setFaixaJogo(normalizarFaixa(row?.belt));
+              const pat = Number((row as { patrimony_jc?: unknown } | null)?.patrimony_jc);
+              if (Number.isFinite(pat)) setPatrimonio(pat);
               // Modais de evento do dia: junta data civil (aniversário/Dia do
               // Judô/fim/começo de ano) com a grande competição da semana (do
               // calendário; nunca clássicos; continental só do continente do user).
@@ -259,11 +250,9 @@ export default function Inicio() {
         if (!active || !naAlvo || naAlvo.ids.length === 0) return;
         setSavedTeam(naAlvo);
       })();
-
       (async () => {
         const vistos = await desempenhosVistosConta();
         if (!active) return;
-
         if (aDecorrer) {
           if (vistos[aDecorrer.idCompeticao]) return;
           // Já vi o ponto de situação ao vivo desta competição (guardado na CONTA)?
@@ -298,7 +287,6 @@ export default function Inicio() {
           }
           return;
         }
-
         const cong = await buscarResultadosCongelados();
         if (!active || !cong) return;
         if (vistos[cong.comp]) return;
@@ -326,26 +314,21 @@ export default function Inicio() {
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   useEffect(() => {
     if (phase !== "tutorial") return;
     const t = targetForStep(step);
     const el = t === "team" ? teamRef.current : t === "ligas" ? ligasRef.current : t === "belt" ? beltRef.current : null;
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [phase, step]);
-
   const glow = (n: TutTarget) => (tutTarget === n ? "iltut" : undefined);
-
   function finishOnboarding() {
     marcarTutorialVisto("ippon_onboarding");
     setPhase(null);
   }
-
   function openTutorial() {
     setStep(0);
     setPhase("tutorial");
   }
-
   // Fecha o modal de evento da frente da fila: marca-o como visto, grava no sino
   // (para não se perder) e avança para o próximo da fila.
   // Nota: os eventos COM push (aniversário, Dia do Judô) já são gravados no sino
@@ -368,7 +351,6 @@ export default function Inicio() {
     }
     setModaisFila((fila) => fila.slice(1));
   }
-
   async function abrirResumoDaGaleria(compEscolhida: string) {
     const cong = await buscarResultadosCongelados(compEscolhida);
     if (!cong) return;
@@ -390,7 +372,6 @@ export default function Inicio() {
     setDesempenhoDaGaleria(true);
     setGaleriaAberta(false);
   }
-
   // Carrega a identidade REAL da conta para a competição do resumo (nome + escudo
   // gravados na tabela `equipas`). Faz merge sobre a identidade local: começa de
   // loadIdentity() e sobrepõe só o que a cloud trouxer, para nenhum campo do tipo
@@ -409,7 +390,6 @@ export default function Inicio() {
     } catch {}
     setIdentityResumo(base);
   }
-
   if (!ready) {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#7c8a82", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -417,16 +397,13 @@ export default function Inicio() {
       </main>
     );
   }
-
   // Os modais de evento só aparecem fora do tutorial de onboarding e sem outro
   // overlay aberto (resumo da rodada / galeria), para não empilhar pop-ups.
   const modalEvento = modaisFila[0] ?? null;
   const podeMostrarModalEvento = !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta;
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes iltut{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.75)}50%{box-shadow:0 0 0 9px rgba(74,144,217,0.18)}} .iltut{animation:iltut 1.3s ease-in-out infinite} @keyframes ilentrar{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.28)}} .ilentrar{animation:ilentrar 1.5s ease-in-out infinite;border-radius:999px} @keyframes ilmodalin{0%{opacity:0;transform:translateY(10px) scale(0.97)}100%{opacity:1;transform:none}} .ilmodalin{animation:ilmodalin 0.28s cubic-bezier(0.2,0.7,0.3,1)}`}</style>
-
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 14px 86px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           {visitante ? (
@@ -465,10 +442,8 @@ export default function Inicio() {
             <SinoNotificacoes calcOpts={{ temEquipa: temEquipaCompleta }} />
           </div>
         </header>
-
         {/* Convite para instalar a app (PWA). Só aparece a quem ainda não instalou. */}
         <CartaoInstalarApp />
-
         {/* Botão da galeria de resumos (todas as rodadas jogadas). Só para quem tem conta. */}
         {!visitante && (
           <button onClick={() => setGaleriaAberta(true)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 10, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "11px 14px", marginBottom: 14, cursor: "pointer", fontFamily: FB, color: "#f1ede2", textAlign: "left" }}>
@@ -484,7 +459,6 @@ export default function Inicio() {
             <span style={{ color: GOLD, fontSize: 18 }}>›</span>
           </button>
         )}
-
         {isProMax ? (
           <a href="/pro-max-central" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "linear-gradient(135deg,#3f86d6,#7fb8f5)", borderRadius: 14, padding: "13px 14px", marginBottom: 14, textDecoration: "none" }}>
             <div>
@@ -525,14 +499,11 @@ export default function Inicio() {
             <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Assinar</span>
           </a>
         )}
-
         <div ref={teamRef} className={glow("team")}>
-          {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo)} faixa={faixaJogo} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} />}
+          {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo)} faixa={faixaJogo} patrimonio={patrimonio} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} />}
         </div>
-
         {/* Lembrete de notificações: aparece depois de ter equipa montada. */}
         {!visitante && teamInfo && userIdState && <LembreteNotificacoes userId={userIdState} />}
-
         <Card>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
             <CardTitle>{ehClassico ? (emAndamento ? "Clássico atual" : "Próximo clássico") : (emAndamento ? "Competição atual" : "Próxima competição")}</CardTitle>
@@ -564,7 +535,6 @@ export default function Inicio() {
             )}
           </div>
         </Card>
-
         {emAndamento && (
           <Card>
             <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}>
@@ -605,7 +575,6 @@ export default function Inicio() {
             })()}
           </Card>
         )}
-
         <a ref={ligasRef} className={glow("ligas")} href="/ligas" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
           <Card>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: minhasLigas && minhasLigas.length > 0 ? 6 : 0 }}>
@@ -628,24 +597,23 @@ export default function Inicio() {
             )}
           </Card>
         </a>
-
       </div>
-
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 62, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
         <Tab label="Início" active icon={<HomeIcon />} href="/inicio" />
         <Tab label="Competições" icon={<TrophyIcon />} href="/ligas" />
         <Tab label="Atletas" icon={<AthletesIcon />} href="/atletas" />
-        <Tab label="Pro" icon={<BoltIcon />} href={isProMax ? "/pro-max-central" : isPro ? "/pro" : "/ippon-pro"} />
+        {/* Destino ÚNICO: /pro-central decide para onde ir (ver app/pro-central).
+            Assim todas as barras da app apontam para o mesmo sítio e nenhuma
+            precisa de saber o nível — era essa divergência que levava um Pro Max
+            à página de vendas a partir de qualquer ecrã que não este. */}
+        <Tab label="Pro" icon={<BoltIcon />} href="/pro-central" />
       </nav>
-
       {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || "Campeão"} target={tutTarget} cor={corDaFaixa(faixaJogo)} />}
-
       {/* Modais de evento (aniversário, grande competição, etc.). Aparecem 1x por
           evento; em sequência quando coincidem; ao fechar vão para o sino. */}
       {podeMostrarModalEvento && modalEvento && (
         <ModalEvento msg={modalEvento} onClose={fecharModalEvento} cor={corDaFaixa(faixaJogo)} />
       )}
-
       {desempenho && (
         <Desempenho
           dados={desempenho.dados}
@@ -676,7 +644,6 @@ export default function Inicio() {
           }}
         />
       )}
-
       {galeriaAberta && userIdState && (
         <GaleriaResumos
           userId={userIdState}
@@ -687,7 +654,6 @@ export default function Inicio() {
     </main>
   );
 }
-
 async function notificarResumo(idComp: string, nomeComp: string, dados: DesempenhoRodada) {
   try {
     const chaveResumo = `ippon_notif_resumo_${idComp}`;
@@ -705,19 +671,16 @@ async function notificarResumo(idComp: string, nomeComp: string, dados: Desempen
     localStorage.setItem(chaveResumo, "1");
   } catch {}
 }
-
 const iconBtn: React.CSSProperties = {
   width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent",
   color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer",
 };
-
 function Card({ children }: { children: React.ReactNode }) {
   return <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 13, marginBottom: 12 }}>{children}</div>;
 }
 function CardTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>{children}</div>;
 }
-
 function TeamCreate({ corDodo = "#efeadd" }: { corDodo?: string }) {
   return (
     <div style={{ border: "1px solid #2a4d3e", borderRadius: 16, overflow: "hidden", marginBottom: 14, background: "repeating-linear-gradient(45deg,#1c3a2e 0 16px,#1a352a 16px 32px)" }}>
@@ -734,8 +697,17 @@ function TeamCreate({ corDodo = "#efeadd" }: { corDodo?: string }) {
     </div>
   );
 }
-
-function TeamBuilt({ info, fechoTexto, faixa }: { info: { name: string; value: string; last: number }; fechoTexto: string; faixa: Faixa }) {
+// `patrimonio` = users.patrimony_jc, o valor REAL.
+//
+// Antes calculava-se aqui `100 - valor da equipa`. Isso não é o património: é o
+// SALDO que sobra para gastar, e parte sempre de 100 fixo — por isso nunca
+// oscilava, por mais que os atletas valorizassem. Alguém com 116,2 JC na base
+// via "JC 2,8" no ecrã.
+//
+// São duas coisas diferentes e a app confundia-as:
+//   Património = quanto vale ao todo (equipa + saldo). Evolui a cada rodada.
+//   Saldo      = quanto sobra para comprar. É o 100 - valor da equipa.
+function TeamBuilt({ info, fechoTexto, faixa, patrimonio }: { info: { name: string; value: string; last: number }; fechoTexto: string; faixa: Faixa; patrimonio: number | null }) {
   return (
     <div style={{ border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
       <div style={{ background: "#1c3a2e", padding: 9, textAlign: "center", fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aee9c9" }}>A minha equipa</div>
@@ -751,10 +723,10 @@ function TeamBuilt({ info, fechoTexto, faixa }: { info: { name: string; value: s
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", textAlign: "center", marginBottom: 12 }}>
           {(() => {
-            const temValor = info.value !== "—";
-            const valorNum = temValor ? Number(info.value) : 0;
-            const patrimonio = temValor ? `JC ${Math.round((100 - valorNum) * 10) / 10}` : "—";
-            return [[patrimonio, "Património"], [String(info.last), "Última"], [`JC ${info.value}`, "Valor"]].map(([v, l]) => (
+            // Enquanto o património não chega da base, mostra "—" em vez de um
+            // número inventado: um valor errado é pior do que um traço.
+            const pat = patrimonio !== null ? `JC ${Math.round(patrimonio * 10) / 10}` : "—";
+            return [[pat, "Património"], [String(info.last), "Última"], [`JC ${info.value}`, "Valor"]].map(([v, l]) => (
               <div key={l}>
                 <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: l === "Património" ? GOLD : "#f1ede2" }}>{v}</div>
                 <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{l}</div>
@@ -770,7 +742,6 @@ function TeamBuilt({ info, fechoTexto, faixa }: { info: { name: string; value: s
     </div>
   );
 }
-
 function Tab({ label, icon, active, href }: { label: string; icon: React.ReactNode; active?: boolean; href?: string }) {
   const baseStyle: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? GOLD : "#6f7d76", textDecoration: "none" };
   const content = (
@@ -781,7 +752,6 @@ function Tab({ label, icon, active, href }: { label: string; icon: React.ReactNo
   );
   return href ? <a href={href} style={baseStyle}>{content}</a> : <div style={baseStyle}>{content}</div>;
 }
-
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.78)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 100 }}>
@@ -789,7 +759,6 @@ function Overlay({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
 // Modal de evento (estilo tutorial, com o Dôdo). Um botão único; ao fechar, o
 // chamador marca como visto, grava no sino e avança para o próximo da fila.
 // `cor` = a faixa REAL do jogador. Era fixa em #141110 (quase preto), o que dava
@@ -815,7 +784,6 @@ function ModalEvento({ msg, onClose, cor }: { msg: MensagemEspecial; onClose: ()
     </Overlay>
   );
 }
-
 // `cor` = a faixa REAL do jogador (ver a nota do ModalEvento).
 // CUIDADO: a variável `isPro` aqui dentro é LOCAL e significa "este é o passo do
 // Ippon Pro" — não tem nada a ver com a subscrição do utilizador.
@@ -824,7 +792,6 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
   const isWelcome = step === 0;
   const isPro = step === STEPS.length + 1;
   const teach = STEPS[step - 1];
-
   if (target) {
     const title = isPro ? "Ippon Pro" : teach.title;
     const text = isPro
@@ -850,7 +817,6 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
       </div>
     );
   }
-
   return (
     <Overlay>
       <div style={{ textAlign: "right", marginBottom: 8 }}>
@@ -861,7 +827,6 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
           <div key={i} style={{ flex: 1, height: 4, borderRadius: 999, background: i <= step ? GOLD : "#3a463f" }} />
         ))}
       </div>
-
       {isWelcome ? (
         <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -922,7 +887,6 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
     </Overlay>
   );
 }
-
 function HomeIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
