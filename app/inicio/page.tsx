@@ -155,6 +155,14 @@ export default function Inicio() {
       // telemóvel (permissão já concedida → ativarPush nunca corria → a conta nova
       // ficava sem push). Seguro: não faz nada sem permissão/subscrição.
       if (userId) { void reconciliarPush(userId); }
+      // MARCA ATIVIDADE. É isto que impede uma conta de ser apagada por
+      // inatividade — e por isso é "abrir a app", não "escalar": quem abre para
+      // ver o ranking está a usar o produto na mesma.
+      //
+      // Não se usa o `last_sign_in_at` do Supabase porque esse só regista logins
+      // NOVOS: quem fica com a sessão aberta no telemóvel durante meses nunca
+      // volta a fazer login, e apareceria como inativo estando cá todos os dias.
+      supabase.rpc("ippon_marcar_atividade").then(() => {}, () => {});
       if (userId) {
         fetch(`/api/liga/minhas?user_id=${userId}`)
           .then((r) => r.json())
