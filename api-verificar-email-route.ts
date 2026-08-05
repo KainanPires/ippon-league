@@ -42,8 +42,25 @@ function novoToken(): string {
   return Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join("");
 }
 
+// Escapa texto para HTML.
+//
+// NOTA sobre a forma como está escrito: as entidades são montadas a partir dos
+// seus códigos numéricos em vez de aparecerem literais no código. Parece um
+// rodeio, mas tem razão de ser — a versão com "&quot;" escrito à letra já se
+// corrompeu uma vez ao passar por um documento Word (ficou como três aspas
+// seguidas, sintaxe inválida, e a rota deixou de compilar sem que o deploy
+// acusasse nada). Assim o ficheiro sobrevive a qualquer conversão de texto.
+const E_AMP = String.fromCharCode(38) + "amp;";
+const E_LT = String.fromCharCode(38) + "lt;";
+const E_GT = String.fromCharCode(38) + "gt;";
+const E_QUOT = String.fromCharCode(38) + "quot;";
+
 function esc(v: string): string {
-  return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return String(v)
+    .split("&").join(E_AMP)
+    .split("<").join(E_LT)
+    .split(">").join(E_GT)
+    .split(String.fromCharCode(34)).join(E_QUOT);
 }
 
 function baseUrl(req: Request): string {
