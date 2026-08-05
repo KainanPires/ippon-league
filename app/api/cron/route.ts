@@ -80,6 +80,14 @@ const CATS: { cat: string; gender: "M" | "F" }[] = [
 
 // Linha especial no cache que guarda quem está a competir AGORA.
 const CHAVE_AO_VIVO = "_a_competir_agora";
+// Linha especial no cache que marca o que JÁ foi feito uma vez. Sem isto, uma
+// tarefa "do dia 1" corria a cada corrida do cron — e como ele passou a correr
+// de HORA A HORA, isso deu 24 recálculos de faixa a 1 de agosto, com 24 rondas
+// de notificações a cada utilizador. (Foi assim que aconteceu: a guarda "só no
+// dia 1" bastava quando o cron era diário, e deixou de bastar sem ninguém
+// reparar. Tarefas de "uma vez por período" precisam de marca própria, não de
+// depender da frequência com que o cron é chamado.)
+const CHAVE_FEITO = "_feito_uma_vez";
 // Linha especial no cache que guarda o CURSOR dos preços: { comp, dia, indice }.
 // Vive no atletas_cache para não precisar de tabela nova (mesmo padrão do ao-vivo).
 const CHAVE_CURSOR_PRECOS = "_cursor_precos";
@@ -147,6 +155,38 @@ function baseUrl(req: Request): string {
   } catch {
     return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
   }
+}
+
+// ---------------------------------------------------------------------------
+// MARCAS DE "JÁ FEITO" — para tarefas que só devem correr UMA VEZ por período.
+//
+// Guardadas todas numa linha do atletas_cache, como um objeto { marca: ISO }.
+// Uma linha só (e não uma por marca) porque são poucas e lidas em conjunto.
+// ---------------------------------------------------------------------------
+async function lerFeitos(): Promise<Record<string, string>> {
+  if (!supabaseAdmin) return {};
+  try {
+    const { data } = await supabaseAdmin
+      .from("atletas_cache").select("atletas").eq("id_competition", CHAVE_FEITO).maybeSingle();
+    const a = data?.atletas;
+    return (a && typeof a === "object" && !Array.isArray(a)) ? (a as Record<string, string>) : {};
+  } catch { return {}; }
+}
+
+async function marcarFeito(marca: string): Promise<void> {
+  if (!supabaseAdmin) return;
+  try {
+    const atuais = await lerFeitos();
+    await supabaseAdmin.from("atletas_cache").upsert(
+      {
+        id_competition: CHAVE_FEITO,
+        atletas: { ...atuais, [marca]: new Date().toISOString() },
+        total: Object.keys(atuais).length + 1,
+        atualizado_em: new Date().toISOString(),
+      },
+      { onConflict: "id_competition" }
+    );
+  } catch { /* se falhar, no pior caso repete-se — não se perde trabalho */ }
 }
 
 /** Chave do dia ("AAAA-MM-DD") para o cursor reiniciar todos os dias. */
@@ -1117,6 +1157,11 @@ export async function GET(req: Request) {
     if (haTempo(t0, MS_MARGEM_ETAPA)) ligasEncerradas = await encerrarLigasTerminadas(hoje);
   } catch { /* não bloqueia */ }
 
+  // Tarefas de "uma vez por período" que esta corrida saltou por já estarem
+  // feitas. Vai na resposta: sem isto, uma corrida que não faz nada é
+  // indistinguível de uma que falhou em silêncio.
+  const jaFeitoHoje: string[] = [];
+
   // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
   //     também forçar via ?faixas=AAAA-MM para teste manual.
   let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; gravadas: number; falhadas: number; primeiroErro: string | null; minJogadores: number; minVindoDoAmbiente: boolean; minBruto: string | null } | null = null;
@@ -1127,8 +1172,19 @@ export async function GET(req: Request) {
       faixas = { mes: forcarFaixas, ...r };
     } else if (hoje.getDate() === 1 && haTempo(t0, MS_MARGEM_ETAPA)) {
       const mes = mesAnteriorDe(hoje);
-      const r = await recalcularFaixas(mes);
-      faixas = { mes, ...r };
+      // UMA VEZ POR MÊS. A marca é o próprio mês recalculado, por isso a segunda
+      // corrida do dia 1 (e todas as outras) encontra-a e não repete. Sem isto,
+      // com o cron de hora a hora, cada jogador recebia 24 notificações de faixa
+      // no mesmo dia.
+      const feitos = await lerFeitos();
+      const marca = `faixas_${mes}`;
+      if (!feitos[marca]) {
+        const r = await recalcularFaixas(mes);
+        faixas = { mes, ...r };
+        await marcarFeito(marca);
+      } else {
+        jaFeitoHoje.push(marca);
+      }
     }
   } catch { /* não bloqueia */ }
 
@@ -1137,7 +1193,18 @@ export async function GET(req: Request) {
   let fechoAnual: { ano: number; mundial: number; continentais: Record<string, number> } | null = null;
   try {
     if (hoje.getDate() === 1 && hoje.getMonth() === 0 && haTempo(t0, MS_MARGEM_ETAPA)) { // 1 de janeiro
-      fechoAnual = await fecharAnoOficial(hoje.getFullYear() - 1);
+      // UMA VEZ POR ANO, pela mesma razão das faixas: a 1 de janeiro o cron
+      // corre 24 vezes, e sem marca reescrevia o pódio (e as notificações de
+      // campeão) a cada hora.
+      const anoFechar = hoje.getFullYear() - 1;
+      const feitos = await lerFeitos();
+      const marca = `ano_${anoFechar}`;
+      if (!feitos[marca]) {
+        fechoAnual = await fecharAnoOficial(anoFechar);
+        await marcarFeito(marca);
+      } else {
+        jaFeitoHoje.push(marca);
+      }
     }
   } catch { /* não bloqueia */ }
 
@@ -1228,6 +1295,7 @@ export async function GET(req: Request) {
     ligas_encerradas: ligasEncerradas,
     faixas,
     fecho_anual: fechoAnual,
+    ja_feito: jaFeitoHoje,
     mercado,
     datas,
     // Estado dos preços nesta corrida (cursor): de onde partiu, onde ficou.
