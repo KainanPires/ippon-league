@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
@@ -18,11 +17,9 @@ import { useNivel } from "@/lib/useNivel";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
 import { useTatame } from "@/components/TatameProvider";
-
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-
 // FAIXA: vem do useFaixa() — a faixa REAL do jogador, a mesma em toda a app.
 //
 // Antes havia aqui `const BELT = "Branca"` e `BELT_HEX = "#efeadd"` fixos, e este
@@ -30,11 +27,8 @@ const GOLD = "#d9a441";
 // quem fosse preta. O cartão de partilha saía igualmente com "Branca". Era o
 // sítio mais errado da app quanto a isto — e o mais visível, porque é onde o
 // jogador passa mais tempo.
-
 const TICK_AO_VIVO_MS = 15000;
-
 type MarketPhase = "aberto" | "fechado" | "ao-vivo";
-
 const IOC: Record<string, string> = {
   JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
   TR: "TUR", UZ: "UZB", RU: "AIN", DE: "GER", XK: "KOS", IT: "ITA", CA: "CAN",
@@ -42,7 +36,6 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
-
 // Tutorial de EDIÇÃO (mercado aberto). Todas as setas apontam para cima (os
 // elementos destacados estão acima do balão, que fica em baixo). `target` indica
 // o que pulsa em cada passo.
@@ -61,18 +54,15 @@ const STEPS_COMPETICAO = [
 ];
 const TUT_EDICAO_KEY: TutKey = "ippon_meutime_tut_edicao";
 const TUT_COMP_KEY: TutKey = "ippon_meutime_tut_competicao";
-
 function sameTeam(a: TeamState, b: TeamState): boolean {
   if ((a.captain || "") !== (b.captain || "")) return false;
   if (a.ids.length !== b.ids.length) return false;
   return [...a.ids].sort().join(",") === [...b.ids].sort().join(",");
 }
-
 type Modal =
   | { kind: "saved" | "trash" | "share" | "leave" | "missing" | "incompleta" }
   | { kind: "athlete"; a: Athlete }
   | null;
-
 // useSearchParams() exige um limite de Suspense no Next.js — o componente real
 // vive em MeuTimeRouter, envolvido aqui.
 export default function MeuTime() {
@@ -82,7 +72,6 @@ export default function MeuTime() {
     </Suspense>
   );
 }
-
 // Decide entre o TEU dojo VIVO (MeuTimeInner — editável / em competição) e o
 // MODO VISITA (só-leitura) — ver um dojo via ?ver=<user>&comp=<id>, vindo da
 // liga ou da chave da Copa.
@@ -97,7 +86,6 @@ function MeuTimeRouter() {
   const comp = searchParams.get("comp");
   // undefined = ainda não sabemos quem somos; null = sem sessão; string = uid.
   const [meuId, setMeuId] = useState<string | null | undefined>(undefined);
-
   useEffect(() => {
     let active = true;
     supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
@@ -107,12 +95,10 @@ function MeuTimeRouter() {
     });
     return () => { active = false; };
   }, []);
-
   // A competição "viva" agora: a que decorre (mercado fechado) ou a próxima de
   // mercado aberto. Serve para distinguir o meu dojo editável de uma ronda passada.
   const foco = focoMercado();
   const compViva = (foco.aDecorrer ?? foco.alvo).idCompeticao;
-
   if (ver && comp) {
     // Ainda a descobrir quem sou: espera (evita piscar o dojo errado).
     if (meuId === undefined) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
@@ -123,7 +109,6 @@ function MeuTimeRouter() {
   }
   return <MeuTimeInner />;
 }
-
 // ===========================================================================
 // MODO VISITA — ver um DOJO em só-leitura (rival na liga, ou qualquer equipa
 // numa ronda da Copa, incluindo a minha própria numa ronda passada).
@@ -148,7 +133,6 @@ type ItemVisita = {
   gender?: string;    // "M" | "F" quando a pool resolveu
   athlete?: Athlete;  // Athlete completo da pool (para a grelha e o detalhe)
 };
-
 function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string }) {
   const router = useRouter();
   const [fase, setFase] = useState<"carregando" | "sem-equipa" | "erro" | "ok" | "bloqueado">("carregando");
@@ -169,10 +153,8 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   // A MINHA faixa (do hook partilhado). Serve para o Dôdo e para o cartão de
   // partilha — que só aparece quando o dojo é meu, por isso é sempre a certa.
   const { cor: corFaixa, nome: nomeFaixa } = useFaixa();
-
   const foco = focoMercado();
   const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp;
-
   // Rodada + data desta competição, tiradas do calendário local pelo idComp
   // (mais robusto do que depender da API). A data vem no formato AAAA/MM/DD e
   // mostramo-la como DD/MM/AAAA. rodadaNum é o nº da rodada (1..52) ou null.
@@ -192,7 +174,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
     const ent = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
     return ent ? nomeCompeticao(ent) : nomeComp;
   })();
-
   // 1) Sessão (exige login) + equipa do alvo (servidor) + pool da competição.
   useEffect(() => {
     let active = true;
@@ -205,12 +186,10 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
       const euMesmo = meuId === alvoUserId;
       setSouEu(euMesmo);
       // O nível vem do useNivel() (ver abaixo), não do metadata.
-
       const poolP = fetch(`/api/atletas?id=${idComp}`).then((r) => r.json()).catch(() => null);
       const eqP = fetch(`/api/equipa-na-rodada?user=${encodeURIComponent(alvoUserId)}&comp=${encodeURIComponent(idComp)}`).then((r) => r.json()).catch(() => null);
       const [poolJson, eqJson] = await Promise.all([poolP, eqP]);
       if (!active) return;
-
       if (!eqJson || !eqJson.ok) { setFase("erro"); return; }
       if (typeof eqJson?.competicao?.nome === "string") setNomeComp(eqJson.competicao.nome);
       // Portão do servidor: mercado ainda aberto -> não há escalação para mostrar.
@@ -220,11 +199,9 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
         setFase("sem-equipa");
         return;
       }
-
       const pool = new Map<string, Athlete>();
       const lista: Athlete[] = Array.isArray(poolJson?.atletas) ? poolJson.atletas : [];
       for (const a of lista) pool.set(a.id, a);
-
       const base: { id: unknown; nome?: unknown; pais?: unknown; categoria?: unknown; pontos?: unknown; capitao?: unknown }[] =
         Array.isArray(eqJson.atletas) ? eqJson.atletas : [];
       const novosItens: ItemVisita[] = base.map((a) => {
@@ -242,7 +219,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
       });
       const pontosBase: Record<string, number> = {};
       for (const a of base) pontosBase[String(a.id)] = Number(a.pontos) || 0;
-
       setItens(novosItens);
       setCapitao(eqJson.capitao ? String(eqJson.capitao) : null);
       setNomeTime(String(eqJson.nome_time || "Equipa"));
@@ -256,7 +232,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alvoUserId, idComp]);
-
   // 2) Pontos AO VIVO — só quando esta é a competição que decorre agora.
   useEffect(() => {
     if (fase !== "ok" || !aDecorrerAgora || itens.length === 0) return;
@@ -287,7 +262,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase, aDecorrerAgora, itens, idComp]);
-
   const scoreOf = (id: string, cap: boolean) => { const b = pontos[id] ?? 0; return cap ? b * 2 : b; };
   const totalPts = Math.round(itens.reduce((s, i) => s + scoreOf(i.id, i.capitao), 0) * 10) / 10;
   // Grelha de tatame só quando a pool deu género (e Athlete) para TODOS. Senão,
@@ -300,7 +274,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   const horaTick = ultimaAtualizacao
     ? new Date(ultimaAtualizacao).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <style>{`@keyframes ilp{0%,100%{opacity:1}50%{opacity:.25}} .ilp{animation:ilp 1.1s ease-in-out infinite}`}</style>
@@ -311,21 +284,18 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
           </button>
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>{souEu ? "O teu dojo" : "Dojo do rival"}</h1>
         </header>
-
         {fase === "carregando" && (
           <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
             <div style={{ width: 80, height: 80, margin: "0 auto 8px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>A abrir o dojo…</div>
           </div>
         )}
-
         {fase === "erro" && (
           <div style={{ textAlign: "center", padding: "30px 16px", background: "#1a1110", border: "1px solid #3a2420", borderRadius: 16 }}>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#ef8d83", marginBottom: 8 }}>Ups</div>
             <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Não foi possível abrir este dojo agora. Tenta de novo daqui a pouco.</p>
           </div>
         )}
-
         {fase === "sem-equipa" && (
           <div style={{ textAlign: "center", padding: "26px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
             <div style={{ width: 90, height: 90, margin: "0 auto 6px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
@@ -333,7 +303,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
             <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{souEu ? "Não escalaste equipa nesta competição." : "Este treinador não escalou equipa nesta competição."}</p>
           </div>
         )}
-
         {fase === "bloqueado" && (
           <div style={{ textAlign: "center", padding: "28px 18px", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16 }}>
             <div style={{ fontSize: 32, marginBottom: 6 }}>🔒</div>
@@ -344,7 +313,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
             </p>
           </div>
         )}
-
         {fase === "ok" && (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
@@ -356,7 +324,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
                 {linhaRodada && <div style={{ fontSize: 11, color: "#93a39a", marginTop: 1 }}>{linhaRodada}</div>}
               </div>
             </div>
-
             {podeGrelha ? (
               <section style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
                 <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
@@ -397,7 +364,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
                 })}
               </div>
             )}
-
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={corFaixa} expression={phase === "ao-vivo" ? "determinado" : "feliz"} /></div>
@@ -411,7 +377,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
                 <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
               </div>
             </div>
-
             {aDecorrerAgora && horaTick && (
               <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 11, color: "#7fd1a3" }}>
@@ -420,13 +385,11 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
                 </div>
               </div>
             )}
-
             <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
               {podeGrelha
                 ? (souEu ? "A tua equipa nesta rodada. Toca num atleta para ver como pontuou." : "Estás a ver o dojo de um rival. Toca num atleta para ver como pontuou.")
                 : "Pontos de cada atleta nesta competição. O capitão (CAP) conta a dobrar no total."}
             </p>
-
             {/* Partilhar a minha equipa desta rodada. Só quando o dojo é meu —
                 partilhar a equipa de um rival como se fosse minha não faz sentido. */}
             {souEu && itens.length > 0 && (
@@ -438,7 +401,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
           </>
         )}
       </div>
-
       {modal && (
         <AthleteDetail
           a={modal}
@@ -452,7 +414,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
           onClose={() => setModal(null)}
         />
       )}
-
       {partilhar && (
         <CartaoEquipa
           identity={escudoAlvo || DEFAULT_IDENTITY}
@@ -466,7 +427,6 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
     </main>
   );
 }
-
 function MeuTimeInner() {
   const [team, setTeam] = useState<TeamState>({ ids: [], captain: null }); // rascunho (editável)
   const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null }); // guardado (referência p/ dirty)
@@ -511,7 +471,6 @@ function MeuTimeInner() {
   // salvar uma nova substitui-a. (Fluxo pedido pelo Kainan.)
   const searchParams = useSearchParams();
   const montar = searchParams.get("montar") === "1";
-
   const foco = focoMercado();
   const atual = foco.atual;
   const emAndamento = foco.aDecorrer !== null;
@@ -521,14 +480,15 @@ function MeuTimeInner() {
   // Quem sou eu (para o lembrete "esqueceste de salvar"). Guardado quando a
   // sessão é confirmada; usado pelo hook do lembrete.
   const [userId, setUserId] = useState<string | null>(null);
-
+  // PATRIMÓNIO REAL (users.patrimony_jc): o que a equipa vale ao todo, com as
+  // valorizações já aplicadas pelo motor de congelamento. Não se calcula aqui.
+  const [patrimonio, setPatrimonio] = useState<number | null>(null);
   // LEMBRETE "esqueceste de salvar o teu time" — hook reutilizável. Observa a
   // saída do ecrã e agenda/cancela conforme há (ou não) rascunho por salvar para
   // esta competição. A lógica (rascunho vs guardado) vive no hook, partilhada com
   // o Mercado, por isso aqui basta uma linha. O servidor recusa agendar com o
   // mercado fechado, por isso não é preciso filtrar a competição aqui.
   useLembreteSalvar(userId, idComp);
-
   useEffect(() => {
     let active = true;
     try {
@@ -586,7 +546,16 @@ function MeuTimeInner() {
       setReady(true);
       try {
         const uid = (data.session as { user?: { id?: string } } | null)?.user?.id;
-        if (uid) setUserId(uid);
+        if (uid) {
+          setUserId(uid);
+          // Património real, da mesma fonte que o /inicio.
+          supabase.from("users").select("patrimony_jc").eq("id", uid).maybeSingle()
+            .then(({ data: row }) => {
+              if (!active) return;
+              const p = Number((row as { patrimony_jc?: unknown } | null)?.patrimony_jc);
+              if (Number.isFinite(p)) setPatrimonio(p);
+            });
+        }
       } catch {}
       // O nível vem do useNivel() (tabela `users`), não do metadata.
       // Tutoriais já vistos na CONTA — buscar uma vez (decide o tutorial só
@@ -605,7 +574,6 @@ function MeuTimeInner() {
             ...(idc.name ? { name: idc.name } : {}),
           }));
         }).catch(() => {});
-
         const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
         if (!active) return;
         if (naDecorrer && naDecorrer.ids.length > 0 && aDecorrer) {
@@ -639,7 +607,6 @@ function MeuTimeInner() {
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   // Pontos reais + tick ao vivo.
   //
   // PORTÃO ANTI-ESPREITADELA (cliente): enquanto o mercado desta competição
@@ -707,11 +674,9 @@ function MeuTimeInner() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idComp]);
-
   // Modo atual (edição vs competição) para decidir qual tutorial. Calculado também
   // aqui (antes do return) para o efeito de "primeira vez" poder usá-lo.
   const emCompeticaoNow = emAndamento && idComp === atual.idCompeticao && team.ids.length > 0;
-
   // TUTORIAL — primeira vez: abre automaticamente uma vez por modo. Só decide
   // DEPOIS de sabermos o que já foi visto na CONTA (vistosConta !== null). Sem
   // isto, o efeito corria antes da conta responder e o tutorial reaparecia mesmo
@@ -730,9 +695,7 @@ function MeuTimeInner() {
     setGuide(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, vistosConta, emCompeticaoNow]);
-
   if (!ready) return <main style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
-
   // RESOLUÇÃO RICA: separa os atletas que a pool conhece (resolvidos) dos que
   // já não estão na pool (ausentes — ex.: saíram dos inscritos da competição).
   // Em vez de os esconder (bug antigo do resolve + filter), mostramo-los numa
@@ -752,7 +715,11 @@ function MeuTimeInner() {
   const males = athletes.filter((a) => a.gender === "M");
   const females = athletes.filter((a) => a.gender === "F");
   const squadValue = fmt(athletes.reduce((s, a) => s + a.priceJc, 0));
-  const saldo = jcLeft(team); // o que sobra para gastar (mostrado como 'Património')
+  // SALDO: o que sobra dos 100 para comprar. É diferente de PATRIMÓNIO — e o
+  // ecrã chamava-lhe património, o que fazia parecer que este nunca oscilava.
+  //   Património = quanto vale ao todo (equipa + saldo). Evolui a cada rodada.
+  //   Saldo      = quanto sobra para gastar agora.
+  const saldo = jcLeft(team);
   const scoreOf = (a: Athlete) => {
     const base = pontos[a.id] ?? 0;
     return a.id === team.captain ? base * 2 : base;
@@ -766,16 +733,13 @@ function MeuTimeInner() {
   // Tema de cor do tatame (Pro Max). tatamePorId cai no default se o id não
   // existir, por isso isto é sempre seguro.
   const tema = tatamePorId(tatameId);
-
   // Tutorial ativo conforme o momento + qual elemento destacar agora.
   const passos = emCompeticao ? STEPS_COMPETICAO : STEPS_EDICAO;
   const passoAtual = guide !== null ? passos[guide] : null;
   const destaque = passoAtual?.target ?? null; // "topo" | "vazio" | "atletas" | "total" | "guardar"
-
   const horaTick = ultimaAtualizacao
     ? new Date(ultimaAtualizacao).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
-
   // ---- Edição (só quando editável) ----
   function update(next: TeamState) {
     setTeam(next);
@@ -803,14 +767,12 @@ function MeuTimeInner() {
     setModal(null);
     router.push("/mercado?montar=1");
   }
-
   // Depois de fechar o aviso "e agora?": não voltamos a mostrar o modal "Equipa
   // salva" (o aviso já o disse, e melhor). Só a avaliação, se for altura.
   function fecharAvisoGuardada() {
     setAvisoGuardada(false);
     if (temNomeProprio(identity) && devePedirAvaliacao()) setMostrarAvaliacao(true);
   }
-
   async function salvar(destino?: string | null) {
     if (!isComplete(team)) { setModal({ kind: "missing" }); return; }
     setSavingCloud(true);
@@ -879,11 +841,9 @@ function MeuTimeInner() {
     setLeaveTo(null);
     if (destino) router.push(destino);
   }
-
   // Lugares vazios para completar a equipa (4 masc + 4 fem).
   const vagasM = Math.max(0, 4 - males.length);
   const vagasF = Math.max(0, 4 - females.length);
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <style>{`@keyframes ilp{0%,100%{opacity:1}50%{opacity:.25}} .ilp{animation:ilp 1.1s ease-in-out infinite} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:14px} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
@@ -895,7 +855,6 @@ function MeuTimeInner() {
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>Meu Time</h1>
           <button onClick={() => { setTutKeyAberta(emCompeticao ? TUT_COMP_KEY : TUT_EDICAO_KEY); setGuide(0); }} aria-label="Como funciona" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
         </header>
-
         {(!temEquipa || equipaIrresoluvel) ? (
           <div style={{ textAlign: "center", padding: "26px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
             <div style={{ width: 96, height: 96, margin: "0 auto 6px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
@@ -924,11 +883,14 @@ function MeuTimeInner() {
               <div className={destaque === "topo" ? "ilglow" : undefined} style={{ display: "flex", gap: 8, padding: 2 }}>
                 <div style={{ background: "#141a17", border: `1px solid #2a4d3e`, borderRadius: 12, padding: "8px 16px", textAlign: "right" }}>
                   <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em" }}>Património</div>
-                  <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: GOLD }}>JC {fmt(saldo)}</div>
+                  <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: GOLD }}>
+                    {patrimonio !== null ? `JC ${fmt(patrimonio)}` : "—"}
+                  </div>
+                  {/* O saldo também interessa aqui: é com ele que se compra. */}
+                  <div style={{ fontSize: 10, color: "#7c8a82", marginTop: 2 }}>Saldo JC {fmt(saldo)}</div>
                 </div>
               </div>
             </div>
-
             {/* AVISO de atletas indisponíveis: a equipa tem ids que já não estão
                 na competição (saíram dos inscritos). Mostramo-los em baixo para
                 a equipa não parecer mais pequena, e explicamos o que fazer. */}
@@ -950,7 +912,6 @@ function MeuTimeInner() {
                 </div>
               </div>
             )}
-
             <section className={destaque === "atletas" || destaque === "vazio" ? "ilglow" : undefined} style={{ background: tema.foraBg, border: `2px solid ${tema.foraBorda}`, borderRadius: 16, padding: 10 }}>
               <div style={{ background: tema.dentroBg, border: `2px solid ${tema.dentroBorda}`, borderRadius: 10, padding: "12px 10px" }}>
                 <SectionLabel>Masculino</SectionLabel>
@@ -965,7 +926,6 @@ function MeuTimeInner() {
                 </div>
               </div>
             </section>
-
             {/* SELETOR DE COR DO TATAME (Pro Max). Botão discreto por baixo do
                 tatame. Pro Max escolhe entre os 5 temas; não-Pro-Max vê o painel
                 bloqueado, com convite a subir. Guarda no servidor (/api/tatame). */}
@@ -979,7 +939,6 @@ function MeuTimeInner() {
                 void setTatame(id);
               }}
             />
-
             {/* SECÇÃO DE INDISPONÍVEIS: atletas guardados na equipa que a pool já
                 não conhece (sem dados de nome/género/preço). Mostramos só o id e,
                 se editável, um botão para os remover. Fora da grelha M/F porque
@@ -1007,7 +966,6 @@ function MeuTimeInner() {
                 </div>
               </div>
             )}
-
             <div className={destaque === "total" ? "ilglow" : undefined} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={corFaixa} expression={emCompeticao ? "determinado" : "feliz"} /></div>
@@ -1027,7 +985,6 @@ function MeuTimeInner() {
                 <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{emCompeticao ? "pts" : "valor"}</div>
               </div>
             </div>
-
             {emCompeticao ? (
               <>
               <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
@@ -1063,7 +1020,6 @@ function MeuTimeInner() {
           </>
         )}
       </div>
-
       {/* Barra fixa de guardar — só quando há alterações por guardar (prende para salvar). */}
       {dirty && (
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 60 }}>
@@ -1073,7 +1029,6 @@ function MeuTimeInner() {
           </div>
         </div>
       )}
-
       {modal?.kind === "athlete" && (
         <AthleteDetail
           a={modal.a}
@@ -1087,7 +1042,6 @@ function MeuTimeInner() {
           onClose={() => setModal(null)}
         />
       )}
-
       {modal?.kind === "missing" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -1106,7 +1060,6 @@ function MeuTimeInner() {
           </div>
         </div>
       )}
-
       {modal?.kind === "saved" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -1121,7 +1074,6 @@ function MeuTimeInner() {
           </div>
         </div>
       )}
-
       {modal?.kind === "trash" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -1133,7 +1085,6 @@ function MeuTimeInner() {
           </div>
         </div>
       )}
-
       {modal?.kind === "leave" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -1145,7 +1096,6 @@ function MeuTimeInner() {
           </div>
         </div>
       )}
-
       {modal?.kind === "share" && (
         <CartaoEquipa
           identity={identity}
@@ -1157,7 +1107,6 @@ function MeuTimeInner() {
           onClose={() => setModal(null)}
         />
       )}
-
       {modal?.kind === "incompleta" && (
         <div style={overlayBg}>
           <div style={cardBox}>
@@ -1175,14 +1124,11 @@ function MeuTimeInner() {
           </div>
         </div>
       )}
-
       {mostrarAvaliacao && (
         <Avaliacao nomeTime={identity.name} onClose={() => setMostrarAvaliacao(false)} />
       )}
-
       {/* AVISO "e agora?" — logo depois de guardar a equipa, uma vez. */}
       {avisoGuardada && <AvisoEquipaGuardada onFechar={fecharAvisoGuardada} />}
-
       {guide !== null && passoAtual && (
         <TutorialMeuTime
           passos={passos}
@@ -1206,11 +1152,9 @@ function MeuTimeInner() {
     </main>
   );
 }
-
 /* =========================================================================
  * DECOMPOSIÇÃO LUTA-A-LUTA (popup do atleta)
  * ========================================================================= */
-
 interface Rubrica { label: string; quantidade: number; pontos: number; negativo: boolean }
 interface LutaDetalhe {
   id_fight: string;
@@ -1225,9 +1169,7 @@ type EstadoDetalhe =
   | { fase: "erro" }
   | { fase: "vazio"; estadoTexto?: string }
   | { fase: "ok"; lutas: LutaDetalhe[]; total: number };
-
 const sinal = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
-
 function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onCaptain, onSell, onClose }: { a: Athlete; captain: boolean; score: number; temResultados: boolean; editavel: boolean; idComp: string; onCaptain: () => void; onSell: () => void; onClose: () => void }) {
   const up = a.variation >= 0;
   const [detalhe, setDetalhe] = useState<EstadoDetalhe>({ fase: "carregando" });
@@ -1235,7 +1177,6 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
   // pedimos. (Ver o portão anti-espreitadela no MeuTimeInner e no servidor.)
   const podeVerPontos = pontosVisiveisPorId(idComp);
   const mostrarResultados = temResultados && podeVerPontos;
-
   // Resumo de lutas (para o card "Desempenho" durante a competição). Conta
   // vitórias/derrotas a partir do detalhe já carregado — sem chamadas extra.
   const resumoLutas = (() => {
@@ -1247,7 +1188,6 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
     }
     return { lutas: detalhe.lutas.length, vitorias: v, derrotas: d };
   })();
-
   // Busca a decomposição luta-a-luta só quando há resultados (competição a
   // decorrer ou encerrada) E o mercado já fechou. Sem isso não faz sentido
   // (e poupa a chamada).
@@ -1271,7 +1211,6 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
       .catch(() => { if (active) setDetalhe({ fase: "erro" }); });
     return () => { active = false; };
   }, [a.id, idComp, mostrarResultados]);
-
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.78)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 100 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "#10160f", borderTop: `2px solid ${captain ? "#FF8F00" : "#243029"}`, borderRadius: "18px 18px 0 0", padding: "16px 16px 24px", maxHeight: "86%", overflowY: "auto" }}>
@@ -1287,7 +1226,6 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
           </div>
           <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
-
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "10px 12px" }}>
             <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>Preço</div>
@@ -1316,7 +1254,6 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
             )}
           </div>
         </div>
-
         {mostrarResultados ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "12px 14px", marginBottom: editavel ? 16 : 0 }}>
             <div>
@@ -1332,12 +1269,10 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
               : "🔒 Os pontos só aparecem depois de o mercado fechar. Assim ninguém escolhe a equipa a olhar para os resultados."}
           </div>
         )}
-
         {/* DECOMPOSIÇÃO luta-a-luta — só quando há resultados E se podem ver. */}
         {mostrarResultados && (
           <DetalheLutas estado={detalhe} captain={captain} />
         )}
-
         {/* AÇÕES: só quando editável (mercado aberto). Em competição, não se mexe. */}
         {editavel ? (
           <div style={{ marginTop: 16 }}>
@@ -1351,7 +1286,6 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
     </div>
   );
 }
-
 // Lista das lutas decompostas (ou estados de carregamento/vazio).
 function DetalheLutas({ estado, captain }: { estado: EstadoDetalhe; captain: boolean }) {
   if (estado.fase === "carregando") {
@@ -1370,7 +1304,6 @@ function DetalheLutas({ estado, captain }: { estado: EstadoDetalhe; captain: boo
       </div>
     );
   }
-
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 10 }}>
@@ -1418,7 +1351,6 @@ function DetalheLutas({ estado, captain }: { estado: EstadoDetalhe; captain: boo
     </div>
   );
 }
-
 // Seletor de cor do tatame (Pro Max). Mostra os 5 temas em miniatura. Pro Max
 // escolhe; não-Pro-Max vê tudo bloqueado (cadeado + convite a subir a Pro Max).
 function SeletorTatame({ aberto, onToggle, atual, isProMax, onEscolher }: { aberto: boolean; onToggle: () => void; atual: TatameId; isProMax: boolean; onEscolher: (id: TatameId) => void }) {
@@ -1439,7 +1371,6 @@ function SeletorTatame({ aberto, onToggle, atual, isProMax, onEscolher }: { aber
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
         </span>
       </button>
-
       {aberto && (
         <div style={{ marginTop: 8, background: "#121815", border: "1px solid #243029", borderRadius: 12, padding: 12 }}>
           {!isProMax && (
@@ -1483,7 +1414,6 @@ function SeletorTatame({ aberto, onToggle, atual, isProMax, onEscolher }: { aber
     </div>
   );
 }
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -1492,7 +1422,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
 function Cell({ a, captain, score, phase, onClick }: { a: Athlete; captain: boolean; score: number; phase: MarketPhase; onClick: () => void }) {
   const surname = a.name.split(" ").slice(-1)[0];
   let value: React.ReactNode;
@@ -1515,7 +1444,6 @@ function Cell({ a, captain, score, phase, onClick }: { a: Athlete; captain: bool
     </button>
   );
 }
-
 function EmptyCell({ montar }: { montar?: boolean }) {
   return (
     <a href={montar ? "/mercado?montar=1" : "/mercado"} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 3px", borderRadius: 12, border: "1.5px dashed rgba(217,164,65,0.7)", background: "rgba(12,14,13,0.62)", textDecoration: "none", minHeight: 92 }}>
@@ -1524,19 +1452,16 @@ function EmptyCell({ montar }: { montar?: boolean }) {
     </a>
   );
 }
-
 function TrashIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>;
 }
 function ShareIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M8 7l4-4 4 4" /></svg>;
 }
-
 const overlayBg: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 };
 const cardBox: React.CSSProperties = { width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" };
 const primaryBtn: React.CSSProperties = { width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" };
 const ghostBtn: React.CSSProperties = { marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB };
-
 // Cancelamento imediato do lembrete "esqueceste de salvar", chamado ao SALVAR
 // (sem esperar pela próxima saída de ecrã). Reutiliza a mesma rota do hook.
 function cancelarLembreteSalvarAgora(userId: string | null, idComp: string) {
@@ -1550,7 +1475,6 @@ function cancelarLembreteSalvarAgora(userId: string | null, idComp: string) {
     }).catch(() => {});
   } catch {}
 }
-
 // Tutorial do Meu Time (edição ou competição). Balão em baixo, seta SEMPRE para
 // cima (os elementos destacados estão acima do balão). O elemento citado pulsa
 // via a classe ilglow aplicada no corpo da página (controlada por `destaque`).
