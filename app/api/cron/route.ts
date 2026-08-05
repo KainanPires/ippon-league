@@ -1127,6 +1127,18 @@ export async function GET(req: Request) {
     }
   } catch { /* não bloqueia o resto do cron */ }
 
+  // (E-ter) CONTAS INATIVAS — avisa quem está prestes a perder a conta, e apaga
+  // quem passou o ano. A rota trata do "uma vez por dia" (guarda de 20h), por
+  // isso é seguro chamá-la de hora a hora.
+  let contasInativas: { avisados: number; apagados: number } | null = null;
+  try {
+    if (haTempo(t0, MS_MARGEM_ETAPA)) {
+      const r = await fetch(`${base}/api/contas-inativas?key=${encodeURIComponent(process.env.CRON_SECRET || "")}`);
+      const j = await r.json().catch(() => null);
+      if (j && j.ok) contasInativas = { avisados: Number(j.avisados || 0), apagados: Number(j.apagados || 0) };
+    }
+  } catch { /* não bloqueia o resto do cron */ }
+
   // (F) Notificações de DATAS ESPECIAIS por push (aniversário + Dia do Judô).
   //     Idempotente por dia. Não bloqueia o resto do cron se falhar.
   let datas: { dia_do_judo: number; aniversarios: number; outras_globais: number } | null = null;
@@ -1205,6 +1217,7 @@ export async function GET(req: Request) {
     mercado,
     datas,
     emails_verificacao: emailsVerificacao,
+    contas_inativas: contasInativas,
     // Estado dos preços nesta corrida (cursor): de onde partiu, onde ficou.
     precos: {
       dia: diaHoje,
