@@ -98,6 +98,9 @@ export default function Inicio() {
   // que o motor de congelamento escreve a cada rodada, com as valorizações e
   // desvalorizações já aplicadas. Ver a nota em TeamBuilt.
   const [patrimonio, setPatrimonio] = useState<number | null>(null);
+  // Email por confirmar? Enquanto não estiver, mostra-se uma faixa. Não bloqueia
+  // nada — a pessoa joga na mesma; só fica a saber que falta.
+  const [emailPorVerificar, setEmailPorVerificar] = useState(false);
   const [modaisFila, setModaisFila] = useState<MensagemEspecial[]>([]);
   const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
   const [minhasLigas, setMinhasLigas] = useState<{ id: string; name: string; membros: number }[] | null>(null);
@@ -175,12 +178,13 @@ export default function Inicio() {
         else setName("Campeão");
         // O nível já vem do useNivel() (tabela `users`) — não se lê do metadata.
         if (userId) {
-          supabase.from("users").select("belt, data_nascimento, country_code, patrimony_jc").eq("id", userId).maybeSingle()
+          supabase.from("users").select("belt, data_nascimento, country_code, patrimony_jc, email_verificado_em").eq("id", userId).maybeSingle()
             .then(({ data: row }) => {
               if (!active) return;
               setFaixaJogo(normalizarFaixa(row?.belt));
               const pat = Number((row as { patrimony_jc?: unknown } | null)?.patrimony_jc);
               if (Number.isFinite(pat)) setPatrimonio(pat);
+              setEmailPorVerificar(!(row as { email_verificado_em?: unknown } | null)?.email_verificado_em);
               // Modais de evento do dia: junta data civil (aniversário/Dia do
               // Judô/fim/começo de ano) com a grande competição da semana (do
               // calendário; nunca clássicos; continental só do continente do user).
@@ -444,6 +448,12 @@ export default function Inicio() {
         </header>
         {/* Convite para instalar a app (PWA). Só aparece a quem ainda não instalou. */}
         <CartaoInstalarApp />
+
+        {/* EMAIL POR CONFIRMAR. Não bloqueia nada: a pessoa joga na mesma. Mas
+            fica visível, e o cron manda um lembrete por dia até confirmar. É o
+            equilíbrio que se quis — não perder ninguém no registo, e ainda assim
+            acabar com endereços que não existem (havia um "@gamil.com" na base). */}
+        {!visitante && emailPorVerificar && <FaixaVerificarEmail />}
         {/* Botão da galeria de resumos (todas as rodadas jogadas). Só para quem tem conta. */}
         {!visitante && (
           <button onClick={() => setGaleriaAberta(true)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 10, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "11px 14px", marginBottom: 14, cursor: "pointer", fontFamily: FB, color: "#f1ede2", textAlign: "left" }}>
@@ -675,6 +685,53 @@ const iconBtn: React.CSSProperties = {
   width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent",
   color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer",
 };
+// Faixa de "confirma o teu email". Mostra o estado vindo do redirecionamento
+// (?email=ok, ?email=expirado...) e deixa reenviar a ligação.
+function FaixaVerificarEmail() {
+  const [estado, setEstado] = useState<"normal" | "enviando" | "enviado" | "erro">("normal");
+  const [msg, setMsg] = useState("");
+
+  async function reenviar() {
+    setEstado("enviando"); setMsg("");
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) { setEstado("erro"); setMsg("Entra na tua conta primeiro."); return; }
+      const j = await fetch("/api/verificar-email", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((r) => r.json());
+      if (j?.jaVerificado) { setEstado("enviado"); setMsg("Já está confirmado!"); return; }
+      if (j?.jaEnviado) { setEstado("enviado"); setMsg(String(j.nota || "Acabámos de enviar.")); return; }
+      if (!j?.ok) { setEstado("erro"); setMsg("Não conseguimos enviar agora. Tenta daqui a pouco."); return; }
+      setEstado("enviado"); setMsg("Enviado! Vê a tua caixa de entrada (e o spam).");
+    } catch {
+      setEstado("erro"); setMsg("Não conseguimos enviar agora.");
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a2410,#10160f)", border: "1px solid #5a4a18", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", marginBottom: 14 }}>
+      <span style={{ flexShrink: 0, color: GOLD, marginTop: 1 }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Confirma o teu email</div>
+        <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "4px 0 0" }}>
+          Enviámos-te uma ligação. Confirmar garante que recebes os avisos das rodadas e que não perdes a conta.
+        </p>
+        {msg && <p style={{ fontSize: 11.5, color: estado === "erro" ? "#ef8d83" : "#7fd1a3", margin: "6px 0 0" }}>{msg}</p>}
+        {estado !== "enviado" && (
+          <button onClick={reenviar} disabled={estado === "enviando"}
+            style={{ marginTop: 8, background: "transparent", border: "none", color: GOLD, fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: FB, padding: 0, textDecoration: "underline" }}>
+            {estado === "enviando" ? "A enviar…" : "Reenviar o email"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Card({ children }: { children: React.ReactNode }) {
   return <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 13, marginBottom: 12 }}>{children}</div>;
 }
