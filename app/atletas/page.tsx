@@ -199,7 +199,11 @@ function Atletas() {
         <NavTab label="Início" href="/inicio" icon={<HomeIcon />} />
         <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} />
         <NavTab label="Atletas" href="/atletas" icon={<AthletesIcon />} active />
-        <NavTab label="Pro" href="/ippon-pro" icon={<BoltIcon />} />
+        {/* /pro-central decide o destino conforme o nível (ver
+            app/pro-central/page.tsx). Antes apontava sempre para /ippon-pro — a
+            página de VENDAS — e um Pro Max que tocasse aqui era convidado a
+            comprar o que já tinha. Todas as barras da app usam este destino. */}
+        <NavTab label="Pro" href="/pro-central" icon={<BoltIcon />} />
       </nav>
     </main>
   );
@@ -309,7 +313,6 @@ function Detalhe({ r, nomeComp, verificado, onVerificado, onClose }: { r: RankRo
         {/* REIVINDICAR — o convite ao próprio atleta. Fica no fim: quem chega
             aqui já viu os seus números, que é o argumento. */}
         <Reivindicar r={r} verificado={!!verificado} onVerificado={onVerificado} />
-
         {/* A "razão" do ponto: resumo agregado das ações na competição (#scout). */}
         {r.acoes && Object.keys(r.acoes).length > 0 && linhasDeAcoes(r.acoes).length > 0 && (
           <div style={{ marginTop: 14 }}>
@@ -338,7 +341,6 @@ function SeloVerificado() {
     </span>
   );
 }
-
 // ---------------------------------------------------------------------------
 // REIVINDICAR O PERFIL — "és tu? prova-o".
 //
@@ -365,7 +367,6 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
   // Código já fora de prazo? Então oferece-se um novo em vez de deixar a pessoa
   // a tentar um que já não serve.
   const [expirado, setExpirado] = useState(false);
-
   // Estado deste atleta para ESTE utilizador (já pediu? já verificou?).
   useEffect(() => {
     let vivo = true;
@@ -386,7 +387,6 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
     })();
     return () => { vivo = false; };
   }, [r.id]);
-
   async function chamar(corpo: Record<string, unknown>) {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
@@ -398,7 +398,6 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
     });
     return res.json();
   }
-
   async function pedir() {
     setErro(""); setAEnviar(true);
     try {
@@ -408,7 +407,6 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
     } catch { setErro("Não foi possível registar o pedido."); }
     finally { setAEnviar(false); }
   }
-
   async function novoCodigo() {
     setErro(""); setAEnviar(true);
     try {
@@ -419,7 +417,6 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
     } catch { setErro("Não foi possível gerar um código novo."); }
     finally { setAEnviar(false); }
   }
-
   async function verificar() {
     setErro(""); setAEnviar(true);
     try {
@@ -434,10 +431,8 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
     } catch { setErro("Não foi possível verificar."); }
     finally { setAEnviar(false); }
   }
-
   // Já verificado por alguém: não há nada a pedir.
   if (verificado && fase !== "feito") return null;
-
   if (fase === "feito") {
     return (
       <div style={{ marginTop: 16, background: "#0f1620", border: "1px solid #2f6fb3", borderRadius: 12, padding: "12px 14px", textAlign: "center" }}>
@@ -450,7 +445,6 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
       </div>
     );
   }
-
   if (!aberto) {
     return (
       <button
@@ -461,7 +455,6 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
       </button>
     );
   }
-
   return (
     <div style={{ marginTop: 16, background: "#0f1620", border: "1px solid #2f5478", borderRadius: 12, padding: "13px 14px" }}>
       {temSessao === false ? (
@@ -535,7 +528,6 @@ function Reivindicar({ r, verificado, onVerificado }: { r: RankRow; verificado: 
     </div>
   );
 }
-
 function Carregando({ inline }: { inline?: boolean }) {
   const box = (
     <div style={{ textAlign: "center", padding: "40px 16px", background: inline ? "transparent" : "#0c0e0d", color: "#7c8a82" }}>
