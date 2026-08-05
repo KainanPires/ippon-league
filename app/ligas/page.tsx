@@ -451,7 +451,11 @@ export default function Ligas() {
         <NavTab label="Início" href="/inicio" icon={<HomeIcon />} />
         <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} active />
         <NavTab label="Atletas" href="/atletas" icon={<AthletesIcon />} />
-        <NavTab label="Pro" icon={<BoltIcon />} href="/ippon-pro" />
+        {/* /pro-central decide para onde ir conforme o nível (ver
+            app/pro-central/page.tsx). Antes apontava SEMPRE para /ippon-pro —
+            a página de VENDAS — o que mandava um Pro Max comprar uma coisa que
+            já tinha. As outras barras da app devem usar este mesmo destino. */}
+        <NavTab label="Pro" icon={<BoltIcon />} href="/pro-central" />
       </nav>
     </main>
   );
