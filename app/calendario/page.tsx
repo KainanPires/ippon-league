@@ -1,5 +1,4 @@
 "use client";
-
 // CALENDÁRIO OFICIAL IPPON LEAGUE 2026 — só INFORMATIVO da competição.
 // Regra do "clássico cego":
 //  - Competição real: mostra nome e nível sempre.
@@ -12,7 +11,6 @@
 // Ao ABRIR, a página faz scroll automático até à competição-alvo (a que está a
 // decorrer ou a próxima com mercado aberto — focoMercado().alvo). A lista e a
 // ordem ficam iguais; quem subir o scroll vê as competições antigas.
-
 import { useEffect, useRef } from "react";
 import {
   CALENDARIO_2026,
@@ -21,11 +19,9 @@ import {
   focoMercado,
   type SemanaCalendario,
 } from "@/lib/calendario";
-
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 function dataCurta(de: string): string {
   const [, m, d] = de.split("/").map((x) => parseInt(x, 10));
@@ -34,24 +30,19 @@ function dataCurta(de: string): string {
 function nomeSemClassico(nome: string): string {
   return nome.replace(/\s*[—-]\s*Cl[áa]ssico\s*$/i, "");
 }
-
 type Estado = "passada" | "aDecorrer" | "proxima" | "futura";
-
 export default function CalendarioPage() {
   const foco = focoMercado();
   const alvoId = foco.alvo.idCompeticao;
   const lista = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
-
   // Cartão-alvo do scroll: o PRIMEIRO que ainda não terminou (em ordem
   // cronológica = o que está a decorrer ou o próximo). Determinado pela própria
   // lista (não por ids a baterem certo), para a ref estar sempre num cartão real.
   // Se já tudo terminou (fim do ano), fica no último.
   let idxAlvo = lista.findIndex((s) => !competicaoFechada(s));
   if (idxAlvo < 0) idxAlvo = lista.length - 1;
-
   // Cartão para onde levar o scroll ao abrir.
   const alvoRef = useRef<HTMLDivElement | null>(null);
-
   useEffect(() => {
     // Leva o scroll até à competição atual/próxima ao ABRIR.
     // Usamos scrollIntoView (encontra sozinho o contentor com scroll, seja a
@@ -67,7 +58,6 @@ export default function CalendarioPage() {
     }, ms));
     return () => { cancelado = true; timers.forEach((t) => clearTimeout(t)); };
   }, [idxAlvo]);
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <style>{`@keyframes pulsoOuro {
@@ -81,7 +71,6 @@ export default function CalendarioPage() {
           </a>
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Calendário 2026</h1>
         </header>
-
         {/* O que é um clássico — explicação fixa no topo. */}
         <div style={{ background: "#181410", border: "1px dashed #3a3320", borderRadius: 14, padding: "13px 14px", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -92,7 +81,6 @@ export default function CalendarioPage() {
             Um clássico é uma grande competição dos últimos anos — <strong style={{ color: "#f1ede2" }}>Grand Prix, Grand Slam, Mundiais e Olimpíadas</strong> — que reavivamos nas semanas sem competição oficial. Serve de base à pontuação e relembra grandes momentos do judô, para haver jogo toda a semana. Vês o <strong style={{ color: "#f1ede2" }}>nível e o ano</strong>, mas <strong style={{ color: "#e6c97a" }}>o nome só se revela no dia</strong>.
           </p>
         </div>
-
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {lista.map((s, i) => (
             <CartaoSemana
@@ -104,17 +92,19 @@ export default function CalendarioPage() {
           ))}
         </div>
       </div>
-
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 60, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around", zIndex: 50 }}>
         <NavTab label="Início" href="/inicio" icon={<HomeIcon />} />
         <NavTab label="Competições" href="/ligas" icon={<TrophyIcon />} active />
         <NavTab label="Atletas" href="/atletas" icon={<AthletesIcon />} />
-        <NavTab label="Pro" href="/ippon-pro" icon={<BoltIcon />} />
+        {/* /pro-central decide o destino conforme o nível (ver
+            app/pro-central/page.tsx). Antes apontava sempre para /ippon-pro — a
+            página de VENDAS — e um Pro Max que tocasse aqui era convidado a
+            comprar o que já tinha. Todas as barras da app usam este destino. */}
+        <NavTab label="Pro" href="/pro-central" icon={<BoltIcon />} />
       </nav>
     </main>
   );
 }
-
 function CartaoSemana({ s, alvoId, alvoRef }: { s: SemanaCalendario; alvoId: string; alvoRef?: React.RefObject<HTMLDivElement | null> }) {
   const mkt = estadoMercado(s);
   const estado: Estado = competicaoFechada(s)
@@ -124,12 +114,10 @@ function CartaoSemana({ s, alvoId, alvoRef }: { s: SemanaCalendario; alvoId: str
     : s.idCompeticao === alvoId
     ? "proxima"
     : "futura";
-
   // Clássico fica "cego" enquanto o mercado está aberto (próxima ou futura).
   const cego = s.classico && mkt.estado === "aberto";
   const anoCego = s.anoOriginal ? ` ${s.anoOriginal}` : "";
   const titulo = cego ? `Clássico Nº ${s.semana}` : nomeSemClassico(s.nome);
-
   const corBorda =
     estado === "passada" ? "#1a221d" :
     estado === "aDecorrer" ? "#2f7d54" :
@@ -141,7 +129,6 @@ function CartaoSemana({ s, alvoId, alvoRef }: { s: SemanaCalendario; alvoId: str
     estado === "aDecorrer" ? "#7fd1a3" :
     estado === "proxima" ? GOLD : "#cfd8d2";
   const corTitulo = estado === "passada" ? "#7c8a82" : cego ? "#e6c97a" : "#f1ede2";
-
   return (
     <div ref={alvoRef} style={{
       background: estado === "proxima" ? "#15170f" : "#121815",
@@ -157,7 +144,6 @@ function CartaoSemana({ s, alvoId, alvoRef }: { s: SemanaCalendario; alvoId: str
         <div style={{ fontSize: 9, color: "#7c8a82", textTransform: "uppercase", letterSpacing: "0.05em" }}>Rodada</div>
         <div style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, color: corNum }}>{s.semana}</div>
       </div>
-
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: corTitulo }}>{titulo}</span>
@@ -174,7 +160,6 @@ function CartaoSemana({ s, alvoId, alvoRef }: { s: SemanaCalendario; alvoId: str
     </div>
   );
 }
-
 function NavTab({ label, icon, href, active }: { label: string; icon: React.ReactNode; href?: string; active?: boolean }) {
   const style: React.CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? GOLD : "#6f7d76", textDecoration: "none" };
   const inner = <>{icon}<span style={{ fontSize: 11, fontWeight: active ? 700 : 400 }}>{label}</span></>;
