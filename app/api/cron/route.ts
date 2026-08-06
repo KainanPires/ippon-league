@@ -1159,6 +1159,8 @@ export async function GET(req: Request) {
     if (supabaseAdmin && haTempo(t0, MS_MARGEM_ETAPA)) {
       const { data } = await supabaseAdmin.rpc("ippon_publicar_agendadas");
       agendadasPublicadas = Number(data ?? 0);
+      // E retira os destaques fora de prazo (48h) — ver hub-destaque-expira.sql.
+      await supabaseAdmin.rpc("ippon_limpar_destaques");
     }
   } catch { /* não bloqueia o resto do cron */ }
 
