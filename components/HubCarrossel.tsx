@@ -67,7 +67,8 @@ interface Noticia {
   pais: string | null;
   continente: string | null;
   imagem_url: string | null;   // só as escritas por pessoas têm
-  dados: { escudo?: Identity | null } | null;  // as geradas trazem o escudo da equipa
+  dados: { escudo?: Identity | null } | null;
+  estado: string;   // um EDITOR vê também as que ainda não estão no ar  // as geradas trazem o escudo da equipa
 }
 
 /** De quanto em quanto tempo passa. 6s: dá para ler um título sem pressa. */
@@ -94,7 +95,7 @@ export function HubCarrossel() {
       }
       await supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, resumo, corpo, nome_competicao, imagem_url, dados, pais, continente")
+      .select("id, tipo, titulo, resumo, corpo, nome_competicao, imagem_url, dados, pais, continente, estado")
       .order("destaque", { ascending: false })
       .order("criada_em", { ascending: false })
       .limit(8)
@@ -159,7 +160,16 @@ export function HubCarrossel() {
             <span style={{ fontSize: 20, flexShrink: 0, lineHeight: 1.2 }} aria-hidden="true">{est.icone}</span>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", lineHeight: 1.3 }}>{n.titulo}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", lineHeight: 1.3 }}>
+              {/* Só um editor vê notícias por publicar. A marca evita que ele
+                  pense que já está no ar o que ainda está à espera. */}
+              {n.estado && n.estado !== "publicada" && (
+                <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "2px 5px", borderRadius: 4, background: "#2a1f1c", color: "#ef8d83", marginRight: 6, verticalAlign: "middle" }}>
+                  {n.estado === "revisao" ? "a rever" : n.estado === "agendada" ? "agendada" : "rascunho"}
+                </span>
+              )}
+              {n.titulo}
+            </div>
             {/* Duas linhas e corta: o carrossel é uma montra, não o artigo. */}
             <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.45, margin: "5px 0 0", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
               {n.resumo || n.corpo}
