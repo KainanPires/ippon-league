@@ -76,6 +76,16 @@ interface Noticia {
 /** De quanto em quanto tempo passa. 6s: dá para ler um título sem pressa. */
 const INTERVALO_MS = 6000;
 
+/**
+ * Quanto tempo fica parado depois de um gesto, antes de voltar a andar.
+ *
+ * 12 segundos — o dobro do intervalo normal. Quem acabou de escolher uma
+ * notícia quer lê-la; retomar de imediato faria o trabalho dela desaparecer.
+ * Mas também não pode parar para sempre: a rotação automática é o que dá vida
+ * ao mural para quem só passa o olho.
+ */
+const PAUSA_APOS_GESTO = 12000;
+
 export function HubCarrossel() {
   const [noticias, setNoticias] = useState<Noticia[]>([]);
   const [i, setI] = useState(0);
@@ -87,6 +97,10 @@ export function HubCarrossel() {
   const toqueX = useRef<number | null>(null);
   const toqueY = useRef<number | null>(null);
   const arrastou = useRef(false);
+  const retomaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ao sair do ecrã, não deixa temporizadores pendurados.
+  useEffect(() => () => { if (retomaTimer.current) clearTimeout(retomaTimer.current); }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -140,7 +154,10 @@ export function HubCarrossel() {
     toqueX.current = t.clientX;
     toqueY.current = t.clientY;
     arrastou.current = false;
-    setParado(true); // enquanto o dedo está em cima, não roda sozinho
+    // Para ENQUANTO o dedo está em cima — não para sempre. As duas coisas
+    // convivem: passa sozinho de 6 em 6 segundos, e quem quiser escolher
+    // arrasta. Depois de largar, volta a andar (ver fimToque).
+    setParado(true);
   }
 
   function moveToque(e: React.TouchEvent) {
@@ -153,14 +170,28 @@ export function HubCarrossel() {
   }
 
   function fimToque(e: React.TouchEvent) {
-    if (toqueX.current === null) return;
+    if (toqueX.current === null) { retomar(); return; }
     const dx = e.changedTouches[0].clientX - toqueX.current;
     toqueX.current = null;
     toqueY.current = null;
-    if (!arrastou.current || Math.abs(dx) < MIN_ARRASTO) return;
-    // Roda em círculo: da última salta para a primeira, e ao contrário. Um
-    // carrossel que trava nas pontas parece avariado.
-    setI((x) => (dx < 0 ? (x + 1) % noticias.length : (x - 1 + noticias.length) % noticias.length));
+    if (arrastou.current && Math.abs(dx) >= MIN_ARRASTO) {
+      // Roda em círculo: da última salta para a primeira, e ao contrário. Um
+      // carrossel que trava nas pontas parece avariado.
+      setI((x) => (dx < 0 ? (x + 1) % noticias.length : (x - 1 + noticias.length) % noticias.length));
+    }
+    retomar();
+  }
+
+  /**
+   * Volta a andar sozinho, depois de uma pausa.
+   *
+   * Espera um pouco antes de retomar: se voltasse a rodar no instante em que o
+   * dedo se levanta, a notícia que a pessoa acabou de escolher desaparecia
+   * quase de imediato. Este intervalo dá tempo de a ler.
+   */
+  function retomar() {
+    if (retomaTimer.current) clearTimeout(retomaTimer.current);
+    retomaTimer.current = setTimeout(() => setParado(false), PAUSA_APOS_GESTO);
   }
 
   // Sem notícias, não desenha nada. Ver a nota no topo.
@@ -190,7 +221,7 @@ export function HubCarrossel() {
         // Para de rodar enquanto o dedo (ou o rato) está em cima: ninguém quer
         // que a notícia mude a meio da leitura.
         onMouseEnter={() => setParado(true)}
-        onMouseLeave={() => setParado(false)}
+        onMouseLeave={() => retomar()}
         onTouchStart={inicioToque}
         onTouchMove={moveToque}
         onTouchEnd={fimToque}
@@ -238,7 +269,7 @@ export function HubCarrossel() {
           {noticias.map((x, idx) => (
             <button
               key={x.id}
-              onClick={() => { setI(idx); setParado(true); }}
+              onClick={() => { setI(idx); setParado(true); retomar(); }}
               aria-label={`Notícia ${idx + 1} de ${noticias.length}`}
               style={{
                 width: idx === i ? 18 : 6, height: 6, borderRadius: 999, border: "none", padding: 0,
