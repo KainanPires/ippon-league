@@ -109,7 +109,9 @@ export function HubCarrossel() {
       </div>
 
       <a
-        href="/blog"
+        // Vai direto para ESTA notícia, não para a lista: quem toca quer ler o
+        // que está a ver, não voltar a procurá-lo no meio de outras vinte.
+        href={`/blog/${n.id}`}
         // Para de rodar enquanto o dedo (ou o rato) está em cima: ninguém quer
         // que a notícia mude a meio da leitura.
         onMouseEnter={() => setParado(true)}
