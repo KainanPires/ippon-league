@@ -106,13 +106,31 @@ export default function EditorBlog() {
   useEffect(() => { if (acesso === "sim") void carregarLista(); }, [acesso, carregarLista]);
 
   // --- Imagem: carrega para o Storage e guarda o endereço ---
+  //
+  // Cada passo diz o que está a fazer. A primeira versão falhava em silêncio: o
+  // campo de ficheiro continuava lá, sem pré-visualização e sem erro, e não
+  // havia forma de saber se a imagem tinha subido, se o formato era recusado,
+  // ou se nada tinha sequer acontecido.
   async function escolherImagem(ficheiro: File) {
-    setErro(""); setACarregarImg(true);
+    setErro(""); setMsg(""); setACarregarImg(true);
     try {
+      // Limite do Supabase por omissão: 50 MB. Uma foto de telemóvel moderna
+      // passa disso com facilidade, e o erro que vem de lá não é claro.
+      if (ficheiro.size > 45 * 1024 * 1024) {
+        setErro(`A imagem tem ${(ficheiro.size / 1024 / 1024).toFixed(1)} MB — demasiado grande. Reduz para menos de 45 MB.`);
+        return;
+      }
       // Nome único: a data mais um número. Sem isto, duas notícias com uma foto
       // chamada "capa.jpg" escreviam uma por cima da outra.
       const ext = (ficheiro.name.split(".").pop() || "jpg").toLowerCase();
       const nome = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      // Sem sessão não há permissão nenhuma no Storage — e é uma causa fácil
+      // de despistar mal (parece um problema de permissões da pasta).
+      const { data: sess } = await supabase.auth.getSession();
+      if (!sess.session) {
+        setErro("A tua sessão expirou. Recarrega a página e entra outra vez.");
+        return;
+      }
       const { error } = await supabase.storage.from("blog").upload(nome, ficheiro, { upsert: false });
       if (error) {
         // Também aqui: o erro real. O mais comum é o bucket "blog" não existir
@@ -122,9 +140,15 @@ export default function EditorBlog() {
         return;
       }
       const { data } = supabase.storage.from("blog").getPublicUrl(nome);
+      if (!data?.publicUrl) {
+        setErro("A imagem subiu mas não conseguimos o endereço dela. Confirma que o bucket 'blog' está público.");
+        return;
+      }
       setF((x) => ({ ...x, imagem_url: data.publicUrl }));
-    } catch {
-      setErro("Não foi possível carregar a imagem.");
+      setMsg("Imagem carregada.");
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      setErro(`Não foi possível carregar a imagem.${m ? ` (${m})` : ""}`);
     } finally {
       setACarregarImg(false);
     }
@@ -271,11 +295,21 @@ export default function EditorBlog() {
                 </button>
               </div>
             ) : (
-              <input type="file" accept="image/*" disabled={aCarregarImg}
+              <input type="file" accept="image/jpeg,image/png,image/webp" disabled={aCarregarImg}
                 onChange={(e) => { const fi = e.target.files?.[0]; if (fi) void escolherImagem(fi); }}
                 style={{ ...inp, padding: 9 }} />
             )}
-            {aCarregarImg && <div style={{ fontSize: 12, color: "#93a39a", marginTop: 6 }}>A carregar…</div>}
+            {aCarregarImg && (
+              <div style={{ fontSize: 12, color: GOLD, marginTop: 6, fontWeight: 700 }}>A carregar a imagem…</div>
+            )}
+            {!aCarregarImg && !f.imagem_url && (
+              // Diz o que é preciso acontecer. Sem isto, escolher o ficheiro e
+              // não ver nada acontecer parece que já está feito — e a notícia
+              // sai sem imagem.
+              <div style={{ fontSize: 11, color: "#5f6f67", marginTop: 5 }}>
+                Depois de escolher, a imagem aparece aqui. Se não aparecer, alguma coisa correu mal.
+              </div>
+            )}
           </Campo>
 
           {f.imagem_url && (
