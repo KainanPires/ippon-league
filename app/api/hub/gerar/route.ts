@@ -19,12 +19,13 @@
 // ---------------------------------------------------------------------------
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { CALENDARIO_2026, nomeCompeticao, competicaoFechada } from "@/lib/calendario";
+import { CALENDARIO_2026, nomeCompeticao, competicaoFechada, numeroDaRodada } from "@/lib/calendario";
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import {
   noticiaMelhorRodada, noticiaAtletaDestaque, noticiaValorizacao,
   noticiaDesvalorizacao, noticiaMaisEscalado, noticiaCopaCampeao,
   noticiaMaisRico, noticiaLiderPontos, noticiaPercursoCampeao,
+  noticiaCampeaoAno, noticiaRicoAno,
   contarCampanha,
   type NoticiaNova,
 } from "@/lib/gerarNoticias";
@@ -69,6 +70,9 @@ export async function GET(req: Request) {
     const comp = semana.idCompeticao;
     // Nome COMPLETO: a competição já terminou, logo a cidade pode aparecer.
     const nomeComp = nomeCompeticao(semana, agora);
+    // A rodada vai nos títulos: sem ela, "foi a melhor do mundo" confunde-se
+    // com um título anual.
+    const rodada = numeroDaRodada(comp);
     // --- 1) Melhor da rodada (mundial e continentais) ---
     // O ESCUDO vem junto: é a única imagem que estas notícias podem ter, e é
     // nossa — desenhada a partir de uma configuração (forma, cores, símbolo),
@@ -88,7 +92,7 @@ export async function GET(req: Request) {
         escopo: String(m.escopo || ""),
         continente: NOME_CONTINENTE[String(m.continente) as Continente] || String(m.continente || ""),
         nParticipantes: Number(m.n_participantes || 0),
-        idComp: comp, nomeComp,
+        idComp: comp, nomeComp, rodada,
       });
       if (n) {
         // O ESCUDO da equipa vai junto: é a única imagem que uma notícia gerada
@@ -134,7 +138,7 @@ export async function GET(req: Request) {
         pais: String(top[0].country_code || ""),
         categoria: String(top[0].weight_category || ""),
         pontos: Number(top[0].pontos || 0),
-        idComp: comp, nomeComp, campanha,
+        idComp: comp, nomeComp, campanha, rodada,
       });
       // País do atleta: uma notícia sobre um brasileiro interessa mais no Brasil.
       if (n) {
@@ -305,6 +309,71 @@ export async function GET(req: Request) {
       if (n) { n.dados = { ...(n.dados || {}), chave: `lider-mundial-${hoje}` }; novas.push(n); }
     }
   } catch { /* sem pontuações: salta */ }
+
+  // --- BALANÇO DO ANO ---
+  //
+  // Só depois de o ano fechar. O `campeoes_oficiais` já guarda os pódios
+  // anuais (é o `fecharAnoOficial` do cron que os escreve a 1 de janeiro), por
+  // isso lemos de lá em vez de recalcular.
+  //
+  // `?ano=2026` força a geração para testar sem esperar por janeiro.
+  const anoPedido = Number(searchParams.get("ano") || 0);
+  const anoFechado = anoPedido || (agora.getMonth() === 0 ? agora.getFullYear() - 1 : 0);
+  if (anoFechado > 0) {
+    try {
+      const { data: podios } = await supabaseAdmin
+        .from("campeoes_oficiais")
+        .select("tipo, continente, posicao, user_id, pontos")
+        .eq("ano", anoFechado)
+        .order("posicao", { ascending: true });
+      const eqDe = async (uid: string) => {
+        const { data } = await supabaseAdmin!
+          .from("equipas").select("nome, escudo").eq("user_id", uid)
+          .order("id_competicao", { ascending: false }).limit(1).maybeSingle();
+        return { nome: String(data?.nome || ""), escudo: data?.escudo ?? null };
+      };
+      // Quantas rodadas teve o ano, para dizer a média por rodada.
+      const rodadasDoAno = CALENDARIO_2026.length;
+      // Agrupa por âmbito: mundial, e um por continente.
+      const porAmbito = new Map<string, typeof podios>();
+      for (const p of podios || []) {
+        const k = String(p.tipo) === "mundial" ? "mundial" : `c:${p.continente}`;
+        if (!porAmbito.has(k)) porAmbito.set(k, []);
+        porAmbito.get(k)!.push(p);
+      }
+      for (const [amb, lista] of porAmbito) {
+        if (!lista || lista.length === 0) continue;
+        const primeiro = lista[0];
+        const segundo = lista[1];
+        const eq = await eqDe(String(primeiro.user_id));
+        const seg = segundo ? await eqDe(String(segundo.user_id)) : null;
+        const mundial = amb === "mundial";
+        const cont = mundial ? undefined : amb.slice(2);
+        const n = noticiaCampeaoAno({
+          nomeTime: eq.nome, pontos: Number(primeiro.pontos || 0), ano: anoFechado,
+          escopo: mundial ? "mundial" : "continental",
+          continente: cont ? (NOME_CONTINENTE[cont as Continente] || cont) : undefined,
+          rodadas: rodadasDoAno, escudo: eq.escudo,
+          segundo: seg ? { nomeTime: seg.nome, pontos: Number(segundo.pontos || 0) } : null,
+        });
+        if (n) { if (cont) n.continente = cont; novas.push(n); }
+      }
+
+      // O mais rico no fecho do ano: o património de hoje, no dia em que o ano
+      // acaba, é o que conta.
+      const { data: ricosAno } = await supabaseAdmin
+        .from("users").select("id, patrimony_jc, continente")
+        .gt("patrimony_jc", 0).order("patrimony_jc", { ascending: false }).limit(1);
+      if (ricosAno && ricosAno[0]) {
+        const eq = await eqDe(String(ricosAno[0].id));
+        const n = noticiaRicoAno({
+          nomeTime: eq.nome, patrimonio: Number(ricosAno[0].patrimony_jc || 0),
+          ano: anoFechado, escopo: "mundial", escudo: eq.escudo,
+        });
+        if (n) novas.push(n);
+      }
+    } catch { /* sem pódios do ano: salta */ }
+  }
 
   // --- 7) Copas que terminaram ---
   // Fora do ciclo das competições: uma copa acaba numa rodada, mas a notícia é
