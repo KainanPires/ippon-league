@@ -127,7 +127,8 @@ export async function GET(req: Request) {
   return NextResponse.json({
     ok: true,
     edicao: {
-      id: edicao.id, numero: edicao.numero, estado: edicao.estado,
+      id: edicao.id, numero: edicao.numero, ano: edicao.ano, estado: edicao.estado,
+      nome: `${edicao.numero}ª Copa do Dôdo entre Continentes · ${edicao.ano || new Date().getFullYear()}`,
       inscricoes_ate: edicao.inscricoes_ate, league_id: edicao.league_id,
     },
     inscritos: (inscritos || []).length,
@@ -195,7 +196,9 @@ async function sortear(simular: boolean) {
   // que já existe — confrontos, apuramento, herança de equipa, desempates.
   const alvo = focoMercado().alvo;
   const { data: liga } = await supabaseAdmin.from("leagues").insert({
-    name: `Mata-Mata do Dôdo · Edição ${edicao.numero}`,
+    // O nome oficial da edição. Contínuo desde sempre (1.ª, 2.ª, 3.ª...), com o
+    // ano à parte: a 15.ª Copa vale mais como marca do que "a 3.ª de 2029".
+    name: `${edicao.numero}ª Copa do Dôdo entre Continentes · ${edicao.ano || new Date().getFullYear()}`,
     type: "oficial",
     formato: "copa",
     privacidade: "fechada",
