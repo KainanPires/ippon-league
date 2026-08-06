@@ -197,6 +197,10 @@ export default function EditorBlog() {
         // por uma pessoa, que é o que a revisão queria garantir.
         publicar_auto_em: null,
         destaque: f.destaque,
+        // O autor fica registado para uso INTERNO (saber quem escreveu o quê,
+        // e para a política de leitura deixar cada um ver os seus rascunhos).
+        // Mas o que aparece ao leitor é "Equipa Ippon League": o nome de quem
+        // escreve muda quando a equipa muda, e a notícia é da marca.
         autor_id: uid,
         autor_nome: meuNome || null,
         // Preserva o que já lá estava (chave e escudo). Ver a nota em
@@ -285,7 +289,11 @@ export default function EditorBlog() {
           </a>
           <div style={{ flex: 1 }}>
             <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Escrever</h1>
-            <div style={{ fontSize: 11.5, color: "#93a39a" }}>{meuNome || "Editor"}</div>
+            {/* Quem está a escrever é informação de bastidor. O que sai
+                assinado é sempre "Equipa Ippon League". */}
+            <div style={{ fontSize: 11.5, color: "#93a39a" }}>
+              {meuNome ? `${meuNome} · publica como Equipa Ippon League` : "Equipa Ippon League"}
+            </div>
           </div>
         </header>
 
