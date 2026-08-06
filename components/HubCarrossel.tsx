@@ -1,0 +1,151 @@
+"use client";
+
+// components/HubCarrossel.tsx
+//
+// O BLOG DO DÔDO, em carrossel — no fim do ecrã inicial.
+//
+// ---------------------------------------------------------------------------
+// PORQUE EXISTE
+//
+// O plano original do projeto apontou a retenção entre competições como um dos
+// riscos principais: "o utilizador precisa de voltar entre competições". Num dia
+// sem judô, a app não tem nada a dizer. As notícias dão motivo para abrir.
+//
+// As notícias são geradas a partir dos dados (ver lib/gerarNoticias.ts) — não há
+// ninguém a escrever, e não há custo por notícia.
+//
+// ---------------------------------------------------------------------------
+// DETALHES QUE PARECEM PEQUENOS E NÃO SÃO
+//
+// PASSA SOZINHO, mas PARA quando se toca. Um carrossel que continua a andar
+// enquanto a pessoa está a ler é a forma mais rápida de a irritar.
+//
+// RESPEITA QUEM PREFERE MENOS MOVIMENTO. Se o sistema tiver "reduzir movimento"
+// ligado (uma preferência de acessibilidade), não roda sozinho de todo — quem a
+// ativa costuma tê-la por uma razão, e uma dessas razões é enjoo com animações.
+//
+// NÃO APARECE VAZIO. Sem notícias, o componente não desenha nada. Um bloco a
+// dizer "ainda não há notícias" é pior do que não haver bloco nenhum.
+// ---------------------------------------------------------------------------
+
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/lib/supabase";
+
+const FD = "var(--font-geist-mono), system-ui, sans-serif";
+const FB = "var(--font-geist-sans), system-ui, sans-serif";
+const GOLD = "#d9a441";
+
+/** Cada tipo tem o seu ícone e cor — dá para reconhecer a notícia de relance. */
+const ESTILO: Record<string, { icone: string; cor: string }> = {
+  melhor_rodada: { icone: "🥇", cor: GOLD },
+  atleta_destaque: { icone: "🔥", cor: "#e2655a" },
+  valorizacao: { icone: "📈", cor: "#7fd1a3" },
+  desvalorizacao: { icone: "📉", cor: "#ef8d83" },
+  mais_escalado: { icone: "👥", cor: "#7fb8f5" },
+  faixas: { icone: "🥋", cor: "#b79be0" },
+  copa_campeao: { icone: "🏆", cor: GOLD },
+  curiosidade: { icone: "💡", cor: "#aee9c9" },
+};
+
+interface Noticia {
+  id: string;
+  tipo: string;
+  titulo: string;
+  resumo: string | null;
+  corpo: string;
+  nome_competicao: string | null;
+}
+
+/** De quanto em quanto tempo passa. 6s: dá para ler um título sem pressa. */
+const INTERVALO_MS = 6000;
+
+export function HubCarrossel() {
+  const [noticias, setNoticias] = useState<Noticia[]>([]);
+  const [i, setI] = useState(0);
+  const [parado, setParado] = useState(false);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    supabase
+      .from("hub_noticias")
+      .select("id, tipo, titulo, resumo, corpo, nome_competicao")
+      .order("destaque", { ascending: false })
+      .order("criada_em", { ascending: false })
+      .limit(8)
+      .then(({ data }) => {
+        if (!vivo || !data) return;
+        setNoticias(data as Noticia[]);
+      });
+    return () => { vivo = false; };
+  }, []);
+
+  useEffect(() => {
+    if (noticias.length <= 1 || parado) return;
+    // Preferência de acessibilidade: quem pede menos movimento não leva um
+    // carrossel a rodar sozinho.
+    try {
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    } catch { /* sem matchMedia: segue */ }
+    timer.current = setInterval(() => setI((x) => (x + 1) % noticias.length), INTERVALO_MS);
+    return () => { if (timer.current) clearInterval(timer.current); };
+  }, [noticias.length, parado]);
+
+  // Sem notícias, não desenha nada. Ver a nota no topo.
+  if (noticias.length === 0) return null;
+
+  const n = noticias[Math.min(i, noticias.length - 1)];
+  const est = ESTILO[n.tipo] || ESTILO.curiosidade;
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#cdb86a" }}>
+          Blog do Dôdo
+        </span>
+        <a href="/blog" style={{ fontFamily: FD, fontSize: 11.5, fontWeight: 700, color: GOLD, textDecoration: "none" }}>
+          Ver tudo ›
+        </a>
+      </div>
+
+      <a
+        href="/blog"
+        // Para de rodar enquanto o dedo (ou o rato) está em cima: ninguém quer
+        // que a notícia mude a meio da leitura.
+        onMouseEnter={() => setParado(true)}
+        onMouseLeave={() => setParado(false)}
+        onTouchStart={() => setParado(true)}
+        style={{ display: "block", background: "#121815", border: `1px solid ${est.cor}33`, borderLeft: `3px solid ${est.cor}`, borderRadius: 13, padding: "13px 14px", textDecoration: "none", color: "inherit", minHeight: 92 }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <span style={{ fontSize: 20, flexShrink: 0, lineHeight: 1.2 }} aria-hidden="true">{est.icone}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", lineHeight: 1.3 }}>{n.titulo}</div>
+            <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.45, margin: "5px 0 0" }}>
+              {n.resumo || n.corpo}
+            </p>
+          </div>
+        </div>
+      </a>
+
+      {/* As bolinhas. Também servem de navegação — tocar salta para essa
+          notícia e para a rotação, que é o que se espera ao interagir. */}
+      {noticias.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 9 }}>
+          {noticias.map((x, idx) => (
+            <button
+              key={x.id}
+              onClick={() => { setI(idx); setParado(true); }}
+              aria-label={`Notícia ${idx + 1} de ${noticias.length}`}
+              style={{
+                width: idx === i ? 18 : 6, height: 6, borderRadius: 999, border: "none", padding: 0,
+                background: idx === i ? GOLD : "#2a3a33",
+                cursor: "pointer", transition: "width .25s, background .25s",
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
