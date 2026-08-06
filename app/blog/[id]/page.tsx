@@ -35,6 +35,9 @@ const ESTILO: Record<string, { icone: string; cor: string; etiqueta: string }> =
   mais_escalado: { icone: "👥", cor: "#7fb8f5", etiqueta: "Escalações" },
   faixas: { icone: "🥋", cor: "#b79be0", etiqueta: "Faixas" },
   copa_campeao: { icone: "🏆", cor: GOLD, etiqueta: "Copa" },
+  mais_rico: { icone: "💰", cor: GOLD, etiqueta: "Património" },
+  lider_pontos: { icone: "👑", cor: GOLD, etiqueta: "Ranking" },
+  percurso_campeao: { icone: "🏆", cor: GOLD, etiqueta: "Copa" },
   curiosidade: { icone: "💡", cor: "#aee9c9", etiqueta: "Curiosidade" },
 };
 
