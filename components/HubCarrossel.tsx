@@ -34,6 +34,9 @@ import { supabase } from "@/lib/supabase";
 // ficheiro. Por isso vem no campo `dados` da notícia e é o componente que o
 // desenha — ajusta-se a qualquer tamanho e não ocupa espaço nenhum.
 import { Escudo, type Identity } from "@/components/Escudo";
+// As notícias da região do leitor aparecem primeiro. Nenhuma é escondida — ver
+// a nota em lib/ordenarNoticias.
+import { ordenarPorRegiao } from "@/lib/ordenarNoticias";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -58,6 +61,8 @@ interface Noticia {
   resumo: string | null;
   corpo: string;
   nome_competicao: string | null;
+  pais: string | null;
+  continente: string | null;
   imagem_url: string | null;   // só as escritas por pessoas têm
   dados: { escudo?: Identity | null } | null;  // as geradas trazem o escudo da equipa
 }
@@ -73,16 +78,28 @@ export function HubCarrossel() {
 
   useEffect(() => {
     let vivo = true;
-    supabase
+    (async () => {
+      // País do leitor, para as notícias da região dele virem primeiro.
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      let meuPais: string | null = null;
+      let meuCont: string | null = null;
+      if (uid) {
+        const { data: u } = await supabase.from("users").select("country_code, continente").eq("id", uid).maybeSingle();
+        meuPais = u?.country_code ? String(u.country_code) : null;
+        meuCont = u?.continente ? String(u.continente) : null;
+      }
+      await supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, resumo, corpo, nome_competicao, imagem_url, dados")
+      .select("id, tipo, titulo, resumo, corpo, nome_competicao, imagem_url, dados, pais, continente")
       .order("destaque", { ascending: false })
       .order("criada_em", { ascending: false })
       .limit(8)
       .then(({ data }) => {
         if (!vivo || !data) return;
-        setNoticias(data as Noticia[]);
+        setNoticias(ordenarPorRegiao(data as Noticia[], meuPais, meuCont));
       });
+    })();
     return () => { vivo = false; };
   }, []);
 
