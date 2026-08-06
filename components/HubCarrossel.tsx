@@ -79,6 +79,12 @@ export function HubCarrossel() {
   const [i, setI] = useState(0);
   const [parado, setParado] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Onde o dedo tocou, e quanto andou. Serve para distinguir ARRASTAR de TOCAR:
+  // o cartão inteiro é uma ligação, e sem esta distinção cada deslize abriria
+  // uma notícia por engano.
+  const toqueX = useRef<number | null>(null);
+  const toqueY = useRef<number | null>(null);
+  const arrastou = useRef(false);
 
   useEffect(() => {
     let vivo = true;
@@ -118,6 +124,43 @@ export function HubCarrossel() {
     return () => { if (timer.current) clearInterval(timer.current); };
   }, [noticias.length, parado]);
 
+  // --- Arrastar para mudar de notícia ---
+  //
+  // Num telemóvel, arrastar é o gesto natural para um carrossel — esperar 6
+  // segundos ou acertar numa bolinha de 6px não é.
+  //
+  // 45px é o mínimo para contar como deslize. Abaixo disso é um toque com a mão
+  // pouco firme, e deve abrir a notícia como qualquer toque.
+  const MIN_ARRASTO = 45;
+
+  function inicioToque(e: React.TouchEvent) {
+    const t = e.touches[0];
+    toqueX.current = t.clientX;
+    toqueY.current = t.clientY;
+    arrastou.current = false;
+    setParado(true); // enquanto o dedo está em cima, não roda sozinho
+  }
+
+  function moveToque(e: React.TouchEvent) {
+    if (toqueX.current === null || toqueY.current === null) return;
+    const dx = e.touches[0].clientX - toqueX.current;
+    const dy = e.touches[0].clientY - toqueY.current;
+    // Só conta como arrasto do carrossel se for mais horizontal que vertical —
+    // senão estamos a impedir a pessoa de fazer scroll na página.
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) arrastou.current = true;
+  }
+
+  function fimToque(e: React.TouchEvent) {
+    if (toqueX.current === null) return;
+    const dx = e.changedTouches[0].clientX - toqueX.current;
+    toqueX.current = null;
+    toqueY.current = null;
+    if (!arrastou.current || Math.abs(dx) < MIN_ARRASTO) return;
+    // Roda em círculo: da última salta para a primeira, e ao contrário. Um
+    // carrossel que trava nas pontas parece avariado.
+    setI((x) => (dx < 0 ? (x + 1) % noticias.length : (x - 1 + noticias.length) % noticias.length));
+  }
+
   // Sem notícias, não desenha nada. Ver a nota no topo.
   if (noticias.length === 0) return null;
 
@@ -139,11 +182,16 @@ export function HubCarrossel() {
         // Vai direto para ESTA notícia, não para a lista: quem toca quer ler o
         // que está a ver, não voltar a procurá-lo no meio de outras vinte.
         href={`/blog/${n.id}`}
+        // Se foi um ARRASTO, não abre a notícia — só mudou de cartão. Sem isto,
+        // cada deslize abriria a notícia por engano.
+        onClick={(e) => { if (arrastou.current) { e.preventDefault(); arrastou.current = false; } }}
         // Para de rodar enquanto o dedo (ou o rato) está em cima: ninguém quer
         // que a notícia mude a meio da leitura.
         onMouseEnter={() => setParado(true)}
         onMouseLeave={() => setParado(false)}
-        onTouchStart={() => setParado(true)}
+        onTouchStart={inicioToque}
+        onTouchMove={moveToque}
+        onTouchEnd={fimToque}
         style={{ display: "block", background: "#121815", border: `1px solid ${est.cor}33`, borderLeft: `3px solid ${est.cor}`, borderRadius: 13, padding: "13px 14px", textDecoration: "none", color: "inherit", minHeight: 92 }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -179,9 +227,12 @@ export function HubCarrossel() {
       </a>
 
       {/* As bolinhas. Também servem de navegação — tocar salta para essa
-          notícia e para a rotação, que é o que se espera ao interagir. */}
+          notícia e para a rotação, que é o que se espera ao interagir.
+          Ao lado, uma dica de que se pode arrastar: um gesto que não se anuncia
+          é um gesto que ninguém descobre. */}
       {noticias.length > 1 && (
-        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 9 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 9 }}>
+          <span style={{ fontSize: 10, color: "#3c463f", marginRight: 2 }} aria-hidden="true">‹</span>
           {noticias.map((x, idx) => (
             <button
               key={x.id}
@@ -194,6 +245,7 @@ export function HubCarrossel() {
               }}
             />
           ))}
+          <span style={{ fontSize: 10, color: "#3c463f", marginLeft: 2 }} aria-hidden="true">›</span>
         </div>
       )}
     </div>
