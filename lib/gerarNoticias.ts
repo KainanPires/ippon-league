@@ -28,6 +28,10 @@
 
 export interface NoticiaNova {
   tipo: string;
+  /** País a que a notícia diz mais respeito ("BR"). Vazio = mundial. */
+  pais?: string | null;
+  /** Continente ("americas"). Vazio = mundial. Ver a nota sobre ORDENAR. */
+  continente?: string | null;
   titulo: string;
   corpo: string;
   resumo: string;
@@ -90,16 +94,61 @@ export function noticiaMelhorRodada(d: {
   };
 }
 
+/**
+ * Conta a história de uma campanha, luta a luta.
+ *
+ * Os dados existem: a Chave Maestro guarda, para cada atleta, com quem lutou,
+ * se ganhou, e que ações fez em cada combate. Um resultado seco ("53 pontos")
+ * não conta nada; "cinco lutas, quatro ippons, bateu o campeão nos quartos"
+ * conta.
+ *
+ * Devolve "" quando não há detalhe — nem todas as competições têm moldura
+ * montada, e uma frase inventada seria pior do que nenhuma.
+ */
+export function contarCampanha(
+  lutas: { adv: string; venceu: boolean; i: number; w: number; y: number; s: number }[] | null,
+  nomeDoAdversario: (id: string) => string,
+): string {
+  if (!lutas || lutas.length === 0) return "";
+  const v = lutas.filter((l) => l.venceu).length;
+  const d = lutas.length - v;
+  const ippons = lutas.reduce((t, l) => t + (l.i || 0), 0);
+  const wazas = lutas.reduce((t, l) => t + (l.w || 0), 0);
+
+  const partes: string[] = [];
+  partes.push(`Foram ${lutas.length} ${lutas.length === 1 ? "luta" : "lutas"}: ${v}V–${d}D.`);
+  if (ippons > 0) {
+    partes.push(ippons === 1 ? "Fechou uma com ippon." : `Fechou ${ippons} com ippon.`);
+  } else if (wazas > 0) {
+    partes.push(wazas === 1 ? "Marcou um waza-ari." : `Marcou ${wazas} waza-aris.`);
+  }
+  // Quem bateu: os nomes dão cara à campanha. Três chegam — mais do que isso
+  // vira lista e deixa de se ler.
+  const batidos = lutas.filter((l) => l.venceu).map((l) => nomeDoAdversario(l.adv)).filter(Boolean).slice(0, 3);
+  if (batidos.length > 0) {
+    partes.push(`Pelo caminho ficaram ${batidos.join(", ")}.`);
+  }
+  const perdeu = lutas.find((l) => !l.venceu);
+  if (perdeu) {
+    const quem = nomeDoAdversario(perdeu.adv);
+    if (quem) partes.push(`A única derrota foi contra ${quem}.`);
+  }
+  return partes.join(" ");
+}
+
 /** O atleta que mais pontuou na competição. */
 export function noticiaAtletaDestaque(d: {
   nome: string; pais: string; categoria: string; pontos: number;
   idComp: string; nomeComp: string;
+  /** A campanha luta a luta, quando existe (ver contarCampanha). */
+  campanha?: string;
 }): NoticiaNova | null {
   if (!d.nome || d.pontos <= 0) return null;
+  const detalhe = d.campanha ? ` ${d.campanha}` : "";
   return {
     tipo: "atleta_destaque",
     titulo: `${apelido(d.nome)} arrasou em ${d.nomeComp}`,
-    corpo: `${d.nome} (${d.pais}) somou ${num(d.pontos)} pontos nos ${d.categoria}kg — o melhor de toda a competição. Quem o tinha na equipa agradece.`,
+    corpo: `${d.nome} (${d.pais}) somou ${num(d.pontos)} pontos nos ${d.categoria}kg — o melhor de toda a competição.${detalhe} Quem o tinha na equipa agradece.`,
     resumo: `${apelido(d.nome)} (${d.pais}) · ${num(d.pontos)} pts — o melhor da rodada`,
     id_competicao: d.idComp,
     nome_competicao: d.nomeComp,
@@ -112,14 +161,16 @@ export function noticiaAtletaDestaque(d: {
 export function noticiaValorizacao(d: {
   nome: string; pais: string; de: number; para: number;
   idComp: string; nomeComp: string;
+  campanha?: string;
 }): NoticiaNova | null {
   const sub = d.para - d.de;
   if (!d.nome || sub <= 0) return null;
   const pct = d.de > 0 ? Math.round((sub / d.de) * 100) : 0;
+  const detalhe = d.campanha ? ` ${d.campanha}` : "";
   return {
     tipo: "valorizacao",
     titulo: `${apelido(d.nome)} valorizou ${pct}%`,
-    corpo: `Depois de ${d.nomeComp}, ${d.nome} (${d.pais}) subiu de JC ${num(d.de)} para JC ${num(d.para)}. Quem o tinha antes da rodada fez um bom negócio.`,
+    corpo: `Depois de ${d.nomeComp}, ${d.nome} (${d.pais}) subiu de JC ${num(d.de)} para JC ${num(d.para)}.${detalhe} Quem o tinha antes da rodada fez um bom negócio.`,
     resumo: `${apelido(d.nome)} · JC ${num(d.de)} → ${num(d.para)} (+${pct}%)`,
     id_competicao: d.idComp,
     nome_competicao: d.nomeComp,
@@ -131,16 +182,18 @@ export function noticiaValorizacao(d: {
 export function noticiaDesvalorizacao(d: {
   nome: string; pais: string; de: number; para: number;
   idComp: string; nomeComp: string;
+  campanha?: string;
 }): NoticiaNova | null {
   const queda = d.de - d.para;
   if (!d.nome || queda <= 0) return null;
   const pct = d.de > 0 ? Math.round((queda / d.de) * 100) : 0;
+  const detalhe = d.campanha ? ` ${d.campanha}` : "";
   return {
     tipo: "desvalorizacao",
     titulo: `${apelido(d.nome)} caiu ${pct}%`,
     // Sem sarcasmo: é um atleta real, e quem o escalou já perdeu património.
     // A notícia informa, não gozar.
-    corpo: `${d.nome} (${d.pais}) desceu de JC ${num(d.de)} para JC ${num(d.para)} depois de ${d.nomeComp}. Fica mais barato para quem acreditar na recuperação.`,
+    corpo: `${d.nome} (${d.pais}) desceu de JC ${num(d.de)} para JC ${num(d.para)} depois de ${d.nomeComp}.${detalhe} Fica mais barato para quem acreditar na recuperação.`,
     resumo: `${apelido(d.nome)} · JC ${num(d.de)} → ${num(d.para)} (−${pct}%)`,
     id_competicao: d.idComp,
     nome_competicao: d.nomeComp,
