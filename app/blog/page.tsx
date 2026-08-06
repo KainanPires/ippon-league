@@ -108,7 +108,7 @@ export default function Blog() {
             {noticias.map((n) => {
               const e = ESTILO[n.tipo] || ESTILO.curiosidade;
               return (
-                <article key={n.id} style={{ background: "#121815", border: "1px solid #243029", borderLeft: `3px solid ${e.cor}`, borderRadius: 13, padding: "13px 14px" }}>
+                <a key={n.id} href={`/blog/${n.id}`} style={{ display: "block", background: "#121815", border: "1px solid #243029", borderLeft: `3px solid ${e.cor}`, borderRadius: 13, padding: "13px 14px", textDecoration: "none", color: "inherit" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
                     <span style={{ fontSize: 15 }} aria-hidden="true">{e.icone}</span>
                     <span style={{ fontFamily: FD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: e.cor }}>{e.etiqueta}</span>
@@ -120,7 +120,7 @@ export default function Blog() {
                   {n.nome_competicao && (
                     <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 8 }}>{n.nome_competicao}</div>
                   )}
-                </article>
+                </a>
               );
             })}
           </div>
