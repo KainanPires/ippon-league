@@ -86,6 +86,11 @@ export default function EditorBlog() {
   const [aCarregarImg, setACarregarImg] = useState(false);
   const [msg, setMsg] = useState("");
   const [erro, setErro] = useState("");
+  // Filtros da lista. No painel o que interessa é ENCONTRAR uma notícia
+  // concreta para corrigir — por isso a procura por texto é o principal, e o
+  // estado ajuda a separar o que espera decisão do que já está no ar.
+  const [procura, setProcura] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "revisao" | "publicada" | "rascunho">("todos");
 
   // Só entra quem tem is_editor. A verificação é também no servidor (RLS), esta
   // é para o ecrã não desenhar um formulário que nunca gravaria nada.
@@ -290,6 +295,15 @@ export default function EditorBlog() {
     await carregarLista();
   }
 
+  // Aplica os filtros. Simples de propósito: com 60 notícias, uma procura por
+  // título e quatro estados resolvem tudo. Filtros mais finos desenhados antes
+  // de haver volume quase sempre acertam nos errados.
+  const visiveis = lista.filter((it) => {
+    if (filtroEstado !== "todos" && it.estado !== filtroEstado) return false;
+    if (procura.trim() && !it.titulo.toLowerCase().includes(procura.trim().toLowerCase())) return false;
+    return true;
+  });
+
   if (acesso === "a-ver") {
     return <Centro texto="A verificar…" />;
   }
@@ -415,17 +429,39 @@ export default function EditorBlog() {
           )}
         </div>
 
-        {/* ---------- O QUE JÁ ESCREVI ---------- */}
+        {/* ---------- TODAS AS NOTÍCIAS ---------- */}
         <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 10 }}>
-          Escritas ({lista.length})
+          Notícias ({visiveis.length}{visiveis.length !== lista.length ? ` de ${lista.length}` : ""})
         </div>
-        {lista.length === 0 ? (
+
+        {/* Procura por texto: o filtro mais útil aqui. Quem vem a este ecrã
+            normalmente já sabe qual notícia quer — só precisa de a achar. */}
+        <input
+          value={procura}
+          onChange={(e) => setProcura(e.target.value)}
+          placeholder="Procurar por título…"
+          style={{ ...inp, marginBottom: 8 }}
+        />
+        <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+          {([
+            ["todos", "Todas"],
+            ["revisao", "A rever"],
+            ["publicada", "No ar"],
+            ["rascunho", "Rascunhos"],
+          ] as const).map(([id, nome]) => (
+            <button key={id} onClick={() => setFiltroEstado(id)}
+              style={{ background: filtroEstado === id ? GOLD : "transparent", border: `1px solid ${filtroEstado === id ? GOLD : "#2a3a33"}`, color: filtroEstado === id ? "#1b211e" : "#93a39a", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", padding: "6px 11px", borderRadius: 8, cursor: "pointer" }}>
+              {nome}
+            </button>
+          ))}
+        </div>
+        {visiveis.length === 0 ? (
           <div style={{ fontSize: 13, color: "#5f6f67", textAlign: "center", padding: "20px 0" }}>
-            Ainda não escreveste nenhuma.
+            {lista.length === 0 ? "Ainda não há notícias." : "Nada corresponde a esta procura."}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            {lista.map((it) => (
+            {visiveis.map((it) => (
               <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#121815", border: "1px solid #243029", borderRadius: 11, padding: "10px 12px" }}>
                 <span style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "3px 7px", borderRadius: 5,
                   background: it.estado === "publicada" ? "#13301f" : it.estado === "revisao" ? "#2a1f1c" : it.estado === "agendada" ? "#2a2410" : "#1a2028",
