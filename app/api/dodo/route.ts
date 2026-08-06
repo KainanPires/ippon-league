@@ -27,7 +27,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sortearVagas, tamanhoDaChave, VAGAS_POR_CONTINENTE, TOTAL_VAGAS } from "@/lib/sorteioDodo";
-import { CONTINENTES, NOME_CONTINENTE, type Continente } from "@/lib/continentes";
+import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import { focoMercado } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
@@ -157,7 +157,7 @@ async function sortear(simular: boolean) {
     return NextResponse.json({ ok: true, poucos: true, inscritos: lista.length });
   }
 
-  const r = sortearVagas(lista, [...CONTINENTES]);
+  const r = sortearVagas(lista, Object.keys(NOME_CONTINENTE));
   // A chave tem de ser potência de 2. Com 24 sorteados joga-se com 16 — melhor
   // do que inventar byes que dariam vantagem a uns sem eles fazerem nada.
   const tamanho = tamanhoDaChave(r.sorteados.length);
