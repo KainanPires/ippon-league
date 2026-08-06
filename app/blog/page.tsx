@@ -168,7 +168,7 @@ export default function Blog() {
                   </div>
                   {(n.nome_competicao || n.autor_nome) && (
                     <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 8 }}>
-                      {[n.nome_competicao, n.autor_nome ? `por ${n.autor_nome}` : ""].filter(Boolean).join(" · ")}
+                      {[n.nome_competicao, n.autor_nome ? "Equipa Ippon League" : ""].filter(Boolean).join(" · ")}
                     </div>
                   )}
                 </a>
