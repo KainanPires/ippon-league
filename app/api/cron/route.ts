@@ -1167,13 +1167,23 @@ export async function GET(req: Request) {
   // (E-sexies) MATA-MATA DO DÔDO: sorteia quando as inscrições fecham, e retira
   // quem deixou de ter Pro (o adversário avança). Ambas as rotas não fazem nada
   // quando não há edição a decorrer, por isso é barato chamá-las sempre.
-  let dodo: { sorteio: unknown; desqualificados: number } | null = null;
+  let dodo: { sorteio: unknown; desqualificados: number; edicao_aberta: number } | null = null;
   try {
     if (haTempo(t0, MS_MARGEM_ETAPA)) {
       const seg = encodeURIComponent(process.env.CRON_SECRET || "");
+      // Abre a edição seguinte quando a atual chega às meias-finais. Só faz
+      // alguma coisa se o ciclo automático estiver ligado em dodo_config —
+      // antes do lançamento, fica desligado e nada abre sozinho.
+      let abriu = 0;
+      try {
+        if (supabaseAdmin) {
+          const { data } = await supabaseAdmin.rpc("ippon_abrir_proxima_copa");
+          abriu = Number(data ?? 0);
+        }
+      } catch { /* sem ciclo: segue */ }
       const rs = await fetch(`${base}/api/dodo?sortear=1&key=${seg}`).then((r) => r.json()).catch(() => null);
       const rv = await fetch(`${base}/api/dodo/verificar-pro?key=${seg}`).then((r) => r.json()).catch(() => null);
-      dodo = { sorteio: rs?.ok ? rs : null, desqualificados: Number(rv?.desqualificados || 0) };
+      dodo = { sorteio: rs?.ok ? rs : null, desqualificados: Number(rv?.desqualificados || 0), edicao_aberta: abriu };
     }
   } catch { /* não bloqueia o resto do cron */ }
 
