@@ -24,6 +24,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { Mascot } from "@/components/Mascot";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -272,7 +273,7 @@ export default function EditorBlog() {
     return <Centro texto="A verificar…" />;
   }
   if (acesso === "nao") {
-    return <Centro texto="Esta página é para a equipa editorial." />;
+    return <SemAcesso />;
   }
 
   return (
@@ -455,6 +456,42 @@ function Campo({ label, ajuda, children }: { label: string; ajuda?: string; chil
 
 function Aviso({ cor, texto }: { cor: string; texto: string }) {
   return <div style={{ fontSize: 12.5, color: cor, marginBottom: 10, lineHeight: 1.45 }}>{texto}</div>;
+}
+
+/**
+ * Quem não é editor.
+ *
+ * O acesso a sério é garantido pela BASE DE DADOS: as políticas exigem
+ * is_editor para inserir, editar ou apagar. Este ecrã é só cortesia — evita
+ * mostrar um formulário que nunca gravaria nada.
+ *
+ * Com o Dôdo a fazer o gesto de "aqui não". Uma frase seca a dizer que a página
+ * não é para si soa a porta na cara; o mesmo dito pelo mascote da app soa a
+ * "enganaste-te no caminho".
+ */
+function SemAcesso() {
+  return (
+    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ maxWidth: 320, textAlign: "center" }}>
+        <div style={{ position: "relative", width: 130, height: 130, margin: "0 auto 6px" }}>
+          <Mascot belt="#efeadd" expression="indicando" />
+          {/* Braços cruzados por cima do Dôdo: "aqui não". */}
+          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52 }} aria-hidden="true">
+            🙅
+          </span>
+        </div>
+        <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "6px 0 10px" }}>
+          Por aqui não
+        </h1>
+        <p style={{ fontSize: 14, color: "#93a39a", lineHeight: 1.6, margin: "0 0 20px" }}>
+          Esta zona é da equipa que escreve as notícias. Se estás à procura do blog, é já a seguir.
+        </p>
+        <a href="/blog" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 13.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px 24px", borderRadius: 11, textDecoration: "none" }}>
+          Ir para o Blog do Dôdo
+        </a>
+      </div>
+    </main>
+  );
 }
 
 function Centro({ texto }: { texto: string }) {
