@@ -63,7 +63,9 @@ const VAZIO: Rascunho = {
 
 interface Item {
   id: string; tipo: string; titulo: string; estado: string;
-  publicar_em: string | null; criada_em: string; autor_nome: string | null;
+  publicar_em: string | null; publicar_auto_em: string | null;
+  criada_em: string; autor_nome: string | null;
+  autor_id: string | null;   // null = gerada pelo motor
 }
 
 export default function EditorBlog() {
@@ -94,13 +96,20 @@ export default function EditorBlog() {
   }, []);
 
   const carregarLista = useCallback(async () => {
+    // Tudo o que o editor pode gerir: o que escreveu, MAIS as geradas que estão
+    // à espera de revisão. Antes só mostrava as escritas — e as automáticas
+    // publicavam-se sem ninguém as ver.
     const { data } = await supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, estado, publicar_em, criada_em, autor_nome")
-      .not("autor_id", "is", null)
+      .select("id, tipo, titulo, estado, publicar_em, publicar_auto_em, criada_em, autor_nome, autor_id")
       .order("criada_em", { ascending: false })
-      .limit(40);
-    setLista((data as Item[]) || []);
+      .limit(60);
+    const todas = (data as Item[]) || [];
+    // As que esperam revisão primeiro: são as que têm prazo.
+    setLista([
+      ...todas.filter((x) => x.estado === "revisao"),
+      ...todas.filter((x) => x.estado !== "revisao" && x.autor_id),
+    ]);
   }, []);
 
   useEffect(() => { if (acesso === "sim") void carregarLista(); }, [acesso, carregarLista]);
@@ -175,6 +184,9 @@ export default function EditorBlog() {
         link_youtube: f.link_youtube.trim() || null,
         estado,
         publicar_em: estado === "agendada" ? new Date(f.publicar_em).toISOString() : null,
+        // Ao mexer numa notícia gerada, ela deixa de estar em revisão: passou
+        // por uma pessoa, que é o que a revisão queria garantir.
+        publicar_auto_em: null,
         destaque: f.destaque,
         autor_id: uid,
         autor_nome: meuNome || null,
@@ -228,6 +240,13 @@ export default function EditorBlog() {
     });
     setMsg(""); setErro("");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /** Publica já uma notícia que está em revisão, sem esperar pelo prazo. */
+  async function publicarJa(id: string) {
+    await supabase.from("hub_noticias")
+      .update({ estado: "publicada", publicar_auto_em: null }).eq("id", id);
+    await carregarLista();
   }
 
   async function apagar(id: string) {
@@ -370,11 +389,26 @@ export default function EditorBlog() {
             {lista.map((it) => (
               <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#121815", border: "1px solid #243029", borderRadius: 11, padding: "10px 12px" }}>
                 <span style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "3px 7px", borderRadius: 5,
-                  background: it.estado === "publicada" ? "#13301f" : it.estado === "agendada" ? "#2a2410" : "#1a2028",
-                  color: it.estado === "publicada" ? "#7fd1a3" : it.estado === "agendada" ? GOLD : "#7c8a82" }}>
-                  {it.estado === "publicada" ? "no ar" : it.estado === "agendada" ? "agendada" : "rascunho"}
+                  background: it.estado === "publicada" ? "#13301f" : it.estado === "revisao" ? "#2a1f1c" : it.estado === "agendada" ? "#2a2410" : "#1a2028",
+                  color: it.estado === "publicada" ? "#7fd1a3" : it.estado === "revisao" ? "#ef8d83" : it.estado === "agendada" ? GOLD : "#7c8a82" }}>
+                  {it.estado === "publicada" ? "no ar" : it.estado === "revisao" ? "a rever" : it.estado === "agendada" ? "agendada" : "rascunho"}
                 </span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "#d6ddd6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.titulo}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 13, color: "#d6ddd6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.titulo}</span>
+                  {/* Quanto falta para sair sozinha. Sem isto, "a rever" não
+                      diz se há tempo de mexer ou se é já a seguir. */}
+                  {it.estado === "revisao" && it.publicar_auto_em && (
+                    <span style={{ display: "block", fontSize: 10, color: "#7c8a82", marginTop: 1 }}>
+                      {faltamHoras(it.publicar_auto_em)}
+                    </span>
+                  )}
+                  {!it.autor_id && (
+                    <span style={{ display: "block", fontSize: 10, color: "#5f6f67", marginTop: 1 }}>gerada automaticamente</span>
+                  )}
+                </span>
+                {it.estado === "revisao" && (
+                  <button onClick={() => publicarJa(it.id)} style={{ ...btnMini, color: "#7fd1a3", borderColor: "#2a4d3e" }}>Publicar já</button>
+                )}
                 <button onClick={() => editar(it.id)} style={btnMini}>Editar</button>
                 <button onClick={() => apagar(it.id)} style={{ ...btnMini, color: "#ef8d83", borderColor: "#5a2f2c" }}>Apagar</button>
               </div>
@@ -384,6 +418,16 @@ export default function EditorBlog() {
       </div>
     </main>
   );
+}
+
+/** "sai daqui a 4h" — para o editor saber se tem tempo de mexer. */
+function faltamHoras(iso: string): string {
+  const ms = Date.parse(iso) - Date.now();
+  if (!Number.isFinite(ms)) return "";
+  if (ms <= 0) return "sai na próxima passagem";
+  const h = Math.floor(ms / 3600000);
+  if (h >= 1) return `sai daqui a ${h}h`;
+  return `sai daqui a ${Math.max(1, Math.round(ms / 60000))} min`;
 }
 
 function Campo({ label, ajuda, children }: { label: string; ajuda?: string; children: React.ReactNode }) {
