@@ -90,7 +90,7 @@ export default function Blog() {
       }
       await supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, corpo, nome_competicao, criada_em, imagem_url, autor_nome, dados, pais, continente")
+      .select("id, tipo, titulo, corpo, nome_competicao, criada_em, imagem_url, autor_nome, dados, pais, continente, estado")
       .order("criada_em", { ascending: false })
       .limit(60)
       .then(({ data }) => {
@@ -135,6 +135,16 @@ export default function Blog() {
                 <a key={n.id} href={`/blog/${n.id}`} style={{ display: "block", background: "#121815", border: "1px solid #243029", borderLeft: `3px solid ${e.cor}`, borderRadius: 13, padding: "13px 14px", textDecoration: "none", color: "inherit" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
                     <span style={{ fontSize: 15 }} aria-hidden="true">{e.icone}</span>
+                    {/* Só um EDITOR chega a ver isto: a política de leitura
+                        deixa-o ver rascunhos e notícias em revisão, que mais
+                        ninguém vê. Sem a marca, ele não distingue o que já
+                        está no ar do que ainda não — e pensa que publicou algo
+                        que continua à espera. */}
+                    {n.estado && n.estado !== "publicada" && (
+                      <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 4, background: "#2a1f1c", color: "#ef8d83" }}>
+                        {n.estado === "revisao" ? "a rever" : n.estado === "agendada" ? "agendada" : "rascunho"}
+                      </span>
+                    )}
                     <span style={{ fontFamily: FD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: e.cor }}>{e.etiqueta}</span>
                     <span style={{ flex: 1 }} />
                     <span style={{ fontSize: 10.5, color: "#5f6f67" }}>{quando(n.criada_em)}</span>
