@@ -112,13 +112,23 @@ export default function EditorBlog() {
       .from("hub_noticias")
       .select("id, tipo, titulo, estado, publicar_em, publicar_auto_em, criada_em, autor_nome, autor_id")
       .order("criada_em", { ascending: false })
+      // 60 chega para hoje. Com o tempo, o mural cresce e vai ser preciso uma
+      // procura — mas com filtros inventados antes de haver volume, quase sempre
+      // se acerta nos errados.
       .limit(60);
     const todas = (data as Item[]) || [];
-    // As que esperam revisão primeiro: são as que têm prazo.
-    setLista([
-      ...todas.filter((x) => x.estado === "revisao"),
-      ...todas.filter((x) => x.estado !== "revisao" && x.autor_id),
-    ]);
+    // TODAS as notícias, geradas ou escritas.
+    //
+    // A primeira versão filtrava por `autor_id`, que só as escritas por pessoas
+    // têm — e por isso as geradas desapareciam da lista assim que saíam de
+    // revisão. Publicavam-se e ficavam sem forma de as corrigir ou apagar sem ir
+    // ao Supabase. Se uma notícia automática sair com um erro, tem de haver
+    // maneira de lhe mexer aqui.
+    //
+    // A ordem: primeiro o que espera decisão (revisão), depois rascunhos e
+    // agendadas, e por fim o que já está no ar.
+    const ordem: Record<string, number> = { revisao: 0, rascunho: 1, agendada: 2, publicada: 3 };
+    setLista([...todas].sort((a, b) => (ordem[a.estado] ?? 9) - (ordem[b.estado] ?? 9)));
   }, []);
 
   useEffect(() => { if (acesso === "sim") void carregarLista(); }, [acesso, carregarLista]);
@@ -264,6 +274,13 @@ export default function EditorBlog() {
   async function publicarJa(id: string) {
     await supabase.from("hub_noticias")
       .update({ estado: "publicada", publicar_auto_em: null }).eq("id", id);
+    await carregarLista();
+  }
+
+  /** Tira uma notícia do ar, sem a apagar. Volta a rascunho para se corrigir. */
+  async function despublicar(id: string) {
+    await supabase.from("hub_noticias")
+      .update({ estado: "rascunho", publicar_em: null, publicar_auto_em: null }).eq("id", id);
     await carregarLista();
   }
 
@@ -430,6 +447,12 @@ export default function EditorBlog() {
                 </span>
                 {it.estado === "revisao" && (
                   <button onClick={() => publicarJa(it.id)} style={{ ...btnMini, color: "#7fd1a3", borderColor: "#2a4d3e" }}>Publicar já</button>
+                )}
+                {/* TIRAR DO AR sem apagar. Se uma notícia sair com um erro, o
+                    primeiro reflexo é escondê-la — corrigir com calma vem
+                    depois. Apagar de vez é uma decisão diferente e mais dura. */}
+                {it.estado === "publicada" && (
+                  <button onClick={() => despublicar(it.id)} style={{ ...btnMini, color: "#e0894f", borderColor: "#5a4a18" }}>Tirar do ar</button>
                 )}
                 <button onClick={() => editar(it.id)} style={btnMini}>Editar</button>
                 <button onClick={() => apagar(it.id)} style={{ ...btnMini, color: "#ef8d83", borderColor: "#5a2f2c" }}>Apagar</button>
