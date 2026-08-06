@@ -27,6 +27,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sortearVagas, tamanhoDaChave, VAGAS_POR_CONTINENTE, TOTAL_VAGAS } from "@/lib/sorteioDodo";
+// São CINCO continentes (as federações da IJF), e as chaves de NOME_CONTINENTE
+// são a lista deles. Não há uma constante CONTINENTES separada — usar as chaves
+// evita ter duas listas a poder divergir.
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import { focoMercado } from "@/lib/calendario";
 
@@ -73,6 +76,10 @@ export async function GET(req: Request) {
   }
 
   // --- Estado atual ---
+  // NOTA: 'preparada' fica de fora de propósito. Uma edição preparada existe
+  // mas ninguém a vê — serve para deixar tudo pronto e só abrir as inscrições
+  // quando houver publicidade a acompanhar. Abrir sem ninguém saber daria uma
+  // Copa com três inscritos.
   const { data: edicao } = await supabaseAdmin
     .from("dodo_edicoes")
     .select("*")
@@ -104,7 +111,9 @@ export async function GET(req: Request) {
     const ehPro = !!u?.is_pro || !!u?.is_pro_max;
     const { data: minha } = await supabaseAdmin
       .from("dodo_inscricoes").select("sorteada").eq("edicao_id", edicao.id).eq("user_id", uid).maybeSingle();
-    const aberto = String(edicao.estado) === "inscricoes" && Date.now() < Date.parse(String(edicao.inscricoes_ate));
+    const aberto = String(edicao.estado) === "inscricoes"
+      && !!edicao.inscricoes_ate
+      && Date.now() < Date.parse(String(edicao.inscricoes_ate));
     eu = {
       inscrito: !!minha,
       sorteada: minha ? (minha.sorteada as boolean | null) : null,
@@ -141,7 +150,7 @@ async function sortear(simular: boolean) {
   if (!edicao) return NextResponse.json({ ok: true, nada: "Nenhuma edição com inscrições abertas." });
 
   // Ainda dentro do prazo? O sorteio só acontece depois de fecharem.
-  if (Date.now() < Date.parse(String(edicao.inscricoes_ate))) {
+  if (!edicao.inscricoes_ate || Date.now() < Date.parse(String(edicao.inscricoes_ate))) {
     return NextResponse.json({ ok: true, aguarda: true, inscricoes_ate: edicao.inscricoes_ate });
   }
 
@@ -235,7 +244,7 @@ export async function POST(req: Request) {
   if (!edicao) {
     return NextResponse.json({ ok: false, erro: "Não há inscrições abertas." }, { status: 409 });
   }
-  if (Date.now() >= Date.parse(String(edicao.inscricoes_ate))) {
+  if (!edicao.inscricoes_ate || Date.now() >= Date.parse(String(edicao.inscricoes_ate))) {
     return NextResponse.json({ ok: false, erro: "As inscrições já fecharam." }, { status: 409 });
   }
 
