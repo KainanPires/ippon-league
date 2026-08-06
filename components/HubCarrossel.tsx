@@ -131,7 +131,8 @@ export function HubCarrossel() {
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", lineHeight: 1.3 }}>{n.titulo}</div>
-            <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.45, margin: "5px 0 0" }}>
+            {/* Duas linhas e corta: o carrossel é uma montra, não o artigo. */}
+            <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.45, margin: "5px 0 0", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
               {n.resumo || n.corpo}
             </p>
           </div>
