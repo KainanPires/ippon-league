@@ -38,6 +38,8 @@ const ESTILO: Record<string, { icone: string; cor: string; etiqueta: string }> =
   mais_rico: { icone: "💰", cor: GOLD, etiqueta: "Património" },
   lider_pontos: { icone: "👑", cor: GOLD, etiqueta: "Ranking" },
   percurso_campeao: { icone: "🏆", cor: GOLD, etiqueta: "Copa" },
+  campeao_ano: { icone: "🏅", cor: GOLD, etiqueta: "Campeão do Ano" },
+  rico_ano: { icone: "💎", cor: GOLD, etiqueta: "Balanço do Ano" },
   curiosidade: { icone: "💡", cor: "#aee9c9", etiqueta: "Curiosidade" },
 };
 
