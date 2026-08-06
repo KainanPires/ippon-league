@@ -212,6 +212,10 @@ export default function EditorBlog() {
         // por uma pessoa, que é o que a revisão queria garantir.
         publicar_auto_em: null,
         destaque: f.destaque,
+        // 48h de destaque, contadas a partir de agora. Ao reeditar uma notícia
+        // já destacada, o prazo recomeça — é o comportamento esperado de quem
+        // acabou de decidir destacá-la outra vez.
+        destaque_ate: f.destaque ? new Date(Date.now() + 48 * 3600 * 1000).toISOString() : null,
         // O autor fica registado para uso INTERNO (saber quem escreveu o quê,
         // e para a política de leitura deixar cada um ver os seus rascunhos).
         // Mas o que aparece ao leitor é "Equipa Ippon League": o nome de quem
@@ -408,7 +412,9 @@ export default function EditorBlog() {
           <label style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer", marginBottom: 14 }}>
             <input type="checkbox" checked={f.destaque} onChange={(e) => setF((x) => ({ ...x, destaque: e.target.checked }))}
               style={{ width: 17, height: 17, accentColor: GOLD }} />
-            <span style={{ fontSize: 13, color: "#c7d0c9" }}>Destacar (aparece primeiro no carrossel)</span>
+            <span style={{ fontSize: 13, color: "#c7d0c9" }}>
+              Destacar <span style={{ color: "#7c8a82" }}>— aparece primeiro no carrossel durante 48h</span>
+            </span>
           </label>
 
           {erro && <Aviso cor="#ef8d83" texto={erro} />}
