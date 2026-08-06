@@ -1139,6 +1139,18 @@ export async function GET(req: Request) {
     }
   } catch { /* não bloqueia o resto do cron */ }
 
+  // (E-quater) HUB DA COMUNIDADE — gera as notícias das competições já
+  // congeladas. A rota verifica se cada notícia já existe antes de a escrever,
+  // por isso é seguro chamá-la de hora a hora.
+  let hubNoticias: { candidatas: number; gravadas: number } | null = null;
+  try {
+    if (haTempo(t0, MS_MARGEM_ETAPA)) {
+      const r = await fetch(`${base}/api/hub/gerar?key=${encodeURIComponent(process.env.CRON_SECRET || "")}`);
+      const j = await r.json().catch(() => null);
+      if (j && j.ok) hubNoticias = { candidatas: Number(j.candidatas || 0), gravadas: Number(j.gravadas || 0) };
+    }
+  } catch { /* não bloqueia o resto do cron */ }
+
   // (F) Notificações de DATAS ESPECIAIS por push (aniversário + Dia do Judô).
   //     Idempotente por dia. Não bloqueia o resto do cron se falhar.
   let datas: { dia_do_judo: number; aniversarios: number; outras_globais: number } | null = null;
@@ -1218,6 +1230,7 @@ export async function GET(req: Request) {
     datas,
     emails_verificacao: emailsVerificacao,
     contas_inativas: contasInativas,
+    hub_noticias: hubNoticias,
     // Estado dos preços nesta corrida (cursor): de onde partiu, onde ficou.
     precos: {
       dia: diaHoje,
