@@ -23,6 +23,10 @@ import { useNivel } from "@/lib/useNivel";
 import { CartaoInstalarApp } from "@/components/InstalarApp";
 import { LembreteNotificacoes } from "@/components/NotificacoesPush";
 import { reconciliarPush } from "@/lib/push";
+// Blog do Dôdo: notícias geradas a partir dos dados do jogo. Dá motivo para
+// abrir a app num dia sem competição — o buraco de retenção que o plano
+// original identificou.
+import { HubCarrossel } from "@/components/HubCarrossel";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -456,7 +460,6 @@ export default function Inicio() {
         </header>
         {/* Convite para instalar a app (PWA). Só aparece a quem ainda não instalou. */}
         <CartaoInstalarApp />
-
         {/* EMAIL POR CONFIRMAR. Não bloqueia nada: a pessoa joga na mesma. Mas
             fica visível, e o cron manda um lembrete por dia até confirmar. É o
             equilíbrio que se quis — não perder ninguém no registo, e ainda assim
@@ -615,6 +618,10 @@ export default function Inicio() {
             )}
           </Card>
         </a>
+
+        {/* BLOG DO DÔDO — no fim, de propósito: quem chega aqui já viu a equipa
+            e as ligas. É conteúdo para ficar, não para decidir. */}
+        <HubCarrossel />
       </div>
       <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 62, background: "#0f1411", borderTop: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
         <Tab label="Início" active icon={<HomeIcon />} href="/inicio" />
@@ -698,7 +705,6 @@ const iconBtn: React.CSSProperties = {
 function FaixaVerificarEmail() {
   const [estado, setEstado] = useState<"normal" | "enviando" | "enviado" | "erro">("normal");
   const [msg, setMsg] = useState("");
-
   async function reenviar() {
     setEstado("enviando"); setMsg("");
     try {
@@ -717,7 +723,6 @@ function FaixaVerificarEmail() {
       setEstado("erro"); setMsg("Não conseguimos enviar agora.");
     }
   }
-
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a2410,#10160f)", border: "1px solid #5a4a18", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", marginBottom: 14 }}>
       <span style={{ flexShrink: 0, color: GOLD, marginTop: 1 }}>
@@ -739,7 +744,6 @@ function FaixaVerificarEmail() {
     </div>
   );
 }
-
 function Card({ children }: { children: React.ReactNode }) {
   return <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 13, marginBottom: 12 }}>{children}</div>;
 }
