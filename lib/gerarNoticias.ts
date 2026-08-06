@@ -43,6 +43,19 @@ export function num(n: number): string {
   return Number.isInteger(r) ? String(r) : r.toFixed(1);
 }
 
+/**
+ * Nome de EQUIPA entre aspas: "Relâmpago Marquinhos".
+ *
+ * Porquê: nas notícias aparecem lado a lado nomes de equipas (escolhidos pelos
+ * jogadores) e nomes de atletas reais. Sem distinção visual, "Relâmpago
+ * Marquinhos foi o melhor do mundo" lê-se como se fosse uma pessoa. As aspas
+ * dizem, sem explicar nada, que aquilo é o nome de um time.
+ */
+export function equipa(nome: string): string {
+  const n = String(nome || "").trim();
+  return n ? `"${n}"` : "";
+}
+
 /** Último nome de um atleta, para as frases não ficarem intermináveis. */
 export function apelido(nome: string): string {
   const p = String(nome || "").trim().split(/\s+/);
@@ -64,11 +77,12 @@ export function noticiaMelhorRodada(d: {
   const mundial = d.escopo === "mundial";
   const onde = mundial ? "do mundo" : `de ${d.continente}`;
   const entre = d.nParticipantes > 1 ? ` entre ${d.nParticipantes} treinadores` : "";
+  const eq = equipa(d.nomeTime);
   return {
     tipo: "melhor_rodada",
-    titulo: mundial ? `${d.nomeTime} foi o melhor do mundo` : `${d.nomeTime} lidera ${d.continente}`,
-    corpo: `Com ${num(d.pontos)} pontos em ${d.nomeComp}, ${d.nomeTime} foi a melhor equipa ${onde}${entre}. O certificado já está no perfil.`,
-    resumo: `${d.nomeTime} · ${num(d.pontos)} pts · melhor ${onde}`,
+    titulo: mundial ? `${eq} foi a melhor do mundo` : `${eq} lidera ${d.continente}`,
+    corpo: `Com ${num(d.pontos)} pontos em ${d.nomeComp}, a equipa ${eq} foi a melhor ${onde}${entre}. O certificado já está no perfil.`,
+    resumo: `${eq} · ${num(d.pontos)} pts · melhor ${onde}`,
     id_competicao: d.idComp,
     nome_competicao: d.nomeComp,
     dados: { chave: `${d.escopo}-${d.continente}`, pontos: d.pontos, escopo: d.escopo },
@@ -163,7 +177,7 @@ export function noticiaFaixas(d: {
   const partes: string[] = [];
   if (d.subiram > 0) partes.push(`${d.subiram} ${d.subiram === 1 ? "subiu" : "subiram"}`);
   if (d.desceram > 0) partes.push(`${d.desceram} ${d.desceram === 1 ? "desceu" : "desceram"}`);
-  const topo = d.topo ? ` ${d.topo.nome} está agora na faixa ${d.topo.faixa}.` : "";
+  const topo = d.topo ? ` ${equipa(d.topo.nome)} está agora na faixa ${d.topo.faixa}.` : "";
   return {
     tipo: "faixas",
     titulo: "As faixas mudaram",
@@ -179,12 +193,13 @@ export function noticiaCopaCampeao(d: {
   nomeLiga: string; campeao: string; vice: string | null; participantes: number; ligaId: string;
 }): NoticiaNova | null {
   if (!d.campeao) return null;
-  const contra = d.vice ? ` Bateu ${d.vice} na final.` : "";
+  const camp = equipa(d.campeao);
+  const contra = d.vice ? ` Bateu ${equipa(d.vice)} na final.` : "";
   return {
     tipo: "copa_campeao",
-    titulo: `${d.campeao} venceu a ${d.nomeLiga}`,
+    titulo: `${camp} venceu a ${d.nomeLiga}`,
     corpo: `Acabou o mata-mata da ${d.nomeLiga}, entre ${d.participantes} equipas.${contra} O certificado de campeão já está disponível.`,
-    resumo: `${d.campeao} · campeão da ${d.nomeLiga}`,
+    resumo: `${camp} · campeão da ${d.nomeLiga}`,
     dados: { chave: d.ligaId, participantes: d.participantes },
     destaque: true,
   };
