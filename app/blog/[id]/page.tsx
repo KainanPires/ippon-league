@@ -45,6 +45,23 @@ interface Noticia {
   id_competicao: string | null;
   nome_competicao: string | null;
   criada_em: string;
+  // Campos das notícias ESCRITAS (nas geradas vêm vazios).
+  autor_nome: string | null;
+  imagem_url: string | null;
+  imagem_credito: string | null;
+  link_instagram: string | null;
+  link_tiktok: string | null;
+  link_youtube: string | null;
+}
+
+/** Botão para o vídeo desta notícia numa rede social. */
+function Rede({ href, nome, cor }: { href: string; nome: string; cor: string }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer"
+      style={{ display: "inline-block", background: "transparent", border: `1px solid ${cor}66`, color: cor, fontFamily: FD, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", padding: "7px 13px", borderRadius: 8, textDecoration: "none" }}>
+      {nome}
+    </a>
+  );
 }
 
 function quando(iso: string): string {
@@ -75,7 +92,7 @@ export default function NoticiaPagina() {
       if (!id) return;
       const { data } = await supabase
         .from("hub_noticias")
-        .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em")
+        .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em, autor_nome, imagem_url, imagem_credito, link_instagram, link_tiktok, link_youtube")
         .eq("id", id).maybeSingle();
       if (!vivo) return;
       if (!data) { setN("nao-existe"); return; }
@@ -87,7 +104,7 @@ export default function NoticiaPagina() {
       if (noticia.id_competicao) {
         const { data: outras } = await supabase
           .from("hub_noticias")
-          .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em")
+          .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em, autor_nome, imagem_url, imagem_credito, link_instagram, link_tiktok, link_youtube")
           .eq("id_competicao", noticia.id_competicao)
           .neq("id", noticia.id)
           .limit(5);
@@ -133,7 +150,17 @@ export default function NoticiaPagina() {
           </div>
         ) : (
           <>
-            <article style={{ background: "#121815", border: "1px solid #243029", borderLeft: `3px solid ${e.cor}`, borderRadius: 14, padding: "16px 15px" }}>
+            <article style={{ background: "#121815", border: "1px solid #243029", borderLeft: `3px solid ${e.cor}`, borderRadius: 14, overflow: "hidden" }}>
+              {n.imagem_url && (
+                <div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={n.imagem_url} alt="" style={{ width: "100%", display: "block" }} />
+                  {n.imagem_credito && (
+                    <div style={{ fontSize: 10.5, color: "#5f6f67", padding: "5px 15px 0" }}>{n.imagem_credito}</div>
+                  )}
+                </div>
+              )}
+              <div style={{ padding: "16px 15px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                 <span style={{ fontSize: 18 }} aria-hidden="true">{e.icone}</span>
                 <span style={{ fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: e.cor }}>{e.etiqueta}</span>
@@ -144,11 +171,30 @@ export default function NoticiaPagina() {
               <h1 style={{ fontSize: 20, fontWeight: 700, color: "#f1ede2", lineHeight: 1.25, margin: "0 0 10px" }}>{n.titulo}</h1>
               <p style={{ fontSize: 14.5, color: "#c7d0c9", lineHeight: 1.6, margin: 0 }}>{n.corpo}</p>
 
-              {n.nome_competicao && (
-                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a221d", fontSize: 12, color: "#93a39a" }}>
-                  {n.nome_competicao}
+              {(n.nome_competicao || n.autor_nome) && (
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a221d", fontSize: 12, color: "#93a39a", display: "flex", justifyContent: "space-between", gap: 10 }}>
+                  <span>{n.nome_competicao || ""}</span>
+                  {/* Só as notícias escritas por pessoas têm autor. As geradas
+                      pelo motor não assinam — não seria honesto. */}
+                  {n.autor_nome && <span style={{ flexShrink: 0 }}>por {n.autor_nome}</span>}
                 </div>
               )}
+
+              {/* O CICLO: notícia -> vídeo -> de volta. Se houver vídeo sobre
+                  isto nas redes, é aqui que se manda o leitor. */}
+              {(n.link_instagram || n.link_tiktok || n.link_youtube) && (
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a221d" }}>
+                  <div style={{ fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 8 }}>
+                    Ver em vídeo
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                    {n.link_instagram && <Rede href={n.link_instagram} nome="Instagram" cor="#c13584" />}
+                    {n.link_tiktok && <Rede href={n.link_tiktok} nome="TikTok" cor="#69c9d0" />}
+                    {n.link_youtube && <Rede href={n.link_youtube} nome="YouTube" cor="#e2655a" />}
+                  </div>
+                </div>
+              )}
+              </div>
             </article>
 
             <button onClick={partilhar} style={{ width: "100%", marginTop: 12, padding: 12, borderRadius: 11, border: "none", background: copiado ? "#1c3a2e" : GOLD, color: copiado ? "#aee9c9" : "#1b211e", fontFamily: FD, fontSize: 13.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
