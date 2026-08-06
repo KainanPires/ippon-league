@@ -24,6 +24,7 @@ import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import {
   noticiaMelhorRodada, noticiaAtletaDestaque, noticiaValorizacao,
   noticiaDesvalorizacao, noticiaMaisEscalado, noticiaCopaCampeao,
+  noticiaMaisRico, noticiaLiderPontos, noticiaPercursoCampeao,
   contarCampanha,
   type NoticiaNova,
 } from "@/lib/gerarNoticias";
@@ -213,13 +214,105 @@ export async function GET(req: Request) {
       }
     }
   }
-  // --- 6) Copas que terminaram ---
+  // ========================================================================
+  // NOTÍCIAS SOBRE O ESTADO DO JOGO
+  //
+  // Estas não são de uma rodada: são de quem está por cima AGORA. Por isso
+  // ficam fora do ciclo das competições, e são refeitas de tempos a tempos —
+  // a chave inclui o dia, para o líder de hoje não colidir com o de ontem.
+  // ========================================================================
+  const hoje = agora.toISOString().slice(0, 10);
+
+  // --- 5) O maior património (mundial e por continente) ---
+  try {
+    const { data: ricos } = await supabaseAdmin
+      .from("users")
+      .select("id, patrimony_jc, continente")
+      .gt("patrimony_jc", 0)
+      .order("patrimony_jc", { ascending: false })
+      .limit(200);
+    const lista = ricos || [];
+    // O nome e o escudo vêm da última equipa guardada — é a mais representativa.
+    const equipaDeUser = async (uid: string): Promise<{ nome: string; escudo: unknown }> => {
+      const { data } = await supabaseAdmin!
+        .from("equipas").select("nome, escudo").eq("user_id", uid)
+        .order("id_competicao", { ascending: false }).limit(1).maybeSingle();
+      return { nome: String(data?.nome || ""), escudo: data?.escudo ?? null };
+    };
+    if (lista[0]) {
+      const eq = await equipaDeUser(String(lista[0].id));
+      const seg = lista[1] ? await equipaDeUser(String(lista[1].id)) : null;
+      const n = noticiaMaisRico({
+        nomeTime: eq.nome, patrimonio: Number(lista[0].patrimony_jc || 0),
+        escopo: "mundial", escudo: eq.escudo,
+        segundo: seg ? { nomeTime: seg.nome, patrimonio: Number(lista[1].patrimony_jc || 0) } : null,
+      });
+      if (n) { n.dados = { ...(n.dados || {}), chave: `rico-mundial-${hoje}` }; novas.push(n); }
+    }
+    // Por continente: o primeiro de cada um.
+    const porCont = new Map<string, typeof lista>();
+    for (const u of lista) {
+      const c = String(u.continente || "");
+      if (!c) continue;
+      if (!porCont.has(c)) porCont.set(c, []);
+      porCont.get(c)!.push(u);
+    }
+    for (const [cont, us] of porCont) {
+      // Com um só jogador num continente, "o mais rico" não diz nada.
+      if (us.length < 2) continue;
+      const eq = await equipaDeUser(String(us[0].id));
+      const seg = await equipaDeUser(String(us[1].id));
+      const n = noticiaMaisRico({
+        nomeTime: eq.nome, patrimonio: Number(us[0].patrimony_jc || 0),
+        escopo: "continental", continente: NOME_CONTINENTE[cont as Continente] || cont,
+        escudo: eq.escudo,
+        segundo: { nomeTime: seg.nome, patrimonio: Number(us[1].patrimony_jc || 0) },
+      });
+      if (n) {
+        n.dados = { ...(n.dados || {}), chave: `rico-${cont}-${hoje}` };
+        n.continente = cont;
+        novas.push(n);
+      }
+    }
+  } catch { /* sem património: salta */ }
+
+  // --- 6) Quem acumulou mais pontos ---
+  try {
+    const { data: pts } = await supabaseAdmin
+      .from("pontuacoes").select("user_id, pontos").limit(5000);
+    const soma = new Map<string, { total: number; rodadas: number }>();
+    for (const p of pts || []) {
+      const k = String(p.user_id);
+      const a = soma.get(k) || { total: 0, rodadas: 0 };
+      a.total += Number(p.pontos || 0); a.rodadas++;
+      soma.set(k, a);
+    }
+    const ordenado = [...soma.entries()].sort((a, b) => b[1].total - a[1].total);
+    if (ordenado[0]) {
+      const eqDe = async (uid: string) => {
+        const { data } = await supabaseAdmin!
+          .from("equipas").select("nome, escudo").eq("user_id", uid)
+          .order("id_competicao", { ascending: false }).limit(1).maybeSingle();
+        return { nome: String(data?.nome || ""), escudo: data?.escudo ?? null };
+      };
+      const eq = await eqDe(ordenado[0][0]);
+      const seg = ordenado[1] ? await eqDe(ordenado[1][0]) : null;
+      const n = noticiaLiderPontos({
+        nomeTime: eq.nome, pontos: ordenado[0][1].total, rodadas: ordenado[0][1].rodadas,
+        escopo: "mundial", escudo: eq.escudo,
+        segundo: seg ? { nomeTime: seg.nome, pontos: ordenado[1][1].total } : null,
+      });
+      if (n) { n.dados = { ...(n.dados || {}), chave: `lider-mundial-${hoje}` }; novas.push(n); }
+    }
+  } catch { /* sem pontuações: salta */ }
+
+  // --- 7) Copas que terminaram ---
   // Fora do ciclo das competições: uma copa acaba numa rodada, mas a notícia é
   // sobre a liga, não sobre a competição.
   try {
     const { data: copas } = await supabaseAdmin
       .from("leagues")
-      .select("id, name")
+      .select("id, name, type")
       .eq("formato", "copa").eq("copa_estado", "terminada")
       .order("id", { ascending: false }).limit(10);
     for (const liga of copas || []) {
@@ -249,6 +342,40 @@ export async function GET(req: Request) {
         ligaId: String(liga.id),
       });
       if (n) { n.dados = { ...(n.dados || {}), escudo: eqCampeao.escudo }; novas.push(n); }
+
+      // O PERCURSO, ronda a ronda. Só para as ligas OFICIAIS: uma copa entre
+      // amigos não é notícia para o mural; a mundial e as continentais são.
+      if (String(liga.type) === "oficial") {
+        try {
+          const { data: confrontos } = await supabaseAdmin
+            .from("copa_confrontos")
+            .select("ronda, fase, jogador_a, jogador_b, pontos_a, pontos_b, vencedor")
+            .eq("league_id", liga.id).eq("vencedor", final.vencedor)
+            .order("ronda", { ascending: true });
+          const percurso = [];
+          for (const c of confrontos || []) {
+            const souA = String(c.jogador_a) === String(final.vencedor);
+            const advId = souA ? c.jogador_b : c.jogador_a;
+            if (!advId) continue;
+            const adv = await equipaDe(String(advId));
+            percurso.push({
+              ronda: String(c.fase || `Ronda ${c.ronda}`),
+              adversario: adv.nome,
+              meus: Number(souA ? c.pontos_a : c.pontos_b) || 0,
+              dele: Number(souA ? c.pontos_b : c.pontos_a) || 0,
+            });
+          }
+          const np = noticiaPercursoCampeao({
+            nomeLiga: String(liga.name || "Copa"),
+            campeao: eqCampeao.nome,
+            participantes: count ?? 0,
+            ligaId: String(liga.id),
+            percurso,
+            escudo: eqCampeao.escudo,
+          });
+          if (np) novas.push(np);
+        } catch { /* sem confrontos: fica só a notícia do campeão */ }
+      }
     }
   } catch { /* sem copas: salta */ }
   if (simular) {
