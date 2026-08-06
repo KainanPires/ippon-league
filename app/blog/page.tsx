@@ -42,6 +42,8 @@ interface Noticia {
   corpo: string;
   nome_competicao: string | null;
   criada_em: string;
+  imagem_url: string | null;   // só as escritas por pessoas têm
+  autor_nome: string | null;
 }
 
 /** "há 2 horas", "ontem", "há 3 dias" — mais legível que uma data seca. */
@@ -67,7 +69,7 @@ export default function Blog() {
     let vivo = true;
     supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, corpo, nome_competicao, criada_em")
+      .select("id, tipo, titulo, corpo, nome_competicao, criada_em, imagem_url, autor_nome")
       .order("criada_em", { ascending: false })
       .limit(60)
       .then(({ data }) => {
@@ -115,10 +117,20 @@ export default function Blog() {
                     <span style={{ flex: 1 }} />
                     <span style={{ fontSize: 10.5, color: "#5f6f67" }}>{quando(n.criada_em)}</span>
                   </div>
+                  {/* Miniatura à esquerda quando há imagem. Uma lista só de
+                      texto cansa depressa; com imagem, o olho fixa-se. */}
                   <h2 style={{ fontSize: 15, fontWeight: 700, color: "#f1ede2", lineHeight: 1.3, margin: "0 0 6px" }}>{n.titulo}</h2>
-                  <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>{n.corpo}</p>
-                  {n.nome_competicao && (
-                    <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 8 }}>{n.nome_competicao}</div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    {n.imagem_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={n.imagem_url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+                    )}
+                    <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0, flex: 1, minWidth: 0 }}>{n.corpo}</p>
+                  </div>
+                  {(n.nome_competicao || n.autor_nome) && (
+                    <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 8 }}>
+                      {[n.nome_competicao, n.autor_nome ? `por ${n.autor_nome}` : ""].filter(Boolean).join(" · ")}
+                    </div>
                   )}
                 </a>
               );
