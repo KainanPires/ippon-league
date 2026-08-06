@@ -62,6 +62,27 @@ interface Noticia {
 }
 
 /** "há 2 horas", "ontem", "há 3 dias" — mais legível que uma data seca. */
+/** A que família pertence cada tipo de notícia. Ver a nota sobre os separadores. */
+const FAMILIA: Record<string, "rodada" | "mercado" | "comunidade" | "artigos"> = {
+  melhor_rodada: "rodada",
+  atleta_destaque: "rodada",
+  mais_escalado: "rodada",
+  valorizacao: "mercado",
+  desvalorizacao: "mercado",
+  mais_rico: "mercado",
+  rico_ano: "mercado",
+  faixas: "comunidade",
+  copa_campeao: "comunidade",
+  percurso_campeao: "comunidade",
+  lider_pontos: "comunidade",
+  campeao_ano: "comunidade",
+  editorial: "artigos",
+  entrevista: "artigos",
+  antevisao: "artigos",
+  analise: "artigos",
+  curiosidade: "artigos",
+};
+
 function quando(iso: string): string {
   const t = Date.parse(iso);
   if (!t) return "";
@@ -79,6 +100,15 @@ function quando(iso: string): string {
 export default function Blog() {
   const [noticias, setNoticias] = useState<Noticia[] | null>(null);
   const { cor: corFaixa } = useFaixa();
+  // Separadores por CATEGORIA, não por tipo exato.
+  //
+  // Um leitor não pensa em "valorizacao" e "desvalorizacao" — pensa em
+  // "mercado". Agrupar os tipos técnicos em quatro famílias dá-lhe algo que
+  // reconhece, e evita uma fila de doze separadores que ninguém lê.
+  const [aba, setAba] = useState<"tudo" | "rodada" | "mercado" | "comunidade" | "artigos">("tudo");
+  // Procura por texto: para quem já sabe o que quer. No blog é secundária — o
+  // leitor costuma vir explorar, não procurar.
+  const [procura, setProcura] = useState("");
 
   useEffect(() => {
     let vivo = true;
@@ -106,6 +136,18 @@ export default function Blog() {
     return () => { vivo = false; };
   }, []);
 
+  // Aplica os filtros do leitor.
+  const visiveis = (noticias || []).filter((n) => {
+    if (aba !== "tudo" && FAMILIA[n.tipo] !== aba) return false;
+    if (procura.trim()) {
+      const q = procura.trim().toLowerCase();
+      // Procura no título E no corpo: quem escreve "Ivanov" quer a notícia dele,
+      // mesmo que o nome só apareça no texto.
+      if (!n.titulo.toLowerCase().includes(q) && !n.corpo.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 40px" }}>
@@ -120,21 +162,50 @@ export default function Blog() {
           <div style={{ width: 38, height: 38, flexShrink: 0 }}><Mascot belt={corFaixa} expression="sabio" /></div>
         </header>
 
+        {/* Separadores + procura. Só aparecem quando há notícias que cheguem
+            para valer a pena filtrar — com três, filtrar é mais trabalho do que
+            ler tudo. */}
+        {noticias !== null && noticias.length > 4 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 8 }}>
+              {([
+                ["tudo", "Tudo"],
+                ["rodada", "Rodadas"],
+                ["mercado", "Mercado"],
+                ["comunidade", "Comunidade"],
+                ["artigos", "Artigos"],
+              ] as const).map(([id, nome]) => (
+                <button key={id} onClick={() => setAba(id)}
+                  style={{ flexShrink: 0, background: aba === id ? GOLD : "transparent", border: `1px solid ${aba === id ? GOLD : "#2a3a33"}`, color: aba === id ? "#1b211e" : "#93a39a", fontFamily: FD, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", padding: "7px 13px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  {nome}
+                </button>
+              ))}
+            </div>
+            <input
+              value={procura}
+              onChange={(e) => setProcura(e.target.value)}
+              placeholder="Procurar…"
+              style={{ width: "100%", boxSizing: "border-box", background: "#121815", border: "1px solid #243029", borderRadius: 9, padding: "9px 12px", color: "#f1ede2", fontSize: 13.5, fontFamily: FB, outline: "none" }}
+            />
+          </div>
+        )}
+
         {noticias === null ? (
           <div style={{ textAlign: "center", padding: "40px 16px", color: "#7c8a82", fontFamily: FD, fontSize: 12.5, textTransform: "uppercase", letterSpacing: "0.1em" }}>
             A carregar…
           </div>
-        ) : noticias.length === 0 ? (
+        ) : visiveis.length === 0 ? (
           <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "26px 16px", textAlign: "center" }}>
             <div style={{ width: 76, height: 76, margin: "0 auto 10px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
             <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>
-              Ainda não há notícias.<br />
-              Assim que a próxima competição terminar, conto-te tudo o que aconteceu.
+              {noticias.length === 0
+                ? "Ainda não há notícias. Assim que a próxima competição terminar, conto-te tudo o que aconteceu."
+                : "Não encontrei nada assim. Experimenta outra categoria."}
             </p>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {noticias.map((n) => {
+            {visiveis.map((n) => {
               const e = ESTILO[n.tipo] || ESTILO.curiosidade;
               return (
                 <a key={n.id} href={`/blog/${n.id}`} style={{ display: "block", background: "#121815", border: "1px solid #243029", borderLeft: `3px solid ${e.cor}`, borderRadius: 13, padding: "13px 14px", textDecoration: "none", color: "inherit" }}>
