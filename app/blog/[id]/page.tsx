@@ -21,6 +21,7 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Mascot } from "@/components/Mascot";
 import { useFaixa } from "@/lib/useFaixa";
+import { Escudo, type Identity } from "@/components/Escudo";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -52,6 +53,8 @@ interface Noticia {
   link_instagram: string | null;
   link_tiktok: string | null;
   link_youtube: string | null;
+  // As geradas trazem aqui o escudo da equipa de que falam.
+  dados: { escudo?: Identity | null } | null;
 }
 
 /** Botão para o vídeo desta notícia numa rede social. */
@@ -92,7 +95,7 @@ export default function NoticiaPagina() {
       if (!id) return;
       const { data } = await supabase
         .from("hub_noticias")
-        .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em, autor_nome, imagem_url, imagem_credito, link_instagram, link_tiktok, link_youtube")
+        .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em, autor_nome, imagem_url, imagem_credito, link_instagram, link_tiktok, link_youtube, dados")
         .eq("id", id).maybeSingle();
       if (!vivo) return;
       if (!data) { setN("nao-existe"); return; }
@@ -104,7 +107,7 @@ export default function NoticiaPagina() {
       if (noticia.id_competicao) {
         const { data: outras } = await supabase
           .from("hub_noticias")
-          .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em, autor_nome, imagem_url, imagem_credito, link_instagram, link_tiktok, link_youtube")
+          .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em, autor_nome, imagem_url, imagem_credito, link_instagram, link_tiktok, link_youtube, dados")
           .eq("id_competicao", noticia.id_competicao)
           .neq("id", noticia.id)
           .limit(5);
@@ -156,6 +159,13 @@ export default function NoticiaPagina() {
                 borda lê-se como mais um bloco da app — e isto é para ser lido
                 do princípio ao fim, não consultado de relance. */}
             <article>
+              {/* Notícia sobre uma equipa, sem foto: o escudo faz de capa. É
+                  grande de propósito — é o rosto daquela pessoa no jogo. */}
+              {!n.imagem_url && n.dados?.escudo && (
+                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 20px" }}>
+                  <Escudo config={n.dados.escudo} size={128} />
+                </div>
+              )}
               {n.imagem_url && (
                 <div style={{ margin: "0 -14px 16px" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
