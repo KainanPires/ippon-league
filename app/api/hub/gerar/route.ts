@@ -98,30 +98,49 @@ export async function GET(req: Request) {
     }
 
     // --- 3) e 4) Maior valorização e maior queda ---
-    // Só olhamos para preços com antes E depois: sem os dois não há variação
-    // para contar.
-    try {
-      const { data: precos } = await supabaseAdmin
-        .from("precos_atletas")
-        .select("id_person, nome, country_code, preco_antes, preco_depois")
-        .eq("id_competicao", comp)
-        .not("preco_antes", "is", null)
-        .not("preco_depois", "is", null);
-      const lista = (precos || []).map((p) => ({
-        nome: String(p.nome || ""),
-        pais: String(p.country_code || ""),
-        de: Number(p.preco_antes || 0),
-        para: Number(p.preco_depois || 0),
-      })).filter((p) => p.nome && p.de > 0);
-      if (lista.length > 0) {
-        const sobe = [...lista].sort((a, b) => (b.para - b.de) - (a.para - a.de))[0];
-        const desce = [...lista].sort((a, b) => (a.para - a.de) - (b.para - b.de))[0];
-        const nS = noticiaValorizacao({ ...sobe, idComp: comp, nomeComp });
-        if (nS) novas.push(nS);
-        const nD = noticiaDesvalorizacao({ ...desce, idComp: comp, nomeComp });
-        if (nD) novas.push(nD);
-      }
-    } catch { /* sem tabela de preços: salta esta notícia */ }
+    //
+    // Os dados vêm de `resultados_atletas`, não de `precos_atletas`. A segunda
+    // guarda só o preço ATUAL — não tem memória do antes. A primeira guarda
+    // `preco_antes` e `preco_novo` de cada rodada, que é exatamente a variação
+    // que interessa contar.
+    //
+    // (Andei a procurar na tabela errada e cheguei a pensar que era preciso
+    // mexer no motor de congelamento para guardar o histórico. Não é: ele já o
+    // grava, na tabela dos resultados.)
+    const { data: precos } = await supabaseAdmin
+      .from("resultados_atletas")
+      .select("nome, country_code, preco_antes, preco_novo, variacao_jc")
+      .eq("id_competicao", comp)
+      .not("preco_antes", "is", null)
+      .not("preco_novo", "is", null)
+      .order("variacao_jc", { ascending: false })
+      .limit(1);
+    if (precos && precos[0] && Number(precos[0].variacao_jc) > 0) {
+      const p = precos[0];
+      const n = noticiaValorizacao({
+        nome: String(p.nome || ""), pais: String(p.country_code || ""),
+        de: Number(p.preco_antes || 0), para: Number(p.preco_novo || 0),
+        idComp: comp, nomeComp,
+      });
+      if (n) novas.push(n);
+    }
+    const { data: quedas } = await supabaseAdmin
+      .from("resultados_atletas")
+      .select("nome, country_code, preco_antes, preco_novo, variacao_jc")
+      .eq("id_competicao", comp)
+      .not("preco_antes", "is", null)
+      .not("preco_novo", "is", null)
+      .order("variacao_jc", { ascending: true })
+      .limit(1);
+    if (quedas && quedas[0] && Number(quedas[0].variacao_jc) < 0) {
+      const p = quedas[0];
+      const n = noticiaDesvalorizacao({
+        nome: String(p.nome || ""), pais: String(p.country_code || ""),
+        de: Number(p.preco_antes || 0), para: Number(p.preco_novo || 0),
+        idComp: comp, nomeComp,
+      });
+      if (n) novas.push(n);
+    }
 
     // --- 5) O atleta mais escalado ---
     const { data: equipas } = await supabaseAdmin
