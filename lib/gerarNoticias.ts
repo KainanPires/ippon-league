@@ -76,17 +76,27 @@ export function apelido(nome: string): string {
 export function noticiaMelhorRodada(d: {
   nomeTime: string; pontos: number; escopo: string; continente: string;
   nParticipantes: number; idComp: string; nomeComp: string;
+  /** Número da rodada no calendário (1..52). Sem ele o título fica ambíguo. */
+  rodada?: number | null;
 }): NoticiaNova | null {
   if (!d.nomeTime || d.pontos <= 0) return null;
   const mundial = d.escopo === "mundial";
   const onde = mundial ? "do mundo" : `de ${d.continente}`;
   const entre = d.nParticipantes > 1 ? ` entre ${d.nParticipantes} treinadores` : "";
   const eq = equipa(d.nomeTime);
+  // A RODADA NO TÍTULO.
+  //
+  // "foi a melhor do mundo" lê-se como se fosse do ano inteiro — e no fim do
+  // ano vamos ter mesmo notícias do melhor do ANO. Sem a rodada, as duas
+  // confundem-se, e a de uma semana passa por um título anual.
+  const naRodada = d.rodada ? ` na Rodada ${d.rodada}` : "";
   return {
     tipo: "melhor_rodada",
-    titulo: mundial ? `${eq} foi a melhor do mundo` : `${eq} lidera ${d.continente}`,
-    corpo: `Com ${num(d.pontos)} pontos em ${d.nomeComp}, a equipa ${eq} foi a melhor ${onde}${entre}. O certificado já está no perfil.`,
-    resumo: `${eq} · ${num(d.pontos)} pts · melhor ${onde}`,
+    titulo: mundial
+      ? `${eq} foi a melhor do mundo${naRodada}`
+      : `${eq} foi a melhor de ${d.continente}${naRodada}`,
+    corpo: `Com ${num(d.pontos)} pontos em ${d.nomeComp}${d.rodada ? ` (Rodada ${d.rodada})` : ""}, a equipa ${eq} foi a melhor ${onde}${entre}. O certificado já está no perfil.`,
+    resumo: `${eq} · ${num(d.pontos)} pts · melhor ${onde}${naRodada}`,
     id_competicao: d.idComp,
     nome_competicao: d.nomeComp,
     dados: { chave: `${d.escopo}-${d.continente}`, pontos: d.pontos, escopo: d.escopo },
@@ -142,12 +152,14 @@ export function noticiaAtletaDestaque(d: {
   idComp: string; nomeComp: string;
   /** A campanha luta a luta, quando existe (ver contarCampanha). */
   campanha?: string;
+  rodada?: number | null;
 }): NoticiaNova | null {
   if (!d.nome || d.pontos <= 0) return null;
   const detalhe = d.campanha ? ` ${d.campanha}` : "";
+  const naRodada = d.rodada ? ` · Rodada ${d.rodada}` : "";
   return {
     tipo: "atleta_destaque",
-    titulo: `${apelido(d.nome)} arrasou em ${d.nomeComp}`,
+    titulo: `${apelido(d.nome)} arrasou em ${d.nomeComp}${naRodada}`,
     corpo: `${d.nome} (${d.pais}) somou ${num(d.pontos)} pontos nos ${d.categoria}kg — o melhor de toda a competição.${detalhe} Quem o tinha na equipa agradece.`,
     resumo: `${apelido(d.nome)} (${d.pais}) · ${num(d.pontos)} pts — o melhor da rodada`,
     id_competicao: d.idComp,
@@ -358,6 +370,72 @@ export function noticiaPercursoCampeao(d: {
     corpo: `${eq} venceu a ${d.nomeLiga} entre ${d.participantes} equipas.\n\n${linhas.join("\n")}\n\n${drama.trim()}`,
     resumo: `${eq} · campeão da ${d.nomeLiga} · ${d.percurso.length} rondas`,
     dados: { chave: `percurso-${d.ligaId}`, escudo: d.escudo ?? null },
+    destaque: true,
+  };
+}
+
+
+// ===========================================================================
+// BALANÇO DO ANO — geradas a 1 de janeiro
+//
+// Estas são as ÚNICAS que podem dizer "do ano" sem ambiguidade. Todas as
+// outras têm de trazer a rodada no título, senão confundem-se com estas: uma
+// notícia semanal que diga "foi a melhor do mundo" parece um título anual.
+// ===========================================================================
+
+/** O campeão do ano — mundial ou de um continente. */
+export function noticiaCampeaoAno(d: {
+  nomeTime: string; pontos: number; ano: number;
+  escopo: "mundial" | "continental"; continente?: string;
+  rodadas: number; segundo?: { nomeTime: string; pontos: number } | null;
+  escudo?: unknown;
+}): NoticiaNova | null {
+  if (!d.nomeTime || d.pontos <= 0) return null;
+  const mundial = d.escopo === "mundial";
+  const onde = mundial ? "do mundo" : `de ${d.continente}`;
+  const eq = equipa(d.nomeTime);
+  const media = d.rodadas > 0 ? ` Foram ${num(d.pontos / d.rodadas)} pontos por rodada, ao longo de ${d.rodadas}.` : "";
+  const dist = d.segundo && d.segundo.pontos > 0
+    ? ` ${equipa(d.segundo.nomeTime)} ficou a ${num(d.pontos - d.segundo.pontos)} pontos.`
+    : "";
+  return {
+    tipo: "campeao_ano",
+    titulo: mundial
+      ? `${eq} é a campeã mundial de ${d.ano}`
+      : `${eq} é a campeã de ${d.continente} em ${d.ano}`,
+    corpo: `Fechou o ano, e ${eq} termina ${d.ano} como a melhor equipa ${onde}, com ${num(d.pontos)} pontos.${media}${dist} Um ano inteiro no topo — não foi sorte de uma rodada.`,
+    resumo: `${eq} · ${num(d.pontos)} pts · campeã ${onde} de ${d.ano}`,
+    dados: { chave: `campeao-${d.ano}-${d.escopo}-${d.continente || "mundo"}`, ano: d.ano, escudo: d.escudo ?? null },
+    continente: mundial ? null : (d.continente || null),
+    destaque: true,
+  };
+}
+
+/** O maior património no fecho do ano. */
+export function noticiaRicoAno(d: {
+  nomeTime: string; patrimonio: number; ano: number;
+  escopo: "mundial" | "continental"; continente?: string;
+  escudo?: unknown;
+}): NoticiaNova | null {
+  if (!d.nomeTime || d.patrimonio <= 0) return null;
+  const mundial = d.escopo === "mundial";
+  const onde = mundial ? "do mundo" : `de ${d.continente}`;
+  const eq = equipa(d.nomeTime);
+  // O património começa em 100 para todos, por isso a diferença para esse valor
+  // é a medida real do que se ganhou no mercado ao longo do ano.
+  const ganho = d.patrimonio - 100;
+  const quanto = ganho > 0
+    ? ` Começou o ano com JC 100 e ganhou JC ${num(ganho)} só a comprar e vender bem.`
+    : "";
+  return {
+    tipo: "rico_ano",
+    titulo: mundial
+      ? `${eq} fecha ${d.ano} como a equipa mais rica do mundo`
+      : `${eq} é a mais rica ${onde} em ${d.ano}`,
+    corpo: `Com JC ${num(d.patrimonio)}, ${eq} termina ${d.ano} com o maior património ${onde}.${quanto} O património não vem de pontos: vem de escolher os atletas certos antes de eles valorizarem.`,
+    resumo: `${eq} · JC ${num(d.patrimonio)} · maior património de ${d.ano}`,
+    dados: { chave: `rico-ano-${d.ano}-${d.escopo}-${d.continente || "mundo"}`, ano: d.ano, escudo: d.escudo ?? null },
+    continente: mundial ? null : (d.continente || null),
     destaque: true,
   };
 }
