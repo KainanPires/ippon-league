@@ -114,7 +114,13 @@ export default function EditorBlog() {
       const ext = (ficheiro.name.split(".").pop() || "jpg").toLowerCase();
       const nome = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const { error } = await supabase.storage.from("blog").upload(nome, ficheiro, { upsert: false });
-      if (error) { setErro("Não foi possível carregar a imagem. Confirma que o formato é jpg, png ou webp."); return; }
+      if (error) {
+        // Também aqui: o erro real. O mais comum é o bucket "blog" não existir
+        // ou não ter política de escrita para editores.
+        const e = error as { message?: string };
+        setErro(`Imagem: ${e.message || "não foi possível carregar"}`);
+        return;
+      }
       const { data } = supabase.storage.from("blog").getPublicUrl(nome);
       setF((x) => ({ ...x, imagem_url: data.publicUrl }));
     } catch {
@@ -153,7 +159,20 @@ export default function EditorBlog() {
       const res = f.id
         ? await supabase.from("hub_noticias").update(linha).eq("id", f.id)
         : await supabase.from("hub_noticias").insert(linha);
-      if (res.error) { setErro("Não foi possível guardar. Tenta outra vez."); return; }
+      if (res.error) {
+        // MOSTRA O ERRO REAL. A primeira versão dizia só "não foi possível
+        // guardar" — o que não ajuda ninguém a resolver nada. Uma mensagem
+        // genérica esconde exatamente a informação de que se precisa.
+        //
+        // Os erros mais prováveis aqui:
+        //   • falta política de INSERT na tabela (a RLS recusa a escrita)
+        //   • um valor não passa numa constraint (tipo ou estado inválido)
+        //   • uma coluna que o SQL ainda não criou
+        const e = res.error as { message?: string; details?: string; hint?: string; code?: string };
+        const partes = [e.message, e.details, e.hint, e.code ? `(código ${e.code})` : ""].filter(Boolean);
+        setErro(partes.join(" · ") || "Não foi possível guardar.");
+        return;
+      }
       setMsg(estado === "publicada" ? "Publicada!" : estado === "agendada" ? "Agendada." : "Guardada como rascunho.");
       setF(VAZIO);
       await carregarLista();
