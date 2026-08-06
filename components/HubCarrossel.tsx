@@ -30,6 +30,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+// O escudo das equipas é DESENHADO a partir de uma configuração, não é um
+// ficheiro. Por isso vem no campo `dados` da notícia e é o componente que o
+// desenha — ajusta-se a qualquer tamanho e não ocupa espaço nenhum.
+import { Escudo, type Identity } from "@/components/Escudo";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -55,6 +59,7 @@ interface Noticia {
   corpo: string;
   nome_competicao: string | null;
   imagem_url: string | null;   // só as escritas por pessoas têm
+  dados: { escudo?: Identity | null } | null;  // as geradas trazem o escudo da equipa
 }
 
 /** De quanto em quanto tempo passa. 6s: dá para ler um título sem pressa. */
@@ -70,7 +75,7 @@ export function HubCarrossel() {
     let vivo = true;
     supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, resumo, corpo, nome_competicao, imagem_url")
+      .select("id, tipo, titulo, resumo, corpo, nome_competicao, imagem_url, dados")
       .order("destaque", { ascending: false })
       .order("criada_em", { ascending: false })
       .limit(8)
@@ -126,6 +131,10 @@ export function HubCarrossel() {
           {n.imagem_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={n.imagem_url} alt="" style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+          ) : n.dados?.escudo ? (
+            // Notícia sobre uma equipa: mostra o escudo dela. Vale muito mais
+            // do que um ícone genérico — é a cara da pessoa no jogo.
+            <span style={{ flexShrink: 0, display: "flex" }}><Escudo config={n.dados.escudo} size={44} /></span>
           ) : (
             <span style={{ fontSize: 20, flexShrink: 0, lineHeight: 1.2 }} aria-hidden="true">{est.icone}</span>
           )}
