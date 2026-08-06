@@ -54,6 +54,9 @@ interface Noticia {
   pais: string | null;
   continente: string | null;
   dados: { escudo?: Identity | null } | null;  // as geradas trazem o escudo
+  // Um EDITOR vê também o que ainda não está no ar (rascunhos, em revisão).
+  // Sem isto, ele não distingue o publicado do que continua à espera.
+  estado: string;
 }
 
 /** "há 2 horas", "ontem", "há 3 dias" — mais legível que uma data seca. */
