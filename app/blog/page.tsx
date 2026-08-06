@@ -20,6 +20,9 @@ import { supabase } from "@/lib/supabase";
 import { Mascot } from "@/components/Mascot";
 import { useFaixa } from "@/lib/useFaixa";
 import { Escudo, type Identity } from "@/components/Escudo";
+// As notícias da região do leitor aparecem primeiro. Nenhuma é escondida — ver
+// a nota em lib/ordenarNoticias.
+import { ordenarPorRegiao } from "@/lib/ordenarNoticias";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -45,6 +48,8 @@ interface Noticia {
   criada_em: string;
   imagem_url: string | null;   // só as escritas por pessoas têm
   autor_nome: string | null;
+  pais: string | null;
+  continente: string | null;
   dados: { escudo?: Identity | null } | null;  // as geradas trazem o escudo
 }
 
@@ -69,15 +74,27 @@ export default function Blog() {
 
   useEffect(() => {
     let vivo = true;
-    supabase
+    (async () => {
+      // País do leitor, para ordenar. Ver lib/ordenarNoticias.
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      let meuPais: string | null = null;
+      let meuCont: string | null = null;
+      if (uid) {
+        const { data: u } = await supabase.from("users").select("country_code, continente").eq("id", uid).maybeSingle();
+        meuPais = u?.country_code ? String(u.country_code) : null;
+        meuCont = u?.continente ? String(u.continente) : null;
+      }
+      await supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, corpo, nome_competicao, criada_em, imagem_url, autor_nome, dados")
+      .select("id, tipo, titulo, corpo, nome_competicao, criada_em, imagem_url, autor_nome, dados, pais, continente")
       .order("criada_em", { ascending: false })
       .limit(60)
       .then(({ data }) => {
         if (!vivo) return;
-        setNoticias((data as Noticia[]) || []);
+        setNoticias(ordenarPorRegiao((data as Noticia[]) || [], meuPais, meuCont));
       });
+    })();
     return () => { vivo = false; };
   }, []);
 
