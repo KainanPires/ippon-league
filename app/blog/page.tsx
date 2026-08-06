@@ -125,7 +125,9 @@ export default function Blog() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={n.imagem_url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
                     )}
-                    <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0, flex: 1, minWidth: 0 }}>{n.corpo}</p>
+                    {/* Na LISTA o texto é só uma amostra: 3 linhas e corta. O artigo
+                        completo é na página da notícia. */}
+                    <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0, flex: 1, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{n.corpo}</p>
                   </div>
                   {(n.nome_competicao || n.autor_nome) && (
                     <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 8 }}>
