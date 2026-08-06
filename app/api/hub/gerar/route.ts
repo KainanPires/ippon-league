@@ -24,12 +24,25 @@ import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import {
   noticiaMelhorRodada, noticiaAtletaDestaque, noticiaValorizacao,
   noticiaDesvalorizacao, noticiaMaisEscalado, noticiaCopaCampeao,
+  contarCampanha,
   type NoticiaNova,
 } from "@/lib/gerarNoticias";
+import { continenteDoPais } from "@/lib/continentes";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 /** Quantos dias para trás procurar competições a noticiar. */
 const JANELA_DIAS = 10;
+
+/**
+ * Horas em REVISÃO antes de uma notícia gerada se publicar sozinha.
+ *
+ * As automáticas nascem em rascunho para o editor as poder melhorar — um
+ * resultado seco vira uma história quando passa por uma mão humana. Mas não
+ * podem ficar presas à espera de alguém: ao fim deste tempo saem na mesma.
+ *
+ * 6 horas: dá para rever a rodada de domingo antes de a segunda-feira começar.
+ */
+const HORAS_REVISAO = 6;
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = (searchParams.get("key") || "").trim();
@@ -76,24 +89,57 @@ export async function GET(req: Request) {
         nParticipantes: Number(m.n_participantes || 0),
         idComp: comp, nomeComp,
       });
-      if (n) novas.push(n);
+      if (n) {
+        // O ESCUDO da equipa vai junto: é a única imagem que uma notícia gerada
+        // pode ter, e é nossa. Desenhado a partir da configuração, não é um
+        // ficheiro — por isso viaja em `dados`.
+        n.dados = { ...(n.dados || {}), escudo: m.escudo ?? null };
+        // A notícia do melhor CONTINENTAL é dessa região; a mundial é de todos.
+        if (String(m.escopo) !== "mundial") n.continente = String(m.continente || "") || null;
+        novas.push(n);
+      }
     }
+    // Nomes de todos os atletas desta competição: precisamos deles para dizer
+    // CONTRA QUEM cada um lutou. Uma consulta só, reutilizada em várias notícias.
+    const nomePorId = new Map<string, string>();
+    try {
+      const { data: todos } = await supabaseAdmin
+        .from("resultados_atletas").select("id_person, nome").eq("id_competicao", comp);
+      for (const a of todos || []) nomePorId.set(String(a.id_person), String(a.nome || ""));
+    } catch { /* sem nomes: a campanha sai sem adversários */ }
+    const apelidoDe = (id: string): string => {
+      const n = nomePorId.get(id) || "";
+      const p = n.trim().split(/\s+/);
+      return p.length > 1 ? p[p.length - 1] : p[0] || "";
+    };
+
     // --- 2) O atleta que mais pontuou ---
     const { data: top } = await supabaseAdmin
       .from("resultados_atletas")
-      .select("nome, country_code, weight_category, pontos")
+      .select("id_person, nome, country_code, weight_category, pontos, lutas")
       .eq("id_competicao", comp)
       .order("pontos", { ascending: false })
       .limit(1);
     if (top && top[0]) {
+      // A campanha luta a luta, quando existe. Só as competições com moldura
+      // montada a têm (é a Chave Maestro que a grava) — nas outras, a notícia
+      // sai só com o total, sem inventar nada.
+      const campanha = contarCampanha(
+        Array.isArray(top[0].lutas) ? (top[0].lutas as never[]) : null,
+        apelidoDe,
+      );
       const n = noticiaAtletaDestaque({
         nome: String(top[0].nome || ""),
         pais: String(top[0].country_code || ""),
         categoria: String(top[0].weight_category || ""),
         pontos: Number(top[0].pontos || 0),
-        idComp: comp, nomeComp,
+        idComp: comp, nomeComp, campanha,
       });
-      if (n) novas.push(n);
+      // País do atleta: uma notícia sobre um brasileiro interessa mais no Brasil.
+      if (n) {
+        n.pais = String(top[0].country_code || "") || null;
+        novas.push(n);
+      }
     }
     // --- 3) e 4) Maior valorização e maior queda ---
     //
@@ -107,7 +153,7 @@ export async function GET(req: Request) {
     // grava, na tabela dos resultados.)
     const { data: precos } = await supabaseAdmin
       .from("resultados_atletas")
-      .select("nome, country_code, preco_antes, preco_novo, variacao_jc")
+      .select("nome, country_code, preco_antes, preco_novo, variacao_jc, lutas")
       .eq("id_competicao", comp)
       .not("preco_antes", "is", null)
       .not("preco_novo", "is", null)
@@ -119,12 +165,13 @@ export async function GET(req: Request) {
         nome: String(p.nome || ""), pais: String(p.country_code || ""),
         de: Number(p.preco_antes || 0), para: Number(p.preco_novo || 0),
         idComp: comp, nomeComp,
+        campanha: contarCampanha(Array.isArray(p.lutas) ? (p.lutas as never[]) : null, apelidoDe),
       });
-      if (n) novas.push(n);
+      if (n) { n.pais = String(p.country_code || "") || null; novas.push(n); }
     }
     const { data: quedas } = await supabaseAdmin
       .from("resultados_atletas")
-      .select("nome, country_code, preco_antes, preco_novo, variacao_jc")
+      .select("nome, country_code, preco_antes, preco_novo, variacao_jc, lutas")
       .eq("id_competicao", comp)
       .not("preco_antes", "is", null)
       .not("preco_novo", "is", null)
@@ -136,8 +183,9 @@ export async function GET(req: Request) {
         nome: String(p.nome || ""), pais: String(p.country_code || ""),
         de: Number(p.preco_antes || 0), para: Number(p.preco_novo || 0),
         idComp: comp, nomeComp,
+        campanha: contarCampanha(Array.isArray(p.lutas) ? (p.lutas as never[]) : null, apelidoDe),
       });
-      if (n) novas.push(n);
+      if (n) { n.pais = String(p.country_code || "") || null; novas.push(n); }
     }
     // --- 5) O atleta mais escalado ---
     const { data: equipas } = await supabaseAdmin
@@ -225,12 +273,24 @@ export async function GET(req: Request) {
     if (chave) q = q.eq("dados->>chave", chave);
     const { data: existe } = await q;
     if (existe && existe.length > 0) { jaExistiam++; continue; }
+    // NASCE EM REVISÃO, não publicada.
+    //
+    // O editor tem assim a hipótese de melhorar a notícia antes de alguém a ver
+    // — e as automáticas são as que mais ganham com isso: um resultado seco
+    // vira uma história quando passa por uma mão humana.
+    //
+    // Mas não fica presa à espera de ninguém: o `publicar_auto_em` faz o cron
+    // publicá-la ao fim de HORAS_REVISAO, mesmo que ninguém lhe toque.
     const { error } = await supabaseAdmin.from("hub_noticias").insert({
       tipo: n.tipo, titulo: n.titulo, corpo: n.corpo, resumo: n.resumo,
       id_competicao: n.id_competicao ?? null,
       nome_competicao: n.nome_competicao ?? null,
       dados: n.dados ?? {},
       destaque: !!n.destaque,
+      pais: n.pais ?? null,
+      continente: n.continente ?? null,
+      estado: "revisao",
+      publicar_auto_em: new Date(Date.now() + HORAS_REVISAO * 3600 * 1000).toISOString(),
     });
     if (!error) gravadas++;
   }
