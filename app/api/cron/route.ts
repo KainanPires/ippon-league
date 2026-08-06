@@ -1164,6 +1164,19 @@ export async function GET(req: Request) {
     }
   } catch { /* não bloqueia o resto do cron */ }
 
+  // (E-sexies) MATA-MATA DO DÔDO: sorteia quando as inscrições fecham, e retira
+  // quem deixou de ter Pro (o adversário avança). Ambas as rotas não fazem nada
+  // quando não há edição a decorrer, por isso é barato chamá-las sempre.
+  let dodo: { sorteio: unknown; desqualificados: number } | null = null;
+  try {
+    if (haTempo(t0, MS_MARGEM_ETAPA)) {
+      const seg = encodeURIComponent(process.env.CRON_SECRET || "");
+      const rs = await fetch(`${base}/api/dodo?sortear=1&key=${seg}`).then((r) => r.json()).catch(() => null);
+      const rv = await fetch(`${base}/api/dodo/verificar-pro?key=${seg}`).then((r) => r.json()).catch(() => null);
+      dodo = { sorteio: rs?.ok ? rs : null, desqualificados: Number(rv?.desqualificados || 0) };
+    }
+  } catch { /* não bloqueia o resto do cron */ }
+
   // (F) Notificações de DATAS ESPECIAIS por push (aniversário + Dia do Judô).
   //     Idempotente por dia. Não bloqueia o resto do cron se falhar.
   let datas: { dia_do_judo: number; aniversarios: number; outras_globais: number } | null = null;
@@ -1244,6 +1257,7 @@ export async function GET(req: Request) {
     emails_verificacao: emailsVerificacao,
     contas_inativas: contasInativas,
     hub_noticias: hubNoticias,
+    dodo,
     noticias_agendadas_publicadas: agendadasPublicadas,
     // Estado dos preços nesta corrida (cursor): de onde partiu, onde ficou.
     precos: {
