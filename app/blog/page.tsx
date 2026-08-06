@@ -19,6 +19,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Mascot } from "@/components/Mascot";
 import { useFaixa } from "@/lib/useFaixa";
+import { Escudo, type Identity } from "@/components/Escudo";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -44,6 +45,7 @@ interface Noticia {
   criada_em: string;
   imagem_url: string | null;   // só as escritas por pessoas têm
   autor_nome: string | null;
+  dados: { escudo?: Identity | null } | null;  // as geradas trazem o escudo
 }
 
 /** "há 2 horas", "ontem", "há 3 dias" — mais legível que uma data seca. */
@@ -69,7 +71,7 @@ export default function Blog() {
     let vivo = true;
     supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, corpo, nome_competicao, criada_em, imagem_url, autor_nome")
+      .select("id, tipo, titulo, corpo, nome_competicao, criada_em, imagem_url, autor_nome, dados")
       .order("criada_em", { ascending: false })
       .limit(60)
       .then(({ data }) => {
@@ -121,10 +123,12 @@ export default function Blog() {
                       texto cansa depressa; com imagem, o olho fixa-se. */}
                   <h2 style={{ fontSize: 15, fontWeight: 700, color: "#f1ede2", lineHeight: 1.3, margin: "0 0 6px" }}>{n.titulo}</h2>
                   <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    {n.imagem_url && (
+                    {n.imagem_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={n.imagem_url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
-                    )}
+                    ) : n.dados?.escudo ? (
+                      <span style={{ flexShrink: 0, display: "flex" }}><Escudo config={n.dados.escudo} size={56} /></span>
+                    ) : null}
                     {/* Na LISTA o texto é só uma amostra: 3 linhas e corta. O artigo
                         completo é na página da notícia. */}
                     <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0, flex: 1, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{n.corpo}</p>
