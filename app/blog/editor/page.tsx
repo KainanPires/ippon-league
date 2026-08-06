@@ -73,6 +73,14 @@ export default function EditorBlog() {
   const [meuNome, setMeuNome] = useState("");
   const [lista, setLista] = useState<Item[]>([]);
   const [f, setF] = useState<Rascunho>(VAZIO);
+  // Os `dados` da notícia (chave de unicidade, escudo da equipa) NÃO se editam
+  // no painel — mas também não se podem perder. Guardamos os originais aqui e
+  // devolvemo-los tal e qual ao gravar.
+  //
+  // Foi por os apagar que editar uma notícia gerada dava "duplicate key": sem a
+  // chave, duas notícias do mesmo tipo e da mesma competição passavam a ser
+  // indistinguíveis para o índice único. E o escudo da equipa desaparecia.
+  const [dadosOriginais, setDadosOriginais] = useState<Record<string, unknown>>({});
   const [aGravar, setAGravar] = useState(false);
   const [aCarregarImg, setACarregarImg] = useState(false);
   const [msg, setMsg] = useState("");
@@ -190,7 +198,9 @@ export default function EditorBlog() {
         destaque: f.destaque,
         autor_id: uid,
         autor_nome: meuNome || null,
-        dados: {},
+        // Preserva o que já lá estava (chave e escudo). Ver a nota em
+        // `dadosOriginais`.
+        dados: dadosOriginais,
       };
       const res = f.id
         ? await supabase.from("hub_noticias").update(linha).eq("id", f.id)
@@ -211,6 +221,7 @@ export default function EditorBlog() {
       }
       setMsg(estado === "publicada" ? "Publicada!" : estado === "agendada" ? "Agendada." : "Guardada como rascunho.");
       setF(VAZIO);
+      setDadosOriginais({});
       await carregarLista();
     } catch {
       setErro("Não foi possível guardar.");
@@ -223,6 +234,8 @@ export default function EditorBlog() {
     const { data } = await supabase.from("hub_noticias").select("*").eq("id", id).maybeSingle();
     if (!data) return;
     const d = data as Record<string, unknown>;
+    // Guarda os dados originais antes de encher o formulário.
+    setDadosOriginais((d.dados && typeof d.dados === "object" ? d.dados : {}) as Record<string, unknown>);
     setF({
       id: String(d.id),
       tipo: String(d.tipo || "editorial"),
@@ -369,7 +382,7 @@ export default function EditorBlog() {
             </button>
           </div>
           {f.id && (
-            <button onClick={() => { setF(VAZIO); setMsg(""); setErro(""); }}
+            <button onClick={() => { setF(VAZIO); setDadosOriginais({}); setMsg(""); setErro(""); }}
               style={{ width: "100%", marginTop: 9, background: "transparent", border: "none", color: "#7c8a82", fontSize: 12, cursor: "pointer", fontFamily: FB }}>
               Cancelar edição e escrever nova
             </button>
