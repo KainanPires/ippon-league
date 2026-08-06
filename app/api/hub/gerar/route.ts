@@ -483,6 +483,9 @@ export async function GET(req: Request) {
       nome_competicao: n.nome_competicao ?? null,
       dados: n.dados ?? {},
       destaque: !!n.destaque,
+      // O destaque dura 48h. Um destaque permanente deixa de ser destaque —
+      // ver hub-destaque-expira.sql.
+      destaque_ate: n.destaque ? new Date(Date.now() + 48 * 3600 * 1000).toISOString() : null,
       pais: n.pais ?? null,
       continente: n.continente ?? null,
       estado: "revisao",
