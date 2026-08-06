@@ -13,8 +13,8 @@
 // ---------------------------------------------------------------------------
 // AS DUAS VOLTAS
 //
-// 1ª volta — cada continente sorteia as SUAS 4 vagas entre os seus inscritos.
-//            Um continente com 3 inscritos leva os 3 e deixa 1 vaga por usar.
+// 1ª volta — cada continente sorteia as SUAS 6 vagas entre os seus inscritos.
+//            Um continente com 3 inscritos leva os 3 e deixa 3 vagas por usar.
 //
 // 2ª volta — as vagas que sobraram juntam-se e são sorteadas entre TODOS os que
 //            ficaram de fora, de qualquer continente. Assim as 32 vagas
@@ -26,9 +26,19 @@
 // usar quando um continente também não tem excedentes.
 // ---------------------------------------------------------------------------
 
-/** Vagas reservadas a cada continente. 8 continentes × 4 = 32. */
-export const VAGAS_POR_CONTINENTE = 4;
-/** Total de lugares na chave. Tem de ser potência de 2 para o mata-mata fechar. */
+/**
+ * Vagas reservadas a cada continente.
+ *
+ * São CINCO continentes (as federações da IJF: Europa, América, Ásia, África,
+ * Oceânia), não oito. 5 × 6 = 30 lugares reservados; as 2 restantes até às 32
+ * saem da redistribuição, tal como as que um continente não preencher.
+ */
+export const VAGAS_POR_CONTINENTE = 6;
+
+/**
+ * Teto de lugares. A chave real é sempre uma POTÊNCIA DE 2 — com 32 inscritos
+ * joga-se a 32, com 24 joga-se a 16 (ver tamanhoDaChave).
+ */
 export const TOTAL_VAGAS = 32;
 
 export interface InscricaoSorteio {
@@ -102,7 +112,10 @@ export function sortearVagas(
   }
 
   // --- 2ª volta: as vagas que sobraram, entre todos os excedentes ---
-  const vagasRedistribuidas = Math.min(vagasLivres, sobraram.length);
+  // Às vagas que os continentes não usaram juntam-se as que faltam para o teto
+  // (5 × 6 = 30, e o teto é 32). Assim as 32 enchem-se sempre que houver gente.
+  const porAtingirOTeto = Math.max(0, TOTAL_VAGAS - continentes.length * VAGAS_POR_CONTINENTE);
+  const vagasRedistribuidas = Math.min(vagasLivres + porAtingirOTeto, sobraram.length);
   const repescados = baralhar(sobraram).slice(0, vagasRedistribuidas);
   for (const i of repescados) {
     sorteados.push({ id: i.id, user_id: i.user_id, continente: i.continente, porRedistribuicao: true });
