@@ -64,7 +64,10 @@ interface Noticia {
 function Rede({ href, nome, cor }: { href: string; nome: string; cor: string }) {
   return (
     <a href={href} target="_blank" rel="noopener noreferrer"
-      style={{ display: "inline-block", background: "transparent", border: `1px solid ${cor}66`, color: cor, fontFamily: FD, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", padding: "7px 13px", borderRadius: 8, textDecoration: "none" }}>
+      // Botão cheio, com a cor da rede. A versão anterior era um contorno
+      // esbatido que ninguém tocava.
+      style={{ display: "inline-flex", alignItems: "center", gap: 6, background: cor, color: "#fff", fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em", padding: "10px 16px", borderRadius: 9, textDecoration: "none" }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
       {nome}
     </a>
   );
@@ -194,23 +197,36 @@ export default function NoticiaPagina() {
               {(n.nome_competicao || n.autor_nome) && (
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a221d", fontSize: 12, color: "#93a39a", display: "flex", justifyContent: "space-between", gap: 10 }}>
                   <span>{n.nome_competicao || ""}</span>
-                  {/* Só as notícias escritas por pessoas têm autor. As geradas
-                      pelo motor não assinam — não seria honesto. */}
-                  {n.autor_nome && <span style={{ flexShrink: 0 }}>por {n.autor_nome}</span>}
+                  {/* ASSINA A MARCA, NÃO A PESSOA.
+                      O nome de quem escreve muda quando a equipa muda, e o leitor
+                      não quer saber quem foi — quer saber que veio da Ippon
+                      League. O `autor_nome` continua guardado para uso interno
+                      (saber quem escreveu o quê), só não vai para o ecrã. */}
+                  {n.autor_nome && <span style={{ flexShrink: 0 }}>Equipa Ippon League</span>}
                 </div>
               )}
 
               {/* O CICLO: notícia -> vídeo -> de volta. Se houver vídeo sobre
                   isto nas redes, é aqui que se manda o leitor. */}
+              {/* O CICLO: notícia -> vídeo -> de volta.
+                  Estava discreto demais — um "ver em vídeo" cinzento com três
+                  ligações apagadas por baixo passava despercebido. Se a ideia é
+                  levar o leitor às redes, o convite tem de se ver. */}
               {(n.link_instagram || n.link_tiktok || n.link_youtube) && (
-                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a221d" }}>
-                  <div style={{ fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 8 }}>
-                    Ver em vídeo
+                <div style={{ marginTop: 20, background: "#101511", border: `1px solid ${e.cor}44`, borderRadius: 13, padding: "15px 14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
+                    <span style={{ fontSize: 19 }} aria-hidden="true">🎬</span>
+                    <span style={{ fontFamily: FD, fontSize: 14.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em", color: "#f1ede2" }}>
+                      Esta história em vídeo
+                    </span>
                   </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                    {n.link_instagram && <Rede href={n.link_instagram} nome="Instagram" cor="#c13584" />}
+                  <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5, margin: "0 0 12px" }}>
+                    Contámos tudo isto também em vídeo. Escolhe onde queres ver:
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {n.link_instagram && <Rede href={n.link_instagram} nome="Instagram" cor="#e1306c" />}
                     {n.link_tiktok && <Rede href={n.link_tiktok} nome="TikTok" cor="#69c9d0" />}
-                    {n.link_youtube && <Rede href={n.link_youtube} nome="YouTube" cor="#e2655a" />}
+                    {n.link_youtube && <Rede href={n.link_youtube} nome="YouTube" cor="#ff4a3d" />}
                   </div>
                 </div>
               )}
