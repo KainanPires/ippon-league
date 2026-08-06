@@ -1151,6 +1151,17 @@ export async function GET(req: Request) {
     }
   } catch { /* não bloqueia o resto do cron */ }
 
+  // (E-quinquies) Notícias AGENDADAS que já chegaram à hora. Uma notícia
+  // escrita para sair às 9h fica invisível até lá — assim o editor pode
+  // preparar a semana toda de uma vez.
+  let agendadasPublicadas = 0;
+  try {
+    if (supabaseAdmin && haTempo(t0, MS_MARGEM_ETAPA)) {
+      const { data } = await supabaseAdmin.rpc("ippon_publicar_agendadas");
+      agendadasPublicadas = Number(data ?? 0);
+    }
+  } catch { /* não bloqueia o resto do cron */ }
+
   // (F) Notificações de DATAS ESPECIAIS por push (aniversário + Dia do Judô).
   //     Idempotente por dia. Não bloqueia o resto do cron se falhar.
   let datas: { dia_do_judo: number; aniversarios: number; outras_globais: number } | null = null;
@@ -1231,6 +1242,7 @@ export async function GET(req: Request) {
     emails_verificacao: emailsVerificacao,
     contas_inativas: contasInativas,
     hub_noticias: hubNoticias,
+    noticias_agendadas_publicadas: agendadasPublicadas,
     // Estado dos preços nesta corrida (cursor): de onde partiu, onde ficou.
     precos: {
       dia: diaHoje,
