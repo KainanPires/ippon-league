@@ -11,11 +11,9 @@
  *
  * Os números foram validados contra os exemplos do documento mestre.
  */
-
 /* =========================================================================
  * 1. PONTUAÇÃO POR AÇÕES
  * ========================================================================= */
-
 /** Tipos de ação que podem acontecer numa luta. */
 export type ActionType =
   | "ippon_feito"
@@ -27,7 +25,6 @@ export type ActionType =
   | "yuko_sofrido"
   | "shido_recebido"
   | "hansoku_make_recebido";
-
 /** Tabela de pontos por ação (do documento mestre). */
 export const POINTS: Record<ActionType, number> = {
   ippon_feito: 10,
@@ -40,12 +37,10 @@ export const POINTS: Record<ActionType, number> = {
   shido_recebido: -2,
   hansoku_make_recebido: -10,
 };
-
 /** Arredonda a 1 casa decimal (0,1 JC / 0,1 ponto). */
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
-
 /**
  * Soma os pontos de uma lista de ações.
  * As ações são acumulativas: yuko + waza-ari + ippon = 2 + 4 + 10 = 16.
@@ -59,7 +54,6 @@ function round1(n: number): number {
 export function scoreActions(actions: ActionType[]): number {
   return actions.reduce((total, a) => total + (POINTS[a] ?? 0), 0);
 }
-
 /**
  * Custo (negativo) de SOFRER `n` shidos, de forma CRESCENTE.
  *   1.º shido = -2, 2.º = -3, 3.º = -4, ...  (o k-ésimo custa -(k+1))
@@ -73,7 +67,6 @@ export function scoreShidosSofridos(n: number): number {
   for (let k = 1; k <= n; k++) total += -(k + 1);
   return total;
 }
-
 /**
  * Pontuação final de um atleta numa rodada.
  * Se for capitão, a pontuação total é multiplicada por 2.
@@ -82,18 +75,42 @@ export function scoreAthlete(actions: ActionType[], isCaptain = false): number {
   const base = scoreActions(actions);
   return isCaptain ? base * 2 : base;
 }
-
 /* =========================================================================
  * 2. VALORIZAÇÃO / DESVALORIZAÇÃO  (preço dos atletas)
  * ========================================================================= */
-
 /** Preço mínimo absoluto: nenhum atleta vale menos que 2 JC. */
 export const MIN_PRICE = 2;
 
+/**
+ * Preço MÁXIMO de um atleta. O documento mestre define a elite mundial em
+ * "15 a 20 JC" — 20 é o topo da escala, e nada o deve ultrapassar.
+ *
+ * Faltava, e o mercado explodiu: numa só rodada apareceram 18 atletas acima
+ * disto, um deles a 61,8 JC. Com um orçamento de 100 JC para OITO atletas, um
+ * único a 61,8 torna impossível montar equipa.
+ */
+export const MAX_PRICE = 20;
+
+/**
+ * Quanto um preço pode mexer numa ÚNICA rodada, em percentagem.
+ *
+ * O amortecedor de metade não chegava: um atleta com expectativa 3 que faça 50
+ * pontos dá +1567% bruto, +783% aplicado. Metade de um número absurdo continua
+ * absurdo — o problema é a expectativa pequena no denominador, não o fator.
+ *
+ * Com 50%, um atleta de 5 JC precisa de várias boas competições para chegar ao
+ * topo. Isso é melhor para o jogo, não pior: premeia quem o descobre cedo, e o
+ * mercado passa a ter uma história em vez de saltos.
+ *
+ * NOTA sobre o dinheiro dos jogadores: não é preciso um segundo limite para o
+ * ganho. O que o jogador ganha é o `delta` — a diferença de preço. Limitar o
+ * preço limita o delta pela mesma conta. Se ninguém passa de 20 JC, ninguém
+ * ganha mais do que a distância até 20.
+ */
+export const MAX_VARIACAO_PCT = 50;
 /** Pesos da expectativa de desempenho (70% / 30%). */
 export const WEIGHT_12M = 0.7;
 export const WEIGHT_LAST3 = 0.3;
-
 /**
  * Expectativa de desempenho do atleta.
  *   70% da média dos últimos 12 meses + 30% da média das últimas 3 competições.
@@ -104,7 +121,6 @@ export const WEIGHT_LAST3 = 0.3;
 export function expectedPerformance(avg12m: number, avgLast3: number): number {
   return WEIGHT_12M * avg12m + WEIGHT_LAST3 * avgLast3;
 }
-
 export interface PriceResult {
   oldPrice: number;
   newPrice: number;
@@ -115,7 +131,6 @@ export interface PriceResult {
   /** Quanto o patrimônio de quem escalou ganha (+) ou perde (-), em JC. */
   delta: number;
 }
-
 /**
  * Calcula o novo preço de um atleta depois de uma competição.
  *
@@ -149,26 +164,30 @@ export function computeNewPrice(
       delta: round1(safe - currentPrice),
     };
   }
-
   const rawVariationPct = ((actual - expected) / expected) * 100;
-  const appliedVariationPct = rawVariationPct / 2; // amortecedor
-
+  // 1) Amortecedor: só metade do que o desempenho sugere.
+  let appliedVariationPct = rawVariationPct / 2;
+  // 2) Teto por rodada: mesmo assim, ninguém salta mais do que isto de uma vez.
+  //    É esta linha que faltava — sem ela, uma expectativa pequena no
+  //    denominador produzia variações de centenas por cento.
+  appliedVariationPct = Math.max(-MAX_VARIACAO_PCT, Math.min(MAX_VARIACAO_PCT, appliedVariationPct));
   let newPrice = currentPrice * (1 + appliedVariationPct / 100);
-  newPrice = round1(Math.max(MIN_PRICE, newPrice));
-
+  // 3) Limites absolutos da escala: 2 a 20 JC.
+  newPrice = round1(Math.min(MAX_PRICE, Math.max(MIN_PRICE, newPrice)));
   return {
     oldPrice: currentPrice,
     newPrice,
     rawVariationPct: round1(rawVariationPct),
-    appliedVariationPct: round1(appliedVariationPct),
+    // A variação REAL depois dos limites — é a que o jogador vê, e tem de bater
+    // certo com a diferença de preço. Devolver a teórica faria a app dizer
+    // "+50%" quando o preço subiu 3%.
+    appliedVariationPct: currentPrice > 0 ? round1(((newPrice - currentPrice) / currentPrice) * 100) : 0,
     delta: round1(newPrice - currentPrice),
   };
 }
-
 /* =========================================================================
  * 3. FAIXAS  (por percentil mensal entre jogadores ativos)
  * ========================================================================= */
-
 /** Faixas da melhor para a pior. Índice menor = faixa melhor. */
 export const BELTS = [
   "preta",
@@ -179,9 +198,7 @@ export const BELTS = [
   "azul",
   "branca",
 ] as const;
-
 export type Belt = (typeof BELTS)[number];
-
 /**
  * Recebe a "fração de topo" (0 = melhor jogador, 1 = pior) e devolve a faixa.
  * Cortes do documento: Preta 5% · Marrom 10% · Roxa 15% · Verde 20% ·
@@ -196,7 +213,6 @@ export function beltFromTopFraction(topFraction: number): Belt {
   if (topFraction <= 0.9) return "azul";
   return "branca";
 }
-
 /**
  * Faixa de um jogador, comparado com todos os jogadores ativos.
  * Empates ficam com a mesma faixa (a melhor do empate).
@@ -210,17 +226,14 @@ export function beltForUser(allScores: number[], userScore: number): Belt {
   const better = allScores.filter((s) => s > userScore).length;
   return beltFromTopFraction((better + 1) / n);
 }
-
 export interface RankedUser {
   id: string;
   score: number;
 }
-
 export interface BeltedUser extends RankedUser {
   position: number; // 1 = primeiro
   belt: Belt;
 }
-
 /**
  * Atribui posição + faixa a uma lista inteira de jogadores de uma vez.
  * Útil para recalcular o ranking mensal e as faixas num só passo.
@@ -237,20 +250,16 @@ export function assignBeltsForRanking(users: RankedUser[]): BeltedUser[] {
     };
   });
 }
-
 /* =========================================================================
  * 4. TRANSIÇÃO DE FAIXA  (para animações e mensagens)
  * ========================================================================= */
-
 export type BeltDirection = "subiu" | "manteve" | "desceu";
-
 export interface BeltTransition {
   from: Belt;
   to: Belt;
   direction: BeltDirection;
   message: string;
 }
-
 const BELT_LABEL: Record<Belt, string> = {
   preta: "Preta",
   marrom: "Marrom",
@@ -260,7 +269,6 @@ const BELT_LABEL: Record<Belt, string> = {
   azul: "Azul",
   branca: "Branca",
 };
-
 /**
  * Compara a faixa anterior com a nova e devolve o que mudou,
  * com uma mensagem pronta para mostrar ao jogador.
@@ -268,10 +276,8 @@ const BELT_LABEL: Record<Belt, string> = {
 export function beltTransition(prev: Belt, next: Belt): BeltTransition {
   const pi = BELTS.indexOf(prev);
   const ni = BELTS.indexOf(next);
-
   let direction: BeltDirection = "manteve";
   let message = `Mantiveste a Faixa ${BELT_LABEL[next]}. Vamos à próxima rodada.`;
-
   if (ni < pi) {
     direction = "subiu";
     message = `Parabéns! Alcançaste a Faixa ${BELT_LABEL[next]}.`;
@@ -279,6 +285,5 @@ export function beltTransition(prev: Belt, next: Belt): BeltTransition {
     direction = "desceu";
     message = `Caíste para a Faixa ${BELT_LABEL[next]}. Recupera a tua posição na próxima rodada.`;
   }
-
   return { from: prev, to: next, direction, message };
 }
