@@ -150,26 +150,33 @@ export default function NoticiaPagina() {
           </div>
         ) : (
           <>
-            <article style={{ background: "#121815", border: "1px solid #243029", borderLeft: `3px solid ${e.cor}`, borderRadius: 14, overflow: "hidden" }}>
+            {/* DESENHO DE ARTIGO, não de cartão.
+                A imagem ocupa a largura toda, o título é grande, o texto é
+                largo e respirado. Um artigo dentro de um cartão escuro com
+                borda lê-se como mais um bloco da app — e isto é para ser lido
+                do princípio ao fim, não consultado de relance. */}
+            <article>
               {n.imagem_url && (
-                <div>
+                <div style={{ margin: "0 -14px 16px" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={n.imagem_url} alt="" style={{ width: "100%", display: "block" }} />
+                  <img src={n.imagem_url} alt="" style={{ width: "100%", display: "block", maxHeight: 260, objectFit: "cover" }} />
                   {n.imagem_credito && (
-                    <div style={{ fontSize: 10.5, color: "#5f6f67", padding: "5px 15px 0" }}>{n.imagem_credito}</div>
+                    <div style={{ fontSize: 10.5, color: "#5f6f67", padding: "6px 14px 0" }}>{n.imagem_credito}</div>
                   )}
                 </div>
               )}
-              <div style={{ padding: "16px 15px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <span style={{ fontSize: 18 }} aria-hidden="true">{e.icone}</span>
-                <span style={{ fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: e.cor }}>{e.etiqueta}</span>
+              <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <span style={{ fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: e.cor, borderLeft: `2px solid ${e.cor}`, paddingLeft: 8 }}>{e.etiqueta}</span>
                 <span style={{ flex: 1 }} />
                 <span style={{ fontSize: 11, color: "#5f6f67" }}>{quando(n.criada_em)}</span>
               </div>
 
-              <h1 style={{ fontSize: 20, fontWeight: 700, color: "#f1ede2", lineHeight: 1.25, margin: "0 0 10px" }}>{n.titulo}</h1>
-              <p style={{ fontSize: 14.5, color: "#c7d0c9", lineHeight: 1.6, margin: 0 }}>{n.corpo}</p>
+              <h1 style={{ fontSize: 25, fontWeight: 700, color: "#f1ede2", lineHeight: 1.22, margin: "0 0 14px", letterSpacing: "-0.01em" }}>{n.titulo}</h1>
+              {/* pre-wrap: respeita as quebras de linha escritas pelo editor.
+                  Sem isto o HTML junta tudo num bloco só — os parágrafos que a
+                  pessoa separou desapareciam. */}
+              <p style={{ fontSize: 16, color: "#cfd8d2", lineHeight: 1.75, margin: 0, whiteSpace: "pre-wrap" }}>{n.corpo}</p>
 
               {(n.nome_competicao || n.autor_nome) && (
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a221d", fontSize: 12, color: "#93a39a", display: "flex", justifyContent: "space-between", gap: 10 }}>
