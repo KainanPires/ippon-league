@@ -54,6 +54,7 @@ interface Noticia {
   resumo: string | null;
   corpo: string;
   nome_competicao: string | null;
+  imagem_url: string | null;   // só as escritas por pessoas têm
 }
 
 /** De quanto em quanto tempo passa. 6s: dá para ler um título sem pressa. */
@@ -69,7 +70,7 @@ export function HubCarrossel() {
     let vivo = true;
     supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, resumo, corpo, nome_competicao")
+      .select("id, tipo, titulo, resumo, corpo, nome_competicao, imagem_url")
       .order("destaque", { ascending: false })
       .order("criada_em", { ascending: false })
       .limit(8)
@@ -120,7 +121,14 @@ export function HubCarrossel() {
         style={{ display: "block", background: "#121815", border: `1px solid ${est.cor}33`, borderLeft: `3px solid ${est.cor}`, borderRadius: 13, padding: "13px 14px", textDecoration: "none", color: "inherit", minHeight: 92 }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-          <span style={{ fontSize: 20, flexShrink: 0, lineHeight: 1.2 }} aria-hidden="true">{est.icone}</span>
+          {/* Com imagem, mostra a imagem; sem ela, o ícone do tipo. As geradas
+              nunca têm imagem — e o ícone dá-lhes identidade sem precisar de uma. */}
+          {n.imagem_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={n.imagem_url} alt="" style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+          ) : (
+            <span style={{ fontSize: 20, flexShrink: 0, lineHeight: 1.2 }} aria-hidden="true">{est.icone}</span>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", lineHeight: 1.3 }}>{n.titulo}</div>
             <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.45, margin: "5px 0 0" }}>
