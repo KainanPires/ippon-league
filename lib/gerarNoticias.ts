@@ -257,3 +257,107 @@ export function noticiaCopaCampeao(d: {
     destaque: true,
   };
 }
+
+
+// ===========================================================================
+// NOTÍCIAS DE COMUNIDADE — quem está por cima, e porquê
+//
+// Estas não falam de uma rodada: falam do ESTADO do jogo. Quem acumulou mais,
+// quem tem o maior património, quem vem a subir. São as que dão sentido a
+// jogar entre competições — e as que mais alimentam a conversa.
+// ===========================================================================
+
+/**
+ * O maior património, mundial ou de um continente.
+ *
+ * Não é o mesmo que "quem pontuou mais": o património vem das valorizações dos
+ * atletas, ou seja, de escolher bem antes da rodada. Premeia olho de mercado, e
+ * não só sorte na escalação.
+ */
+export function noticiaMaisRico(d: {
+  nomeTime: string; patrimonio: number; escopo: "mundial" | "continental";
+  continente?: string; segundo?: { nomeTime: string; patrimonio: number } | null;
+  escudo?: unknown;
+}): NoticiaNova | null {
+  if (!d.nomeTime || d.patrimonio <= 0) return null;
+  const mundial = d.escopo === "mundial";
+  const onde = mundial ? "do mundo" : `de ${d.continente}`;
+  const eq = equipa(d.nomeTime);
+  // A distância para o segundo é o que torna isto uma corrida em vez de uma
+  // lista. "Lidera por 3 JC" faz querer voltar; "tem 128 JC" não diz nada.
+  const dist = d.segundo && d.segundo.patrimonio > 0
+    ? ` ${equipa(d.segundo.nomeTime)} vem logo atrás, a ${num(d.patrimonio - d.segundo.patrimonio)} JC.`
+    : "";
+  return {
+    tipo: "mais_rico",
+    titulo: mundial ? `${eq} é a equipa mais rica do mundo` : `${eq} lidera o património ${onde}`,
+    corpo: `Com JC ${num(d.patrimonio)} de património, ${eq} é a equipa mais valiosa ${onde}.${dist} O património cresce quando os atletas escalados valorizam — é mercado, não só pontos.`,
+    resumo: `${eq} · JC ${num(d.patrimonio)} · maior património ${onde}`,
+    dados: { chave: `rico-${d.escopo}-${d.continente || "mundo"}`, patrimonio: d.patrimonio, escudo: d.escudo ?? null },
+    continente: mundial ? null : (d.continente || null),
+    destaque: mundial,
+  };
+}
+
+/**
+ * Quem acumulou mais pontos ao longo do tempo (não numa rodada).
+ *
+ * É a corrida de fundo: quem aparece sempre. Diferente do "melhor da rodada",
+ * que pode ser sorte de um fim de semana.
+ */
+export function noticiaLiderPontos(d: {
+  nomeTime: string; pontos: number; rodadas: number;
+  escopo: "mundial" | "continental"; continente?: string;
+  segundo?: { nomeTime: string; pontos: number } | null;
+  escudo?: unknown;
+}): NoticiaNova | null {
+  if (!d.nomeTime || d.pontos <= 0) return null;
+  const mundial = d.escopo === "mundial";
+  const onde = mundial ? "mundial" : d.continente || "";
+  const eq = equipa(d.nomeTime);
+  const media = d.rodadas > 0 ? num(d.pontos / d.rodadas) : "";
+  const porRodada = media ? ` São ${media} pontos por rodada, em ${d.rodadas}.` : "";
+  const dist = d.segundo && d.segundo.pontos > 0
+    ? ` A vantagem para ${equipa(d.segundo.nomeTime)} é de ${num(d.pontos - d.segundo.pontos)} pontos.`
+    : "";
+  return {
+    tipo: "lider_pontos",
+    titulo: mundial ? `${eq} lidera o ranking mundial` : `${eq} manda em ${onde}`,
+    corpo: `${eq} soma ${num(d.pontos)} pontos e é quem está por cima ${mundial ? "no mundo" : `em ${onde}`}.${porRodada}${dist}`,
+    resumo: `${eq} · ${num(d.pontos)} pts · líder ${mundial ? "mundial" : onde}`,
+    dados: { chave: `lider-${d.escopo}-${d.continente || "mundo"}`, pontos: d.pontos, escudo: d.escudo ?? null },
+    continente: mundial ? null : (d.continente || null),
+    destaque: mundial,
+  };
+}
+
+/**
+ * O percurso de um campeão de mata-mata — por quem passou, ronda a ronda.
+ *
+ * Só para as ligas OFICIAIS (mundial e continental). Uma copa entre amigos não
+ * é notícia para o mural; a mundial é.
+ */
+export function noticiaPercursoCampeao(d: {
+  nomeLiga: string; campeao: string; participantes: number; ligaId: string;
+  // Ronda a ronda: quem enfrentou e com que pontuação.
+  percurso: { ronda: string; adversario: string; meus: number; dele: number }[];
+  escudo?: unknown;
+}): NoticiaNova | null {
+  if (!d.campeao || d.percurso.length === 0) return null;
+  const eq = equipa(d.campeao);
+  const linhas = d.percurso.map((p) => `${p.ronda}: bateu ${equipa(p.adversario)} por ${num(p.meus)}–${num(p.dele)}`);
+  // A luta mais renhida é a que se conta. Um caminho todo folgado não tem
+  // história; uma final por meio ponto tem.
+  const maisRenhida = [...d.percurso].sort((a, b) => (a.meus - a.dele) - (b.meus - b.dele))[0];
+  const drama = maisRenhida && (maisRenhida.meus - maisRenhida.dele) < 10
+    ? ` O momento mais renhido foi ${maisRenhida.ronda.toLowerCase()}, decidido por ${num(maisRenhida.meus - maisRenhida.dele)} pontos.`
+    : "";
+  return {
+    tipo: "percurso_campeao",
+    titulo: `O caminho de ${eq} até ao título`,
+    corpo: `${eq} venceu a ${d.nomeLiga} entre ${d.participantes} equipas.\n\n${linhas.join("\n")}\n\n${drama.trim()}`,
+    resumo: `${eq} · campeão da ${d.nomeLiga} · ${d.percurso.length} rondas`,
+    dados: { chave: `percurso-${d.ligaId}`, escudo: d.escudo ?? null },
+    destaque: true,
+  };
+}
