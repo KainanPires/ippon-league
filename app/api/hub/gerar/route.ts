@@ -26,13 +26,10 @@ import {
   noticiaDesvalorizacao, noticiaMaisEscalado, noticiaCopaCampeao,
   type NoticiaNova,
 } from "@/lib/gerarNoticias";
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
 /** Quantos dias para trás procurar competições a noticiar. */
 const JANELA_DIAS = 10;
-
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = (searchParams.get("key") || "").trim();
@@ -44,7 +41,6 @@ export async function GET(req: Request) {
   }
   const simular = (searchParams.get("simular") || "").trim() === "1";
   const compForcada = (searchParams.get("comp") || "").trim();
-
   const agora = new Date();
   // Que competições noticiar: a forçada, ou as que terminaram há pouco.
   const semanas = compForcada
@@ -54,18 +50,22 @@ export async function GET(req: Request) {
         const dias = (agora.getTime() - ini) / 86400000;
         return dias >= 0 && dias <= JANELA_DIAS && competicaoFechada(s, agora);
       });
-
   const novas: NoticiaNova[] = [];
-
   for (const semana of semanas) {
     const comp = semana.idCompeticao;
     // Nome COMPLETO: a competição já terminou, logo a cidade pode aparecer.
     const nomeComp = nomeCompeticao(semana, agora);
-
     // --- 1) Melhor da rodada (mundial e continentais) ---
+    // O ESCUDO vem junto: é a única imagem que estas notícias podem ter, e é
+    // nossa — desenhada a partir de uma configuração (forma, cores, símbolo),
+    // não um ficheiro. Por isso guarda-se em `dados`, e o ecrã desenha-a.
+    //
+    // Uma notícia sobre uma equipa com o escudo dela ao lado vale muito mais do
+    // que um ícone genérico de troféu. E quando houver foto do jogador (com
+    // consentimento), substitui-se — a estrutura já suporta as duas.
     const { data: melhores } = await supabaseAdmin
       .from("melhores_rodada")
-      .select("nome_time, pontos, escopo, continente, n_participantes")
+      .select("nome_time, pontos, escopo, continente, n_participantes, escudo")
       .eq("id_competicao", comp);
     for (const m of melhores || []) {
       const n = noticiaMelhorRodada({
@@ -78,7 +78,6 @@ export async function GET(req: Request) {
       });
       if (n) novas.push(n);
     }
-
     // --- 2) O atleta que mais pontuou ---
     const { data: top } = await supabaseAdmin
       .from("resultados_atletas")
@@ -96,7 +95,6 @@ export async function GET(req: Request) {
       });
       if (n) novas.push(n);
     }
-
     // --- 3) e 4) Maior valorização e maior queda ---
     //
     // Os dados vêm de `resultados_atletas`, não de `precos_atletas`. A segunda
@@ -141,7 +139,6 @@ export async function GET(req: Request) {
       });
       if (n) novas.push(n);
     }
-
     // --- 5) O atleta mais escalado ---
     const { data: equipas } = await supabaseAdmin
       .from("equipas").select("atletas").eq("id_competicao", comp);
@@ -168,7 +165,6 @@ export async function GET(req: Request) {
       }
     }
   }
-
   // --- 6) Copas que terminaram ---
   // Fora do ciclo das competições: uma copa acaba numa rodada, mas a notícia é
   // sobre a liga, não sobre a competição.
@@ -185,30 +181,31 @@ export async function GET(req: Request) {
         .eq("league_id", liga.id).eq("fase", "final").maybeSingle();
       if (!final?.vencedor) continue;
       const perdedor = final.vencedor === final.jogador_a ? final.jogador_b : final.jogador_a;
-      const nomeDe = async (uid: string | null): Promise<string> => {
-        if (!uid) return "";
+      // Nome E escudo da equipa: a última que guardaram é a mais representativa.
+      const equipaDe = async (uid: string | null): Promise<{ nome: string; escudo: unknown }> => {
+        if (!uid) return { nome: "", escudo: null };
         const { data } = await supabaseAdmin!
-          .from("equipas").select("nome").eq("user_id", uid)
+          .from("equipas").select("nome, escudo").eq("user_id", uid)
           .order("id_competicao", { ascending: false }).limit(1).maybeSingle();
-        return String(data?.nome || "");
+        return { nome: String(data?.nome || ""), escudo: data?.escudo ?? null };
       };
       const { count } = await supabaseAdmin
         .from("league_members").select("id", { count: "exact", head: true }).eq("league_id", liga.id);
+      const eqCampeao = await equipaDe(String(final.vencedor));
+      const eqVice = await equipaDe(perdedor ? String(perdedor) : null);
       const n = noticiaCopaCampeao({
         nomeLiga: String(liga.name || "Copa"),
-        campeao: await nomeDe(String(final.vencedor)),
-        vice: await nomeDe(perdedor ? String(perdedor) : null) || null,
+        campeao: eqCampeao.nome,
+        vice: eqVice.nome || null,
         participantes: count ?? 0,
         ligaId: String(liga.id),
       });
-      if (n) novas.push(n);
+      if (n) { n.dados = { ...(n.dados || {}), escudo: eqCampeao.escudo }; novas.push(n); }
     }
   } catch { /* sem copas: salta */ }
-
   if (simular) {
     return NextResponse.json({ ok: true, simulacao: true, geradas: novas.length, noticias: novas });
   }
-
   // GRAVA — verificando primeiro se já existe.
   //
   // Podia bastar o índice único da tabela, mas ele usa expressões (coalesce),
@@ -228,7 +225,6 @@ export async function GET(req: Request) {
     if (chave) q = q.eq("dados->>chave", chave);
     const { data: existe } = await q;
     if (existe && existe.length > 0) { jaExistiam++; continue; }
-
     const { error } = await supabaseAdmin.from("hub_noticias").insert({
       tipo: n.tipo, titulo: n.titulo, corpo: n.corpo, resumo: n.resumo,
       id_competicao: n.id_competicao ?? null,
@@ -238,6 +234,5 @@ export async function GET(req: Request) {
     });
     if (!error) gravadas++;
   }
-
   return NextResponse.json({ ok: true, candidatas: novas.length, gravadas, ja_existiam: jaExistiam });
 }
