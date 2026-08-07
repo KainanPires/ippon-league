@@ -78,6 +78,22 @@
 // continuam a funcionar exatamente como antes.
 //
 // ---------------------------------------------------------------------------
+// QUEM ESTÁ A DISPUTAR A COPA ATUAL NÃO SE INSCREVE NA SEGUINTE
+//
+// As inscrições da edição seguinte abrem enquanto a atual ainda se joga, e isso
+// é de propósito: quem está de fora não tem de esperar que a Copa acabe para
+// pôr o nome. Mas quem está DENTRO da chave a decorrer não se pode inscrever —
+// senão poderia estar nas duas ao mesmo tempo, com a mesma equipa a valer para
+// confrontos de duas Copas diferentes.
+//
+// Vale para quem foi sorteado (está na chave), tenha já sido eliminado ou não:
+// a Copa é dele até ela terminar. Assim que a edição sai de 'sorteada' e de
+// 'a_decorrer', deixa de haver bloqueio.
+//
+// A verificação vive no SERVIDOR, tanto no GET (para o ecrã não mostrar um
+// botão que vai falhar) como no POST (que é onde a regra tem de valer mesmo).
+//
+// ---------------------------------------------------------------------------
 // NOTIFICAÇÕES
 //
 // Três momentos, no sininho:
@@ -174,6 +190,16 @@ export async function GET(req: Request) {
 
   const uid = await uidDoPedido(req);
 
+  // Estou na chave da Copa que está a decorrer? É o que bloqueia a inscrição na
+  // seguinte. Calculado aqui em cima porque as duas secções lá abaixo precisam.
+  let naChaveAtual = false;
+  if (uid && edDecorrer) {
+    const { data: m } = await supabaseAdmin
+      .from("dodo_inscricoes").select("sorteada")
+      .eq("edicao_id", edDecorrer.id).eq("user_id", uid).maybeSingle();
+    naChaveAtual = !!m && m.sorteada === true;
+  }
+
   if (!edInscricoes && !edDecorrer) {
     // Não há edição visível — mas se houver uma PREPARADA com data de abertura,
     // dizemos QUANDO abre. A página mostra a contagem; a edição continua
@@ -236,10 +262,12 @@ export async function GET(req: Request) {
       eu = {
         inscrito: !!minha,
         sorteada: minha ? (minha.sorteada as boolean | null) : null,
-        podeInscrever: ehPro && aberto && !minha,
+        podeInscrever: ehPro && aberto && !minha && !naChaveAtual,
         motivo: !ehPro
           ? "O Mata-Mata do Dôdo é para membros Ippon Pro."
-          : !aberto ? "As inscrições já fecharam." : undefined,
+          : naChaveAtual
+            ? "Estás a disputar a Copa que decorre. Podes inscrever-te na seguinte quando esta terminar."
+            : !aberto ? "As inscrições já fecharam." : undefined,
       };
     }
 
@@ -265,19 +293,10 @@ export async function GET(req: Request) {
       } catch { /* sem código: a página cai em /ligas */ }
     }
 
-    // Estou nesta chave? Só quem foi sorteado joga.
-    let naChave = false;
-    if (uid) {
-      const { data: m } = await supabaseAdmin
-        .from("dodo_inscricoes").select("sorteada")
-        .eq("edicao_id", edDecorrer.id).eq("user_id", uid).maybeSingle();
-      naChave = !!m && m.sorteada === true;
-    }
-
     decorrerOut = {
       id: edDecorrer.id, numero: edDecorrer.numero, ano: edDecorrer.ano,
       estado: edDecorrer.estado, nome: nomeDe(edDecorrer),
-      league_id: edDecorrer.league_id, invite_code, naChave,
+      league_id: edDecorrer.league_id, invite_code, naChave: naChaveAtual,
     };
   }
 
@@ -523,6 +542,26 @@ export async function POST(req: Request) {
       ok: false, precisaPro: true,
       erro: "O Mata-Mata do Dôdo é para membros Ippon Pro.",
     }, { status: 403 });
+  }
+
+  // Já está a disputar a Copa que decorre? Então não entra na seguinte.
+  // Verificado aqui, no servidor: o ecrã esconde o botão, mas a regra tem de
+  // valer mesmo que o pedido chegue por outro caminho.
+  const { data: emCurso } = await supabaseAdmin
+    .from("dodo_edicoes").select("id, numero")
+    .in("estado", ["sorteada", "a_decorrer"])
+    .order("numero", { ascending: false }).limit(1);
+  const edCurso = (emCurso || [])[0];
+  if (edCurso) {
+    const { data: naChave } = await supabaseAdmin
+      .from("dodo_inscricoes").select("sorteada")
+      .eq("edicao_id", edCurso.id).eq("user_id", uid).maybeSingle();
+    if (naChave && naChave.sorteada === true) {
+      return NextResponse.json({
+        ok: false, naCopaAtual: true,
+        erro: `Estás a disputar a ${edCurso.numero}ª Copa. Podes inscrever-te na seguinte assim que esta terminar.`,
+      }, { status: 409 });
+    }
   }
 
   const continente = String(u?.continente || "");
