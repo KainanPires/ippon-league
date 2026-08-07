@@ -42,6 +42,42 @@
 // continuar coerente se alguém o chamar (devolve jaEstava e não faz nada).
 //
 // ---------------------------------------------------------------------------
+// JOGA-SE COM QUEM APARECER  (corrigido)
+//
+// Antes, o número de participantes era arredondado PARA BAIXO até à potência de
+// 2 mais próxima: 21 sorteados jogavam a 16 e cinco pessoas sorteadas ficavam de
+// fora depois de já saberem que tinham entrado. Com 26, ficavam dez.
+//
+// Agora entram todos os sorteados e a chave arredonda PARA CIMA, com passagens
+// automáticas na primeira ronda — que é, aliás, o que uma competição de judô faz
+// quando o número de inscritos não é redondo.
+//
+// A troca não é de graça: quem recebe passagem automática avança uma ronda sem
+// lutar. Mas cortar alguém que já foi sorteado é pior — essa pessoa não joga
+// NADA, e foi avisada de que tinha entrado.
+//
+// ---------------------------------------------------------------------------
+// DUAS EDIÇÕES AO MESMO TEMPO  (corrigido)
+//
+// Quando a Copa a decorrer chega às meias-finais, o ciclo automático abre as
+// inscrições da edição SEGUINTE. A partir desse momento existem duas edições
+// visíveis: uma a jogar-se e outra a receber inscritos.
+//
+// A consulta usava .maybeSingle(), que REBENTA quando encontra mais do que uma
+// linha. No dia em que a segunda edição abrisse, a rota devolvia erro e a página
+// dizia "não há Copa aberta" — desapareciam as duas de uma vez. Uma bomba com
+// temporizador, e o temporizador era o próprio ciclo automático.
+//
+// Agora a rota devolve as duas, em campos separados:
+//   aDecorrer   — a que está a ser jogada (sorteada / a_decorrer), com a chave
+//   inscricoes  — a que está a receber inscritos, com a contagem por continente
+//
+// Os campos antigos (edicao, eu, inscritos, porContinente) continuam lá, a
+// apontar para a edição de inscrições, ou para a que decorre se não houver
+// inscrições abertas. Assim os ecrãs que ainda não conhecem os campos novos
+// continuam a funcionar exatamente como antes.
+//
+// ---------------------------------------------------------------------------
 // NOTIFICAÇÕES
 //
 // Três momentos, no sininho:
@@ -57,13 +93,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { sortearVagas, tamanhoDaChave, VAGAS_POR_CONTINENTE, TOTAL_VAGAS } from "@/lib/sorteioDodo";
+import { sortearVagas, VAGAS_POR_CONTINENTE, TOTAL_VAGAS } from "@/lib/sorteioDodo";
 // São CINCO continentes (as federações da IJF), e as chaves de NOME_CONTINENTE
 // são a lista deles. Não há uma constante CONTINENTES separada — usar as chaves
 // evita ter duas listas a poder divergir.
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import { focoMercado } from "@/lib/calendario";
-import { gerarPrimeiraRonda } from "@/lib/copa";
+import { gerarPrimeiraRonda, tamanhoChave } from "@/lib/copa";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
 export const dynamic = "force-dynamic";
@@ -122,18 +158,27 @@ export async function GET(req: Request) {
   // mas ninguém a vê — serve para deixar tudo pronto e só abrir as inscrições
   // quando houver publicidade a acompanhar. Abrir sem ninguém saber daria uma
   // Copa com três inscritos.
-  const { data: edicao } = await supabaseAdmin
+  //
+  // Sem .maybeSingle(): podem vir DUAS (ver a nota no topo do ficheiro).
+  const { data: edicoes } = await supabaseAdmin
     .from("dodo_edicoes")
     .select("*")
     .in("estado", ["inscricoes", "sorteada", "a_decorrer"])
-    .order("numero", { ascending: false })
-    .maybeSingle();
+    .order("numero", { ascending: false });
 
-  if (!edicao) {
+  const todas = (edicoes || []) as Record<string, unknown>[];
+  // A mais recente de cada tipo. Ordenadas por número decrescente, a primeira
+  // que corresponder é sempre a mais nova.
+  const edInscricoes = todas.find((e) => String(e.estado) === "inscricoes") ?? null;
+  const edDecorrer = todas.find((e) => ["sorteada", "a_decorrer"].includes(String(e.estado))) ?? null;
+
+  const uid = await uidDoPedido(req);
+
+  if (!edInscricoes && !edDecorrer) {
     // Não há edição visível — mas se houver uma PREPARADA com data de abertura,
     // dizemos QUANDO abre. A página mostra a contagem; a edição continua
-    // invisível em tudo o resto (nome, número, inscrições). Saber que abre a 12
-    // de março não é o mesmo que poder entrar hoje.
+    // invisível em tudo o resto. Saber que abre a 12 de março não é o mesmo que
+    // poder entrar hoje.
     let abre_em: string | null = null;
     try {
       const { data: prep } = await supabaseAdmin
@@ -141,71 +186,122 @@ export async function GET(req: Request) {
         .select("*")
         .eq("estado", "preparada")
         .order("numero", { ascending: true })
-        .maybeSingle();
+        .limit(1);
       // Coluna opcional: se ainda não existir na tabela, fica null e a página
       // volta ao texto genérico. Nada rebenta por causa disto.
-      const d = (prep as Record<string, unknown> | null)?.inscricoes_de;
+      const d = ((prep || [])[0] as Record<string, unknown> | undefined)?.inscricoes_de;
       if (d) abre_em = String(d);
     } catch { /* sem data: a página diz apenas "em breve" */ }
 
-    return NextResponse.json({ ok: true, edicao: null, abre_em, nota: "Não há edição a decorrer." });
+    return NextResponse.json({
+      ok: true, edicao: null, aDecorrer: null, inscricoes: null,
+      abre_em, vagasPorContinente: VAGAS_POR_CONTINENTE, totalVagas: TOTAL_VAGAS,
+      nota: "Não há edição a decorrer.",
+    });
   }
 
-  // Quantos por continente, para a página mostrar onde há mais concorrência.
-  const { data: inscritos } = await supabaseAdmin
-    .from("dodo_inscricoes")
-    .select("continente, sorteada")
-    .eq("edicao_id", edicao.id);
+  const nomeDe = (e: Record<string, unknown>) =>
+    `${e.numero}ª Copa do Dôdo entre Continentes · ${e.ano || new Date().getFullYear()}`;
 
-  const porContinente: Record<string, number> = {};
-  for (const i of inscritos || []) {
-    const c = String(i.continente);
-    porContinente[c] = (porContinente[c] ?? 0) + 1;
-  }
-
-  // O código de convite da liga da Copa, para a página abrir a chave direto.
-  let invite_code: string | null = null;
-  if (edicao.league_id) {
-    try {
-      const { data: lg } = await supabaseAdmin
-        .from("leagues").select("invite_code").eq("id", edicao.league_id).maybeSingle();
-      if (lg?.invite_code) invite_code = String(lg.invite_code);
-    } catch { /* sem código: a página cai em /ligas */ }
-  }
-
-  // O meu estado, se houver sessão.
-  const uid = await uidDoPedido(req);
+  // ---- A edição que está a RECEBER INSCRIÇÕES ----
+  let inscricoesOut: Record<string, unknown> | null = null;
+  let porContinente: Record<string, number> = {};
+  let nInscritos = 0;
   let eu: { inscrito: boolean; sorteada: boolean | null; podeInscrever: boolean; motivo?: string } | null = null;
-  if (uid) {
-    const { data: u } = await supabaseAdmin
-      .from("users").select("is_pro, is_pro_max, continente").eq("id", uid).maybeSingle();
-    const ehPro = !!u?.is_pro || !!u?.is_pro_max;
 
-    const { data: minha } = await supabaseAdmin
-      .from("dodo_inscricoes").select("sorteada").eq("edicao_id", edicao.id).eq("user_id", uid).maybeSingle();
+  if (edInscricoes) {
+    const { data: inscritos } = await supabaseAdmin
+      .from("dodo_inscricoes")
+      .select("continente, sorteada")
+      .eq("edicao_id", edInscricoes.id);
 
-    const aberto = String(edicao.estado) === "inscricoes"
-      && !!edicao.inscricoes_ate
-      && Date.now() < Date.parse(String(edicao.inscricoes_ate));
+    for (const i of inscritos || []) {
+      const c = String((i as Record<string, unknown>).continente);
+      porContinente[c] = (porContinente[c] ?? 0) + 1;
+    }
+    nInscritos = (inscritos || []).length;
 
-    eu = {
-      inscrito: !!minha,
-      sorteada: minha ? (minha.sorteada as boolean | null) : null,
-      podeInscrever: ehPro && aberto && !minha,
-      motivo: !ehPro
-        ? "O Mata-Mata do Dôdo é para membros Ippon Pro."
-        : !aberto ? "As inscrições já fecharam." : undefined,
+    const aberto = !!edInscricoes.inscricoes_ate
+      && Date.now() < Date.parse(String(edInscricoes.inscricoes_ate));
+
+    if (uid) {
+      const { data: u } = await supabaseAdmin
+        .from("users").select("is_pro, is_pro_max").eq("id", uid).maybeSingle();
+      const ehPro = !!u?.is_pro || !!u?.is_pro_max;
+
+      const { data: minha } = await supabaseAdmin
+        .from("dodo_inscricoes").select("sorteada")
+        .eq("edicao_id", edInscricoes.id).eq("user_id", uid).maybeSingle();
+
+      eu = {
+        inscrito: !!minha,
+        sorteada: minha ? (minha.sorteada as boolean | null) : null,
+        podeInscrever: ehPro && aberto && !minha,
+        motivo: !ehPro
+          ? "O Mata-Mata do Dôdo é para membros Ippon Pro."
+          : !aberto ? "As inscrições já fecharam." : undefined,
+      };
+    }
+
+    inscricoesOut = {
+      id: edInscricoes.id, numero: edInscricoes.numero, ano: edInscricoes.ano,
+      estado: edInscricoes.estado, nome: nomeDe(edInscricoes),
+      inscricoes_ate: edInscricoes.inscricoes_ate,
+      aberta: aberto, inscritos: nInscritos, porContinente, eu,
     };
   }
 
+  // ---- A edição que está a SER JOGADA ----
+  let decorrerOut: Record<string, unknown> | null = null;
+
+  if (edDecorrer) {
+    // O código de convite da liga, para a página abrir a chave direto.
+    let invite_code: string | null = null;
+    if (edDecorrer.league_id) {
+      try {
+        const { data: lg } = await supabaseAdmin
+          .from("leagues").select("invite_code").eq("id", edDecorrer.league_id).maybeSingle();
+        if (lg?.invite_code) invite_code = String(lg.invite_code);
+      } catch { /* sem código: a página cai em /ligas */ }
+    }
+
+    // Estou nesta chave? Só quem foi sorteado joga.
+    let naChave = false;
+    if (uid) {
+      const { data: m } = await supabaseAdmin
+        .from("dodo_inscricoes").select("sorteada")
+        .eq("edicao_id", edDecorrer.id).eq("user_id", uid).maybeSingle();
+      naChave = !!m && m.sorteada === true;
+    }
+
+    decorrerOut = {
+      id: edDecorrer.id, numero: edDecorrer.numero, ano: edDecorrer.ano,
+      estado: edDecorrer.estado, nome: nomeDe(edDecorrer),
+      league_id: edDecorrer.league_id, invite_code, naChave,
+    };
+  }
+
+  // ---- Compatibilidade ----
+  // `edicao` e companhia continuam a existir, a apontar para a edição de
+  // inscrições (é a que pede uma ação a quem chega). Sem inscrições abertas,
+  // apontam para a que decorre. Os ecrãs antigos não dão pela diferença.
+  const principal = edInscricoes ?? edDecorrer!;
+  const principalEhInscricoes = !!edInscricoes;
+
   return NextResponse.json({
     ok: true,
+    // --- campos novos ---
+    aDecorrer: decorrerOut,
+    inscricoes: inscricoesOut,
+    // --- campos antigos, mantidos ---
     edicao: {
-      id: edicao.id, numero: edicao.numero, ano: edicao.ano, estado: edicao.estado,
-      nome: `${edicao.numero}ª Copa do Dôdo entre Continentes · ${edicao.ano || new Date().getFullYear()}`,
-      inscricoes_ate: edicao.inscricoes_ate, league_id: edicao.league_id, invite_code,
+      id: principal.id, numero: principal.numero, ano: principal.ano,
+      estado: principal.estado, nome: nomeDe(principal),
+      inscricoes_ate: principal.inscricoes_ate ?? null,
+      league_id: principal.league_id ?? null,
+      invite_code: principalEhInscricoes ? null : (decorrerOut?.invite_code ?? null),
     },
-    inscritos: (inscritos || []).length,
+    inscritos: nInscritos,
     porContinente,
     vagasPorContinente: VAGAS_POR_CONTINENTE,
     totalVagas: TOTAL_VAGAS,
@@ -219,9 +315,12 @@ export async function GET(req: Request) {
 async function sortear(simular: boolean) {
   if (!supabaseAdmin) return NextResponse.json({ ok: false }, { status: 500 });
 
-  const { data: edicao } = await supabaseAdmin
+  // .limit(1) e não .maybeSingle(): se por alguma razão houver duas edições em
+  // inscrições, sorteia-se a mais recente em vez de rebentar.
+  const { data: linhas } = await supabaseAdmin
     .from("dodo_edicoes").select("*").eq("estado", "inscricoes")
-    .order("numero", { ascending: false }).maybeSingle();
+    .order("numero", { ascending: false }).limit(1);
+  const edicao = (linhas || [])[0];
 
   if (!edicao) return NextResponse.json({ ok: true, nada: "Nenhuma edição com inscrições abertas." });
 
@@ -246,16 +345,17 @@ async function sortear(simular: boolean) {
 
   const r = sortearVagas(lista, Object.keys(NOME_CONTINENTE));
 
-  // A chave tem de ser potência de 2. Com 24 sorteados joga-se com 16 — melhor
-  // do que inventar byes que dariam vantagem a uns sem eles fazerem nada.
-  const tamanho = tamanhoDaChave(r.sorteados.length);
-  const entram = r.sorteados.slice(0, tamanho);
+  // Entram TODOS os sorteados. A chave arredonda para cima e as vagas a mais
+  // viram passagens automáticas na 1ª ronda (ver a nota no topo do ficheiro).
+  const entram = r.sorteados;
+  const tamanho = tamanhoChave(entram.length);
 
   if (simular) {
     return NextResponse.json({
       ok: true, simulacao: true, edicao: edicao.numero,
       inscritos: lista.length, sorteados: r.sorteados.length,
-      tamanhoChave: tamanho, resumo: r.resumo,
+      tamanhoChave: tamanho, passagensAutomaticas: tamanho - entram.length,
+      resumo: r.resumo,
     });
   }
 
@@ -370,7 +470,8 @@ async function sortear(simular: boolean) {
   return NextResponse.json({
     ok: true, edicao: edicao.numero, league_id: liga?.id ?? null,
     inscritos: lista.length, entraram: entram.length,
-    tamanhoChave: tamanho, confrontos: confrontosCriados, resumo: r.resumo,
+    tamanhoChave: tamanho, passagensAutomaticas: tamanho - entram.length,
+    confrontos: confrontosCriados, resumo: r.resumo,
   });
 }
 
@@ -390,9 +491,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, erro: "Pedido inválido." }, { status: 400 });
   }
 
-  const { data: edicao } = await supabaseAdmin
+  // Mesma razão do sortear: .limit(1) em vez de .maybeSingle().
+  const { data: linhasEd } = await supabaseAdmin
     .from("dodo_edicoes").select("id, numero, estado, inscricoes_ate")
-    .eq("estado", "inscricoes").order("numero", { ascending: false }).maybeSingle();
+    .eq("estado", "inscricoes").order("numero", { ascending: false }).limit(1);
+  const edicao = (linhasEd || [])[0];
 
   if (!edicao) {
     return NextResponse.json({ ok: false, erro: "Não há inscrições abertas." }, { status: 409 });
