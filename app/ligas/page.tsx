@@ -30,6 +30,8 @@ function esc(p: Partial<Identity>): Identity { return { ...DEFAULT_IDENTITY, ...
 interface MinhaLiga {
   id: string;
   name: string;
+  /** "oficial" nas ligas da casa (Copa do Dôdo); vazio ou outro nas de amigos. */
+  type?: string | null;
   formato: string;
   privacidade: string;
   escudo: Identity | null;
@@ -355,7 +357,14 @@ export default function Ligas() {
 
   // Separa as minhas ligas em ativas (lista principal). As terminadas e os
   // certificados vivem agora na aba Resultados (componente ResultadosConteudo).
-  const ativas = mine.filter((l) => !ligaTerminada(l));
+  //
+  // AS OFICIAIS FICAM DE FORA desta lista. A Copa do Dôdo é uma liga com
+  // formato "copa" como qualquer outra, por isso vinha no /api/liga/minhas e
+  // aparecia duas vezes: na linha fixa da Copa, lá em cima, E no meio das ligas
+  // de amigos. Pior ainda, ocupava um dos lugares do limite de copas do plano —
+  // o jogador via "Copas 1/1" e ficava sem poder criar a sua, por causa de uma
+  // competição da casa em que entrou por sorteio.
+  const ativas = mine.filter((l) => !ligaTerminada(l) && l.type !== "oficial");
 
   // Contagens para os avisos de limite (só ligas de amigos; mine já é só amigos).
   // Conta SÓ as ativas — as terminadas já não ocupam lugar prático.
