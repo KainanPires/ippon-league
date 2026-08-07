@@ -2,13 +2,36 @@
 //
 // CHAVE DA COPA IPPON (servidor, chave secreta) — para a tela visual.
 //
-// Recebe (GET): ?id=<league_id>
+// Recebe (GET): ?id=<league_id>  ou  ?codigo=<invite_code>
 // Devolve a chave inteira: os confrontos por ronda + a identidade de cada
 // jogador (nome do time + escudo) para a tela desenhar sem mais pedidos.
 //
 // Também devolve metadados úteis: estado da copa, nº de inscritos, nº total de
 // rondas previstas (para mostrar as rondas futuras "a aguardar"), e o pódio
 // quando a copa terminou.
+//
+// ---------------------------------------------------------------------------
+// SÃO DOIS TERCEIROS, NÃO UM  (corrigido)
+//
+// O motor da copa produz DOIS medalhistas de bronze, por cruzamento diagonal:
+// o repescado de cima enfrenta o perdedor da meia-final de baixo, e o repescado
+// de baixo enfrenta o perdedor da meia de cima. São dois confrontos com
+// fase="bronze" na mesma ronda.
+//
+// Esta rota só olhava para o PRIMEIRO deles (um `find`), por isso o segundo
+// medalhado desaparecia: não saía na chave, e — porque a aba Resultados lê o
+// pódio daqui — também não recebia certificado. Ficava com uma medalha que o
+// jogo lhe deu e que a app nunca lhe mostrou.
+//
+// Agora devolvem-se todos em `podio.terceiros`. O campo `podio.terceiro`
+// mantém-se, com o primeiro, para não partir nada que ainda o leia.
+//
+// NOTA sobre os bronzes sem luta: em chaves pequenas há bronzes com
+// jogador_b = null (não há ninguém para repescar, e o perdedor da meia fica em
+// 3º direto). O apuramento decide-os como "bye" e grava o vencedor à mesma, por
+// isso entram nesta lista como qualquer outro.
+// ---------------------------------------------------------------------------
+
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { tamanhoChave, numeroDeRondas } from "@/lib/copa";
@@ -26,6 +49,7 @@ export async function GET(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ erro: "Servidor sem ligação." }, { status: 500 });
   }
+
   const { searchParams } = new URL(req.url);
   const league_id_param = (searchParams.get("id") || "").trim();
   const codigo = (searchParams.get("codigo") || "").trim().toUpperCase();
@@ -37,18 +61,21 @@ export async function GET(req: Request) {
   const consulta = supabaseAdmin
     .from("leagues")
     .select("id, name, formato, copa_estado, copa_competicao_inicial, escudo");
+
   const { data: liga } = league_id_param
     ? await consulta.eq("id", league_id_param).maybeSingle()
     : await consulta.eq("invite_code", codigo).maybeSingle();
+
   if (!liga) return NextResponse.json({ erro: "Liga não encontrada." }, { status: 404 });
   if (liga.formato !== "copa") return NextResponse.json({ erro: "Não é uma copa." }, { status: 400 });
 
   const league_id = liga.id;
 
-  // Confrontos (toda a chave), por ronda e ordem.
+  // Confrontos (toda a chave), por ronda e ordem. A `metade` vai também: é o
+  // lado da chave, e é o que permite desenhar a repescagem do lado certo.
   const { data: confrontos } = await supabaseAdmin
     .from("copa_confrontos")
-    .select("id, ronda, ordem, fase, jogador_a, jogador_b, id_competicao, pontos_a, pontos_b, vencedor, decidido_por, estado")
+    .select("id, ronda, ordem, fase, jogador_a, jogador_b, id_competicao, pontos_a, pontos_b, vencedor, decidido_por, estado, metade")
     .eq("league_id", league_id)
     .order("ronda", { ascending: true })
     .order("ordem", { ascending: true });
@@ -60,6 +87,7 @@ export async function GET(req: Request) {
     .from("league_members")
     .select("user_id")
     .eq("league_id", league_id);
+
   const userIds = (membros || []).map((m) => m.user_id);
   const nInscritos = userIds.length;
 
@@ -90,15 +118,29 @@ export async function GET(req: Request) {
   const nParticiparam = await contarParticipantes(lista, Array.from(naChave));
 
   // Pódio (só quando terminada).
-  let podio: { campeao?: string; vice?: string; terceiro?: string } = {};
+  const podio: {
+    campeao?: string;
+    vice?: string;
+    /** O primeiro terceiro. Mantido para quem ainda leia o campo antigo. */
+    terceiro?: string;
+    /** TODOS os medalhistas de bronze. Normalmente dois. */
+    terceiros: string[];
+  } = { terceiros: [] };
+
   if (liga.copa_estado === "terminada") {
     const final = lista.find((c) => c.fase === "final");
-    const bronze = lista.find((c) => c.fase === "bronze");
     if (final && final.vencedor) {
       podio.campeao = final.vencedor;
       podio.vice = final.vencedor === final.jogador_a ? (final.jogador_b ?? undefined) : final.jogador_a;
     }
-    if (bronze && bronze.vencedor) podio.terceiro = bronze.vencedor;
+    // TODOS os bronzes, sem repetir. O Set protege contra o caso improvável de
+    // a mesma pessoa aparecer em dois confrontos de bronze.
+    const bronzes = new Set<string>();
+    for (const c of lista) {
+      if (c.fase === "bronze" && c.vencedor) bronzes.add(String(c.vencedor));
+    }
+    podio.terceiros = Array.from(bronzes);
+    if (podio.terceiros.length > 0) podio.terceiro = podio.terceiros[0];
   }
 
   return NextResponse.json({
@@ -127,11 +169,13 @@ async function contarParticipantes(
   if (!supabaseAdmin) return 0;
   const comps = Array.from(new Set(confrontos.map((c) => c.id_competicao).filter(Boolean)));
   if (comps.length === 0 || jogadoresDaChave.length === 0) return 0;
+
   const { data: eqs } = await supabaseAdmin
     .from("equipas")
     .select("user_id")
     .in("id_competicao", comps)
     .in("user_id", jogadoresDaChave);
+
   const distintos = new Set<string>((eqs || []).map((e) => String(e.user_id)));
   return distintos.size;
 }
@@ -173,5 +217,6 @@ async function identidadesDe(userIds: string[], compInicial: string | null): Pro
   for (const u of userIds) {
     if (!out[u]) out[u] = { user_id: u, nome_time: "Equipa", escudo: null };
   }
+
   return out;
 }
