@@ -436,7 +436,7 @@ function Regras({ vagasCont, totalVagas }: { vagasCont: number; totalVagas: numb
           Como numa chave internacional. Quem perde para um semifinalista volta a jogar na repescagem, e cruza com o perdedor da meia-final do lado oposto. Saem dois medalhados de bronze, não um.
         </Regra>
         <Regra n="9" titulo="A final soma-se até ao fim" ultima>
-          Os dois finalistas acumulam a pontuação desde a meia-final até ao dia em que se disputam os bronzes. Ganha a Copa quem tiver mais no total. Quem terminar no pódio recebe um certificado digital para partilhar, guardado na aba Resultados.
+          A contagem da final começa quando os dois finalistas estão apurados — o que fizeram nos quartos e nas meias não conta para o título. Enquanto a repescagem decorre, os finalistas continuam a somar, e o dia da disputa dos bronzes é a última competição que conta. Ganha a Copa quem tiver mais no total. Quem terminar no pódio recebe um certificado digital para partilhar, guardado na aba Resultados.
         </Regra>
       </div>
 
