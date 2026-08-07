@@ -32,6 +32,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { NOME_CONTINENTE, continenteDoPais, type Continente } from "@/lib/continentes";
 import { useNivel } from "@/lib/useNivel";
+import { TrofeuDodo } from "@/components/TrofeuDodo";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -208,13 +209,20 @@ export default function Dodo() {
         ) : (
           <>
             {/* --- A edição --- */}
-            <div style={{ background: "linear-gradient(160deg,#17201b,#111614)", border: `1px solid ${aberta ? "#4a3f18" : "#243029"}`, borderRadius: 16, padding: "18px 16px", marginBottom: 14 }}>
-              <Selo estado={edicao.estado} aberta={aberta} />
-              <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, lineHeight: 1.3, margin: "10px 0 4px", color: "#f1ede2" }}>
-                {edicao.numero}ª Copa do Dôdo
+            <div style={{ background: "linear-gradient(160deg,#17201b,#111614)", border: `1px solid ${aberta ? "#4a3f18" : "#243029"}`, borderRadius: 16, padding: "20px 16px 18px", marginBottom: 14 }}>
+              {/* O troféu é o símbolo da Copa. Aqui aparece grande, com o número
+                  da edição gravado na placa. */}
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+                <TrofeuDodo size={108} numero={`${edicao.numero}ª`} titulo={`Troféu da ${edicao.numero}ª Copa do Dôdo`} />
               </div>
-              <div style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5 }}>
-                Mata-mata mundial entre continentes · {edicao.ano || new Date().getFullYear()}
+              <div style={{ textAlign: "center" }}>
+                <Selo estado={edicao.estado} aberta={aberta} />
+                <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, lineHeight: 1.3, margin: "10px 0 4px", color: "#f1ede2" }}>
+                  {edicao.numero}ª Copa do Dôdo
+                </div>
+                <div style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5 }}>
+                  Mata-mata mundial entre continentes · {edicao.ano || new Date().getFullYear()}
+                </div>
               </div>
 
               {aberta && restam && (
@@ -337,6 +345,11 @@ export default function Dodo() {
 function SemEdicao() {
   return (
     <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 16, padding: "26px 18px", textAlign: "center" }}>
+      {/* O troféu fica à vista mesmo sem Copa aberta: é o símbolo, não um prémio
+          que só existe quando há edição. */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 14, opacity: 0.45 }}>
+        <TrofeuDodo size={88} />
+      </div>
       <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#cfd8d2", marginBottom: 8 }}>Ainda não há Copa aberta</div>
       <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.55, margin: "0 0 16px" }}>
         A próxima edição abre inscrições antes da competição que a inicia. Avisamos-te por notificação — não é preciso andar a espreitar.
