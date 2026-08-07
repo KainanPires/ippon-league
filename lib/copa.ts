@@ -15,7 +15,9 @@ import { proximaDepoisDe, CALENDARIO_2026, type SemanaCalendario } from "@/lib/c
 export interface ConfrontoInicial {
   ronda: number;        // 1
   ordem: number;        // 0,1,2... posição na ronda
-  fase: "normal";       // a final/bronze só aparecem nas últimas rondas (Fase C)
+  // Normalmente "normal" — a final e o bronze só aparecem nas últimas rondas.
+  // EXCEÇÃO: numa chave de DOIS, a 1ª ronda JÁ É a final (ver gerarPrimeiraRonda).
+  fase: "normal" | "final";
   jogador_a: string;    // user_id
   jogador_b: string | null;  // null = bye (jogador_a passa sozinho)
   id_competicao: string;     // competição desta ronda
@@ -64,6 +66,15 @@ export function numeroDeRondas(tamanho: number): number {
  * cima, baixo...), por isso as passagens nunca diferem em mais de uma entre os
  * dois lados.
  *
+ * CHAVE DE DOIS: O ÚNICO CONFRONTO É A FINAL.
+ *
+ * E tem de nascer com fase "final", não "normal". O apuramento pergunta "esta
+ * ronda era a final?" para saber que a copa acabou; com fase "normal" a resposta
+ * era não, tentava gerar a ronda seguinte, não havia nenhuma — e a copa ficava
+ * em 'a_decorrer' para sempre, sem campeão, sem pódio, sem certificado e sem
+ * notificação. A rota da chave também procura a fase "final" para montar o
+ * pódio, por isso marcá-la aqui resolve os dois sítios de uma vez.
+ *
  * @param inscritos  user_ids dos inscritos
  * @param idCompeticaoInicial  competição da 1ª ronda (escolhida pelo admin)
  * @param rnd  função aleatória (default Math.random; injetável para testes)
@@ -88,6 +99,8 @@ export function gerarPrimeiraRonda(
     ordemLugares.push(i);
     if (meio + i < lugares) ordemLugares.push(meio + i);
   }
+  // Chave de dois: o único confronto é a final (ver a nota acima).
+  const faseBase: "normal" | "final" = tamanho === 2 ? "final" : "normal";
   const porLugar: (ConfrontoInicial | null)[] = new Array(lugares).fill(null);
   let k = 0;
   // 1) As passagens automáticas primeiro, nos lugares alternados.
@@ -96,7 +109,7 @@ export function gerarPrimeiraRonda(
     porLugar[lugar] = {
       ronda: 1,
       ordem: lugar,
-      fase: "normal",
+      fase: faseBase,
       jogador_a: jogador,
       jogador_b: null,
       id_competicao: idCompeticaoInicial,
@@ -110,7 +123,7 @@ export function gerarPrimeiraRonda(
     porLugar[lugar] = {
       ronda: 1,
       ordem: lugar,
-      fase: "normal",
+      fase: faseBase,
       jogador_a: aJogar[i],
       jogador_b: aJogar[i + 1] ?? null,
       id_competicao: idCompeticaoInicial,
