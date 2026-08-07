@@ -66,12 +66,25 @@ interface PosOficial {
   total: number;           // total de membros no ranking
 }
 
-// A Copa do Dôdo, para o cartão fixo. undefined = ainda a carregar;
+// A Copa do Dôdo, para o bloco fixo. undefined = ainda a carregar;
 // null = não há edição visível (a rota esconde as 'preparada' de propósito).
+//
+// As duas podem existir ao mesmo tempo: uma a jogar-se e outra a receber
+// inscritos. Quem está na chave a decorrer não se pode inscrever na seguinte —
+// quem decide isso é o servidor, em `podeInscrever`.
 interface EstadoDodo {
-  numero: number;
-  estado: string;
-  inscrito: boolean;
+  inscricoes: {
+    numero: number;
+    aberta: boolean;
+    inscritos: number;
+    eu: { inscrito: boolean; podeInscrever: boolean } | null;
+  } | null;
+  aDecorrer: {
+    numero: number;
+    estado: string;
+    invite_code: string | null;
+    naChave: boolean;
+  } | null;
 }
 
 export default function Ligas() {
@@ -167,9 +180,27 @@ export default function Ligas() {
         });
         const j = await res.json();
         if (!vivo) return;
-        setDodo(j?.edicao
-          ? { numero: Number(j.edicao.numero), estado: String(j.edicao.estado), inscrito: !!j?.eu?.inscrito }
-          : null);
+        if (!j?.inscricoes && !j?.aDecorrer) { setDodo(null); return; }
+        setDodo({
+          inscricoes: j.inscricoes
+            ? {
+                numero: Number(j.inscricoes.numero),
+                aberta: !!j.inscricoes.aberta,
+                inscritos: Number(j.inscricoes.inscritos || 0),
+                eu: j.inscricoes.eu
+                  ? { inscrito: !!j.inscricoes.eu.inscrito, podeInscrever: !!j.inscricoes.eu.podeInscrever }
+                  : null,
+              }
+            : null,
+          aDecorrer: j.aDecorrer
+            ? {
+                numero: Number(j.aDecorrer.numero),
+                estado: String(j.aDecorrer.estado),
+                invite_code: j.aDecorrer.invite_code ? String(j.aDecorrer.invite_code) : null,
+                naChave: !!j.aDecorrer.naChave,
+              }
+            : null,
+        });
       } catch {
         if (vivo) setDodo(null);
       }
@@ -612,38 +643,100 @@ function OficialRow({ cfg, name, sub, href, pos, souPro }: { cfg: Identity; name
   );
 }
 
-// Cartão da Copa do Dôdo. O troféu no lugar do escudo — é o símbolo da Copa, e
-// é o mesmo que aparece grande dentro de /dodo. Sem base: a 34 pixels a madeira
-// virava uma mancha castanha e roubava espaço ao Dôdo.
+// A Copa do Dôdo na lista de competições. Aparece SEMPRE, com ou sem edição.
+//
+// Pode mostrar DUAS linhas: em cima a inscrição para a edição seguinte, em baixo
+// a Copa que está a decorrer. É essa a ordem porque a inscrição tem prazo e a
+// chave não — a que expira fica onde se vê primeiro.
+//
+// O troféu no lugar do escudo, sem base: a 32 pixels a madeira virava uma mancha
+// castanha e roubava espaço ao Dôdo.
 function DodoRow({ dodo }: { dodo: EstadoDodo | null | undefined }) {
-  let sub = "Mata-mata mundial entre continentes";
-  let botao = "Ver";
-  let destaque = false;
-
   if (dodo === undefined) {
-    sub = "A carregar…";
-  } else if (dodo === null) {
-    sub = "A próxima edição abre em breve";
-  } else if (dodo.estado === "inscricoes") {
-    sub = dodo.inscrito ? `${dodo.numero}ª edição · já estás inscrito` : `${dodo.numero}ª edição · inscrições abertas`;
-    botao = dodo.inscrito ? "Ver" : "Inscrever";
-    destaque = !dodo.inscrito;
-  } else if (dodo.estado === "sorteada") {
-    sub = `${dodo.numero}ª edição · sorteio feito`;
-  } else if (dodo.estado === "a_decorrer") {
-    sub = `${dodo.numero}ª edição · a decorrer`;
-    destaque = true;
+    return <LinhaDodo titulo="Copa do Dôdo" sub="A carregar…" botao="Ver" destaque={false} />;
   }
 
+  if (dodo === null) {
+    return <LinhaDodo titulo="Copa do Dôdo" sub="A próxima edição abre em breve" botao="Ver" destaque={false} />;
+  }
+
+  const { inscricoes: insc, aDecorrer: jogo } = dodo;
+  const linhas: React.ReactNode[] = [];
+
+  // 1) Inscrições — em cima, porque têm prazo.
+  if (insc && insc.aberta) {
+    if (insc.eu?.inscrito) {
+      linhas.push(
+        <LinhaDodo
+          key="insc"
+          titulo={`${insc.numero}ª Copa · inscrição feita`}
+          sub="Já estás no sorteio"
+          botao="Ver"
+          destaque={false}
+        />
+      );
+    } else if (insc.eu === null || insc.eu.podeInscrever) {
+      // eu === null significa sem sessão: mostramos o convite à mesma e o /dodo
+      // trata de pedir o login.
+      linhas.push(
+        <LinhaDodo
+          key="insc"
+          titulo={`${insc.numero}ª Copa · inscrições abertas`}
+          sub={`${insc.inscritos} ${insc.inscritos === 1 ? "inscrito" : "inscritos"} até agora`}
+          botao="Inscrever"
+          destaque
+        />
+      );
+    }
+    // Quem não pode inscrever-se (não é Pro, ou está na chave a decorrer) não
+    // vê linha de inscrição nenhuma: o motivo está explicado dentro do /dodo.
+  }
+
+  // 2) A Copa que está a ser jogada — por baixo.
+  if (jogo) {
+    linhas.push(
+      <LinhaDodo
+        key="jogo"
+        titulo={`${jogo.numero}ª Copa · a decorrer`}
+        sub={jogo.naChave ? "Estás nesta chave" : "Acompanha a chave ao vivo"}
+        botao="Ver a chave"
+        destaque={false}
+        href={jogo.invite_code ? `/liga/${jogo.invite_code}` : "/dodo"}
+        realce={jogo.naChave}
+      />
+    );
+  }
+
+  // Nem inscrição visível nem Copa a decorrer: uma linha neutra, para a Copa
+  // nunca desaparecer da lista.
+  if (linhas.length === 0) {
+    return <LinhaDodo titulo="Copa do Dôdo" sub="A próxima edição abre em breve" botao="Ver" destaque={false} />;
+  }
+
+  return <>{linhas}</>;
+}
+
+function LinhaDodo({
+  titulo, sub, botao, destaque, href = "/dodo", realce = false,
+}: {
+  titulo: string;
+  sub: string;
+  botao: string;
+  destaque: boolean;
+  href?: string;
+  realce?: boolean;
+}) {
+  const borda = destaque ? "#2c4a36" : realce ? "#4a3f18" : "#243029";
+  const fundo = destaque ? "#131c17" : realce ? "#1c1a10" : "#121815";
   return (
-    <a href="/dodo" style={{ textDecoration: "none", display: "block" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, background: destaque ? "#1c1a10" : "#121815", border: `1px solid ${destaque ? "#4a3f18" : "#243029"}`, borderRadius: 14, padding: "11px 13px", marginBottom: 9 }}>
+    <a href={href} style={{ textDecoration: "none", display: "block" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, background: fundo, border: `1px solid ${borda}`, borderRadius: 14, padding: "11px 13px", marginBottom: 9 }}>
         <div style={{ flexShrink: 0, display: "flex", width: 34, justifyContent: "center" }}>
           <TrofeuDodo size={32} base={false} titulo="Copa do Dôdo" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Copa do Dôdo</div>
-          <div style={{ fontSize: 11, color: destaque ? GOLD : "#93a39a" }}>{sub}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{titulo}</div>
+          <div style={{ fontSize: 11, color: destaque ? "#7fd39b" : realce ? GOLD : "#93a39a" }}>{sub}</div>
         </div>
         <ActionBtn kind={destaque ? "solicitar" : "ver"}>{botao}</ActionBtn>
       </div>
