@@ -23,6 +23,9 @@
 // ESTADOS QUE ESTA PÁGINA MOSTRA
 //
 //   sem edição   — 'preparada' não é devolvida pela rota: ninguém a vê.
+//                  As REGRAS aparecem à mesma: quem chega aqui entre edições
+//                  tem de perceber o que é a Copa e o que precisa para entrar,
+//                  senão a página só diz "volta depois" e não convence ninguém.
 //   inscricoes   — inscrições abertas, com contagem decrescente.
 //   sorteada     — o sorteio já correu; cada um vê se entrou.
 //   a_decorrer   — a chave está a ser jogada.
@@ -63,6 +66,11 @@ interface Resposta {
   ok: boolean;
   edicao: Edicao | null;
   nota?: string;
+  // Quando a próxima edição abre inscrições. Ainda NÃO vem da rota — hoje as
+  // edições 'preparada' são escondidas por completo. Fica preparado: no dia em
+  // que a rota devolver esta data, a página passa a mostrar a contagem para a
+  // abertura sem precisar de alteração.
+  abre_em?: string | null;
   inscritos?: number;
   porContinente?: Record<string, number>;
   vagasPorContinente?: number;
@@ -205,7 +213,7 @@ export default function Dodo() {
         {aCarregar ? (
           <div style={{ textAlign: "center", padding: "40px 0", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
         ) : !edicao ? (
-          <SemEdicao />
+          <SemEdicao abreEm={dados?.abre_em ?? null} agora={agora} />
         ) : (
           <>
             {/* --- A edição --- */}
@@ -283,31 +291,13 @@ export default function Dodo() {
               />
             ))}
 
-            {/* --- Regras --- */}
-            <Section style={{ marginTop: 20 }}>Como funciona</Section>
-            <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "14px 15px" }}>
-              <Regra n="1" titulo="Inscreves-te durante duas semanas">
-                Não é por ordem de chegada. Quem se inscreve no último dia tem exatamente a mesma hipótese de quem se inscreveu no primeiro — o fuso horário não decide nada.
-              </Regra>
-              <Regra n="2" titulo={`Cada continente sorteia ${vagasCont} vagas`}>
-                Europa, América, Ásia, África e Oceânia, as cinco federações da IJF. Concorres pelo continente do país que tens no perfil, e esse continente fica gravado na inscrição: mudar de país depois não te muda de sorteio.
-              </Regra>
-              <Regra n="3" titulo="O que sobra vai à repescagem">
-                Se um continente tiver menos inscritos do que vagas, as vagas por usar juntam-se num sorteio único entre todos os que ficaram de fora. É assim que as {totalVagas} se enchem.
-              </Regra>
-              <Regra n="4" titulo="A chave é uma potência de 2">
-                Com {totalVagas} sorteados joga-se a {totalVagas}; com 24, joga-se a 16. Ninguém recebe uma ronda de vantagem sem a ter ganho.
-              </Regra>
-              <Regra n="5" titulo="A cada rodada, quem pontua mais avança" ultima>
-                Levas a tua equipa para a Copa e ela conta na competição seguinte do calendário. Perdes uma vez, sais.
-              </Regra>
-            </div>
-
-            <p style={{ fontSize: 11.5, color: "#6f7d76", lineHeight: 1.6, margin: "14px 2px 0" }}>
-              A Copa do Dôdo é para membros Ippon Pro. Se cancelares a subscrição, mantens o acesso até ao fim do período pago — e continuas na Copa até lá.
-            </p>
           </>
         )}
+
+        {/* --- REGRAS --- Fora do ramo da edição de propósito: quem chega aqui
+            entre Copas tem de sair a saber o que é, quem pode entrar e como se
+            joga. Uma página que só diz "não há edição" não angaria ninguém. */}
+        {!aCarregar && <Regras vagasCont={vagasCont} totalVagas={totalVagas} />}
       </div>
 
       {/* Confirmação de saída. */}
@@ -342,20 +332,105 @@ export default function Dodo() {
 
 // Sem edição visível. A rota esconde de propósito as edições 'preparada' — por
 // isso este é o estado normal entre Copas, não uma avaria.
-function SemEdicao() {
+//
+// `abreEm` ainda não vem da rota. Quando vier, esta caixa passa sozinha a
+// mostrar a data e a contagem para a abertura das inscrições.
+function SemEdicao({ abreEm, agora }: { abreEm: string | null; agora: number }) {
+  const falta = contagem(abreEm, agora);
   return (
     <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 16, padding: "26px 18px", textAlign: "center" }}>
       {/* O troféu fica à vista mesmo sem Copa aberta: é o símbolo, não um prémio
           que só existe quando há edição. */}
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 14, opacity: 0.45 }}>
-        <TrofeuDodo size={88} />
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 14, opacity: 0.5 }}>
+        <TrofeuDodo size={92} />
       </div>
-      <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#cfd8d2", marginBottom: 8 }}>Ainda não há Copa aberta</div>
-      <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.55, margin: "0 0 16px" }}>
-        A próxima edição abre inscrições antes da competição que a inicia. Avisamos-te por notificação — não é preciso andar a espreitar.
-      </p>
+      <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#cfd8d2", marginBottom: 8 }}>
+        {falta ? "As inscrições abrem em breve" : "Ainda não há Copa aberta"}
+      </div>
+
+      {falta && abreEm ? (
+        <>
+          <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 700, color: GOLD, lineHeight: 1, margin: "6px 0 6px" }}>{falta}</div>
+          <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.55, margin: "0 0 16px" }}>
+            Abrem a {dataCurta(abreEm)}. Lê as regras aqui em baixo para chegares preparado.
+          </p>
+        </>
+      ) : (
+        <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.55, margin: "0 0 16px" }}>
+          A próxima edição abre inscrições antes da competição que a inicia, e avisamos-te por notificação. Entretanto, as regras estão todas aqui em baixo — vale a pena saber o que é preciso antes de abrir.
+        </p>
+      )}
+
       <a href="/ligas" style={{ display: "inline-block", background: VERDE, color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 13 }}>Ver competições</a>
     </div>
+  );
+}
+
+// As regras completas. Aparecem SEMPRE, com ou sem edição aberta.
+//
+// Descrevem o que o código faz HOJE: eliminação simples, um bronze. O modelo com
+// repescagem em cadeia e dois bronzes existe em lib/copa.ts mas ainda não está
+// ligado ao apuramento — quando estiver, os pontos 6 e 7 têm de ser reescritos.
+function Regras({ vagasCont, totalVagas }: { vagasCont: number; totalVagas: number }) {
+  return (
+    <>
+      {/* Quem pode entrar. Fica em destaque e em primeiro lugar: é a condição
+          que faz a pessoa perceber logo se isto é para ela. */}
+      <Section style={{ marginTop: 22 }}>Quem pode entrar</Section>
+      <div style={{ background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 14, padding: "14px 15px", marginBottom: 10 }}>
+        <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: GOLD, marginBottom: 7 }}>Só membros Ippon Pro e Pro Max</div>
+        <p style={{ fontSize: 12.5, color: "#c7b98f", lineHeight: 1.55, margin: "0 0 10px" }}>
+          A Copa do Dôdo é uma competição mundial com {totalVagas} lugares. Fechá-la aos membros Pro é o que garante que quem ocupa um lugar joga até ao fim, em vez de desaparecer na segunda ronda e estragar a chave a outra pessoa.
+        </p>
+        <p style={{ fontSize: 12.5, color: "#c7b98f", lineHeight: 1.55, margin: 0 }}>
+          Se cancelares a subscrição, mantens o acesso até ao fim do período que pagaste — e continuas na Copa até lá.
+        </p>
+      </div>
+
+      {/* O aviso que mais custa a quem não o lê antes. */}
+      <div style={{ background: "#241614", border: "1px solid #5c332c", borderRadius: 14, padding: "13px 15px", marginBottom: 4 }}>
+        <div style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, color: "#ef8d83", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 6 }}>Se deixares de ser Pro a meio</div>
+        <p style={{ fontSize: 12.5, color: "#d6b3ad", lineHeight: 1.55, margin: 0 }}>
+          Deixas de pontuar, sais da Copa e o teu adversário dessa ronda avança sem jogar. Não é um castigo: a pontuação da Copa vive das funcionalidades Pro, e sem elas não há como te pontuar. Se estiveres a pensar cancelar, faz as contas ao calendário antes de te inscreveres.
+        </p>
+      </div>
+
+      <Section style={{ marginTop: 20 }}>As vagas e o sorteio</Section>
+      <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "14px 15px" }}>
+        <Regra n="1" titulo="É uma competição entre continentes">
+          São cinco: Europa, América, Ásia, África e Oceânia — as cinco federações da IJF. Concorres pelo continente do país que tens no perfil, e esse continente fica gravado na inscrição. Mudar de país depois não te muda de continente, senão bastava trocar de país na véspera para saltar para onde há menos concorrência.
+        </Regra>
+        <Regra n="2" titulo={`Cada continente tem ${vagasCont} vagas reservadas`}>
+          São {vagasCont} lugares que ninguém de fora desse continente pode ocupar. Sem isto, a Europa levava a Copa toda e a Oceânia nunca entrava.
+        </Regra>
+        <Regra n="3" titulo="As vagas que sobram são redistribuídas">
+          Se um continente tiver menos inscritos do que vagas, as que ficaram por usar juntam-se num sorteio único entre todos os que não foram sorteados, seja qual for o continente deles. É assim que os {totalVagas} lugares se enchem mesmo quando um continente aparece pouco.
+        </Regra>
+        <Regra n="4" titulo="A entrada é por sorteio, não por ordem de chegada" ultima>
+          Por ordem, as vagas da Europa desapareciam nos primeiros minutos e quem vive noutro fuso horário nunca entrava — bastava estar acordado à hora certa. Com sorteio, as semanas de inscrição são semanas a sério: quem se inscreve no último dia tem exatamente a mesma hipótese de quem se inscreveu no primeiro.
+        </Regra>
+      </div>
+
+      <Section style={{ marginTop: 20 }}>Como se joga o mata-mata</Section>
+      <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "14px 15px" }}>
+        <Regra n="5" titulo="Cada ronda é uma competição real do calendário">
+          Depois do sorteio ficas com um adversário. Escalas a tua equipa para a competição seguinte do calendário, e a pontuação dessa competição é o resultado do vosso confronto.
+        </Regra>
+        <Regra n="6" titulo="Quem pontua mais avança">
+          Quem pontua menos sai. Em caso de empate, decide primeiro quem fez mais pontos com o capitão; se ainda assim empatar, vai a sorteio. Quem não escalar conta como zero e perde para quem escalou — não escalar é perder.
+        </Regra>
+        <Regra n="7" titulo="A chave é sempre uma potência de 2">
+          Com {totalVagas} sorteados joga-se a {totalVagas}; com 24, joga-se a 16 e os restantes ficam para a edição seguinte. É preferível a inventar passagens automáticas, que dariam a uns jogadores uma ronda de vantagem sem terem feito nada por ela.
+        </Regra>
+        <Regra n="8" titulo="Ganha quem chegar ao fim" ultima>
+          Há final e há disputa do 3º lugar entre os dois que perderam as meias-finais. Quem terminar no pódio recebe um certificado digital para partilhar, que fica guardado na aba Resultados.
+        </Regra>
+      </div>
+
+      <p style={{ fontSize: 11.5, color: "#6f7d76", lineHeight: 1.6, margin: "14px 2px 0" }}>
+        As regras podem ser ajustadas entre edições. Qualquer alteração é anunciada antes de as inscrições abrirem, nunca com uma Copa a decorrer.
+      </p>
+    </>
   );
 }
 
