@@ -376,6 +376,16 @@ export async function POST(req: Request) {
           }));
           await supabaseAdmin.from("copa_confrontos").insert(linhas);
           gerouProxima = true;
+        } else {
+          // REDE DE SEGURANÇA: a ronda ficou decidida e não há nada para gerar
+          // a seguir. Normalmente isto não acontece — a última ronda tem sempre
+          // fase "final" e é apanhada no ramo de cima. Mas se por alguma razão
+          // uma copa chegar aqui sem final, é melhor terminá-la do que deixá-la
+          // em 'a_decorrer' para sempre: uma copa encravada nunca dá pódio,
+          // nunca dá certificado, e o cron passa a apurá-la todas as horas sem
+          // nada para decidir.
+          await supabaseAdmin.from("leagues").update({ copa_estado: "terminada" }).eq("id", league_id);
+          terminada = true;
         }
         // NOTIFICAÇÃO AO PERDEDOR de confronto NORMAL (opção B, validada com o
         // Kainan): usamos os confrontos REALMENTE gerados (`novos`) como fonte da
