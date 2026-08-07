@@ -471,10 +471,17 @@ export function calcularCopaCompleta(
     }
     compIdx++;
   }
-  // FINAL: acumula pontos dos finalistas desde a semi (chegada à final) até agora.
+  // FINAL: acumula os pontos dos finalistas A PARTIR DA FINAL, para a frente.
+  //
+  // Começava uma competição antes (a semifinal), o que fazia o título depender
+  // de uma ronda já jogada e premiava quem tinha tido passagem automática nessa
+  // rodada — levava os pontos sem ter lutado. A janela certa abre quando os dois
+  // finalistas estão apurados e fecha no dia dos bronzes, que é a última
+  // competição da copa. É a mesma regra que o /api/copa/apurar aplica no jogo a
+  // sério; esta função é a simulação e tem de dizer o mesmo.
   const acumuladoFinal: Record<string, number> = {};
   for (const f of finalistas) acumuladoFinal[f] = 0;
-  const inicioAcum = Math.max(0, compChegadaFinal - 1);
+  const inicioAcum = compChegadaFinal;
   for (let c = inicioAcum; c < compIdx; c++) {
     const pts = pontosPorRonda(c);
     for (const f of finalistas) acumuladoFinal[f] += (pts[f] ?? 0);
