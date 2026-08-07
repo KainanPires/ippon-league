@@ -206,6 +206,11 @@ export default function Dodo() {
   const vagasCont = dados?.vagasPorContinente ?? 6;
   const totalVagas = dados?.totalVagas ?? 32;
   const restam = contagem(insc?.inscricoes_ate, agora);
+  // O continente com mais inscritos. É a régua das barras: cada uma mede-se
+  // contra a maior, não contra o número de vagas. Uma barra que enchia até 6
+  // dizia "restam 4 lugares" — a ideia de corrida que o sorteio existe para
+  // eliminar. Aqui a barra responde à pergunta certa: onde é mais disputado.
+  const maiorContinente = Math.max(1, ...Object.values(insc?.porContinente ?? {}).map((v) => Number(v) || 0));
   const aberta = !!insc?.aberta && !!restam;
 
   return (
@@ -295,18 +300,21 @@ export default function Dodo() {
               <>
                 <Section style={{ marginTop: 20 }}>Onde há mais concorrência</Section>
                 <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>
-                  Cada continente sorteia {vagasCont} vagas entre os seus inscritos. Quem não for sorteado entra no sorteio das vagas que sobraram.
+                  Quantas pessoas se inscreveram em cada continente. De cada um saem {vagasCont} no sorteio, por isso quanto mais inscritos ali, mais disputada é a vaga.
                 </p>
 
-                {(Object.keys(NOME_CONTINENTE) as Continente[]).map((c) => (
-                  <LinhaContinente
-                    key={c}
-                    nome={NOME_CONTINENTE[c]}
-                    n={insc.porContinente?.[c] ?? 0}
-                    vagas={vagasCont}
-                    meu={meuContinente === c}
-                  />
-                ))}
+                {(Object.keys(NOME_CONTINENTE) as Continente[]).map((c) => {
+                  const n = insc.porContinente?.[c] ?? 0;
+                  return (
+                    <LinhaContinente
+                      key={c}
+                      nome={NOME_CONTINENTE[c]}
+                      n={n}
+                      maior={maiorContinente}
+                      meu={meuContinente === c}
+                    />
+                  );
+                })}
               </>
             )}
 
@@ -613,9 +621,12 @@ function MeuEstado({
   );
 }
 
-function LinhaContinente({ nome, n, vagas, meu }: { nome: string; n: number; vagas: number; meu: boolean }) {
-  const pct = vagas > 0 ? Math.min(100, (n / vagas) * 100) : 0;
-  const excedente = Math.max(0, n - vagas);
+function LinhaContinente({ nome, n, maior, meu }: { nome: string; n: number; maior: number; meu: boolean }) {
+  const pct = n > 0 ? Math.max(6, (n / maior) * 100) : 0;
+  // O mais disputado ganha destaque de cor. Não é um aviso — é informação:
+  // quem está nele sabe que a sua vaga é mais difícil, e pode ser o empurrão
+  // para se inscrever cedo em vez de deixar para depois.
+  const oMaior = n > 0 && n === maior;
   return (
     <div style={{ background: "#121815", border: `1px solid ${meu ? GOLD : "#243029"}`, borderRadius: 12, padding: "10px 13px", marginBottom: 8 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 7 }}>
@@ -623,18 +634,13 @@ function LinhaContinente({ nome, n, vagas, meu }: { nome: string; n: number; vag
           {nome}
           {meu && <span style={{ fontFamily: FD, fontSize: 9.5, fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.06em", marginLeft: 7 }}>o teu</span>}
         </span>
-        <span style={{ fontFamily: FD, fontSize: 11.5, fontWeight: 700, color: n >= vagas ? "#e0894f" : "#7c8a82", whiteSpace: "nowrap" }}>
-          {n} / {vagas}
+        <span style={{ fontFamily: FD, fontSize: 11.5, fontWeight: 700, color: oMaior ? "#e0894f" : "#7c8a82", whiteSpace: "nowrap" }}>
+          {n} {n === 1 ? "inscrito" : "inscritos"}
         </span>
       </div>
       <div style={{ height: 5, borderRadius: 999, background: "#1a221d", overflow: "hidden" }}>
-        <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: n >= vagas ? "#e0894f" : VERDE }} />
+        <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: oMaior ? "#e0894f" : VERDE }} />
       </div>
-      {excedente > 0 && (
-        <div style={{ fontSize: 10.5, color: "#93a39a", marginTop: 6 }}>
-          {excedente} {excedente === 1 ? "inscrito vai" : "inscritos vão"} à repescagem
-        </div>
-      )}
     </div>
   );
 }
