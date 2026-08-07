@@ -1,5 +1,4 @@
 "use client";
-
 // Conteúdo da aba "Resultados" (dentro de /ligas).
 // Duas secções:
 //   • Resultados positivos — onde ficaste em 1º/2º/3º, com certificado para
@@ -19,16 +18,13 @@
 //   • ANO   (variante "anual" vinda de /api/liga/campeoes) — foste campeão da
 //     ÉPOCA inteira. Só existe depois de 31 de dezembro, quando o cron corre o
 //     fecharAnoOficial. Ver TRAVA DO ANO na secção 2.
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { focoMercado, rotuloRodada } from "@/lib/calendario";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
-
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const GOLD = "#d9a441";
-
 // Um certificado partilhável (1º/2º/3º ou Melhor da Rodada).
 interface Positivo {
   chave: string;
@@ -46,7 +42,6 @@ interface Positivo {
   contexto: string;             // ex. "Copa do Dojo", "Liga Mundial 2026", nome da competição
   pontos: number | null;
 }
-
 // Um resultado sem pódio (4º+ ou eliminado). Só registo, sem certificado.
 interface Outro {
   chave: string;
@@ -54,7 +49,6 @@ interface Outro {
   contexto: string;             // nome da liga/copa
   detalhe: string;              // "5º de 12" / "Eliminado" / "Pontos corridos · terminada"
 }
-
 interface MinhaLiga {
   id: string;
   name: string;
@@ -64,7 +58,6 @@ interface MinhaLiga {
   estado?: string | null;
   copa_estado?: string | null;
 }
-
 function ident(escudo: Identity | null | undefined, nome: string): Identity {
   return { ...DEFAULT_IDENTITY, ...(escudo || {}), name: nome };
 }
@@ -76,7 +69,6 @@ function metaPosicao(pos: PosicaoPodio): { medalha: string; cor: string; rotulo:
 function posicaoDePodio(n: number): PosicaoPodio | null {
   return n === 1 ? "campeao" : n === 2 ? "vice" : n === 3 ? "terceiro" : null;
 }
-
 export function ResultadosConteudo() {
   const [aCarregar, setACarregar] = useState(true);
   const [semSessao, setSemSessao] = useState(false);
@@ -84,24 +76,19 @@ export function ResultadosConteudo() {
   const [outros, setOutros] = useState<Outro[]>([]);
   const [cert, setCert] = useState<Positivo | null>(null);
   const [aba, setAba] = useState<"titulos" | "participacoes">("titulos");
-
   const idComp = (focoMercado().aDecorrer ?? focoMercado().atual).idCompeticao;
-
   useEffect(() => {
     let vivo = true;
     (async () => {
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess.session?.user?.id;
       if (!uid) { if (vivo) { setSemSessao(true); setACarregar(false); } return; }
-
       const pos: Positivo[] = [];
       const out: Outro[] = [];
-
       // Helper de fetch tolerante a falhas.
       async function getJSON(url: string): Promise<Record<string, unknown> | null> {
         try { const r = await fetch(url); return await r.json(); } catch { return null; }
       }
-
       // 1) MELHOR DA RODADA (histórico): cada vitória de rodada é um certificado.
       //    O certificado TEM de identificar a rodada e a competição — senão
       //    confunde-se com o título de época. O número da rodada sai do
@@ -134,7 +121,6 @@ export function ResultadosConteudo() {
           });
         }
       }
-
       // 2) CAMPEÃO DO ANO (Mundial e Continental). Só entra se estiver no top 3.
       //    O nº de participantes vem do ranking do ano (geral) — uma chamada por
       //    âmbito, só quando há de facto um título a mostrar.
@@ -179,16 +165,13 @@ export function ResultadosConteudo() {
           pontos: Number(eu.pontos || 0),
         });
       }
-
       // 3) AS MINHAS LIGAS/COPAS TERMINADAS.
       const minhasJ = await getJSON(`/api/liga/minhas?user_id=${uid}`);
       const minhas: MinhaLiga[] = (minhasJ && Array.isArray(minhasJ.ligas) ? minhasJ.ligas : []) as MinhaLiga[];
-
       for (const l of minhas) {
         const ehCopa = l.formato === "copa";
         const terminada = ehCopa ? l.copa_estado === "terminada" : l.estado === "terminada";
         if (!terminada) continue;
-
         if (ehCopa) {
           // COPA: pódio (campeao/vice/terceiro) via /api/copa/chave.
           const ch = await getJSON(`/api/copa/chave?id=${l.id}`);
@@ -196,10 +179,21 @@ export function ResultadosConteudo() {
           const ids = (ch && (ch.identidades as Record<string, { nome_time?: string; escudo?: unknown }> | undefined)) || {};
           const meuIdent = ids[uid] || {};
           const nPart = ch ? Number(ch.nParticiparam || 0) : 0;
+          // DOIS TERCEIROS. A copa produz dois medalhistas de bronze (cruzamento
+          // diagonal da repescagem), e a rota devolve-os em `podio.terceiros`.
+          // Ler só `podio.terceiro` deixava o segundo sem certificado — tinha a
+          // medalha no jogo e nada na app.
+          //
+          // O campo antigo fica no fim como recurso, para copas terminadas antes
+          // da alteração, cujo pódio ainda foi gravado no formato singular.
+          const terceiros = Array.isArray(podio.terceiros)
+            ? (podio.terceiros as unknown[]).map((t) => String(t))
+            : podio.terceiro != null ? [String(podio.terceiro)] : [];
+
           const minhaPos: PosicaoPodio | null =
             String(podio.campeao) === uid ? "campeao" :
             String(podio.vice) === uid ? "vice" :
-            String(podio.terceiro) === uid ? "terceiro" : null;
+            terceiros.includes(uid) ? "terceiro" : null;
           if (minhaPos) {
             const m = metaPosicao(minhaPos);
             pos.push({
@@ -256,7 +250,6 @@ export function ResultadosConteudo() {
           }
         }
       }
-
       if (!vivo) return;
       setPositivos(pos);
       setOutros(out);
@@ -265,7 +258,6 @@ export function ResultadosConteudo() {
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   if (aCarregar) {
     return <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>;
   }
@@ -284,7 +276,6 @@ export function ResultadosConteudo() {
       </div>
     );
   }
-
   return (
     <>
       {/* Sub-abas: Títulos (conquistas, com certificado) vs Participações (4º+). */}
@@ -296,7 +287,6 @@ export function ResultadosConteudo() {
           <button key={k} onClick={() => setAba(k)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${aba === k ? GOLD : "transparent"}`, color: aba === k ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>{label}</button>
         ))}
       </div>
-
       {/* SUB-ABA "TÍTULOS" — conquistas com certificado (1º/2º/3º e Melhor da Rodada). */}
       {aba === "titulos" && (
         positivos.length === 0 ? (
@@ -333,7 +323,6 @@ export function ResultadosConteudo() {
           </>
         )
       )}
-
       {/* SUB-ABA "PARTICIPAÇÕES" — 4º+ / eliminado, só registo (sem certificado). */}
       {aba === "participacoes" && (
         outros.length === 0 ? (
@@ -357,7 +346,6 @@ export function ResultadosConteudo() {
           </>
         )
       )}
-
       {/* Modal do certificado escolhido */}
       {cert && (
         <CartaoCertificado
