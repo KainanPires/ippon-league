@@ -78,17 +78,28 @@
 // continuam a funcionar exatamente como antes.
 //
 // ---------------------------------------------------------------------------
-// QUEM ESTÁ A DISPUTAR A COPA ATUAL NÃO SE INSCREVE NA SEGUINTE
+// QUEM ESTÁ A DISPUTAR UMA COPA NÃO SE INSCREVE NA SEGUINTE
 //
 // As inscrições da edição seguinte abrem enquanto a atual ainda se joga, e isso
-// é de propósito: quem está de fora não tem de esperar que a Copa acabe para
-// pôr o nome. Mas quem está DENTRO da chave a decorrer não se pode inscrever —
-// senão poderia estar nas duas ao mesmo tempo, com a mesma equipa a valer para
-// confrontos de duas Copas diferentes.
+// é de propósito: quem está de fora não tem de esperar que a Copa acabe para pôr
+// o nome. Mas quem está DENTRO de uma chave a decorrer não se pode inscrever —
+// senão estaria em duas Copas ao mesmo tempo, com a mesma equipa a decidir
+// confrontos de ambas.
 //
-// Vale para quem foi sorteado (está na chave), tenha já sido eliminado ou não:
-// a Copa é dele até ela terminar. Assim que a edição sai de 'sorteada' e de
-// 'a_decorrer', deixa de haver bloqueio.
+// Na prática isto faz saltar uma edição. Quem joga a 1ª está bloqueado para a
+// 2ª (que abre inscrições enquanto a 1ª ainda decorre) e volta a poder entrar
+// na 3ª, cujas inscrições só abrem depois de a 1ª ter acabado. Depois de jogar
+// a 3ª, o mesmo: salta a 4ª e pode a 5ª. Não é uma regra de contagem, é
+// consequência do calendário — se uma Copa se arrastar mais do que o costume,
+// o salto é maior, e sozinho.
+//
+// VALE PARA TODAS AS EDIÇÕES A DECORRER, NÃO SÓ A MAIS RECENTE.
+//
+// A versão anterior só olhava para a edição em curso mais recente. Bastava a 1ª
+// arrastar-se para lá do sorteio da 2ª — as duas em 'a_decorrer' ao mesmo
+// tempo — para a consulta apanhar a 2ª, não encontrar lá a pessoa da 1ª, e
+// deixá-la inscrever-se na 3ª enquanto ainda jogava a 1ª. Agora procura-se em
+// todas as que estão a decorrer.
 //
 // A verificação vive no SERVIDOR, tanto no GET (para o ecrã não mostrar um
 // botão que vai falhar) como no POST (que é onde a regra tem de valer mesmo).
@@ -190,15 +201,22 @@ export async function GET(req: Request) {
 
   const uid = await uidDoPedido(req);
 
-  // Estou na chave da Copa que está a decorrer? É o que bloqueia a inscrição na
-  // seguinte. Calculado aqui em cima porque as duas secções lá abaixo precisam.
-  let naChaveAtual = false;
-  if (uid && edDecorrer) {
+  // Estou na chave de ALGUMA Copa a decorrer? É o que bloqueia a inscrição na
+  // seguinte. Olha para todas as que estão a jogar-se, não só para a mais
+  // recente (ver a nota no topo do ficheiro).
+  const idsEmCurso = todas
+    .filter((e) => ["sorteada", "a_decorrer"].includes(String(e.estado)))
+    .map((e) => String(e.id));
+
+  /** Edições a decorrer em que estou na chave. */
+  let minhasEmCurso: string[] = [];
+  if (uid && idsEmCurso.length > 0) {
     const { data: m } = await supabaseAdmin
-      .from("dodo_inscricoes").select("sorteada")
-      .eq("edicao_id", edDecorrer.id).eq("user_id", uid).maybeSingle();
-    naChaveAtual = !!m && m.sorteada === true;
+      .from("dodo_inscricoes").select("edicao_id")
+      .eq("user_id", uid).eq("sorteada", true).in("edicao_id", idsEmCurso);
+    minhasEmCurso = (m || []).map((x) => String((x as Record<string, unknown>).edicao_id));
   }
+  const naChaveAtual = minhasEmCurso.length > 0;
 
   if (!edInscricoes && !edDecorrer) {
     // Não há edição visível — mas se houver uma PREPARADA com data de abertura,
@@ -266,7 +284,7 @@ export async function GET(req: Request) {
         motivo: !ehPro
           ? "O Mata-Mata do Dôdo é para membros Ippon Pro."
           : naChaveAtual
-            ? "Estás a disputar a Copa que decorre. Podes inscrever-te na seguinte quando esta terminar."
+            ? "Estás a disputar uma Copa. Podes inscrever-te assim que ela terminar — normalmente a tempo da edição seguinte a esta."
             : !aberto ? "As inscrições já fecharam." : undefined,
       };
     }
@@ -296,7 +314,9 @@ export async function GET(req: Request) {
     decorrerOut = {
       id: edDecorrer.id, numero: edDecorrer.numero, ano: edDecorrer.ano,
       estado: edDecorrer.estado, nome: nomeDe(edDecorrer),
-      league_id: edDecorrer.league_id, invite_code, naChave: naChaveAtual,
+      league_id: edDecorrer.league_id, invite_code,
+      // Desta chave em concreto — pode estar noutra que ainda decorre.
+      naChave: minhasEmCurso.includes(String(edDecorrer.id)),
     };
   }
 
@@ -544,22 +564,28 @@ export async function POST(req: Request) {
     }, { status: 403 });
   }
 
-  // Já está a disputar a Copa que decorre? Então não entra na seguinte.
+  // Já está a disputar alguma Copa? Então não entra nesta.
   // Verificado aqui, no servidor: o ecrã esconde o botão, mas a regra tem de
-  // valer mesmo que o pedido chegue por outro caminho.
+  // valer mesmo que o pedido chegue por outro caminho. E procura em TODAS as
+  // edições a decorrer, não só na mais recente.
   const { data: emCurso } = await supabaseAdmin
     .from("dodo_edicoes").select("id, numero")
-    .in("estado", ["sorteada", "a_decorrer"])
-    .order("numero", { ascending: false }).limit(1);
-  const edCurso = (emCurso || [])[0];
-  if (edCurso) {
-    const { data: naChave } = await supabaseAdmin
-      .from("dodo_inscricoes").select("sorteada")
-      .eq("edicao_id", edCurso.id).eq("user_id", uid).maybeSingle();
-    if (naChave && naChave.sorteada === true) {
+    .in("estado", ["sorteada", "a_decorrer"]);
+
+  const emCursoLista = (emCurso || []) as Record<string, unknown>[];
+  if (emCursoLista.length > 0) {
+    const { data: minhas } = await supabaseAdmin
+      .from("dodo_inscricoes").select("edicao_id")
+      .eq("user_id", uid).eq("sorteada", true)
+      .in("edicao_id", emCursoLista.map((e) => String(e.id)));
+
+    const primeira = (minhas || [])[0] as Record<string, unknown> | undefined;
+    if (primeira) {
+      const dela = emCursoLista.find((e) => String(e.id) === String(primeira.edicao_id));
+      const num = dela ? `${dela.numero}ª` : "atual";
       return NextResponse.json({
         ok: false, naCopaAtual: true,
-        erro: `Estás a disputar a ${edCurso.numero}ª Copa. Podes inscrever-te na seguinte assim que esta terminar.`,
+        erro: `Estás a disputar a ${num} Copa. Podes inscrever-te assim que ela terminar — normalmente a tempo da edição seguinte a esta.`,
       }, { status: 409 });
     }
   }
