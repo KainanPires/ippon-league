@@ -361,7 +361,6 @@ function SemEdicao({ abreEm, agora }: { abreEm: string | null; agora: number }) 
         </p>
       )}
 
-      <a href="/ligas" style={{ display: "inline-block", background: VERDE, color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 13 }}>Ver competições</a>
     </div>
   );
 }
@@ -374,40 +373,32 @@ function SemEdicao({ abreEm, agora }: { abreEm: string | null; agora: number }) 
 function Regras({ vagasCont, totalVagas }: { vagasCont: number; totalVagas: number }) {
   return (
     <>
-      {/* Quem pode entrar. Fica em destaque e em primeiro lugar: é a condição
-          que faz a pessoa perceber logo se isto é para ela. */}
+      {/* Quem pode entrar. Uma caixa só, e curta: é a condição que faz a pessoa
+          perceber num segundo se isto é para ela. */}
       <Section style={{ marginTop: 22 }}>Quem pode entrar</Section>
-      <div style={{ background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 14, padding: "14px 15px", marginBottom: 10 }}>
+      <div style={{ background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 14, padding: "14px 15px" }}>
         <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: GOLD, marginBottom: 7 }}>Só membros Ippon Pro e Pro Max</div>
-        <p style={{ fontSize: 12.5, color: "#c7b98f", lineHeight: 1.55, margin: "0 0 10px" }}>
-          A Copa do Dôdo é uma competição mundial com {totalVagas} lugares. Fechá-la aos membros Pro é o que garante que quem ocupa um lugar joga até ao fim, em vez de desaparecer na segunda ronda e estragar a chave a outra pessoa.
+        <p style={{ fontSize: 12.5, color: "#c7b98f", lineHeight: 1.55, margin: "0 0 9px" }}>
+          A subscrição é anual. Se cancelares a meio, continuas a jogar até ao fim do ano que pagaste — a Copa incluída.
         </p>
         <p style={{ fontSize: 12.5, color: "#c7b98f", lineHeight: 1.55, margin: 0 }}>
-          Se cancelares a subscrição, mantens o acesso até ao fim do período que pagaste — e continuas na Copa até lá.
-        </p>
-      </div>
-
-      {/* O aviso que mais custa a quem não o lê antes. */}
-      <div style={{ background: "#241614", border: "1px solid #5c332c", borderRadius: 14, padding: "13px 15px", marginBottom: 4 }}>
-        <div style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, color: "#ef8d83", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 6 }}>Se deixares de ser Pro a meio</div>
-        <p style={{ fontSize: 12.5, color: "#d6b3ad", lineHeight: 1.55, margin: 0 }}>
-          Deixas de pontuar, sais da Copa e o teu adversário dessa ronda avança sem jogar. Não é um castigo: a pontuação da Copa vive das funcionalidades Pro, e sem elas não há como te pontuar. Se estiveres a pensar cancelar, faz as contas ao calendário antes de te inscreveres.
+          Se a subscrição chegar mesmo ao fim durante a Copa, sais dela e o teu adversário dessa ronda avança.
         </p>
       </div>
 
       <Section style={{ marginTop: 20 }}>As vagas e o sorteio</Section>
       <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "14px 15px" }}>
-        <Regra n="1" titulo="É uma competição entre continentes">
-          São cinco: Europa, América, Ásia, África e Oceânia — as cinco federações da IJF. Concorres pelo continente do país que tens no perfil, e esse continente fica gravado na inscrição. Mudar de país depois não te muda de continente, senão bastava trocar de país na véspera para saltar para onde há menos concorrência.
+        <Regra n="1" titulo={`Cinco continentes, ${vagasCont} vagas cada`}>
+          Europa, América, Ásia, África e Oceânia — as cinco federações da IJF. Cada uma tem {vagasCont} lugares reservados.
         </Regra>
-        <Regra n="2" titulo={`Cada continente tem ${vagasCont} vagas reservadas`}>
-          São {vagasCont} lugares que ninguém de fora desse continente pode ocupar. Sem isto, a Europa levava a Copa toda e a Oceânia nunca entrava.
+        <Regra n="2" titulo="Concorres pelo continente do teu perfil">
+          Fica gravado na inscrição. Mudar de país depois não te muda de continente.
         </Regra>
         <Regra n="3" titulo="As vagas que sobram são redistribuídas">
-          Se um continente tiver menos inscritos do que vagas, as que ficaram por usar juntam-se num sorteio único entre todos os que não foram sorteados, seja qual for o continente deles. É assim que os {totalVagas} lugares se enchem mesmo quando um continente aparece pouco.
+          Se um continente não encher as suas, as que ficaram por usar juntam-se e são sorteadas entre todos os que não foram sorteados, seja qual for o continente deles. É assim que se completam os {totalVagas} lugares.
         </Regra>
-        <Regra n="4" titulo="A entrada é por sorteio, não por ordem de chegada" ultima>
-          Por ordem, as vagas da Europa desapareciam nos primeiros minutos e quem vive noutro fuso horário nunca entrava — bastava estar acordado à hora certa. Com sorteio, as semanas de inscrição são semanas a sério: quem se inscreve no último dia tem exatamente a mesma hipótese de quem se inscreveu no primeiro.
+        <Regra n="4" titulo="A entrada é por sorteio" ultima>
+          Entre os inscritos de cada continente, quando as inscrições fecham. Não é por ordem de chegada: inscreveres-te no primeiro dia ou no último dá exatamente a mesma hipótese.
         </Regra>
       </div>
 
@@ -417,13 +408,16 @@ function Regras({ vagasCont, totalVagas }: { vagasCont: number; totalVagas: numb
           Depois do sorteio ficas com um adversário. Escalas a tua equipa para a competição seguinte do calendário, e a pontuação dessa competição é o resultado do vosso confronto.
         </Regra>
         <Regra n="6" titulo="Quem pontua mais avança">
-          Quem pontua menos sai. Em caso de empate, decide primeiro quem fez mais pontos com o capitão; se ainda assim empatar, vai a sorteio. Quem não escalar conta como zero e perde para quem escalou — não escalar é perder.
+          Quem pontua menos sai. Em caso de empate, decide quem fez mais pontos com o capitão; se ainda assim empatar, vai a sorteio. Quem não escalar conta como zero — não escalar é perder.
         </Regra>
-        <Regra n="7" titulo="A chave é sempre uma potência de 2">
-          Com {totalVagas} sorteados joga-se a {totalVagas}; com 24, joga-se a 16 e os restantes ficam para a edição seguinte. É preferível a inventar passagens automáticas, que dariam a uns jogadores uma ronda de vantagem sem terem feito nada por ela.
+        <Regra n="7" titulo="Joga-se com quem estiver inscrito">
+          Ninguém é excluído por o número não ser redondo. Quando os inscritos não chegam para encher a chave, alguns recebem passagem automática na primeira ronda, por sorteio, como acontece numa competição de judô.
         </Regra>
-        <Regra n="8" titulo="Ganha quem chegar ao fim" ultima>
-          Há final e há disputa do 3º lugar entre os dois que perderam as meias-finais. Quem terminar no pódio recebe um certificado digital para partilhar, que fica guardado na aba Resultados.
+        <Regra n="8" titulo="Há repescagem e dois terceiros">
+          Como numa chave internacional. Quem perde para um semifinalista volta a jogar na repescagem, e cruza com o perdedor da meia-final do lado oposto. Saem dois medalhados de bronze, não um.
+        </Regra>
+        <Regra n="9" titulo="A final soma-se até ao fim" ultima>
+          Os dois finalistas acumulam a pontuação desde a meia-final até ao dia em que se disputam os bronzes. Ganha a Copa quem tiver mais no total. Quem terminar no pódio recebe um certificado digital para partilhar, guardado na aba Resultados.
         </Regra>
       </div>
 
