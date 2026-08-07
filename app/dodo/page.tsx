@@ -49,33 +49,43 @@ interface EuEstado {
   motivo?: string;
 }
 
-interface Edicao {
+/** A edição que está a RECEBER INSCRIÇÕES. */
+interface EdicaoInscricoes {
   id: string;
   numero: number;
   ano: number | null;
   estado: string;
   nome: string;
   inscricoes_ate: string | null;
+  aberta: boolean;
+  inscritos: number;
+  porContinente: Record<string, number>;
+  eu: EuEstado | null;
+}
+
+/** A edição que está a SER JOGADA. */
+interface EdicaoDecorrer {
+  id: string;
+  numero: number;
+  ano: number | null;
+  estado: string;
+  nome: string;
   league_id: string | null;
-  // Ainda não vem da rota. Fica aqui para o dia em que vier: assim o botão
-  // passa a abrir a chave direto, sem mexer neste ecrã.
-  invite_code?: string | null;
+  invite_code: string | null;
+  /** Fui sorteado para esta chave? */
+  naChave: boolean;
 }
 
 interface Resposta {
   ok: boolean;
-  edicao: Edicao | null;
-  nota?: string;
-  // Quando a próxima edição abre inscrições. Ainda NÃO vem da rota — hoje as
-  // edições 'preparada' são escondidas por completo. Fica preparado: no dia em
-  // que a rota devolver esta data, a página passa a mostrar a contagem para a
-  // abertura sem precisar de alteração.
+  // As duas edições podem coexistir: uma a jogar-se e outra a receber inscritos.
+  aDecorrer?: EdicaoDecorrer | null;
+  inscricoes?: EdicaoInscricoes | null;
+  // Quando não há nenhuma visível, a data em que a próxima abre (se conhecida).
   abre_em?: string | null;
-  inscritos?: number;
-  porContinente?: Record<string, number>;
   vagasPorContinente?: number;
   totalVagas?: number;
-  eu?: EuEstado | null;
+  nota?: string;
 }
 
 function dois(n: number): string {
@@ -143,7 +153,7 @@ export default function Dodo() {
       const j = (await res.json()) as Resposta;
       setDados(j);
     } catch {
-      setDados({ ok: false, edicao: null });
+      setDados({ ok: false, aDecorrer: null, inscricoes: null });
     }
     setACarregar(false);
   }, []);
@@ -190,14 +200,13 @@ export default function Dodo() {
     setAEnviar(false);
   }
 
-  const edicao = dados?.edicao ?? null;
-  const eu = dados?.eu ?? null;
+  const insc = dados?.inscricoes ?? null;
+  const jogo = dados?.aDecorrer ?? null;
+  const eu = insc?.eu ?? null;
   const vagasCont = dados?.vagasPorContinente ?? 6;
   const totalVagas = dados?.totalVagas ?? 32;
-  const inscritos = dados?.inscritos ?? 0;
-  const porContinente = dados?.porContinente ?? {};
-  const restam = contagem(edicao?.inscricoes_ate, agora);
-  const aberta = edicao?.estado === "inscricoes" && !!restam;
+  const restam = contagem(insc?.inscricoes_ate, agora);
+  const aberta = !!insc?.aberta && !!restam;
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -212,84 +221,94 @@ export default function Dodo() {
 
         {aCarregar ? (
           <div style={{ textAlign: "center", padding: "40px 0", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
-        ) : !edicao ? (
+        ) : !insc && !jogo ? (
           <SemEdicao abreEm={dados?.abre_em ?? null} agora={agora} />
         ) : (
           <>
-            {/* --- A edição --- */}
-            <div style={{ background: "linear-gradient(160deg,#17201b,#111614)", border: `1px solid ${aberta ? "#4a3f18" : "#243029"}`, borderRadius: 16, padding: "20px 16px 18px", marginBottom: 14 }}>
-              {/* O troféu é o símbolo da Copa. Aqui aparece grande, com o número
-                  da edição gravado na placa. */}
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-                <TrofeuDodo size={108} numero={`${edicao.numero}ª`} titulo={`Troféu da ${edicao.numero}ª Copa do Dôdo`} />
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <Selo estado={edicao.estado} aberta={aberta} />
-                <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, lineHeight: 1.3, margin: "10px 0 4px", color: "#f1ede2" }}>
-                  {edicao.numero}ª Copa do Dôdo
-                </div>
-                <div style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5 }}>
-                  Mata-mata mundial entre continentes · {edicao.ano || new Date().getFullYear()}
-                </div>
-              </div>
-
-              {aberta && restam && (
-                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #243029", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 10.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Inscrições fecham em</div>
-                    <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: GOLD, lineHeight: 1 }}>{restam}</div>
+            {/* ---- A EDIÇÃO ABERTA A INSCRIÇÕES ----
+                Vem em primeiro porque é a que pede uma ação. A Copa que está a
+                decorrer fica logo a seguir: quem já está a jogar sabe onde ela
+                está, quem chega de novo precisa de ver primeiro como entrar. */}
+            {insc && (
+              <>
+                <div style={{ background: "linear-gradient(160deg,#17201b,#111614)", border: `1px solid ${aberta ? "#4a3f18" : "#243029"}`, borderRadius: 16, padding: "20px 16px 18px", marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+                    <TrofeuDodo size={108} numero={`${insc.numero}ª`} titulo={`Troféu da ${insc.numero}ª Copa do Dôdo`} />
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: "#f1ede2", lineHeight: 1 }}>{inscritos}</div>
-                    <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase", marginTop: 3 }}>inscritos · {totalVagas} vagas</div>
+                  <div style={{ textAlign: "center" }}>
+                    <Selo estado={insc.estado} aberta={aberta} />
+                    <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, lineHeight: 1.3, margin: "10px 0 4px", color: "#f1ede2" }}>
+                      {insc.numero}ª Copa do Dôdo
+                    </div>
+                    <div style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5 }}>
+                      Mata-mata mundial entre continentes · {insc.ano || new Date().getFullYear()}
+                    </div>
                   </div>
+
+                  {aberta && restam && (
+                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #243029", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 10.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Inscrições fecham em</div>
+                        <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: GOLD, lineHeight: 1 }}>{restam}</div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: "#f1ede2", lineHeight: 1 }}>{insc.inscritos}</div>
+                        <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase", marginTop: 3 }}>inscritos · {totalVagas} vagas</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!aberta && (
+                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #243029", fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5 }}>
+                      As inscrições fecharam. O sorteio corre a seguir — volta aqui para saber se entraste.
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {!aberta && edicao.estado === "inscricoes" && (
-                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #243029", fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5 }}>
-                  As inscrições fecharam. O sorteio das {totalVagas} vagas corre a seguir — volta aqui para saber se entraste.
-                </div>
-              )}
-            </div>
+                <MeuEstado
+                  eu={eu}
+                  temSessao={temSessao}
+                  souPro={souPro}
+                  nivelPronto={nivelPronto}
+                  aberta={aberta}
+                  aEnviar={aEnviar}
+                  dataSorteio={insc.inscricoes_ate}
+                  onInscrever={() => acao("inscrever")}
+                  onSair={() => setConfirmarSaida(true)}
+                />
 
-            {/* --- O meu estado --- */}
-            <MeuEstado
-              eu={eu}
-              temSessao={temSessao}
-              souPro={souPro}
-              nivelPronto={nivelPronto}
-              estado={edicao.estado}
-              aberta={aberta}
-              aEnviar={aEnviar}
-              inviteCode={edicao.invite_code ?? null}
-              onInscrever={() => acao("inscrever")}
-              onSair={() => setConfirmarSaida(true)}
-            />
-
-            {erro && (
-              erroEhPro ? (
-                <a href="/ippon-pro" style={{ display: "block", fontSize: 12.5, color: GOLD, marginTop: 10, textDecoration: "none", background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 10, padding: "10px 12px", lineHeight: 1.4 }}>{erro} →</a>
-              ) : (
-                <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 10 }}>{erro}</div>
-              )
+                {erro && (
+                  erroEhPro ? (
+                    <a href="/ippon-pro" style={{ display: "block", fontSize: 12.5, color: GOLD, marginTop: 10, textDecoration: "none", background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 10, padding: "10px 12px", lineHeight: 1.4 }}>{erro} →</a>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#ef8d83", marginTop: 10 }}>{erro}</div>
+                  )
+                )}
+              </>
             )}
 
-            {/* --- Continentes --- */}
-            <Section style={{ marginTop: 20 }}>Onde há mais concorrência</Section>
-            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>
-              Cada continente sorteia {vagasCont} vagas entre os seus inscritos. Quem não for sorteado vai à repescagem, onde as vagas que sobraram são disputadas por todos.
-            </p>
+            {/* ---- A COPA QUE ESTÁ A DECORRER ---- */}
+            {jogo && <CopaADecorrer jogo={jogo} compacta={!!insc} />}
 
-            {(Object.keys(NOME_CONTINENTE) as Continente[]).map((c) => (
-              <LinhaContinente
-                key={c}
-                nome={NOME_CONTINENTE[c]}
-                n={porContinente[c] ?? 0}
-                vagas={vagasCont}
-                meu={meuContinente === c}
-              />
-            ))}
+            {/* ---- Continentes: só faz sentido com inscrições a contar ---- */}
+            {insc && (
+              <>
+                <Section style={{ marginTop: 20 }}>Onde há mais concorrência</Section>
+                <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>
+                  Cada continente sorteia {vagasCont} vagas entre os seus inscritos. Quem não for sorteado entra no sorteio das vagas que sobraram.
+                </p>
+
+                {(Object.keys(NOME_CONTINENTE) as Continente[]).map((c) => (
+                  <LinhaContinente
+                    key={c}
+                    nome={NOME_CONTINENTE[c]}
+                    n={insc.porContinente?.[c] ?? 0}
+                    vagas={vagasCont}
+                    meu={meuContinente === c}
+                  />
+                ))}
+              </>
+            )}
 
           </>
         )}
@@ -453,17 +472,63 @@ function Selo({ estado, aberta }: { estado: string; aberta: boolean }) {
   );
 }
 
+// O cartão da Copa que está a ser jogada. Quando há inscrições abertas em cima,
+// vem em versão compacta — nesse ecrã a ação principal é inscrever-se, e um
+// segundo cartão do mesmo tamanho competia com ela pela atenção.
+function CopaADecorrer({ jogo, compacta }: { jogo: EdicaoDecorrer; compacta: boolean }) {
+  const destino = jogo.invite_code ? `/liga/${jogo.invite_code}` : "/ligas";
+  const sub = jogo.naChave
+    ? "Estás nesta chave"
+    : jogo.estado === "sorteada" ? "Sorteio feito · à espera da primeira ronda" : "A decorrer";
+
+  if (compacta) {
+    return (
+      <a href={destino} style={{ textDecoration: "none", display: "block", marginTop: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px" }}>
+          <div style={{ flexShrink: 0, display: "flex", width: 34, justifyContent: "center" }}>
+            <TrofeuDodo size={32} base={false} titulo="Copa a decorrer" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2" }}>{jogo.numero}ª Copa · a decorrer</div>
+            <div style={{ fontSize: 11, color: jogo.naChave ? GOLD : "#93a39a" }}>{sub}</div>
+          </div>
+          <span style={{ background: "#e67e22", color: "#1b0f06", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 12px", borderRadius: 8, whiteSpace: "nowrap" }}>Ver a chave</span>
+        </div>
+      </a>
+    );
+  }
+
+  return (
+    <div style={{ background: "linear-gradient(160deg,#17201b,#111614)", border: "1px solid #4a3f18", borderRadius: 16, padding: "20px 16px 18px" }}>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+        <TrofeuDodo size={108} numero={`${jogo.numero}ª`} titulo={`Troféu da ${jogo.numero}ª Copa do Dôdo`} />
+      </div>
+      <div style={{ textAlign: "center" }}>
+        <span style={{ display: "inline-block", background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 9px", borderRadius: 999 }}>A decorrer</span>
+        <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, lineHeight: 1.3, margin: "10px 0 4px", color: "#f1ede2" }}>
+          {jogo.numero}ª Copa do Dôdo
+        </div>
+        <div style={{ fontSize: 12.5, color: jogo.naChave ? GOLD : "#93a39a", lineHeight: 1.5 }}>
+          {jogo.naChave
+            ? "Estás nesta chave. Cada rodada elimina metade."
+            : "Esta edição já arrancou. As inscrições da seguinte abrem mais para a frente."}
+        </div>
+      </div>
+      <a href={destino} style={botaoPrimario}>Ver a chave</a>
+    </div>
+  );
+}
+
 function MeuEstado({
-  eu, temSessao, souPro, nivelPronto, estado, aberta, aEnviar, inviteCode, onInscrever, onSair,
+  eu, temSessao, souPro, nivelPronto, aberta, aEnviar, dataSorteio, onInscrever, onSair,
 }: {
   eu: EuEstado | null;
   temSessao: boolean | null;
   souPro: boolean;
   nivelPronto: boolean;
-  estado: string;
   aberta: boolean;
   aEnviar: boolean;
-  inviteCode: string | null;
+  dataSorteio: string | null;
   onInscrever: () => void;
   onSair: () => void;
 }) {
@@ -485,7 +550,6 @@ function MeuEstado({
         <Cartao borda="#4a3f18" fundo="#1c1a10">
           <Titulo cor={GOLD}>Estás na chave</Titulo>
           <Texto>A tua vaga saiu no sorteio. A partir da próxima competição do calendário, cada rodada elimina metade dos que sobram.</Texto>
-          <a href={inviteCode ? `/liga/${inviteCode}` : "/ligas"} style={botaoPrimario}>Ver a chave</a>
         </Cartao>
       );
     }
@@ -493,19 +557,19 @@ function MeuEstado({
       return (
         <Cartao>
           <Titulo cor="#cfd8d2">A tua vaga não saiu</Titulo>
-          <Texto>Foram mais inscritos do que vagas e o sorteio decidiu. A próxima edição volta a abrir com todas as vagas em jogo — e podes acompanhar esta chave na mesma.</Texto>
-          <a href="/ligas" style={botaoSecundario}>Ver competições</a>
+          <Texto>Foram mais inscritos do que vagas e o sorteio decidiu. A próxima edição volta a abrir com todas as vagas em jogo.</Texto>
         </Cartao>
       );
     }
-    // sorteada === null: à espera do sorteio.
+    // sorteada === null: à espera do sorteio. Não há aqui botão de inscrição
+    // nenhum, de propósito — uma pessoa, uma inscrição.
     return (
       <Cartao borda="#2c4a36" fundo="#131c17">
-        <Titulo cor="#7fd39b">Inscrição registada</Titulo>
+        <Titulo cor="#7fd39b">✓ Já fizeste a tua inscrição</Titulo>
         <Texto>
           {aberta
-            ? "Estás no sorteio. A tua hipótese é a mesma de quem se inscrever no último minuto."
-            : "As inscrições fecharam. Assim que o sorteio correr, ficas a saber aqui se entraste."}
+            ? `Está registada e não é preciso fazer mais nada. O sorteio${dataSorteio ? ` sai a ${dataCurta(dataSorteio)}` : " sai quando as inscrições fecharem"} e avisamos-te aqui e no sininho. Obrigado, e boa sorte!`
+            : "As inscrições fecharam. Assim que o sorteio correr, ficas a saber aqui se entraste. Boa sorte!"}
         </Texto>
         {aberta && (
           <button onClick={onSair} disabled={aEnviar} style={{ ...botaoSecundario, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar ? 0.6 : 1 }}>
@@ -521,8 +585,8 @@ function MeuEstado({
     return (
       <Cartao borda="#4a3f18" fundo="#1c1a10">
         <Titulo cor={GOLD}>A tua vaga está em jogo</Titulo>
-        <Texto>Inscreves-te agora e entras no sorteio. Não há corrida ao relógio — o dia em que te inscreves não muda nada.</Texto>
-        <button onClick={onInscrever} disabled={aEnviar} style={{ ...botaoPrimario, border: "none", width: "100%", cursor: aEnviar ? "default" : "pointer", opacity: aEnviar ? 0.6 : 1 }}>
+        <Texto>Inscreves-te agora e entras no sorteio{dataSorteio ? `, que sai a ${dataCurta(dataSorteio)}` : ""}. Não há corrida ao relógio — o dia em que te inscreves não muda nada.</Texto>
+        <button onClick={onInscrever} disabled={aEnviar} style={{ ...botaoPrimario, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar ? 0.6 : 1 }}>
           {aEnviar ? "A inscrever…" : "Inscrever-me na Copa"}
         </button>
       </Cartao>
@@ -543,11 +607,8 @@ function MeuEstado({
 
   return (
     <Cartao>
-      <Titulo cor="#cfd8d2">
-        {estado === "inscricoes" ? "As inscrições já fecharam" : "Esta edição já arrancou"}
-      </Titulo>
+      <Titulo cor="#cfd8d2">As inscrições já fecharam</Titulo>
       <Texto>{eu.motivo || "Podes acompanhar a chave e inscrever-te na próxima edição."}</Texto>
-      <a href="/ligas" style={botaoSecundario}>Ver competições</a>
     </Cartao>
   );
 }
