@@ -105,6 +105,37 @@
 // botão que vai falhar) como no POST (que é onde a regra tem de valer mesmo).
 //
 // ---------------------------------------------------------------------------
+// O CICLO: CADA SORTEIO ABRE AS INSCRIÇÕES DA EDIÇÃO SEGUINTE
+//
+// A 1ª edição é aberta à mão. Daí em diante, o ciclo fecha-se sozinho: no
+// instante em que a Copa N é sorteada, abrem as inscrições da Copa N+1.
+//
+// É este instante — e não outro qualquer — que faz a regra do salto funcionar
+// sem depender de contas: a janela de inscrição da Copa N+1 começa quando a
+// Copa N arranca e fecha na véspera de a N+1 começar, ou seja vive INTEIRA
+// dentro do tempo em que a Copa N se joga. Quem está na chave da N nunca a
+// apanha aberta. Quando as inscrições da N+2 abrirem, a N já terminou e essa
+// pessoa entra. Salta uma edição, sempre, sem ninguém contar nada.
+//
+// QUANDO FECHAM AS INSCRIÇÕES DA SEGUINTE
+//
+// Na véspera da competição em que ela começa — que é a primeira depois de a
+// Copa atual acabar. Isso é calculável AGORA, no sorteio, porque o tamanho da
+// chave já está decidido e o número de rondas sai dele: uma chave de 32 dura 5
+// competições, de 16 dura 4, de 8 dura 3 (é o logaritmo de base 2 do tamanho —
+// as semis e a repescagem correm na mesma competição, e a final com os bronzes
+// também).
+//
+// PORQUE NÃO A FUNÇÃO ippon_abrir_proxima_copa
+//
+// Ela abria a seguinte ao detetar `fase in (\'final\', \'meia\')`. O valor \'meia\'
+// nunca existiu nesta tabela — as meias-finais são fase \'normal\', distinguidas
+// pela metade da chave — por isso a condição resumia-se a "já existe a final",
+// e a final só aparece na última ronda. Abria a Copa seguinte com a atual quase
+// terminada, e aí um jogador da atual ainda apanhava a janela de inscrição
+// aberta. Deixa de ser precisa: manter `dodo_config.automatico = false`.
+//
+// ---------------------------------------------------------------------------
 // NOTIFICAÇÕES
 //
 // Três momentos, no sininho:
@@ -126,7 +157,7 @@ import { sortearVagas, VAGAS_POR_CONTINENTE, TOTAL_VAGAS } from "@/lib/sorteioDo
 // evita ter duas listas a poder divergir.
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import { focoMercado } from "@/lib/calendario";
-import { gerarPrimeiraRonda, tamanhoChave } from "@/lib/copa";
+import { gerarPrimeiraRonda, tamanhoChave, competicaoPorId, idCompeticaoSeguinte } from "@/lib/copa";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
 export const dynamic = "force-dynamic";
@@ -138,6 +169,46 @@ function dataPT(iso: string | null | undefined): string {
   const t = Date.parse(String(iso));
   if (!Number.isFinite(t)) return "em breve";
   return new Date(t).toLocaleDateString("pt-PT", { day: "2-digit", month: "long" });
+}
+
+/**
+ * Quantas competições dura uma copa de `tamanho` participantes.
+ *
+ * É o logaritmo de base 2: 32 -> 5, 16 -> 4, 8 -> 3, 4 -> 2, 2 -> 1. As semis
+ * correm na mesma competição que a 1ª ronda de repescagem, e a final na mesma
+ * que os dois bronzes — por isso não há rondas a mais por causa da repescagem.
+ */
+function rondasDaCopa(tamanho: number): number {
+  let r = 0;
+  let p = tamanho;
+  while (p > 1) { p = Math.floor(p / 2); r++; }
+  return Math.max(1, r);
+}
+
+/**
+ * A competição em que a copa SEGUINTE vai começar: a primeira depois de esta
+ * acabar. Anda no calendário `rondas` passos a partir da competição inicial.
+ * Devolve null se o calendário acabar pelo meio (fim do ano).
+ */
+function competicaoDepoisDaCopa(idInicial: string, rondas: number): string | null {
+  let id: string | null = idInicial;
+  for (let i = 0; i < rondas; i++) {
+    if (!id) return null;
+    id = idCompeticaoSeguinte(id);
+  }
+  return id;
+}
+
+/** Véspera de uma competição, às 23:59. null se a data não for conhecida. */
+function vesperaDe(idComp: string | null): string | null {
+  if (!idComp) return null;
+  const c = competicaoPorId(idComp);
+  if (!c || !c.de) return null;
+  const t = Date.parse(String(c.de));
+  if (!Number.isFinite(t)) return null;
+  const d = new Date(t - 24 * 60 * 60 * 1000);
+  d.setUTCHours(23, 59, 0, 0);
+  return d.toISOString();
 }
 
 /** Quem está a pedir, a partir do token da sessão. */
@@ -475,6 +546,37 @@ async function sortear(simular: boolean) {
       .eq("id", edicao.id);
   }
 
+  // --- ABRIR AS INSCRIÇÕES DA EDIÇÃO SEGUINTE ---
+  // Aqui, e não noutro sítio: ver a nota do ciclo no topo do ficheiro.
+  let seguinteAberta: number | null = null;
+  try {
+    // Guarda: se por alguma razão já houver uma edição a receber inscritos,
+    // não se abre outra. Duas em inscrições ao mesmo tempo não fazem sentido.
+    const { data: jaAberta } = await supabaseAdmin
+      .from("dodo_edicoes").select("id").eq("estado", "inscricoes").limit(1);
+
+    if ((jaAberta || []).length === 0 && confrontosCriados > 0) {
+      const rondas = rondasDaCopa(tamanho);
+      const compSeguinte = competicaoDepoisDaCopa(alvo.idCompeticao, rondas);
+      // Fecha na véspera da competição em que a próxima Copa começa. Se o
+      // calendário não chegar lá (fim do ano), fica com um prazo de 14 dias —
+      // melhor uma data imperfeita do que uma edição sem prazo, que nunca
+      // seria sorteada.
+      const fecho = vesperaDe(compSeguinte)
+        ?? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+      const numeroSeguinte = Number(edicao.numero) + 1;
+      const { error: erroNova } = await supabaseAdmin.from("dodo_edicoes").insert({
+        numero: numeroSeguinte,
+        ano: new Date(fecho).getUTCFullYear(),
+        estado: "inscricoes",
+        inscricoes_de: new Date().toISOString(),
+        inscricoes_ate: fecho,
+      });
+      if (!erroNova) seguinteAberta = numeroSeguinte;
+    }
+  } catch { /* o ciclo pode ser retomado à mão; o sorteio já está feito */ }
+
   // --- Avisar toda a gente ---
   // Depois de tudo gravado. Uma notificação que falhe não desfaz um sorteio.
   const linkChave = liga?.invite_code ? `/liga/${liga.invite_code}` : "/dodo";
@@ -510,7 +612,7 @@ async function sortear(simular: boolean) {
     ok: true, edicao: edicao.numero, league_id: liga?.id ?? null,
     inscritos: lista.length, entraram: entram.length,
     tamanhoChave: tamanho, passagensAutomaticas: tamanho - entram.length,
-    confrontos: confrontosCriados, resumo: r.resumo,
+    confrontos: confrontosCriados, seguinteAberta, resumo: r.resumo,
   });
 }
 
