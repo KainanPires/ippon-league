@@ -36,6 +36,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
+import { useNivel } from "@/lib/useNivel";
 import { uid } from "@/lib/team";
 import { AnaliseConfrontos } from "@/components/AnaliseConfrontos";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -296,17 +297,21 @@ export default function ChaveAtletasPage() {
   const [userId, setUserId] = useState<string>("anon");
   // Nível do utilizador: Pro Max (vê tudo ao vivo), Pro (só início ou final),
   // grátis (não vê chave). Não redireciona — mostra na própria página.
+  //
+  // LÊ-SE DO useNivel, NÃO DO user_metadata  (corrigido)
+  //
+  // Esta página lia `user_metadata.is_pro`, que deixou de ser sincronizado.
+  // Um subscritor Pro aparecia como GRÁTIS e via o ecrã de vendas a oferecer-lhe
+  // o Pro que já tinha pago. O useNivel lê da tabela `users`, que é onde o
+  // webhook da Stripe escreve e onde o servidor confirma o acesso.
+  const { ehPro, ehProMax, pronto: nivelPronto } = useNivel();
+
   useEffect(() => {
-    let vivo = true;
-    supabase.auth.getUser().then(({ data }) => {
-      if (!vivo) return;
-      const meta = (data.user?.user_metadata || {}) as Record<string, unknown>;
-      if (Boolean(meta.is_pro_max)) setNivel("promax");
-      else if (Boolean(meta.is_pro)) setNivel("pro");
-      else setNivel("gratis");
-    });
-    return () => { vivo = false; };
-  }, []);
+    if (!nivelPronto) return;
+    if (ehProMax) setNivel("promax");
+    else if (ehPro) setNivel("pro");
+    else setNivel("gratis");
+  }, [nivelPronto, ehPro, ehProMax]);
   // Carregar favoritos.
   useEffect(() => {
     const u = uid();
@@ -490,7 +495,6 @@ export default function ChaveAtletasPage() {
             <AnaliseConfrontos cat={cat} />
           </div>
         )}
-
         {aba === "chave" && (
         <>
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0 8px", flexWrap: "wrap" }}>
