@@ -34,6 +34,27 @@ export const PRECOS = {
 /** Dias de teste grátis para quem nunca subscreveu. */
 export const DIAS_TESTE = 7;
 
+/**
+ * Os cupões da promoção de lançamento.
+ *
+ * O DESCONTO É AUTOMÁTICO — ninguém escreve código nenhum. A sessão de pagamento
+ * leva o cupão colado, e quem abre a página vê logo o preço com desconto.
+ *
+ * Fazer disto um código que a pessoa tem de saber seria transformar uma
+ * promoção para todos num enigma para alguns: quem não reparasse pagava o preço
+ * cheio e depois escrevia a reclamar, com razão.
+ *
+ * QUANDO A PROMOÇÃO ACABA: a data limite está na Stripe, no próprio cupão. A
+ * partir daí ela recusa o cupão, e a rota do checkout volta a tentar sem ele
+ * (ver o comentário lá). Assim a promoção termina sozinha, sem ninguém ter de
+ * mudar código — e, sobretudo, sem o risco de a app deixar de vender por causa
+ * de uma data esquecida em dois sítios diferentes.
+ */
+export const CUPOES = {
+  pro: "lancamento-pro",
+  promax: "lancamento-promax",
+} as const;
+
 export type Nivel = "pro" | "promax";
 
 /**
