@@ -37,6 +37,25 @@
 // quando algo falhou mesmo e vale a pena tentar de novo.
 //
 // ---------------------------------------------------------------------------
+// SÓ A SUBSCRIÇÃO ATUAL MANDA
+//
+// Os avisos da Stripe não chegam pela ordem em que os acontecimentos ocorreram.
+// Quem cancela e volta a subscrever minutos depois gera dois avisos quase ao
+// mesmo tempo — "a A foi cancelada" e "a B foi criada" — e eles podem chegar
+// trocados.
+//
+// A primeira versão deste ficheiro lia "cancelamento" e desligava o acesso, sem
+// perguntar DE QUAL subscrição. Se o cancelamento da A chegasse depois da
+// criação da B, tirava o acesso que a pessoa acabara de pagar.
+//
+// Agora, antes de mexer no acesso, compara-se: esta subscrição é a que está
+// guardada na conta? Se for uma antiga, ignora-se. Um cancelamento de uma
+// subscrição que já não é a da pessoa não tem nada a dizer sobre o acesso dela.
+//
+// A exceção é quando a conta ainda não tem subscrição guardada — aí a que
+// chegar é a primeira, e é aceite.
+//
+// ---------------------------------------------------------------------------
 // A FONTE DE VERDADE CONTINUA A SER `users`
 //
 // Este ficheiro escreve is_pro e is_pro_max, que é o que o resto da app lê. As
@@ -91,6 +110,21 @@ async function aplicarSubscricao(sub: Assinatura): Promise<void> {
 
   const uid = await acharUtilizador(sub.customer, sub.metadata?.user_id);
   if (!uid) return;
+
+  // --- ESTA SUBSCRIÇÃO AINDA É A DESTA CONTA? ---
+  // Ver a nota do topo. Um aviso atrasado de uma subscrição antiga não pode
+  // desfazer o que uma mais recente já decidiu.
+  const { data: atual } = await supabaseAdmin
+    .from("users").select("stripe_subscription_id").eq("id", uid).maybeSingle();
+
+  const guardada = atual?.stripe_subscription_id ? String(atual.stripe_subscription_id) : "";
+  if (guardada && guardada !== sub.id) {
+    // Há uma subscrição guardada e não é esta. Só se ignora se ESTA já não
+    // estiver viva — uma subscrição ativa que não é a guardada significa que
+    // algo se perdeu pelo caminho, e aí vale a pena atualizar em vez de ignorar.
+    const estaViva = ["active", "trialing", "past_due"].includes(sub.status);
+    if (!estaViva) return;
+  }
 
   const priceId = sub.items?.data?.[0]?.price?.id;
   const nivel: Nivel | null = nivelDoPreco(priceId);
