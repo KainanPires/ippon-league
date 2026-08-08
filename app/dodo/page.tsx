@@ -406,10 +406,20 @@ function Regras({ vagasCont, totalVagas }: { vagasCont: number; totalVagas: numb
       <div style={{ background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 14, padding: "14px 15px" }}>
         <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: GOLD, marginBottom: 7 }}>Só membros Ippon Pro e Pro Max</div>
         <p style={{ fontSize: 12.5, color: "#c7b98f", lineHeight: 1.55, margin: "0 0 9px" }}>
-          A subscrição é anual. Se cancelares a meio, continuas a jogar até ao fim do ano que pagaste — a Copa incluída.
+          A subscrição é mensal e renova-se sozinha todos os meses, até cancelares. Quem cancela fica com acesso até ao fim do mês já pago.
         </p>
         <p style={{ fontSize: 12.5, color: "#c7b98f", lineHeight: 1.55, margin: 0 }}>
-          Se a subscrição chegar mesmo ao fim durante a Copa, sais dela e o teu adversário dessa ronda avança.
+          Uma Copa não cabe num mês: uma chave de {totalVagas} leva cinco competições a decidir-se, o que pode dar três ou quatro meses. Inscreveres-te é comprometeres-te a manter a subscrição até ao fim.
+        </p>
+      </div>
+
+      {/* Curto e em vermelho, porque com subscrição mensal isto deixou de ser
+          uma hipótese remota: basta alguém cancelar depois do primeiro mês para
+          sair a meio de uma Copa que ainda vai a meio. */}
+      <div style={{ background: "#241614", border: "1px solid #5c332c", borderRadius: 14, padding: "12px 15px", marginTop: 9 }}>
+        <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: "#ef8d83", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 6 }}>Se a subscrição acabar a meio</div>
+        <p style={{ fontSize: 12.5, color: "#d6b3ad", lineHeight: 1.55, margin: 0 }}>
+          Sais da Copa e o teu adversário avança sem jogar. A pontuação da Copa vive das funcionalidades Pro, e sem elas não há como te pontuar. Conta os meses antes de te inscreveres.
         </p>
       </div>
 
