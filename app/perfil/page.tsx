@@ -8,6 +8,7 @@ import { BotaoNotificacoes } from "@/components/NotificacoesPush";
 import { supabase } from "@/lib/supabase";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import { PRECO } from "@/lib/precos";
+import { limparCacheNivel } from "@/lib/useNivel";
 import { normalizarFaixa, corDaFaixa, nomeDaFaixa, type Faixa } from "@/lib/faixas";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -62,6 +63,17 @@ export default function Perfil() {
   const [aGerir, setAGerir] = useState(false);
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
   const [erroSub, setErroSub] = useState("");
+
+  // Quem chega aqui vindo do pagamento traz ?pagamento=ok. O nível acabou de
+  // mudar, e a cache do useNivel ainda tem o valor de antes de pagar — sem isto,
+  // a pessoa paga, volta à app, e continua a ver-se como grátis até fechar tudo.
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get("pagamento") === "ok") {
+        limparCacheNivel();
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     let vivo = true;
