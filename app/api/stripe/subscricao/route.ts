@@ -33,7 +33,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { stripeFetch, nivelDoPreco } from "@/lib/stripe";
+import { stripeFetch, nivelDoPreco, fimDoPeriodo } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -44,7 +44,7 @@ interface Assinatura {
   cancel_at_period_end?: boolean;
   current_period_end?: number;
   trial_end?: number | null;
-  items?: { data: { price?: { id?: string } }[] };
+  items?: { data: { price?: { id?: string }; current_period_end?: number | null }[] };
 }
 
 async function uidDoPedido(req: Request): Promise<string | null> {
@@ -105,7 +105,7 @@ export async function GET(req: Request) {
       estado: sub.status,
       emTeste: sub.status === "trialing",
       renova: !sub.cancel_at_period_end,
-      expiraEm: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : base.expiraEm,
+      expiraEm: fimDoPeriodo(sub) ? new Date(fimDoPeriodo(sub)! * 1000).toISOString() : base.expiraEm,
       fimDoTeste: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
       nivel,
     });
@@ -149,15 +149,15 @@ export async function POST(req: Request) {
     await supabaseAdmin.from("users").update({
       renova_automaticamente: acao !== "cancelar",
       cancelado_em: acao === "cancelar" ? new Date().toISOString() : null,
-      pro_expira_em: sub.current_period_end
-        ? new Date(sub.current_period_end * 1000).toISOString()
+      pro_expira_em: fimDoPeriodo(sub)
+        ? new Date(fimDoPeriodo(sub)! * 1000).toISOString()
         : undefined,
     }).eq("id", uid);
 
     return NextResponse.json({
       ok: true,
       renova: acao !== "cancelar",
-      expiraEm: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+      expiraEm: fimDoPeriodo(sub) ? new Date(fimDoPeriodo(sub)! * 1000).toISOString() : null,
     });
   } catch (e) {
     console.error("[stripe/subscricao]", e);
