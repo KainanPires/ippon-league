@@ -50,6 +50,32 @@ function mesDaCompeticao(comp: string): string | null {
 }
 
 export async function POST(req: Request) {
+  // -------------------------------------------------------------------------
+  // ROTA APOSENTADA (agosto de 2026)
+  //
+  // O lib/congelar.ts e o unico dono da tabela `pontuacoes`. Os dois escreviam
+  // com a mesma chave de conflito (user_id, id_competicao), por isso quem
+  // corresse por ultimo prevalecia - e esta rota usava a fonte de pontos
+  // errada (competition.contests), o que podia gravar valores a menos.
+  //
+  // Uma busca no repositorio nao encontrou ninguem a chamar esta rota. Em vez
+  // de a apagar as cegas, fica aqui travada e a avisar: se este aviso aparecer
+  // nos registos da Vercel, alguma coisa ainda a chama e e preciso descobrir o
+  // que antes de apagar a pasta.
+  //
+  // Depois de uma ou duas competicoes sem este aviso, apagar
+  // app/api/pontuacoes/registar/ inteira.
+  //
+  // O codigo abaixo ja esta corrigido (pontua por atleta) e fica guardado para
+  // servir de ferramenta manual de recuperacao, caso volte a ser preciso: basta
+  // apagar este bloco e o return.
+  // -------------------------------------------------------------------------
+  console.warn("[pontuacoes/registar] rota aposentada foi chamada");
+  return NextResponse.json(
+    { ok: false, erro: "Rota aposentada. O congelamento e o unico dono de pontuacoes." },
+    { status: 410 }
+  );
+
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligacao." }, { status: 500 });
   }
