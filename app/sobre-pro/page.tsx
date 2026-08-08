@@ -1,16 +1,13 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { PRECO } from "@/lib/precos";
 import { temSessao } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const MAX = "#7fb8f5"; // tom do Pro Max
-
 // Extras que o Pro Max dá a mais (além de tudo o que o Pro tem). A chave ao vivo
 // e a análise existem só nas competições de topo (Mundial, Grand Slam, Grand
 // Prix, Masters, Olimpíadas) — dito de forma explícita, para não prometer chave
@@ -23,7 +20,6 @@ const MAX_EXTRA: { t: string; x: string }[] = [
   { t: "Grupo exclusivo", x: "Acesso ao grupo de WhatsApp/Telegram só para membros Pro Max — informação da rodada e conversa com outros jogadores." },
   { t: "Layout e visual exclusivos", x: "Um aspeto próprio e distinto, reservado a quem é Pro Max." },
 ];
-
 // O que tens com o Pro. Só o que é REAL ou fundamentado na análise. Nada que
 // entregue a decisão do jogador (quem montar / quem é o melhor da rodada).
 // NOTA (fase de testes): não prometemos prémios — o foco é a vantagem de
@@ -39,11 +35,9 @@ const VANTAGENS: { t: string; x: string }[] = [
   { t: "Até 5 ligas ativas", x: "Cria até 5 ligas em simultâneo, entre mata-mata e pontos corridos." },
   { t: "Design exclusivo Pro", x: "Um visual próprio e distinto, só para membros Ippon Pro." },
 ];
-
 export default function SobrePro() {
   const [logado, setLogado] = useState(false);
   const [isPro, setIsPro] = useState(false);
-
   useEffect(() => {
     temSessao().then(setLogado).catch(() => setLogado(false));
     supabase.auth.getSession().then(({ data }) => {
@@ -51,7 +45,6 @@ export default function SobrePro() {
       setIsPro(Boolean(m.is_pro));
     }).catch(() => setIsPro(false));
   }, []);
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 48px" }}>
@@ -62,14 +55,12 @@ export default function SobrePro() {
           </a>
           <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Ippon Pro</h1>
         </header>
-
         {/* Intro */}
         <section style={{ textAlign: "center", background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "24px 18px", marginBottom: 18 }}>
           <div style={{ width: 88, height: 88, margin: "0 auto 8px" }}><Mascot belt="#141110" expression="sabio" /></div>
           <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", lineHeight: 1.1, color: GOLD }}>Pro e Pro Max</h2>
           <p style={{ fontSize: 14, color: "#dfe6e0", lineHeight: 1.6, margin: 0 }}>Dois níveis de vantagem para jogares com mais informação. O <strong style={{ color: GOLD }}>Pro</strong> dá-te as ferramentas de scout e análise; o <strong style={{ color: MAX }}>Pro Max</strong> acrescenta a competição ao vivo e mais. A estratégia é sempre tua.</p>
         </section>
-
         {/* O que tens */}
         <SectionTitle>O que tens com o Pro</SectionTitle>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
@@ -83,7 +74,6 @@ export default function SobrePro() {
             </div>
           ))}
         </div>
-
         {/* O QUE O PRO MAX ACRESCENTA — secção própria, tom azul (MAX) */}
         <SectionTitle>O Pro Max acrescenta</SectionTitle>
         <p style={{ fontSize: 12.5, color: "#93a39a", margin: "0 0 12px", lineHeight: 1.55 }}>
@@ -100,11 +90,9 @@ export default function SobrePro() {
             </div>
           ))}
         </div>
-
         <p style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.55, margin: "0 2px 22px" }}>
           Os Clássicos (competições do passado) não têm chave ao vivo nem análise, por já terem acontecido.
         </p>
-
         {/* O que o Pro NÃO faz — protege o jogo e a confiança */}
         <SectionTitle>O que o Pro não faz</SectionTitle>
         <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 22 }}>
@@ -112,15 +100,13 @@ export default function SobrePro() {
             O Pro <strong style={{ color: "#cfd8d2" }}>não monta o teu time por ti</strong> e <strong style={{ color: "#cfd8d2" }}>não te diz quem vai ganhar a competição</strong>. Não entregamos &quot;os melhores da rodada&quot; nem em quem apostar — isso tiraria a graça do jogo. Damos-te informação e leituras do histórico; o mérito de acertar é sempre teu.
           </p>
         </div>
-
         {/* Assinatura */}
         <SectionTitle>A assinatura</SectionTitle>
         <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 22 }}>
           <LinhaInfo titulo="7 dias grátis" texto="Experimenta o Pro durante 7 dias. Se cancelares dentro desse período, não pagas nada." />
-          <LinhaInfo titulo="Plano anual" texto="A assinatura é anual e renova-se automaticamente no ano seguinte." />
+          <LinhaInfo titulo="Plano mensal" texto="A subscrição é mensal e renova-se automaticamente todos os meses, até cancelares. Se cancelares, ficas com acesso até ao fim do mês já pago." />
           <LinhaInfo titulo="Cancelar quando quiseres" texto="Ao cancelar, manténs o acesso até ao fim do período já pago — só não há nova renovação." ultimo />
         </div>
-
         {/* Transparência — o mais importante */}
         <SectionTitle>Transparência total</SectionTitle>
         <div style={{ background: "#0f1411", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "16px 16px 18px", marginBottom: 22 }}>
@@ -131,7 +117,6 @@ export default function SobrePro() {
           <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.6, margin: "0 0 10px" }}>O Ippon Pro oferece <strong>apenas informação</strong>, baseada em dados e no histórico dos atletas: os seus resultados nas últimas competições e como costumam pontuar em cada nível. Mostramos tendências e possibilidades — por exemplo, quem tem mais hipótese de valorizar.</p>
           <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.6, margin: 0 }}>Ao assinar, reconheces que o Pro é <strong style={{ color: GOLD }}>meramente informativo e não garante qualquer resultado</strong>. Nunca prometemos certezas nem te dizemos em quem apostar. A decisão e a estratégia são sempre tuas.</p>
         </div>
-
         {/* Link discreto para vendas — só para quem NÃO é Pro */}
         {!isPro && (
           <a href="/ippon-pro" style={{ display: "block", textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px", borderRadius: 12, textDecoration: "none" }}>
@@ -147,11 +132,9 @@ export default function SobrePro() {
     </main>
   );
 }
-
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 10 }}>{children}</div>;
 }
-
 function LinhaInfo({ titulo, texto, ultimo }: { titulo: string; texto: string; ultimo?: boolean }) {
   return (
     <div style={{ borderBottom: ultimo ? "none" : "1px solid #1a221d", paddingBottom: ultimo ? 0 : 12, marginBottom: ultimo ? 0 : 12 }}>
