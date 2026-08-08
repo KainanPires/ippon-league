@@ -35,7 +35,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { PRECOS, DIAS_TESTE, stripeFetch } from "@/lib/stripe";
+import { PRECOS, CUPOES, DIAS_TESTE, stripeFetch } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -153,22 +153,50 @@ export async function POST(req: Request) {
     // mesmo cancelada — não recebe outra semana grátis, senão bastava cancelar
     // e voltar a subscrever para nunca pagar.
     const jaTeve = !!u.stripe_subscription_id;
+    const preco = alvo === "promax" ? PRECOS.promax : PRECOS.pro;
+    const cupao = alvo === "promax" ? CUPOES.promax : CUPOES.pro;
 
-    const sessao = await stripeFetch<{ url: string }>("checkout/sessions", "POST", {
+    const base: Record<string, unknown> = {
       mode: "subscription",
       customer,
-      line_items: [{ price: alvo === "promax" ? PRECOS.promax : PRECOS.pro, quantity: 1 }],
+      line_items: [{ price: preco, quantity: 1 }],
       success_url: `${SITE}/perfil?pagamento=ok`,
       cancel_url: `${SITE}/ippon-pro?pagamento=cancelado`,
       client_reference_id: uid,
-      // Deixa aplicar os cupões de lançamento no próprio ecrã de pagamento.
-      allow_promotion_codes: true,
       subscription_data: {
         trial_period_days: jaTeve ? undefined : DIAS_TESTE,
         metadata: { user_id: uid, nivel: alvo },
       },
       metadata: { user_id: uid, nivel: alvo },
-    });
+    };
+
+    // --- O DESCONTO DE LANÇAMENTO, AUTOMÁTICO ---
+    //
+    // Tenta-se com o cupão colado. Se a Stripe o recusar — porque a data limite
+    // já passou, ou porque o cupão foi apagado — tenta-se outra vez sem ele.
+    //
+    // É de propósito que a data da promoção vive SÓ na Stripe. Se estivesse
+    // também aqui, seriam dois sítios a ter de concordar, e no dia em que
+    // divergissem a app deixava de conseguir vender: pediria um cupão que já
+    // não é aceite e a sessão nunca abriria. Assim o pior que acontece é o
+    // primeiro pedido depois do fim da promoção demorar mais um instante.
+    //
+    // Repara que `allow_promotion_codes` NÃO pode conviver com um desconto já
+    // aplicado — a Stripe recusa as duas coisas juntas. Por isso o campo para
+    // escrever códigos só aparece quando não há cupão automático.
+    let sessao: { url: string };
+    try {
+      sessao = await stripeFetch<{ url: string }>("checkout/sessions", "POST", {
+        ...base,
+        discounts: [{ coupon: cupao }],
+      });
+    } catch (eCupao) {
+      console.warn("[stripe/checkout] cupão recusado, a seguir sem desconto:", eCupao);
+      sessao = await stripeFetch<{ url: string }>("checkout/sessions", "POST", {
+        ...base,
+        allow_promotion_codes: true,
+      });
+    }
 
     return NextResponse.json({ ok: true, url: sessao.url });
   } catch (e) {
