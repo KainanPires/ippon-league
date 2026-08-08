@@ -2,34 +2,82 @@
 //
 // FONTE ÚNICA DE VERDADE para os preços do Ippon Pro e Ippon Pro Max.
 //
-// Todos os sítios que mostram preço devem importar DAQUI, em vez de escrever à
-// mão. Quando o preço mudar, muda-se SÓ neste ficheiro.
+// Todos os sítios que mostram preço importam DAQUI, em vez de escrever à mão.
+// Quando o preço mudar, muda-se SÓ neste ficheiro.
 //
-// PROMOÇÃO DE LANÇAMENTO: tudo a metade do preço futuro (cheio). Quando a
-// promoção acabar, pôr emPromocao:false — passa a mostrar só o cheio.
+// ---------------------------------------------------------------------------
+// ESTES NÚMEROS TÊM DE BATER CERTO COM A STRIPE
 //
-// NÍVEIS:
-//   • Pro     — 4,90€/mês promo (9,90€ cheio).
-//   • Pro Max — 7,80€/mês promo (Pro 4,90 + parte Max 2,90). Cheio 14,80€
-//               (Pro 9,90 + parte Max 4,90).
+// O que está aqui é a montra; quem cobra é a Stripe, pelos preços em
+// lib/stripe.ts. Se divergirem, a página anuncia um valor e o cartão é
+// debitado noutro — e isso dá direito a reclamação mesmo quando o cobrado é o
+// mais baixo.
 //
-// NOTA (mecânica fina por implementar com o pagamento real): quem já é Pro tem
-// uma JANELA DE 7 DIAS, em cada contratação/renovação, para subir a Pro Max
-// pagando só metade da parte Max (+2,90/mês); passada a janela, paga a parte
-// Max cheia (+4,90/mês). Isto NÃO está nesta vitrina — entra quando o pagamento
-// for ligado, porque só aí pode ser acionado e testado.
+// Ao mudar um preço: cria-se um preço NOVO na Stripe (nunca se edita um
+// existente, senão mexe-se em quem já subscreveu), troca-se o identificador em
+// lib/stripe.ts, e só depois se muda o texto aqui. Os três passos, sempre.
+//
+// ---------------------------------------------------------------------------
+// O MODELO: MENSAL, NÃO ANUAL
+//
+// A subscrição é mensal e renova-se sozinha até ser cancelada. Quem cancela
+// mantém o acesso até ao fim do mês já pago e não é cobrado outra vez.
+//
+// Isto foi decidido depois de o projeto ter começado com a ideia de plano
+// anual — se encontrares algum texto a falar em ano, está desatualizado.
+//
+// ---------------------------------------------------------------------------
+// A PROMOÇÃO DE LANÇAMENTO
+//
+// Duas coisas diferentes, e convém não as trocar:
+//
+//   • JANELA — os primeiros 90 dias após o lançamento. É o prazo para entrar.
+//     Fecha sozinha: os cupões na Stripe têm data limite de resgate.
+//
+//   • DURAÇÃO — 6 meses de desconto para cada pessoa, a contar de quando ela
+//     subscreveu. Também acaba sozinho, e o preço sobe ao cheio sem ninguém
+//     ter de migrar nada.
+//
+// Quem entrar no dia 89 tem os mesmos 6 meses de quem entrou no dia 1.
+//
+// Quando a janela fechar, pôr emPromocao:false — a montra passa a mostrar só o
+// preço cheio. Os cupões já não são resgatáveis, mas quem os apanhou continua a
+// contar os seus 6 meses.
+//
+// ---------------------------------------------------------------------------
+// SUBIR DE PRO PARA PRO MAX
+//
+// Dentro dos 7 dias de teste: troca-se o preço da subscrição e não se cobra
+// nada de extra — ainda não houve primeira cobrança. É o prémio de decidir cedo.
+//
+// Depois dos 7 dias: paga-se UMA VEZ a taxa de subida, e daí em diante a pessoa
+// paga o Pro Max normal. Não é uma diferença recorrente: quem subiu tarde e
+// quem comprou Pro Max direto acabam a pagar exatamente o mesmo por mês.
+// ---------------------------------------------------------------------------
 
-const PRO_PROMO = "4,90€";
-const PRO_CHEIO = "9,90€";
-const MAX_PROMO = "7,80€";   // 4,90 (Pro) + 2,90 (metade da parte Max)
-const MAX_CHEIO = "14,80€";  // 9,90 (Pro) + 4,90 (parte Max cheia)
+const PRO_PROMO = "4,99€";
+const PRO_CHEIO = "7,99€";
+const MAX_PROMO = "7,99€";
+const MAX_CHEIO = "11,99€";
 const PERIODO = "/mês";
+
+/** Meses de desconto por pessoa, a contar da subscrição. */
+const MESES_DESCONTO = 6;
+
+/** Dias em que a promoção pode ser apanhada, a contar do lançamento. */
+const DIAS_JANELA = 90;
 
 export const PRECO = {
   // Está em promoção de lançamento?
   emPromocao: true,
   periodo: PERIODO,
   etiqueta: "Promoção de lançamento",
+
+  // Quanto tempo dura, para os textos não terem números escritos à mão.
+  mesesDesconto: MESES_DESCONTO,
+  diasJanela: DIAS_JANELA,
+  /** Ex.: "6 meses com desconto" — para as linhas de rodapé e etiquetas. */
+  duracaoDesconto: `${MESES_DESCONTO} meses com desconto`,
 
   // --- Pro ---
   promo: PRO_PROMO,
@@ -47,14 +95,22 @@ export const PRECO = {
   get maxAtual(): string { return this.emPromocao ? MAX_PROMO : MAX_CHEIO; },
   get maxAtualComPeriodo(): string { return (this.emPromocao ? MAX_PROMO : MAX_CHEIO) + PERIODO; },
 
-  // --- Upgrade Pro -> Pro Max (para quem JÁ é Pro: paga só a parte Max) ---
-  // Promo de lançamento: +2,90/mês (metade da parte Max). Cheio: +4,90/mês.
-  // (A regra da janela de 7 dias entra com o pagamento real — ver nota no topo.)
-  upgradePromo: "+2,90€",
-  upgradeNormal: "+4,90€",
-  upgradePromoComPeriodo: "+2,90€" + PERIODO,
-  get upgradeAtual(): string { return this.emPromocao ? "+2,90€" : "+4,90€"; },
-  get upgradeAtualComPeriodo(): string { return (this.emPromocao ? "+2,90€" : "+4,90€") + PERIODO; },
+  // --- Subir de Pro para Pro Max ---
+  // A DIFERENÇA mensal entre os dois níveis: é o que passa a pagar a mais por
+  // mês quem sobe. Promoção: 7,99 - 4,99. Cheio: 11,99 - 7,99.
+  upgradePromo: "+3,00€",
+  upgradeNormal: "+4,00€",
+  upgradePromoComPeriodo: "+3,00€" + PERIODO,
+  get upgradeAtual(): string { return this.emPromocao ? "+3,00€" : "+4,00€"; },
+  get upgradeAtualComPeriodo(): string { return (this.emPromocao ? "+3,00€" : "+4,00€") + PERIODO; },
+
+  /**
+   * A taxa ÚNICA de quem sobe depois dos 7 dias de teste.
+   *
+   * Não é mensal e não se soma à mensalidade: paga-se uma vez, e a partir daí a
+   * pessoa paga o Pro Max normal, igual a quem o comprou direto.
+   */
+  subidaTaxa: "4,99€",
 
   // Mensagem de valor (fase de testes: sem prémios — foco em informação/competição).
   premios: "Joga com mais informação e compete pelo topo do ranking",
