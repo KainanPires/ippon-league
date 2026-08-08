@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
@@ -8,27 +7,24 @@ import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
 import { focoMercado, nomeCompeticao } from "@/lib/calendario";
 import { supabase } from "@/lib/supabase";
+import { useNivel } from "@/lib/useNivel";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 import { useFaixa } from "@/lib/useFaixa";
-
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const START_JC = 100;
 const FAV_KEY = "ippon_favorites";
-
 // Competição-alvo do mercado: a de mercado aberto (mesma regra do resto da app).
 // Se a competição da semana já fechou (início - 1h), escala-se para a próxima.
 function competicaoAlvo(): string {
   return focoMercado().alvo.idCompeticao;
 }
 const COMPETICAO = competicaoAlvo();
-
 // NOTA sobre o Dôdo: a cor da faixa vem do useFaixa() — a faixa REAL do jogador,
 // a mesma em toda a app. Antes esta página pintava o Dôdo com #141110 fixo, por
 // isso um faixa-preta e um faixa-branca viam exatamente o mesmo mascote.
-
 const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Elite": ["#3a2f12", "#d9a441"],
   "Em alta": ["#13301f", "#7fd1a3"],
@@ -36,7 +32,6 @@ const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Barganha": ["#12303a", "#7fb8f5"],
   "Aposta": ["#2a1f3a", "#b79be0"],
 };
-
 type SortId = "caros" | "baratos" | "valorizados" | "desvalorizados" | "media" | "min-valorizar";
 const SORTS: { id: SortId; label: string; pro?: boolean }[] = [
   { id: "caros", label: "Mais caros" },
@@ -47,10 +42,8 @@ const SORTS: { id: SortId; label: string; pro?: boolean }[] = [
   { id: "min-valorizar", label: "Mínimo para valorizar", pro: true },
 ];
 const sortLabel = (id: SortId) => SORTS.find((s) => s.id === id)?.label || "Ordenar";
-
 const PRICE_MIN = 2;
 const PRICE_MAX = 20;
-
 // dir: para onde a seta do tutorial aponta. "up" = alvo acima do balão (topo);
 // "down" = alvo abaixo (cards). A legenda não aponta para nada (central).
 const STEPS = [
@@ -60,26 +53,23 @@ const STEPS = [
   { t: "Filtros e favoritos", x: "Lá em cima: a ★ mostra só os teus favoritos, e os botões Ordenar e Filtros (preço, país) ajudam-te a encontrar atletas. A ★ em cada card guarda o atleta como favorito.", target: "filters", dir: "up" as const },
   { t: "O que significam os estados", target: "legend", dir: "none" as const },
 ];
-
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 const code3 = (iso: string) => iso;
-
 type SheetKind = "ord" | "fil" | null;
-
 function MercadoInner() {
   // Marca "montar" (?montar=1): vem do lixo do Meu Time. Mantém o ciclo
   // mercado<->meu-time a montar uma equipa nova. Aqui só a usamos para: (a) partir
   // do rascunho vazio, e (b) o "Voltar ao Dojo" levar de volta a /meu-time?montar=1.
   const searchParams = useSearchParams();
   const montar = searchParams.get("montar") === "1";
-
   const [pool, setPool] = useState<Athlete[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isPro, setIsPro] = useState(false);
+  // Nível da tabela `users` — nunca do metadata. `ehPro` é verdadeiro também
+  // para Pro Max: os níveis são cumulativos.
+  const { ehPro: isPro } = useNivel();
   const [loadErr, setLoadErr] = useState("");
   const [aoVivoIds, setAoVivoIds] = useState<Set<string>>(new Set());
   const [aoVivoNome, setAoVivoNome] = useState<string | null>(null);
-
   const [gender, setGender] = useState<Gender>("M");
   const [cat, setCat] = useState<string>(CATEGORIES.M[0]);
   const [query, setQuery] = useState("");
@@ -87,7 +77,6 @@ function MercadoInner() {
   const [team, setTeam] = useState<string[]>([]);
   const [captain, setCaptain] = useState<string | null>(null);
   const [guide, setGuide] = useState<number | null>(null);
-
   const [favs, setFavs] = useState<string[]>([]);
   const [favOnly, setFavOnly] = useState(false);
   const [sort, setSort] = useState<SortId>("caros");
@@ -102,12 +91,10 @@ function MercadoInner() {
   // Quem sou eu — para o lembrete "esqueceste de salvar" (hook). Guardado quando
   // a sessão é confirmada (mesma leitura que decide o is_pro).
   const [userId, setUserId] = useState<string | null>(null);
-
   // Faixa REAL do jogador — a cor do Dôdo em todos os modais desta página.
   // Declarado com os outros hooks, ANTES de qualquer return condicional (o ecrã
   // de "mercado fechado" faz um return cedo; hooks têm de correr sempre).
   const { cor: corFaixa } = useFaixa();
-
   // LEMBRETE "esqueceste de salvar o teu time" — hook reutilizável (o mesmo da
   // meu-time). É AQUI que ele mais conta: a edição real acontece no mercado, e
   // sair daqui com um rascunho por salvar passa agora a agendar o lembrete.
@@ -115,7 +102,6 @@ function MercadoInner() {
   // fechado) para respeitar a ordem dos hooks. O servidor recusa agendar com o
   // mercado fechado, por isso é seguro mesmo durante uma competição a decorrer.
   useLembreteSalvar(userId, COMPETICAO);
-
   // FAVORITOS — fonte de verdade é o SERVIDOR (tabela atletas_favoritos, a mesma
   // que a página da chave e o alerta "o teu atleta é o próximo" usam). Quando o
   // userId chega, buscamos a lista do servidor e alinhamos a interface + a cache
@@ -135,13 +121,11 @@ function MercadoInner() {
       .catch(() => {});
     return () => { active = false; };
   }, [userId]);
-
   // BLOQUEIO DO MERCADO: se há uma competição a decorrer, o mercado fecha por
   // completo (a equipa está trancada durante a rodada). Decidido pelo calendário,
   // como o resto da app. Não importa por que caminho se chega aqui — fica bloqueado.
   const focoAgora = focoMercado();
   const competicaoADecorrer = focoAgora.aDecorrer;
-
   useEffect(() => {
     let active = true;
     // Se o mercado está fechado (competição a decorrer), não carrega nada.
@@ -174,19 +158,19 @@ function MercadoInner() {
         });
       }
     } catch {}
-
-    // Saber se o utilizador é Pro: desbloqueia a info "Mínimo para valorizar"
-    // nos cards e a ordenação por esse valor. Guardamos também o userId (para o
-    // hook do lembrete saber a quem agendar).
+    // O userId, para o hook do lembrete saber a quem agendar.
+    //
+    // O NÍVEL JÁ NÃO VEM DAQUI. Vinha do `user_metadata.is_pro`, que deixou de
+    // ser sincronizado: um subscritor Pro via as funcionalidades bloqueadas e a
+    // app a convidá-lo a comprar o que já tinha pago. Agora vem do useNivel, que
+    // lê da tabela `users` — a mesma fonte que o servidor usa.
     supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
       if (!active) return;
       try {
-        const sess = data.session as { user?: { id?: string; user_metadata?: { is_pro?: boolean } } } | null;
+        const sess = data.session as { user?: { id?: string } } | null;
         if (sess?.user?.id) setUserId(sess.user.id);
-        setIsPro(!!sess?.user?.user_metadata?.is_pro);
       } catch {}
     });
-
     fetch(`/api/atletas?id=${COMPETICAO}`)
       .then((r) => r.json())
       .then((j) => {
@@ -219,11 +203,9 @@ function MercadoInner() {
         setLoading(false);
         setLoadErr("Não foi possível carregar os atletas. Tenta recarregar a página.");
       });
-
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   function persist(next: string[]) {
     const cap = captain && next.includes(captain) ? captain : null;
     setTeam(next);
@@ -271,7 +253,6 @@ function MercadoInner() {
   function clearFilters() {
     setPriceMin(PRICE_MIN); setPriceMax(PRICE_MAX); setCountrySel([]); setFavOnly(false);
   }
-
   // ECRÃ DE BLOQUEIO: competição a decorrer → mercado fechado, equipa trancada.
   if (competicaoADecorrer) {
     return (
@@ -283,7 +264,6 @@ function MercadoInner() {
             </a>
             <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>Mercado</span>
           </div>
-
           <div style={{ textAlign: "center", padding: "30px 18px", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16 }}>
             <div style={{ width: 92, height: 92, margin: "0 auto 10px" }}><Mascot belt={corFaixa} expression="determinado" /></div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 999, padding: "5px 13px", marginBottom: 12 }}>
@@ -304,7 +284,6 @@ function MercadoInner() {
       </main>
     );
   }
-
   const byId = new Map(pool.map((a) => [a.id, a]));
   const teamAthletes = team.map((id) => byId.get(id)).filter(Boolean) as Athlete[];
   const jcLeft = Math.round((START_JC - teamAthletes.reduce((s, a) => s + a.priceJc, 0)) * 10) / 10;
@@ -312,9 +291,7 @@ function MercadoInner() {
   const countF = teamAthletes.filter((a) => a.gender === "F").length;
   const takenM = new Set(teamAthletes.filter((a) => a.gender === "M").map((a) => a.category));
   const takenF = new Set(teamAthletes.filter((a) => a.gender === "F").map((a) => a.category));
-
   const ALL_COUNTRIES = Array.from(new Set(pool.map((a) => a.countryIso))).sort((a, b) => a.localeCompare(b));
-
   let filtered = pool.filter((a) => {
     if (a.gender !== gender) return false;
     if (a.category !== cat) return false;
@@ -335,7 +312,6 @@ function MercadoInner() {
       default: return b.priceJc - a.priceJc;
     }
   });
-
   function buttonState(a: Athlete) {
     const inTeam = team.includes(a.id);
     const genderCount = a.gender === "M" ? countM : countF;
@@ -374,7 +350,6 @@ function MercadoInner() {
       }
     }
   }
-
   const filtroCount = (priceMin > PRICE_MIN ? 1 : 0) + (priceMax < PRICE_MAX ? 1 : 0) + countrySel.length;
   const jcGlow = guide === 0;
   const focus = guide === 1 ? "price" : guide === 2 ? "scout" : null;
@@ -385,11 +360,9 @@ function MercadoInner() {
   const voltarPara = montar
     ? "/meu-time?montar=1"
     : team.length === 8 && !!captain ? "/meu-time" : "/criar-equipa";
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none} @keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
-
       <div style={{ maxWidth: 460, margin: "0 auto" }}>
         <div style={{ position: "sticky", top: 0, background: "#0c0e0d", borderBottom: "1px solid #1a221d", zIndex: 5, padding: "12px 14px 10px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -407,7 +380,6 @@ function MercadoInner() {
               <span className={jcGlow ? "glow" : undefined} style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "6px 11px", fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 15 }}>JC {fmt(jcLeft)}</span>
             </div>
           </div>
-
           {aoVivoIds.size > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 10, padding: "7px 11px", marginBottom: 9 }}>
               <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a", flexShrink: 0 }} />
@@ -416,19 +388,16 @@ function MercadoInner() {
               </span>
             </div>
           )}
-
           {showSearch && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "8px 11px", marginBottom: 9 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93a39a" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
               <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar atleta..." style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB }} />
             </div>
           )}
-
           <div style={{ display: "flex", gap: 8, marginBottom: 9 }}>
             <button onClick={() => { setGender("M"); setCat(CATEGORIES.M[0]); }} style={genderBtn(gender === "M")}>Masculino {countM}/4</button>
             <button onClick={() => { setGender("F"); setCat(CATEGORIES.F[0]); }} style={genderBtn(gender === "F")}>Feminino {countF}/4</button>
           </div>
-
           <div className="noscroll" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 9 }}>
             <button onClick={() => setFavOnly((v) => !v)} aria-label="Só favoritos" className={guide === 3 ? "glow" : undefined} style={{ flexShrink: 0, width: 46, height: 42, borderRadius: 11, border: `1.5px solid ${guide === 3 ? GOLD : favOnly ? GOLD : "#2a3a33"}`, background: favOnly ? "#3a2f12" : "#121815", color: guide === 3 || favOnly ? GOLD : "#5f6f67", fontSize: 18, cursor: "pointer" }}>★</button>
             <button onClick={() => setSheet("ord")} style={fbtn(false)}>
@@ -438,14 +407,12 @@ function MercadoInner() {
               <SlidersIcon /> Filtros {filtroCount > 0 && <span style={cnt}>{filtroCount}</span>}
             </button>
           </div>
-
           <div className="noscroll" style={{ display: "flex", gap: 7, overflowX: "auto" }}>
             {CATEGORIES[gender].map((c) => (
               <button key={c} onClick={() => setCat(c)} style={chip(c === cat)}>{c}</button>
             ))}
           </div>
         </div>
-
         <div style={{ padding: "12px 14px 92px" }}>
           {loading ? (
             <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "40px 0" }}>A carregar atletas reais…</div>
@@ -520,7 +487,6 @@ function MercadoInner() {
           )}
         </div>
       </div>
-
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 40 }}>
         <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div style={{ fontSize: 12, color: "#cfd8d2" }}>
@@ -530,7 +496,6 @@ function MercadoInner() {
           <a href={voltarPara} style={{ background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 18px", borderRadius: 10, fontSize: 14, textDecoration: "none" }}>Voltar ao Dojo</a>
         </div>
       </div>
-
       {sheet === "ord" && (
         <Sheet title="Ordenar" onClose={() => setSheet(null)}>
           {SORTS.map((o) => {
@@ -547,7 +512,6 @@ function MercadoInner() {
           <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>🔒 As ordenações avançadas fazem parte do Ippon Pro.</div>
         </Sheet>
       )}
-
       {sheet === "fil" && (
         <Sheet title="Filtros" onClose={() => setSheet(null)}>
           <div style={sectionTitle}>Preço</div>
@@ -562,7 +526,6 @@ function MercadoInner() {
             <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 2 }}>Máximo</div>
             <input type="range" min={PRICE_MIN} max={PRICE_MAX} value={priceMax} onChange={(e) => { const v = Number(e.target.value); setPriceMax(Math.max(v, priceMin)); }} style={{ width: "100%", accentColor: GOLD }} />
           </div>
-
           <div style={sectionTitle}>País</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
             {ALL_COUNTRIES.map((iso) => {
@@ -572,14 +535,12 @@ function MercadoInner() {
               );
             })}
           </div>
-
           <div style={{ display: "flex", gap: 10 }}>
             <button onClick={() => { clearFilters(); }} style={{ flex: 1, background: "transparent", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: 12, borderRadius: 11, cursor: "pointer" }}>Limpar</button>
             <button onClick={() => setSheet(null)} style={{ flex: 1, ...applyBtn, marginTop: 0 }}>Aplicar</button>
           </div>
         </Sheet>
       )}
-
       {pedirLogin && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
           <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
@@ -591,7 +552,6 @@ function MercadoInner() {
           </div>
         </div>
       )}
-
       {avisoGenero && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
           <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
@@ -606,7 +566,6 @@ function MercadoInner() {
           </div>
         </div>
       )}
-
       {avisoCategoria && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
           <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
@@ -618,12 +577,10 @@ function MercadoInner() {
           </div>
         </div>
       )}
-
       {guide !== null && <Tutorial step={guide} setStep={setGuide} onClose={finishTutorial} cor={corFaixa} />}
     </main>
   );
 }
-
 // useSearchParams() exige um limite de Suspense no Next.js — o componente real
 // vive em MercadoInner, envolvido aqui.
 export default function Mercado() {
@@ -633,7 +590,6 @@ export default function Mercado() {
     </Suspense>
   );
 }
-
 // "Mínimo para valorizar" (Pro): quantos pontos o atleta precisa de fazer na
 // competição para superar a sua expectativa — acima disso, o preço sobe e o
 // jogador ganha JC. A expectativa é a média típica do atleta (campo avg, que vem
@@ -642,11 +598,9 @@ export default function Mercado() {
 function expEsperada(a: Athlete): number {
   return Math.max(0, Math.round((a.avg || 0) * 10) / 10);
 }
-
 const cnt: React.CSSProperties = { background: GOLD, color: "#1b211e", borderRadius: 999, fontSize: 11, fontWeight: 700, padding: "1px 7px" };
 const sectionTitle: React.CSSProperties = { fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#93a39a", marginBottom: 8 };
 const applyBtn: React.CSSProperties = { width: "100%", marginTop: 14, background: "#3f8f5a", color: "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: 13, borderRadius: 11, cursor: "pointer", fontSize: 14 };
-
 function fbtn(active: boolean): React.CSSProperties {
   return { display: "flex", alignItems: "center", gap: 7, flexShrink: 0, whiteSpace: "nowrap", background: active ? "#16201b" : "#121815", border: `1.5px solid ${active ? GOLD : "#2a3a33"}`, color: "#f1ede2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 13, padding: "0 14px", height: 42, borderRadius: 11, cursor: "pointer" };
 }
@@ -656,7 +610,6 @@ function genderBtn(on: boolean): React.CSSProperties {
 function chip(on: boolean): React.CSSProperties {
   return { whiteSpace: "nowrap", fontSize: 12, padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontFamily: FB, border: `1px solid ${on ? "#1c3a2e" : "#243029"}`, background: on ? "#1c3a2e" : "#141a17", color: on ? "#aee9c9" : "#93a39a" };
 }
-
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 80 }}>
@@ -671,7 +624,6 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
     </div>
   );
 }
-
 function Avatar({ code }: { code: string }) {
   return (
     <div style={{ width: 40, height: 44, borderRadius: 8, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -679,7 +631,6 @@ function Avatar({ code }: { code: string }) {
     </div>
   );
 }
-
 function SortIcon() {
   return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 4v16M7 20l-3-3M7 4l3 3M17 20V4M17 4l3 3M17 20l-3-3" /></svg>;
 }
@@ -689,7 +640,6 @@ function SlidersIcon() {
 function LockIcon() {
   return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>;
 }
-
 // Seta a apontar para o elemento destacado (cima = alvo no topo; baixo = alvo nos cards).
 function SetaTutorial({ dir }: { dir: "up" | "down" }) {
   return (
@@ -700,14 +650,12 @@ function SetaTutorial({ dir }: { dir: "up" | "down" }) {
     </div>
   );
 }
-
 // `cor` = cor da faixa do jogador, para o Dôdo aparecer com a faixa certa (era
 // fixo em #141110, o que dava o mesmo mascote a toda a gente).
 function Tutorial({ step, setStep, onClose, cor }: { step: number; setStep: (s: number | null) => void; onClose: () => void; cor: string }) {
   const s = STEPS[step];
   const total = STEPS.length;
   const isLegend = s.target === "legend";
-
   const controls = (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
       <button onClick={() => step > 0 && setStep(step - 1)} style={{ background: "transparent", border: "none", color: step === 0 ? "#3c463f" : "#93a39a", fontSize: 13, fontWeight: 700, cursor: step === 0 ? "default" : "pointer", fontFamily: FB }}>Anterior</button>
@@ -720,7 +668,6 @@ function Tutorial({ step, setStep, onClose, cor }: { step: number; setStep: (s: 
       <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>Pular ✕</button>
     </div>
   );
-
   if (isLegend) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 100 }}>
@@ -743,7 +690,6 @@ function Tutorial({ step, setStep, onClose, cor }: { step: number; setStep: (s: 
       </div>
     );
   }
-
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
       <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
