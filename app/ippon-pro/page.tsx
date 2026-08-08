@@ -1,6 +1,8 @@
 "use client";
+import { useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { PRECO } from "@/lib/precos";
+import { supabase } from "@/lib/supabase";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -31,6 +33,37 @@ const MAX_EXTRA: string[] = [
   "Layout e visual exclusivos Pro Max",
 ];
 export default function IpponPro() {
+  const [aEnviar, setAEnviar] = useState<"pro" | "promax" | null>(null);
+  const [erro, setErro] = useState("");
+
+  // Abre o pagamento. O acesso NÃO é dado aqui nem no regresso: quem o dá é o
+  // webhook, quando a Stripe confirmar que o dinheiro entrou. Isto limita-se a
+  // levar a pessoa ao ecrã de pagamento.
+  async function contratar(alvo: "pro" | "promax") {
+    setErro("");
+    setAEnviar(alvo);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const t = sess.session?.access_token;
+      if (!t) {
+        // Sem sessão não há a quem atribuir a subscrição. Manda entrar e volta.
+        window.location.href = "/entrar?voltar=/ippon-pro";
+        return;
+      }
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ alvo }),
+      });
+      const j = await res.json();
+      if (j?.ok && j.url) { window.location.href = j.url; return; }
+      setErro(j?.erro || "Não foi possível abrir o pagamento.");
+    } catch {
+      setErro("Falha de ligação. Tenta outra vez.");
+    }
+    setAEnviar(null);
+  }
+
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 40px" }}>
@@ -66,8 +99,8 @@ export default function IpponPro() {
               </li>
             ))}
           </ul>
-          <button onClick={() => alert("Pagamento em breve! Estamos a preparar o Ippon Pro.")} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 13, borderRadius: 11, fontSize: 14, cursor: "pointer" }}>
-            Contratar Pro · {PRECO.atualComPeriodo}
+          <button onClick={() => contratar("pro")} disabled={aEnviar !== null} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 13, borderRadius: 11, fontSize: 14, cursor: "pointer" }}>
+            {aEnviar === "pro" ? "A abrir…" : `Contratar Pro · ${PRECO.atualComPeriodo}`}
           </button>
         </div>
         {/* CARTÃO PRO MAX — destacado (é o upsell) */}
@@ -97,8 +130,8 @@ export default function IpponPro() {
               </li>
             ))}
           </ul>
-          <button onClick={() => alert("Pagamento em breve! Estamos a preparar o Ippon Pro Max.")} style={{ width: "100%", marginTop: 16, background: MAX, color: "#0b1220", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 13, borderRadius: 11, fontSize: 14, cursor: "pointer" }}>
-            Contratar Pro Max · {PRECO.maxAtualComPeriodo}
+          <button onClick={() => contratar("promax")} disabled={aEnviar !== null} style={{ width: "100%", marginTop: 16, background: MAX, color: "#0b1220", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 13, borderRadius: 11, fontSize: 14, cursor: "pointer" }}>
+            {aEnviar === "promax" ? "A abrir…" : `Contratar Pro Max · ${PRECO.maxAtualComPeriodo}`}
           </button>
         </div>
         {/* Nota honesta: o que o Pro NÃO faz */}
@@ -111,6 +144,7 @@ export default function IpponPro() {
           </div>
         </div>
         <div style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", lineHeight: 1.5 }}>
+          {erro && <span style={{ display: "block", color: "#ef8d83", marginBottom: 8 }}>{erro}</span>}
           Sem anúncios · subscrição mensal, cancelas quando quiseres · {PRECO.etiqueta.toLowerCase()} ({PRECO.duracaoDesconto}). 🥋
         </div>
       </div>
