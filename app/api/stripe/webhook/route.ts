@@ -47,7 +47,7 @@
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { nivelDoPreco, stripeFetch, verificarAssinatura, PRECOS, type Nivel } from "@/lib/stripe";
+import { nivelDoPreco, stripeFetch, verificarAssinatura, fimDoPeriodo, PRECOS, type Nivel } from "@/lib/stripe";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 
 export const dynamic = "force-dynamic";
@@ -60,7 +60,7 @@ interface Assinatura {
   cancel_at_period_end?: boolean;
   current_period_end?: number;
   canceled_at?: number | null;
-  items?: { data: { id: string; price?: { id?: string } }[] };
+  items?: { data: { id: string; price?: { id?: string }; current_period_end?: number | null }[] };
   metadata?: Record<string, string>;
 }
 
@@ -101,7 +101,7 @@ async function aplicarSubscricao(sub: Assinatura): Promise<void> {
   const campos: Record<string, unknown> = {
     stripe_subscription_id: sub.id,
     stripe_customer_id: sub.customer,
-    pro_expira_em: paraData(sub.current_period_end),
+    pro_expira_em: paraData(fimDoPeriodo(sub)),
     renova_automaticamente: !sub.cancel_at_period_end,
     cancelado_em: sub.cancel_at_period_end ? (paraData(sub.canceled_at) ?? new Date().toISOString()) : null,
   };
