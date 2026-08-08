@@ -21,6 +21,17 @@ const INFO: { label: string; href?: string; soon?: boolean }[] = [
   { label: "Política de privacidade", href: "/privacidade" },
   { label: "Ajuda e contacto", href: "/ajuda" },
 ];
+type Sub = {
+  ehPro: boolean;
+  ehProMax: boolean;
+  /** Veio da Stripe e pode ser cancelada aqui. Falso em acessos dados à mão. */
+  gerivel: boolean;
+  renova: boolean;
+  emTeste: boolean;
+  expiraEm: string | null;
+  fimDoTeste?: string | null;
+};
+
 type Conta = {
   id: string;
   nome: string;
@@ -31,12 +42,68 @@ type Conta = {
   faixaJudo: string;
   isPro: boolean;
 };
+/** Data curta em português, para as linhas do cartão. */
+function dataPT(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const t = Date.parse(String(iso));
+  if (!Number.isFinite(t)) return "—";
+  return new Date(t).toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" });
+}
+
 export default function Perfil() {
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [conta, setConta] = useState<Conta | null>(null);
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
   const [ready, setReady] = useState(false);
   const [saindo, setSaindo] = useState(false);
+  // A subscrição vem da rota, que a lê à Stripe. Não se usa o is_pro do
+  // metadata: ele fica desatualizado assim que alguém muda de plano.
+  const [sub, setSub] = useState<Sub | null>(null);
+  const [aGerir, setAGerir] = useState(false);
+  const [confirmarCancelar, setConfirmarCancelar] = useState(false);
+  const [erroSub, setErroSub] = useState("");
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        const t = sess.session?.access_token;
+        if (!t) return;
+        const res = await fetch("/api/stripe/subscricao", {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${t}` },
+        });
+        const j = await res.json();
+        if (vivo && j?.ok) setSub(j as Sub);
+      } catch { /* o cartão mostra o estado neutro */ }
+    })();
+    return () => { vivo = false; };
+  }, []);
+
+  async function gerirSubscricao(acao: "cancelar" | "reativar") {
+    setErroSub("");
+    setAGerir(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const t = sess.session?.access_token;
+      if (!t) { window.location.href = "/entrar?voltar=/perfil"; return; }
+      const res = await fetch("/api/stripe/subscricao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ acao }),
+      });
+      const j = await res.json();
+      if (j?.ok) {
+        setSub((s) => (s ? { ...s, renova: !!j.renova, expiraEm: j.expiraEm ?? s.expiraEm } : s));
+      } else {
+        setErroSub(j?.erro || "Não foi possível concluir.");
+      }
+    } catch {
+      setErroSub("Falha de ligação. Tenta outra vez.");
+    }
+    setAGerir(false);
+  }
   const [abertoDados, setAbertoDados] = useState(false);
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -243,28 +310,16 @@ export default function Perfil() {
         {abertoDados && ready && conta && (
           <>
             <SectionTitle>A minha assinatura</SectionTitle>
-            <div style={{ background: "#121815", border: `1px solid ${conta.isPro ? GOLD : "#243029"}`, borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px" }}>
-                <span style={{ fontSize: 12, color: "#93a39a" }}>Estado</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: conta.isPro ? GOLD : "#93a39a", display: "flex", alignItems: "center", gap: 7 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: conta.isPro ? "#7fd1a3" : "#5f6f67" }} />
-                  {conta.isPro ? "Ativo" : "Gratuito"}
-                </span>
-              </div>
-              <DataRow label="Plano" value={conta.isPro ? "Ippon Pro" : "Gratuito"} />
-              <DataRow label="Preço" value={conta.isPro ? PRECO.atualComPeriodo : "—"} />
-              {conta.isPro ? (
-                <div style={{ padding: 12 }}>
-                  <a href="/ippon-pro" style={{ display: "block", textAlign: "center", background: "transparent", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, textDecoration: "none" }}>Gerir assinatura</a>
-                </div>
-              ) : (
-                <div style={{ padding: 12 }}>
-                  <a href="/ippon-pro" style={{ display: "block", textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 10, textDecoration: "none" }}>Torna-te Pro</a>
-                </div>
-              )}
-            </div>
+            <CartaoSubscricao
+              sub={sub}
+              aGerir={aGerir}
+              erro={erroSub}
+              onCancelar={() => setConfirmarCancelar(true)}
+              onReativar={() => gerirSubscricao("reativar")}
+            />
           </>
         )}
+
         <SectionTitle>A minha equipa</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 14, background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 12 }}>
           <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={identity} size={52} /></div>
@@ -301,6 +356,27 @@ export default function Perfil() {
         </button>
         <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 22 }}>Ippon League · versão de testes</p>
       </div>
+
+      {/* Confirmação de cancelamento.
+          O texto tem de deixar claro que NÃO se perde nada agora — é a dúvida
+          que mais assusta e a que mais faz desistir de carregar no botão. */}
+      {confirmarCancelar && (
+        <div onClick={() => setConfirmarCancelar(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "#121815", border: "1px solid #2a3a33", borderRadius: 16, padding: "20px 18px" }}>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "#f1ede2", textAlign: "center", marginBottom: 10 }}>Cancelar renovação</div>
+            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, textAlign: "center", margin: "0 0 8px" }}>
+              Não perdes nada hoje. Continuas com tudo até {dataPT(sub?.expiraEm)} e não voltas a ser cobrado.
+            </p>
+            <p style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.5, textAlign: "center", margin: "0 0 16px" }}>
+              Se estiveres a disputar uma Copa que ainda não tenha acabado nessa data, sais dela quando o acesso terminar.
+            </p>
+            <div style={{ display: "flex", gap: 9 }}>
+              <button onClick={() => setConfirmarCancelar(false)} style={{ flex: 1, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>Ficar</button>
+              <button onClick={() => { setConfirmarCancelar(false); gerirSubscricao("cancelar"); }} style={{ flex: 1, background: "#4a2420", border: "1px solid #6d3630", color: "#ef8d83", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -572,5 +648,91 @@ function DoorIcon() {
       <path d="M16 17l5-5-5-5" />
       <path d="M21 12H9" />
     </svg>
+  );
+}
+
+
+// O cartão da subscrição.
+//
+// Mostra o plano, quando é a próxima cobrança, e deixa cancelar ou voltar atrás.
+// CANCELAR NÃO TIRA O ACESSO: desliga a renovação, e a pessoa joga até ao fim do
+// mês que pagou. O texto diz isso com todas as letras, porque é a dúvida que
+// mais gera contactos de apoio — quem cancela quer saber se perde tudo agora.
+function CartaoSubscricao({
+  sub, aGerir, erro, onCancelar, onReativar,
+}: {
+  sub: Sub | null;
+  aGerir: boolean;
+  erro: string;
+  onCancelar: () => void;
+  onReativar: () => void;
+}) {
+  const ativo = !!sub?.ehPro;
+  const plano = sub?.ehProMax ? "Ippon Pro Max" : sub?.ehPro ? "Ippon Pro" : "Gratuito";
+  const preco = sub?.ehProMax ? PRECO.maxAtualComPeriodo : sub?.ehPro ? PRECO.atualComPeriodo : "—";
+  const cancelada = ativo && sub?.renova === false;
+
+  return (
+    <div style={{ background: "#121815", border: `1px solid ${cancelada ? "#5c332c" : ativo ? GOLD : "#243029"}`, borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px" }}>
+        <span style={{ fontSize: 12, color: "#93a39a" }}>Estado</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: cancelada ? "#ef8d83" : ativo ? GOLD : "#93a39a", display: "flex", alignItems: "center", gap: 7 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: cancelada ? "#c56a5f" : ativo ? "#7fd1a3" : "#5f6f67" }} />
+          {cancelada ? "Termina em breve" : sub?.emTeste ? "Em teste grátis" : ativo ? "Ativo" : "Gratuito"}
+        </span>
+      </div>
+
+      <DataRow label="Plano" value={plano} />
+      <DataRow label="Preço" value={preco} />
+
+      {ativo && sub?.expiraEm && (
+        <DataRow
+          label={cancelada ? "Acesso até" : sub?.emTeste ? "Primeira cobrança" : "Próxima cobrança"}
+          value={dataPT(sub.expiraEm)}
+        />
+      )}
+
+      {/* Quem cancelou precisa de saber duas coisas: que não perdeu nada agora,
+          e que pode voltar atrás sem custo enquanto o mês pago não acabar. */}
+      {cancelada && (
+        <div style={{ padding: "12px 16px", borderTop: "1px solid #1a221d" }}>
+          <p style={{ fontSize: 12.5, color: "#d6b3ad", lineHeight: 1.55, margin: 0 }}>
+            A renovação está desligada. Continuas com tudo até {dataPT(sub?.expiraEm)} e não voltas a ser cobrado. Se mudares de ideias antes dessa data, é só voltar a ligar — sem nova cobrança.
+          </p>
+        </div>
+      )}
+
+      {erro && <div style={{ padding: "0 16px 10px", fontSize: 12, color: "#ef8d83" }}>{erro}</div>}
+
+      <div style={{ padding: 12, display: "grid", gap: 8 }}>
+        {!ativo && (
+          <a href="/ippon-pro" style={{ display: "block", textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 10, textDecoration: "none" }}>Torna-te Pro</a>
+        )}
+
+        {ativo && !sub?.ehProMax && (
+          <a href="/ippon-pro" style={{ display: "block", textAlign: "center", background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, textDecoration: "none" }}>Passar a Pro Max</a>
+        )}
+
+        {ativo && sub?.gerivel && !cancelada && (
+          <button onClick={onCancelar} disabled={aGerir} style={{ background: "transparent", border: "1px solid #243029", color: "#93a39a", fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, cursor: aGerir ? "default" : "pointer" }}>
+            {aGerir ? "…" : "Cancelar renovação"}
+          </button>
+        )}
+
+        {ativo && sub?.gerivel && cancelada && (
+          <button onClick={onReativar} disabled={aGerir} style={{ background: "#3f8f5a", border: "none", color: "#06140d", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 10, cursor: aGerir ? "default" : "pointer" }}>
+            {aGerir ? "…" : "Voltar a ativar"}
+          </button>
+        )}
+
+        {/* Acesso dado à mão, sem passar pela Stripe: não há nada para cancelar,
+            e um botão que não faz nada seria pior do que não ter botão. */}
+        {ativo && !sub?.gerivel && (
+          <p style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", margin: 0, lineHeight: 1.5 }}>
+            Este acesso foi atribuído diretamente e não tem cobrança associada.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
