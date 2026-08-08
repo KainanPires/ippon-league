@@ -14,6 +14,15 @@ const MAX = "#7fb8f5"; // tom do Pro Max, para o distinguir do Pro (dourado)
 // e fica guardado até à competição seguinte. O Pro Max vê também o MEIO — a chave
 // AO VIVO durante a competição — além dos extras.
 const PRO: string[] = [
+  // As duas primeiras são as que distinguem o Pro de uma ferramenta de consulta:
+  // deixam de ser dados e passam a ser competição a sério.
+  //
+  // A LINGUAGEM AQUI É DELIBERADA. Nas ligas oficiais a pessoa CONCORRE, porque
+  // basta ser Pro e escalar. Na Copa do Dôdo tem a POSSIBILIDADE de entrar,
+  // porque as vagas são sorteadas — prometer participação a quem pode não ser
+  // sorteado seria vender uma coisa que talvez não receba.
+  "Concorres aos prémios das ligas oficiais Mundial e Continental (o ranking é visível para todos, mas só membros Pro concorrem)",
+  "Podes inscrever-te na Copa do Dôdo, o mata-mata mundial entre continentes — a entrada é por sorteio entre os inscritos",
   "Scout avançado dos atletas (histórico, forma e como pontuam)",
   "Análise do teu time — o que é forte e onde está o risco",
   "Dica de capitão entre os atletas que tu escolheste",
@@ -141,6 +150,17 @@ export default function IpponPro() {
           </div>
           <div style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.55, marginTop: 10 }}>
             Os Clássicos (competições do passado) não têm chave ao vivo nem análise, por já terem acontecido.
+          </div>
+          {/* Sobre os prémios: dito à frente e sem letra pequena. Prometer um
+              prémio concreto numa página de vendas obriga a entregá-lo, e os
+              prémios dependem de patrocinadores que mudam de época para época.
+              O que se promete é o direito a concorrer — isso sim é sempre certo. */}
+          <div style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.55, marginTop: 10 }}>
+            Os prémios são definidos a cada temporada e podem variar — de produtos e equipamento a experiências no mundo do judo. O que a subscrição garante é o direito a concorrer.
+          </div>
+          {/* A Copa é sorteio, e isso não pode ficar escondido numa linha só. */}
+          <div style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.55, marginTop: 10 }}>
+            Na Copa do Dôdo há 32 lugares e a entrada é sorteada entre os inscritos de cada continente. Ser Pro dá-te o direito de te inscreveres, não a garantia de saíres sorteado.
           </div>
         </div>
         <div style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", lineHeight: 1.5 }}>
