@@ -136,6 +136,32 @@ export async function stripeFetch<T = Record<string, unknown>>(
 }
 
 /**
+ * O fim do período pago de uma subscrição, em segundos do Unix.
+ *
+ * PORQUE É QUE ISTO PRECISA DE PROCURAR EM DOIS SÍTIOS
+ *
+ * Até certa altura, `current_period_end` vivia na raiz da subscrição. Nas
+ * versões recentes da API — a nossa é a 2026-07-29.dahlia — passou para dentro
+ * de cada ITEM, porque uma subscrição pode ter itens com ciclos diferentes.
+ *
+ * Ler só a raiz devolvia undefined e o pro_expira_em ficava a nulo: o acesso
+ * funcionava, mas o perfil não conseguia dizer quando é a próxima cobrança e a
+ * rota diária de expirar não sabia quando alguém expira.
+ *
+ * Procura-se primeiro no item e depois na raiz. Assim funciona nas duas
+ * versões, e continuará a funcionar se um dia voltares a uma anterior.
+ */
+export function fimDoPeriodo(sub: {
+  current_period_end?: number | null;
+  items?: { data?: { current_period_end?: number | null }[] };
+}): number | null {
+  const doItem = sub.items?.data?.[0]?.current_period_end;
+  if (doItem && Number.isFinite(doItem)) return doItem;
+  if (sub.current_period_end && Number.isFinite(sub.current_period_end)) return sub.current_period_end;
+  return null;
+}
+
+/**
  * Confirma que um webhook veio mesmo da Stripe.
  *
  * SEM ISTO, QUALQUER PESSOA PODIA DAR-SE PRO A SI PRÓPRIA. O endereço do webhook
