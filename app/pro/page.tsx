@@ -1,16 +1,14 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { supabase } from "@/lib/supabase";
+import { useNivel } from "@/lib/useNivel";
 import { ScoutDoTime } from "@/components/ScoutDoTime";
-
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const MAX = "#7fb8f5"; // tom do Pro Max
-
 export default function DashboardPro() {
   const router = useRouter();
   const [estado, setEstado] = useState<"carregando" | "pro">("carregando");
@@ -18,7 +16,8 @@ export default function DashboardPro() {
   const [verBoasVindas, setVerBoasVindas] = useState(true); // caixa de boas-vindas fechável
   // Convite "Sê Pro Max" só aparece a quem NÃO é Pro Max (não fazer propaganda a quem já é Max).
   const [ehProMax, setEhProMax] = useState(false);
-
+  // A verdade sobre o nível: lida da tabela `users`, nunca do metadata.
+  const { ehPro, ehProMax: ehProMaxReal, pronto: nivelPronto } = useNivel();
   // Depois de fechada uma vez, a caixa de boas-vindas fica fechada (no aparelho).
   useEffect(() => {
     try {
@@ -29,55 +28,53 @@ export default function DashboardPro() {
     setVerBoasVindas(false);
     try { localStorage.setItem("ippon_pro_boasvindas_fechada", "1"); } catch {}
   }
-
+  // ---------------------------------------------------------------------------
+  // O NÍVEL VEM DO useNivel, NÃO DO user_metadata  (corrigido)
+  //
+  // Esta página lia `user_metadata.is_pro` da sessão e expulsava quem desse
+  // falso. Só que o metadata deixou de ser sincronizado quando o trigger parou
+  // de o fazer: quem paga fica com is_pro=true na tabela `users` — que é onde o
+  // webhook da Stripe escreve — e com o metadata a dizer false para sempre.
+  //
+  // Resultado: um subscritor pagante entrava aqui e era mandado para a página
+  // de VENDAS. Depois de ter pago. E não havia como perceber porquê, porque a
+  // base de dados dizia que ele era Pro.
+  //
+  // O useNivel lê da tabela `users`, a mesma fonte que o servidor usa para
+  // bloquear a sério. É esse o único sítio de onde o nível deve vir.
+  //
+  // Repara que o antigo código tinha uma segunda leitura com getUser() para o
+  // caso de o metadata vir "frio" no primeiro instante — um remendo para um
+  // problema que a fonte errada criava. Com a fonte certa, deixa de ser preciso:
+  // o `pronto` do hook diz quando a resposta chegou.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     let active = true;
 
-    // Lê is_pro da sessão. PROBLEMA conhecido: no PRIMEIRO instante, o metadata
-    // pode vir "frio" e is_pro vir undefined → expulsava um Pro. Por isso, se a
-    // 1ª leitura disser "não Pro", CONFIRMAMOS com getUser() antes de reencaminhar.
-    function lerIsPro(u: { user_metadata?: { is_pro?: boolean } } | null | undefined): boolean {
-      return Boolean(u?.user_metadata?.is_pro);
-    }
-    function lerIsProMax(u: { user_metadata?: { is_pro_max?: boolean } } | null | undefined): boolean {
-      return Boolean(u?.user_metadata?.is_pro_max);
-    }
+    // Ainda a saber o nível: não decide nada. Sem isto, expulsava toda a gente
+    // no instante em que a página abre.
+    if (!nivelPronto) return;
 
-    function arrancar(u: { user_metadata?: { nome?: string; is_pro_max?: boolean } } | null | undefined) {
-      if (!active) return;
-      const m = u?.user_metadata || {};
-      setNome(String(m.nome || "").trim().split(" ")[0] || "Campeão");
-      setEhProMax(lerIsProMax(u));
-      setEstado("pro");
-    }
+    if (!ehPro) { router.replace("/ippon-pro"); return; }
 
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!active) return;
-      const u = data.session?.user;
-      if (!u) { router.replace("/ippon-pro"); return; }
-
-      if (lerIsPro(u)) { arrancar(u); return; }
-
+      // O nome continua a vir do metadata, e aí não faz mal: é só um cumprimento.
       try {
-        const { data: fresco } = await supabase.auth.getUser();
+        const { data } = await supabase.auth.getSession();
         if (!active) return;
-        if (lerIsPro(fresco?.user)) { arrancar(fresco?.user); return; }
-      } catch { /* trata como não-Pro abaixo */ }
-
-      if (active) router.replace("/ippon-pro");
+        const m = (data.session?.user?.user_metadata || {}) as { nome?: string };
+        setNome(String(m.nome || "").trim().split(" ")[0] || "Campeão");
+      } catch { /* fica "Campeão" */ }
+      if (active) setEstado("pro");
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-      if (!active) return;
-      const u = session?.user;
-      if (u && lerIsPro(u)) {
-        setEstado((e) => { if (e === "carregando") arrancar(u); return e; });
-      }
-    });
+    return () => { active = false; };
+  }, [router, nivelPronto, ehPro]);
 
-    return () => { active = false; sub?.subscription?.unsubscribe?.(); };
-  }, [router]);
+  // Convite "Sê Pro Max" só a quem não é Pro Max — também da fonte certa.
+  useEffect(() => {
+    if (nivelPronto) setEhProMax(ehProMaxReal);
+  }, [nivelPronto, ehProMaxReal]);
 
   if (estado === "carregando") {
     return (
@@ -86,7 +83,6 @@ export default function DashboardPro() {
       </main>
     );
   }
-
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 48px" }}>
@@ -96,7 +92,6 @@ export default function DashboardPro() {
           </a>
           <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>A minha central Pro</h1>
         </header>
-
         {/* Boas-vindas Pro — fechável (permanente) */}
         {verBoasVindas && (
           <section style={{ position: "relative", textAlign: "center", background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", marginBottom: 18 }}>
@@ -107,7 +102,6 @@ export default function DashboardPro() {
             <p style={{ fontSize: 13.5, color: "#dfe6e0", lineHeight: 1.55, margin: 0 }}>Esta é a tua central de vantagens. Toca em cada atleta para veres a análise profunda do scout.</p>
           </section>
         )}
-
         {/* CHAVE DE ATLETAS — atalho para a chave. O Pro vê a chave congelada
             (início e resultado final) com convite a Pro Max para o ao vivo. */}
         <a href="/chave-atletas" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "13px 14px", marginBottom: 14, color: "#f1ede2" }}>
@@ -120,7 +114,6 @@ export default function DashboardPro() {
           </div>
           <span style={{ color: GOLD, fontSize: 20, flexShrink: 0 }}>›</span>
         </a>
-
         {/* CHAMADA "Sê Pro Max" — só a quem AINDA não é Pro Max (sem propaganda a quem já é Max). */}
         {!ehProMax && (
           <a href="/pro-max" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 14, padding: "13px 14px", marginBottom: 18 }}>
@@ -132,7 +125,6 @@ export default function DashboardPro() {
             <span style={{ color: MAX, fontSize: 20, flexShrink: 0 }}>›</span>
           </a>
         )}
-
         {/* SCOUT — componente partilhado (também usado na central Pro Max). */}
         <ScoutDoTime />
       </div>
