@@ -98,6 +98,10 @@ export function BarraInferior({ ativo }: { ativo?: Ativo }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-around",
+          // As páginas migradas tinham zIndex 50 no seu <nav> próprio. Sem
+          // isto, conteúdo com empilhamento passava por cima da barra nessas
+          // páginas (o /inicio não tinha o problema, mas também não sofre).
+          zIndex: 50,
         }}
       >
         <Tab label="Início" icon={<HomeIcon />} href="/inicio" active={ativo === "inicio"} />
