@@ -121,9 +121,9 @@ export async function POST(req: Request) {
           customer,
           line_items: [{ price: PRECOS.subida, quantity: 1 }],
           // Volta para a área Pro, não para o perfil: quem acabou de pagar deve
-          // aterrar no que comprou. O ?novo= faz aparecer as boas-vindas e o
-          // convite para a comunidade.
-          success_url: `${SITE}/pro?pagamento=ok&novo=promax`,
+          // aterrar no que comprou. O /pro-central encaminha cada nivel para a sua
+          // central (Pro -> /pro, Pro Max -> /pro-max-central).
+          success_url: `${SITE}/pro-central?pagamento=ok&novo=promax`,
           cancel_url: `${SITE}/perfil?pagamento=cancelado`,
           client_reference_id: uid,
           allow_promotion_codes: true,
@@ -145,9 +145,9 @@ export async function POST(req: Request) {
       mode: "subscription",
       customer,
       line_items: [{ price: preco, quantity: 1 }],
-      // Idem: para a área Pro. O `alvo` diz se é "pro" ou "promax" — só o
-      // promax vê o cartão da comunidade.
-      success_url: `${SITE}/pro?pagamento=ok&novo=${alvo}`,
+      // Idem: para o /pro-central, que sabe para onde mandar cada nivel. Nao
+      // se aponta para uma pagina fixa: o nivel decide-se num sitio so.
+      success_url: `${SITE}/pro-central?pagamento=ok&novo=${alvo}`,
       cancel_url: `${SITE}/ippon-pro?pagamento=cancelado`,
       client_reference_id: uid,
       subscription_data: {
