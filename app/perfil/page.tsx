@@ -728,8 +728,13 @@ function CartaoSubscricao({
     {!ativo && (
         <a href="/ippon-pro" style={{ display: "block", textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 10, textDecoration: "none" }}>Torna-te Pro</a>
       )}
+    {/* SUBIDA PARA PRO MAX — vai para /pro-max, NÃO para /ippon-pro.
+        O /ippon-pro é a montra de quem não tem nada: mostra os dois planos
+        do zero e faz um subscritor que já paga sentir que não é reconhecido.
+        O /pro-max lê o nível pelo useNivel e, a quem já é Pro, oferece só a
+        diferença — a taxa única de subida, ou grátis dentro dos 7 dias. */}
     {ativo && !sub?.ehProMax && (
-        <a href="/ippon-pro" style={{ display: "block", textAlign: "center", background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, textDecoration: "none" }}>Passar a Pro Max</a>
+        <a href="/pro-max" style={{ display: "block", textAlign: "center", background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, textDecoration: "none" }}>Passar a Pro Max</a>
       )}
     {ativo && sub?.gerivel && !cancelada && (
         <button onClick={onCancelar} disabled={aGerir} style={{ background: "transparent", border: "1px solid #243029", color: "#93a39a", fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 10, cursor: aGerir ? "default" : "pointer" }}>
