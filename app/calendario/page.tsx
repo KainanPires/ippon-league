@@ -13,17 +13,17 @@
 // ordem ficam iguais; quem subir o scroll vê as competições antigas.
 import { useEffect, useRef } from "react";
 import {
-
-// A barra inferior deixou de estar copiada em cada página. Vive uma vez em
-// components/BarraInferior.tsx, e é lá que o separador Pro pulsa a dourado
-// para quem tem Pro e ainda não visitou a área.
-import { BarraInferior } from "@/components/BarraInferior";
   CALENDARIO_2026,
   estadoMercado,
   competicaoFechada,
   focoMercado,
   type SemanaCalendario,
 } from "@/lib/calendario";
+
+// A barra inferior deixou de estar copiada em cada página. Vive uma vez em
+// components/BarraInferior.tsx, e é lá que o separador Pro pulsa a dourado
+// para quem tem Pro e ainda não visitou a área.
+import { BarraInferior } from "@/components/BarraInferior";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
