@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { PRECO } from "@/lib/precos";
 import { temSessao } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
 import { NotaMoeda } from "@/components/NotaMoeda";
+import { useNivel } from "@/lib/useNivel";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -38,13 +38,21 @@ const VANTAGENS: { t: string; x: string }[] = [
 ];
 export default function SobrePro() {
   const [logado, setLogado] = useState(false);
-  const [isPro, setIsPro] = useState(false);
+
+  // O NÍVEL VEM DO useNivel (tabela `users`), NÃO DO user_metadata.
+  //
+  // Esta página lia `user_metadata.is_pro` para decidir entre o botão de compra
+  // e a mensagem "És membro Ippon Pro". Como o metadata deixou de ser
+  // sincronizado quando o is_pro saiu do trigger, um subscritor que pagou via o
+  // botão a vender-lhe o que já tinha. É a mesma família de bugs do /pro, do
+  // /criar-liga e do /api/liga.
+  //
+  // Pro Max entra no mesmo saco: quem tem Max tem Pro.
+  const { ehPro, ehProMax } = useNivel();
+  const isPro = ehPro || ehProMax;
+
   useEffect(() => {
       temSessao().then(setLogado).catch(() => setLogado(false));
-      supabase.auth.getSession().then(({ data }) => {
-          const m = data.session?.user?.user_metadata || {};
-          setIsPro(Boolean(m.is_pro));
-        }).catch(() => setIsPro(false));
     }, []);
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
