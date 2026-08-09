@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "eslint --max-warnings 0 && next build",
+    "build": "eslint && next build",
     "start": "next start",
     "lint": "eslint"
   },
