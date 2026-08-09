@@ -61,6 +61,56 @@ const proibirNivelNoMetadata = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// O ROQUETE
+//
+// Ao ligar o lint ao build pela primeira vez apareceram 93 avisos em 55
+// ficheiros que nunca tinham passado por ele. Nenhum era um bug: `any` por
+// tipar, variáveis por usar, `<a>` onde devia estar `<Link>`, e regras novas do
+// React 19 sobre setState dentro de efeitos.
+//
+// Corrigir os 93 de uma vez seria mexer em código que funciona para calar ruído
+// — e é assim que se introduzem bugs novos. Mas deixá-los a gritar também não
+// serve: quando aparecer um aviso que É um bug, fica enterrado no meio dos
+// outros e ninguém o vê. Foi exatamente o que aconteceu com o user_metadata: o
+// sinal existia, faltava quem o ouvisse.
+//
+// Daí o roquete. O build TRAVA só no que já está limpo; o resto fica visível
+// como aviso. Cada categoria que for a zero sobe para "error" nesta lista e
+// nunca mais volta atrás.
+//
+// PARA SUBIR UMA CATEGORIA: corrige os casos, corre `npm run lint` até dar
+// zero, e move a linha de `ruidoConhecido` para `jaLimpo`.
+//
+// Estado em 09/08/2026 — por ordem sugerida de limpeza:
+//   1. no-unused-vars .............. 18   sem risco
+//   2. prefer-const ................  1   sem risco
+//   3. no-html-link-for-pages ......  6   <a> para /blog/, ganha-se velocidade
+//   4. no-unescaped-entities .......  2   sem risco
+//   5. no-explicit-any ............. 21   aos poucos, ao tocar em cada ficheiro
+//   6. purity / immutability .......  6   ver caso a caso
+//   7. set-state-in-effect ......... 36   o maior; deixar para o fim, ou nunca
+// ---------------------------------------------------------------------------
+
+const jaLimpo = {
+  // A única que trava o build hoje. Está a zero e assim tem de ficar.
+  "no-restricted-syntax": ["error", ...proibirNivelNoMetadata],
+};
+
+const ruidoConhecido = {
+  // Nenhuma destas é um bug hoje. Ficam visíveis no `npm run lint` e no editor,
+  // mas não travam um deploy. À medida que forem a zero, passam para jaLimpo.
+  "@typescript-eslint/no-unused-vars": "warn",
+  "@typescript-eslint/no-explicit-any": "warn",
+  "prefer-const": "warn",
+  "react/no-unescaped-entities": "warn",
+  "@next/next/no-html-link-for-pages": "warn",
+  "react-hooks/set-state-in-effect": "warn",
+  "react-hooks/immutability": "warn",
+  "react-hooks/purity": "warn",
+  "react-hooks/exhaustive-deps": "warn",
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
 
@@ -78,7 +128,8 @@ const eslintConfig = defineConfig([
   {
     files: ["**/*.ts", "**/*.tsx"],
     rules: {
-      "no-restricted-syntax": ["error", ...proibirNivelNoMetadata],
+      ...ruidoConhecido,
+      ...jaLimpo,
     },
   },
 
