@@ -2,8 +2,8 @@
 //
 // ABRIR UMA SESSÃO DE PAGAMENTO.
 //
-//   POST /api/stripe/checkout  { alvo: "pro" | "promax" | "subida" }
-//   -> { ok: true, url: "https://checkout.stripe.com/..." }
+// POST /api/stripe/checkout { alvo: "pro" | "promax" | "subida" }
+// -> { ok: true, url: "https://checkout.stripe.com/..." }
 //
 // A app manda a pessoa para essa morada. A Stripe trata do cartão, do IVA e do
 // período de teste, e devolve-a a /perfil no fim. Quem dá o acesso NÃO é este
@@ -20,28 +20,24 @@
 // ---------------------------------------------------------------------------
 // OS TRÊS CAMINHOS
 //
-//   pro / promax  — subscrição nova, com DIAS_TESTE dias grátis para quem nunca
-//                   subscreveu. Quem já subscreveu antes não recebe teste outra
-//                   vez, senão bastava cancelar e voltar para ter semanas
-//                   grátis em ciclo.
+// pro / promax — subscrição nova, com DIAS_TESTE dias grátis para quem nunca
+// subscreveu. Quem já subscreveu antes não recebe teste outra
+// vez, senão bastava cancelar e voltar para ter semanas
+// grátis em ciclo.
 //
-//   subida        — quem já tem Pro e quer Pro Max. Dentro do período de teste
-//                   é só trocar o preço da subscrição, sem cobrar nada: ainda
-//                   não houve primeira cobrança. Fora dele, cobra-se uma vez os
-//                   4,99 e a subscrição passa a Pro Max sem proporcionalidade —
-//                   o próximo ciclo já vem a 11,99.
+// subida — quem já tem Pro e quer Pro Max. Dentro do período de teste
+// é só trocar o preço da subscrição, sem cobrar nada: ainda
+// não houve primeira cobrança. Fora dele, cobra-se uma vez os
+// 4,99 e a subscrição passa a Pro Max sem proporcionalidade —
+// o próximo ciclo já vem a 11,99.
 // ---------------------------------------------------------------------------
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { PRECOS, CUPOES, DIAS_TESTE, stripeFetch } from "@/lib/stripe";
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
 const SITE = "https://www.ipponleague.com";
-
 async function uidDoPedido(req: Request): Promise<string | null> {
   try {
     const auth = req.headers.get("authorization") || "";
@@ -51,9 +47,9 @@ async function uidDoPedido(req: Request): Promise<string | null> {
     const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
     if (!url || !pub) return null;
     const sb = createClient(url, pub, {
-      global: { headers: { Authorization: `Bearer ${t}` } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+        global: { headers: { Authorization: `Bearer ${t}` } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
     const { data, error } = await sb.auth.getUser();
     if (error) return null;
     return data?.user?.id ?? null;
@@ -61,33 +57,26 @@ async function uidDoPedido(req: Request): Promise<string | null> {
     return null;
   }
 }
-
 export async function POST(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
   }
-
   const uid = await uidDoPedido(req);
   if (!uid) return NextResponse.json({ ok: false, erro: "Entra na tua conta." }, { status: 401 });
-
   let corpo: { alvo?: string };
   try { corpo = await req.json(); } catch {
     return NextResponse.json({ ok: false, erro: "Pedido inválido." }, { status: 400 });
   }
-
   const alvo = String(corpo.alvo || "");
   if (!["pro", "promax", "subida"].includes(alvo)) {
     return NextResponse.json({ ok: false, erro: "Nível desconhecido." }, { status: 400 });
   }
-
   const { data: u } = await supabaseAdmin
-    .from("users")
-    .select("email, name, is_pro, is_pro_max, stripe_customer_id, stripe_subscription_id")
-    .eq("id", uid)
-    .maybeSingle();
-
+  .from("users")
+  .select("email, name, is_pro, is_pro_max, stripe_customer_id, stripe_subscription_id")
+  .eq("id", uid)
+  .maybeSingle();
   if (!u) return NextResponse.json({ ok: false, erro: "Conta não encontrada." }, { status: 404 });
-
   try {
     // --- O cliente na Stripe ---
     // Criado uma vez e guardado. Sem isto, cada subscrição criava um cliente
@@ -95,14 +84,13 @@ export async function POST(req: Request) {
     let customer = u.stripe_customer_id ? String(u.stripe_customer_id) : "";
     if (!customer) {
       const c = await stripeFetch<{ id: string }>("customers", "POST", {
-        email: u.email || undefined,
-        name: u.name || undefined,
-        metadata: { user_id: uid },
-      });
+          email: u.email || undefined,
+          name: u.name || undefined,
+          metadata: { user_id: uid },
+        });
       customer = c.id;
       await supabaseAdmin.from("users").update({ stripe_customer_id: customer }).eq("id", uid);
     }
-
     // --- SUBIDA DE PRO PARA PRO MAX ---
     if (alvo === "subida") {
       if (!u.is_pro || u.is_pro_max) {
@@ -111,56 +99,55 @@ export async function POST(req: Request) {
       if (!u.stripe_subscription_id) {
         return NextResponse.json({ ok: false, erro: "Não encontrámos a tua subscrição." }, { status: 409 });
       }
-
       const sub = await stripeFetch<{
         status: string;
         items: { data: { id: string }[] };
       }>(`subscriptions/${u.stripe_subscription_id}`);
-
       // Dentro do teste ainda não houve cobrança nenhuma: troca-se o preço e
       // acabou. Não há nada para acertar, nem 4,99 a cobrar — é o prémio de
       // decidir cedo.
       if (sub.status === "trialing") {
         await stripeFetch(`subscriptions/${u.stripe_subscription_id}`, "POST", {
-          items: [{ id: sub.items.data[0].id, price: PRECOS.promax }],
-          proration_behavior: "none",
-          metadata: { user_id: uid, nivel: "promax" },
-        });
+            items: [{ id: sub.items.data[0].id, price: PRECOS.promax }],
+            proration_behavior: "none",
+            metadata: { user_id: uid, nivel: "promax" },
+          });
         return NextResponse.json({ ok: true, imediato: true });
       }
-
       // Fora do teste: cobra-se a subida uma única vez. A troca da subscrição
       // para Pro Max acontece no webhook, quando o pagamento estiver confirmado.
       const sessao = await stripeFetch<{ url: string }>("checkout/sessions", "POST", {
-        mode: "payment",
-        customer,
-        line_items: [{ price: PRECOS.subida, quantity: 1 }],
-        success_url: `${SITE}/perfil?pagamento=ok`,
-        cancel_url: `${SITE}/perfil?pagamento=cancelado`,
-        client_reference_id: uid,
-        allow_promotion_codes: true,
-        metadata: { user_id: uid, acao: "subida" },
-      });
+          mode: "payment",
+          customer,
+          line_items: [{ price: PRECOS.subida, quantity: 1 }],
+          // Volta para a área Pro, não para o perfil: quem acabou de pagar deve
+          // aterrar no que comprou. O ?novo= faz aparecer as boas-vindas e o
+          // convite para a comunidade.
+          success_url: `${SITE}/pro?pagamento=ok&novo=promax`,
+          cancel_url: `${SITE}/perfil?pagamento=cancelado`,
+          client_reference_id: uid,
+          allow_promotion_codes: true,
+          metadata: { user_id: uid, acao: "subida" },
+        });
       return NextResponse.json({ ok: true, url: sessao.url });
     }
-
     // --- SUBSCRIÇÃO NOVA ---
     if (u.is_pro || u.is_pro_max) {
       return NextResponse.json({ ok: false, erro: "Já tens uma subscrição ativa." }, { status: 409 });
     }
-
     // Teste grátis só para quem nunca subscreveu. Quem já teve subscrição —
     // mesmo cancelada — não recebe outra semana grátis, senão bastava cancelar
     // e voltar a subscrever para nunca pagar.
     const jaTeve = !!u.stripe_subscription_id;
     const preco = alvo === "promax" ? PRECOS.promax : PRECOS.pro;
     const cupao = alvo === "promax" ? CUPOES.promax : CUPOES.pro;
-
     const base: Record<string, unknown> = {
       mode: "subscription",
       customer,
       line_items: [{ price: preco, quantity: 1 }],
-      success_url: `${SITE}/perfil?pagamento=ok`,
+      // Idem: para a área Pro. O `alvo` diz se é "pro" ou "promax" — só o
+      // promax vê o cartão da comunidade.
+      success_url: `${SITE}/pro?pagamento=ok&novo=${alvo}`,
       cancel_url: `${SITE}/ippon-pro?pagamento=cancelado`,
       client_reference_id: uid,
       subscription_data: {
@@ -169,7 +156,6 @@ export async function POST(req: Request) {
       },
       metadata: { user_id: uid, nivel: alvo },
     };
-
     // --- O DESCONTO DE LANÇAMENTO, AUTOMÁTICO ---
     //
     // Tenta-se com o cupão colado. Se a Stripe o recusar — porque a data limite
@@ -187,17 +173,16 @@ export async function POST(req: Request) {
     let sessao: { url: string };
     try {
       sessao = await stripeFetch<{ url: string }>("checkout/sessions", "POST", {
-        ...base,
-        discounts: [{ coupon: cupao }],
-      });
+          ...base,
+          discounts: [{ coupon: cupao }],
+        });
     } catch (eCupao) {
       console.warn("[stripe/checkout] cupão recusado, a seguir sem desconto:", eCupao);
       sessao = await stripeFetch<{ url: string }>("checkout/sessions", "POST", {
-        ...base,
-        allow_promotion_codes: true,
-      });
+          ...base,
+          allow_promotion_codes: true,
+        });
     }
-
     return NextResponse.json({ ok: true, url: sessao.url });
   } catch (e) {
     // A mensagem da Stripe é útil nos registos, mas não vai para o ecrã: pode
