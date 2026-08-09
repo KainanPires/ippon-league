@@ -37,7 +37,6 @@ const VANTAGENS: { t: string; x: string }[] = [
   { t: "Design exclusivo Pro", x: "Um visual próprio e distinto, só para membros Ippon Pro." },
 ];
 export default function SobrePro() {
-  const teste = { } as { is_pro?: boolean };
   const [logado, setLogado] = useState(false);
 
   // O NÍVEL VEM DO useNivel (tabela `users`), NÃO DO user_metadata.
