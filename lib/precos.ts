@@ -14,7 +14,7 @@
 // mais baixo.
 //
 // Ao mudar um preço: cria-se um preço NOVO na Stripe (nunca se edita um
-// existente, senão mexe-se em quem já subscreveu), troca-se o identificador em
+  // existente, senão mexe-se em quem já subscreveu), troca-se o identificador em
 // lib/stripe.ts, e só depois se muda o texto aqui. Os três passos, sempre.
 //
 // ---------------------------------------------------------------------------
@@ -31,12 +31,12 @@
 //
 // Duas coisas diferentes, e convém não as trocar:
 //
-//   • JANELA — os primeiros 90 dias após o lançamento. É o prazo para entrar.
-//     Fecha sozinha: os cupões na Stripe têm data limite de resgate.
+// • JANELA — os primeiros 90 dias após o lançamento. É o prazo para entrar.
+// Fecha sozinha: os cupões na Stripe têm data limite de resgate.
 //
-//   • DURAÇÃO — 6 meses de desconto para cada pessoa, a contar de quando ela
-//     subscreveu. Também acaba sozinho, e o preço sobe ao cheio sem ninguém
-//     ter de migrar nada.
+// • DURAÇÃO — 6 meses de desconto para cada pessoa, a contar de quando ela
+// subscreveu. Também acaba sozinho, e o preço sobe ao cheio sem ninguém
+// ter de migrar nada.
 //
 // Quem entrar no dia 89 tem os mesmos 6 meses de quem entrou no dia 1.
 //
@@ -54,31 +54,39 @@
 // paga o Pro Max normal. Não é uma diferença recorrente: quem subiu tarde e
 // quem comprou Pro Max direto acabam a pagar exatamente o mesmo por mês.
 // ---------------------------------------------------------------------------
-
+// A MOEDA
+//
+// Os valores aqui estao em EUROS, porque e em euros que se recebe: a Stripe
+// converte para a moeda do comprador no checkout (Adaptive Pricing ligado) e
+// deposita em euros na conta.
+//
+// Isso quer dizer que um brasileiro le "7,99€" nesta montra e ve "R$ 49,90" no
+// pagamento. E o mesmo valor, mas a surpresa cai no pior momento possivel - o
+// de decidir pagar. Dai o `notaMoeda`: uma linha por baixo dos precos a avisar
+// que o valor sai na moeda local.
+//
+// A solucao completa seria a montra pedir os precos convertidos a Stripe. Fica
+// para quando houver gente fora da zona euro que justifique a chamada extra.
+// ---------------------------------------------------------------------------
 const PRO_PROMO = "4,99€";
 const PRO_CHEIO = "7,99€";
 const MAX_PROMO = "7,99€";
 const MAX_CHEIO = "11,99€";
 const PERIODO = "/mês";
-
 /** Meses de desconto por pessoa, a contar da subscrição. */
 const MESES_DESCONTO = 6;
-
 /** Dias em que a promoção pode ser apanhada, a contar do lançamento. */
 const DIAS_JANELA = 90;
-
 export const PRECO = {
   // Está em promoção de lançamento?
   emPromocao: true,
   periodo: PERIODO,
   etiqueta: "Promoção de lançamento",
-
   // Quanto tempo dura, para os textos não terem números escritos à mão.
   mesesDesconto: MESES_DESCONTO,
   diasJanela: DIAS_JANELA,
   /** Ex.: "6 meses com desconto" — para as linhas de rodapé e etiquetas. */
   duracaoDesconto: `${MESES_DESCONTO} meses com desconto`,
-
   // --- Pro ---
   promo: PRO_PROMO,
   normal: PRO_CHEIO,
@@ -86,7 +94,6 @@ export const PRECO = {
   normalComPeriodo: PRO_CHEIO + PERIODO,
   get atual(): string { return this.emPromocao ? PRO_PROMO : PRO_CHEIO; },
   get atualComPeriodo(): string { return (this.emPromocao ? PRO_PROMO : PRO_CHEIO) + PERIODO; },
-
   // --- Pro Max ---
   maxPromo: MAX_PROMO,
   maxNormal: MAX_CHEIO,
@@ -94,7 +101,6 @@ export const PRECO = {
   maxNormalComPeriodo: MAX_CHEIO + PERIODO,
   get maxAtual(): string { return this.emPromocao ? MAX_PROMO : MAX_CHEIO; },
   get maxAtualComPeriodo(): string { return (this.emPromocao ? MAX_PROMO : MAX_CHEIO) + PERIODO; },
-
   // --- Subir de Pro para Pro Max ---
   // A DIFERENÇA mensal entre os dois níveis: é o que passa a pagar a mais por
   // mês quem sobe. Promoção: 7,99 - 4,99. Cheio: 11,99 - 7,99.
@@ -103,14 +109,20 @@ export const PRECO = {
   upgradePromoComPeriodo: "+3,00€" + PERIODO,
   get upgradeAtual(): string { return this.emPromocao ? "+3,00€" : "+4,00€"; },
   get upgradeAtualComPeriodo(): string { return (this.emPromocao ? "+3,00€" : "+4,00€") + PERIODO; },
-
   /**
-   * A taxa ÚNICA de quem sobe depois dos 7 dias de teste.
-   *
-   * Não é mensal e não se soma à mensalidade: paga-se uma vez, e a partir daí a
-   * pessoa paga o Pro Max normal, igual a quem o comprou direto.
-   */
+  * A taxa ÚNICA de quem sobe depois dos 7 dias de teste.
+  *
+  * Não é mensal e não se soma à mensalidade: paga-se uma vez, e a partir daí a
+  * pessoa paga o Pro Max normal, igual a quem o comprou direto.
+  */
   subidaTaxa: "4,99€",
+  /**
+  * Aviso da moeda, para pôr por baixo de qualquer preço.
+  *
+  * Usar através do <NotaMoeda /> (components/NotaMoeda.tsx) em vez de escrever
+  * a frase à mão — assim muda-se num sítio só, como os preços.
+  */
+  notaMoeda: "Valor cobrado na tua moeda local, à taxa de câmbio do dia.",
 
   // Mensagem de valor (fase de testes: sem prémios — foco em informação/competição).
   premios: "Joga com mais informação e compete pelo topo do ranking",
