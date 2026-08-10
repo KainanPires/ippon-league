@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import { PRECO } from "@/lib/precos";
 import { limparCacheNivel } from "@/lib/useNivel";
+import { SeletorLingua } from "@/components/SeletorLingua";
 import { normalizarFaixa, corDaFaixa, nomeDaFaixa, type Faixa } from "@/lib/faixas";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -309,6 +310,32 @@ return (
         )}
       </div>
     )}
+  {/* IDIOMA — antes das personalizações, de propósito.
+
+      A língua não é um enfeite como a cor do judogui: é o que decide se a
+      pessoa percebe o resto do ecrã. Quem chega ao perfil à procura de trocar
+      de língua não devia ter de passar por três secções primeiro.
+
+      Até agora só se trocava no /entrar e no /comecar — ou seja, quem já tinha
+      sessão iniciada não conseguia mudar de todo.
+
+      É o mesmo componente das outras duas páginas, aqui na versão completa
+      (com os nomes das línguas, não só as bandeiras). A escolha grava no
+      user_metadata e segue a pessoa entre aparelhos.
+
+      O título fica em português: este ecrã ainda não foi traduzido, e uma
+      palavra traduzida no meio de um ecrã por traduzir fica pior do que deixar
+      tudo igual. Quando o perfil for traduzido, passa a {t("perfil.lingua")},
+      que já existe nas cinco línguas. */}
+  {ready && conta && (
+      <>
+      <SectionTitle>Idioma</SectionTitle>
+      <div style={{ marginBottom: 26 }}>
+      <SeletorLingua />
+      </div>
+      </>
+    )}
+
   {abertoDados && ready && conta && <SeletorJudogui />}
   {abertoDados && ready && conta && <AlterarSenha email={conta.email} />}
   {ready && conta && (
