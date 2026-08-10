@@ -2,7 +2,7 @@
 //
 // CHAVE DA COPA IPPON (servidor, chave secreta) — para a tela visual.
 //
-// Recebe (GET): ?id=<league_id>  ou  ?codigo=<invite_code>
+// Recebe (GET): ?id=<league_id> ou ?codigo=<invite_code>
 // Devolve a chave inteira: os confrontos por ronda + a identidade de cada
 // jogador (nome do time + escudo) para a tela desenhar sem mais pedidos.
 //
@@ -11,7 +11,7 @@
 // quando a copa terminou.
 //
 // ---------------------------------------------------------------------------
-// SÃO DOIS TERCEIROS, NÃO UM  (corrigido)
+// SÃO DOIS TERCEIROS, NÃO UM (corrigido)
 //
 // O motor da copa produz DOIS medalhistas de bronze, por cruzamento diagonal:
 // o repescado de cima enfrenta o perdedor da meia-final de baixo, e o repescado
@@ -28,69 +28,58 @@
 //
 // NOTA sobre os bronzes sem luta: em chaves pequenas há bronzes com
 // jogador_b = null (não há ninguém para repescar, e o perdedor da meia fica em
-// 3º direto). O apuramento decide-os como "bye" e grava o vencedor à mesma, por
+  // 3º direto). O apuramento decide-os como "bye" e grava o vencedor à mesma, por
 // isso entram nesta lista como qualquer outro.
 // ---------------------------------------------------------------------------
-
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { tamanhoChave, numeroDeRondas } from "@/lib/copa";
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
 interface Identidade {
   user_id: string;
   nome_time: string;
+  /** Continente e país do inscrito na Copa do Dôdo. null nas copas de amigos. */
+  continente: string | null;
+  pais: string | null;
   escudo: unknown;
 }
-
 export async function GET(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ erro: "Servidor sem ligação." }, { status: 500 });
   }
-
   const { searchParams } = new URL(req.url);
   const league_id_param = (searchParams.get("id") || "").trim();
   const codigo = (searchParams.get("codigo") || "").trim().toUpperCase();
   if (!league_id_param && !codigo) {
     return NextResponse.json({ erro: "Falta ?id=<league_id> ou ?codigo=<invite_code>." }, { status: 400 });
   }
-
   // Liga + estado da copa (por id ou por código de convite).
   const consulta = supabaseAdmin
-    .from("leagues")
-    .select("id, name, formato, copa_estado, copa_competicao_inicial, escudo");
-
+  .from("leagues")
+  .select("id, name, formato, copa_estado, copa_competicao_inicial, escudo");
   const { data: liga } = league_id_param
-    ? await consulta.eq("id", league_id_param).maybeSingle()
-    : await consulta.eq("invite_code", codigo).maybeSingle();
-
+  ? await consulta.eq("id", league_id_param).maybeSingle()
+  : await consulta.eq("invite_code", codigo).maybeSingle();
   if (!liga) return NextResponse.json({ erro: "Liga não encontrada." }, { status: 404 });
   if (liga.formato !== "copa") return NextResponse.json({ erro: "Não é uma copa." }, { status: 400 });
-
   const league_id = liga.id;
-
   // Confrontos (toda a chave), por ronda e ordem. A `metade` vai também: é o
   // lado da chave, e é o que permite desenhar a repescagem do lado certo.
   const { data: confrontos } = await supabaseAdmin
-    .from("copa_confrontos")
-    .select("id, ronda, ordem, fase, jogador_a, jogador_b, id_competicao, pontos_a, pontos_b, vencedor, decidido_por, estado, metade")
-    .eq("league_id", league_id)
-    .order("ronda", { ascending: true })
-    .order("ordem", { ascending: true });
-
+  .from("copa_confrontos")
+  .select("id, ronda, ordem, fase, jogador_a, jogador_b, id_competicao, pontos_a, pontos_b, vencedor, decidido_por, estado, metade")
+  .eq("league_id", league_id)
+  .order("ronda", { ascending: true })
+  .order("ordem", { ascending: true });
   const lista = confrontos || [];
-
   // Inscritos (para saber o tamanho da chave e listar quem está, mesmo sem sorteio).
   const { data: membros } = await supabaseAdmin
-    .from("league_members")
-    .select("user_id")
-    .eq("league_id", league_id);
-
+  .from("league_members")
+  .select("user_id")
+  .eq("league_id", league_id);
   const userIds = (membros || []).map((m) => m.user_id);
   const nInscritos = userIds.length;
-
   // Quem está REALMENTE na chave (saiu no sorteio). Pode ser menos do que os
   // inscritos: quem entrou na liga DEPOIS do sorteio não tem lugar na chave.
   const naChave = new Set<string>();
@@ -99,7 +88,6 @@ export async function GET(req: Request) {
     if (c.jogador_b) naChave.add(String(c.jogador_b));
   }
   const nNaChave = naChave.size;
-
   // Identidade (nome do time + escudo) de cada jogador envolvido.
   // Junta os jogadores dos confrontos + os inscritos (para a sala de espera).
   const envolvidos = new Set<string>(userIds);
@@ -107,16 +95,13 @@ export async function GET(req: Request) {
     if (c.jogador_a) envolvidos.add(c.jogador_a);
     if (c.jogador_b) envolvidos.add(c.jogador_b);
   }
-  const identidades = await identidadesDe(Array.from(envolvidos), liga.copa_competicao_inicial);
-
+  const identidades = await identidadesDe(Array.from(envolvidos), liga.copa_competicao_inicial, league_id);
   // Nº total de rondas previstas (para desenhar as futuras "a aguardar").
   const tamanho = nInscritos >= 2 ? tamanhoChave(nInscritos) : 0;
   const totalRondas = tamanho >= 2 ? numeroDeRondas(tamanho) : 0;
-
   // Nº de PARTICIPANTES que REALMENTE jogaram (escalaram em alguma ronda da copa).
   // Para o certificado anti-boicote: "Campeão entre N participantes".
   const nParticiparam = await contarParticipantes(lista, Array.from(naChave));
-
   // Pódio (só quando terminada).
   const podio: {
     campeao?: string;
@@ -126,7 +111,6 @@ export async function GET(req: Request) {
     /** TODOS os medalhistas de bronze. Normalmente dois. */
     terceiros: string[];
   } = { terceiros: [] };
-
   if (liga.copa_estado === "terminada") {
     const final = lista.find((c) => c.fase === "final");
     if (final && final.vencedor) {
@@ -142,21 +126,19 @@ export async function GET(req: Request) {
     podio.terceiros = Array.from(bronzes);
     if (podio.terceiros.length > 0) podio.terceiro = podio.terceiros[0];
   }
-
   return NextResponse.json({
-    liga: { id: liga.id, name: liga.name, escudo: liga.escudo, copa_estado: liga.copa_estado },
-    confrontos: lista,
-    identidades,        // { user_id: { nome_time, escudo } }
-    nInscritos,
-    nNaChave,           // quantos saíram no sorteio (<= nInscritos)
-    nParticiparam,
-    totalRondas,
-    podio,
-  });
+      liga: { id: liga.id, name: liga.name, escudo: liga.escudo, copa_estado: liga.copa_estado },
+      confrontos: lista,
+      identidades, // { user_id: { nome_time, escudo } }
+      nInscritos,
+      nNaChave, // quantos saíram no sorteio (<= nInscritos)
+      nParticiparam,
+      totalRondas,
+      podio,
+    });
 }
-
 // Conta jogadores DISTINTOS DA CHAVE que escalaram (têm equipa na tabela
-// equipas) em alguma das competições desta copa.
+  // equipas) em alguma das competições desta copa.
 //
 // IMPORTANTE: filtra pelos jogadores da chave. Sem esse filtro, a consulta
 // contava TODOS os utilizadores da app que escalaram nessas competições — numa
@@ -169,53 +151,82 @@ async function contarParticipantes(
   if (!supabaseAdmin) return 0;
   const comps = Array.from(new Set(confrontos.map((c) => c.id_competicao).filter(Boolean)));
   if (comps.length === 0 || jogadoresDaChave.length === 0) return 0;
-
   const { data: eqs } = await supabaseAdmin
-    .from("equipas")
-    .select("user_id")
-    .in("id_competicao", comps)
-    .in("user_id", jogadoresDaChave);
-
+  .from("equipas")
+  .select("user_id")
+  .in("id_competicao", comps)
+  .in("user_id", jogadoresDaChave);
   const distintos = new Set<string>((eqs || []).map((e) => String(e.user_id)));
   return distintos.size;
 }
-
 // Lê o nome do time + escudo de cada jogador. Tenta a equipa na competição
 // inicial da copa; se não houver, cai para a equipa mais recente desse user.
-async function identidadesDe(userIds: string[], compInicial: string | null): Promise<Record<string, Identidade>> {
+async function identidadesDe(userIds: string[], compInicial: string | null, league_id?: string): Promise<Record<string, Identidade>> {
   const out: Record<string, Identidade> = {};
   if (!supabaseAdmin || userIds.length === 0) return out;
-
   // 1ª tentativa: equipa na competição inicial da copa.
   if (compInicial) {
     const { data: eqs } = await supabaseAdmin
-      .from("equipas")
-      .select("user_id, nome, escudo")
-      .eq("id_competicao", compInicial)
-      .in("user_id", userIds);
+    .from("equipas")
+    .select("user_id, nome, escudo")
+    .eq("id_competicao", compInicial)
+    .in("user_id", userIds);
     for (const e of eqs || []) {
-      out[e.user_id] = { user_id: e.user_id, nome_time: e.nome ?? "Equipa", escudo: e.escudo ?? null };
+      out[e.user_id] = { user_id: e.user_id, nome_time: e.nome ?? "Equipa", escudo: e.escudo ?? null, continente: null, pais: null };
     }
   }
-
   // Para quem ainda não tem identidade, busca a equipa mais recente.
   const faltam = userIds.filter((u) => !out[u]);
   if (faltam.length > 0) {
     const { data: outras } = await supabaseAdmin
-      .from("equipas")
-      .select("user_id, nome, escudo, id_competicao")
-      .in("user_id", faltam)
-      .order("id_competicao", { ascending: false });
+    .from("equipas")
+    .select("user_id, nome, escudo, id_competicao")
+    .in("user_id", faltam)
+    .order("id_competicao", { ascending: false });
     for (const e of outras || []) {
       if (!out[e.user_id]) {
-        out[e.user_id] = { user_id: e.user_id, nome_time: e.nome ?? "Equipa", escudo: e.escudo ?? null };
+        out[e.user_id] = { user_id: e.user_id, nome_time: e.nome ?? "Equipa", escudo: e.escudo ?? null, continente: null, pais: null };
       }
     }
   }
-
   // Fallback final para quem não tem nenhuma equipa.
   for (const u of userIds) {
-    if (!out[u]) out[u] = { user_id: u, nome_time: "Equipa", escudo: null };
+    if (!out[u]) out[u] = { user_id: u, nome_time: "Equipa", escudo: null, continente: null, pais: null };
+  }
+
+  // CONTINENTE E PAÍS — só na Copa do Dôdo.
+  //
+  // A Copa é disputada ENTRE CONTINENTES, por isso a chave não faz sentido sem
+  // dizer de onde vem cada um. O dado está em `dodo_inscricoes`, que se chega
+  // por `dodo_edicoes.league_id`.
+  //
+  // Nas copas de amigos não há edição nenhuma associada: os campos ficam a null
+  // e o ecrã simplesmente não os mostra.
+  if (league_id) {
+    try {
+      const { data: edicao } = await supabaseAdmin
+        .from("dodo_edicoes")
+        .select("id")
+        .eq("league_id", league_id)
+        .limit(1);
+
+      const edicaoId = (edicao || [])[0]?.id;
+      if (edicaoId) {
+        const { data: inscricoes } = await supabaseAdmin
+          .from("dodo_inscricoes")
+          .select("user_id, continente, pais")
+          .eq("edicao_id", edicaoId)
+          .in("user_id", userIds);
+
+        for (const i of inscricoes || []) {
+          const u = String(i.user_id);
+          if (out[u]) {
+            out[u].continente = i.continente ? String(i.continente) : null;
+            out[u].pais = i.pais ? String(i.pais) : null;
+          }
+        }
+      }
+    } catch { /* sem continente: a chave desenha na mesma */ }
   }
 
   return out;
