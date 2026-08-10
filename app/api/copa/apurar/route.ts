@@ -102,6 +102,22 @@ export async function POST(req: Request) {
   if (!liga) return NextResponse.json({ ok: false, erro: "Liga não encontrada." }, { status: 404 });
   if (liga.formato !== "copa") return NextResponse.json({ ok: false, erro: "Não é uma copa." }, { status: 400 });
   if (liga.copa_estado !== "sorteada" && liga.copa_estado !== "a_decorrer") {
+    // COPA JÁ TERMINADA: não há nada para apurar, mas pode haver algo para
+    // RECUPERAR. O fecho da edição e o livro de campeões são gravados no fim do
+    // apuramento, e se algum deles falhar a copa fica fechada com o pódio por
+    // registar — sem campeão em `dodo_edicoes` e sem linhas em
+    // `campeoes_oficiais`, que é de onde sai o certificado.
+    //
+    // Foi o que aconteceu à 901ª: a coluna `continente` recusava nulos, o erro
+    // caiu num catch vazio, e a rota passou a sair aqui em todas as chamadas
+    // seguintes. Sem esta recuperação, o único remédio era SQL à mão.
+    //
+    // Correr o fecho outra vez é seguro: o update grava os mesmos valores e o
+    // upsert do livro não duplica.
+    if (liga.copa_estado === "terminada") {
+      const fecho = await fecharEdicaoDoDodo(league_id);
+      return NextResponse.json({ ok: true, apurou: false, estado: liga.copa_estado, fecho });
+    }
     return NextResponse.json({ ok: true, apurou: false, estado: liga.copa_estado });
   }
   const nomeLiga = String(liga.name || "a tua liga");
