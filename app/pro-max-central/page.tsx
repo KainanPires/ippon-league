@@ -21,6 +21,9 @@ import { useJudogui, type JudoguiCor } from "@/components/JudoguiProvider";
 import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
 import { ScoutDoTime } from "@/components/ScoutDoTime";
 import { marcarAreaProVista } from "@/components/BarraInferior";
+import { TutorialBoasVindas } from "@/components/TutorialBoasVindas";
+import { deveMostrarTutorial } from "@/lib/tutorials";
+import { useFaixa } from "@/lib/useFaixa";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const MAX = "#7fb8f5";
@@ -43,6 +46,12 @@ export default function ProMaxCentral() {
   const router = useRouter();
   const [estado, setEstado] = useState<"carregando" | "ok">("carregando");
   const [nome, setNome] = useState("Campeão");
+
+  // BOAS-VINDAS DO PRO MAX. Chave própria, separada da do Pro: quem sobe de Pro
+  // para Pro Max já viu o percurso do Pro e tem de ver o do Max na mesma.
+  const [verBoasVindas, setVerBoasVindas] = useState(false);
+  const [percurso, setPercurso] = useState<"promax" | "promax_direto">("promax");
+  const { cor: corFaixa } = useFaixa();
   const [verBoasVindas, setVerBoasVindas] = useState(true);
   const [verVantagens, setVerVantagens] = useState(true);
 
@@ -50,6 +59,23 @@ export default function ProMaxCentral() {
   useEffect(() => {
     marcarAreaProVista();
   }, []);
+
+  // Qual percurso? Quem NUNCA viu o do Pro veio direto de grátis para Pro Max —
+  // e nesse caso mostra-se tudo, Pro e Max juntos. Quem já viu o do Pro só
+  // precisa da diferença. Decide-se depois de o nível estar confirmado.
+  useEffect(() => {
+    if (!pronto || !ehProMax) return;
+    let vivo = true;
+    (async () => {
+      const mostrarMax = await deveMostrarTutorial("ippon_boasvindas_promax");
+      if (!vivo || !mostrarMax) return;
+      const nuncaViuPro = await deveMostrarTutorial("ippon_boasvindas_pro");
+      if (!vivo) return;
+      setPercurso(nuncaViuPro ? "promax_direto" : "promax");
+      setVerBoasVindas(true);
+    })();
+    return () => { vivo = false; };
+  }, [pronto, ehProMax]);
   useEffect(() => {
       try {
         if (localStorage.getItem("ippon_promax_boasvindas_fechada") === "1") setVerBoasVindas(false);
@@ -98,6 +124,14 @@ export default function ProMaxCentral() {
   }
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+    {verBoasVindas && (
+        <TutorialBoasVindas
+        percurso={percurso}
+        cor={corFaixa}
+        nome={nome}
+        onFechar={() => setVerBoasVindas(false)}
+        />
+      )}
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 48px" }}>
     <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
     <a href="/inicio" aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #24364a", display: "flex", alignItems: "center", justifyContent: "center", color: "#9fb3cc", textDecoration: "none", flexShrink: 0 }}>
@@ -171,6 +205,14 @@ export default function ProMaxCentral() {
     <SeletorJudoguiCentral />
     {/* SCOUT do time — o mesmo componente da /pro, aqui dentro (sem sair). */}
     <ScoutDoTime />
+
+    {/* REVER AS BOAS-VINDAS — ver a nota na central Pro. */}
+    <button
+    onClick={() => { setPercurso("promax"); setVerBoasVindas(true); }}
+    style={{ display: "block", width: "100%", marginTop: 18, background: "transparent", border: "1px solid #2a3a33", color: "#7c8a82", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", padding: "10px", borderRadius: 10, cursor: "pointer" }}
+    >
+    Rever o que tenho com o Pro Max
+    </button>
     </div>
     </main>
   );
