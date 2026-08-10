@@ -2,10 +2,10 @@
 //
 // MATA-MATA DO DÔDO — inscrições e sorteio.
 //
-//   GET  /api/dodo                        -> a edição atual e o meu estado
-//   POST /api/dodo  { acao: "inscrever" } -> inscreve-me
-//   POST /api/dodo  { acao: "sair" }      -> retira a minha inscrição
-//   GET  /api/dodo?sortear=1&key=SEGREDO  -> faz o sorteio (cron ou à mão)
+// GET /api/dodo -> a edição atual e o meu estado
+// POST /api/dodo { acao: "inscrever" } -> inscreve-me
+// POST /api/dodo { acao: "sair" } -> retira a minha inscrição
+// GET /api/dodo?sortear=1&key=SEGREDO -> faz o sorteio (cron ou à mão)
 //
 // ---------------------------------------------------------------------------
 // SÓ PRO E PRO MAX
@@ -24,15 +24,15 @@
 // concorrência na véspera do sorteio.
 //
 // ---------------------------------------------------------------------------
-// A CHAVE É GERADA AQUI, NO FIM DO SORTEIO  (corrigido)
+// A CHAVE É GERADA AQUI, NO FIM DO SORTEIO (corrigido)
 //
 // Antes, esta rota criava a liga da Copa e ficava por aí. A liga nascia com
 // copa_estado='inscricao' e SEM copa_fecho_inscricao — e:
 //
-//   • o /api/copa/sortear recusa sortear sem copa_fecho_inscricao (erro 400);
-//   • o disparo desse sortear é "preguiçoso", feito pela página da liga, e a
-//     liga da Copa não tem invite_code, por isso não há página que o dispare;
-//   • o cron só apura copas em 'sorteada' ou 'a_decorrer', nunca em 'inscricao'.
+// • o /api/copa/sortear recusa sortear sem copa_fecho_inscricao (erro 400);
+// • o disparo desse sortear é "preguiçoso", feito pela página da liga, e a
+// liga da Copa não tem invite_code, por isso não há página que o dispare;
+// • o cron só apura copas em 'sorteada' ou 'a_decorrer', nunca em 'inscricao'.
 //
 // Resultado: a Copa nascia com os 32 lá dentro e ficava parada para sempre.
 //
@@ -42,7 +42,7 @@
 // continuar coerente se alguém o chamar (devolve jaEstava e não faz nada).
 //
 // ---------------------------------------------------------------------------
-// JOGA-SE COM QUEM APARECER  (corrigido)
+// JOGA-SE COM QUEM APARECER (corrigido)
 //
 // Antes, o número de participantes era arredondado PARA BAIXO até à potência de
 // 2 mais próxima: 21 sorteados jogavam a 16 e cinco pessoas sorteadas ficavam de
@@ -57,7 +57,7 @@
 // NADA, e foi avisada de que tinha entrado.
 //
 // ---------------------------------------------------------------------------
-// DUAS EDIÇÕES AO MESMO TEMPO  (corrigido)
+// DUAS EDIÇÕES AO MESMO TEMPO (corrigido)
 //
 // Quando a Copa a decorrer chega às meias-finais, o ciclo automático abre as
 // inscrições da edição SEGUINTE. A partir desse momento existem duas edições
@@ -69,8 +69,8 @@
 // temporizador, e o temporizador era o próprio ciclo automático.
 //
 // Agora a rota devolve as duas, em campos separados:
-//   aDecorrer   — a que está a ser jogada (sorteada / a_decorrer), com a chave
-//   inscricoes  — a que está a receber inscritos, com a contagem por continente
+// aDecorrer — a que está a ser jogada (sorteada / a_decorrer), com a chave
+// inscricoes — a que está a receber inscritos, com a contagem por continente
 //
 // Os campos antigos (edicao, eu, inscritos, porContinente) continuam lá, a
 // apontar para a edição de inscrições, ou para a que decorre se não houver
@@ -102,7 +102,7 @@
 // todas as que estão a decorrer.
 //
 // A verificação vive no SERVIDOR, tanto no GET (para o ecrã não mostrar um
-// botão que vai falhar) como no POST (que é onde a regra tem de valer mesmo).
+  // botão que vai falhar) como no POST (que é onde a regra tem de valer mesmo).
 //
 // ---------------------------------------------------------------------------
 // O CICLO: CADA SORTEIO ABRE AS INSCRIÇÕES DA EDIÇÃO SEGUINTE
@@ -123,8 +123,8 @@
 // Copa atual acabar. Isso é calculável AGORA, no sorteio, porque o tamanho da
 // chave já está decidido e o número de rondas sai dele: uma chave de 32 dura 5
 // competições, de 16 dura 4, de 8 dura 3 (é o logaritmo de base 2 do tamanho —
-// as semis e a repescagem correm na mesma competição, e a final com os bronzes
-// também).
+  // as semis e a repescagem correm na mesma competição, e a final com os bronzes
+  // também).
 //
 // PORQUE NÃO A FUNÇÃO ippon_abrir_proxima_copa
 //
@@ -139,15 +139,14 @@
 // NOTIFICAÇÕES
 //
 // Três momentos, no sininho:
-//   1. inscrição aceite  — confirma e diz QUANDO sai o sorteio
-//   2. sorteado          — parabéns, e o que fazer a seguir
-//   3. não sorteado      — sem rodeios, e sem deixar a pessoa sem próximo passo
+// 1. inscrição aceite — confirma e diz QUANDO sai o sorteio
+// 2. sorteado — parabéns, e o que fazer a seguir
+// 3. não sorteado — sem rodeios, e sem deixar a pessoa sem próximo passo
 //
 // Nenhuma delas bloqueia: uma notificação falhada não pode desfazer um sorteio.
 // A idempotência vem de graça — a inscrição só entra uma vez (índice único) e o
 // sorteio só corre uma vez por edição (a edição muda de estado no fim).
 // ---------------------------------------------------------------------------
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -159,10 +158,8 @@ import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import { focoMercado } from "@/lib/calendario";
 import { gerarPrimeiraRonda, tamanhoChave, competicaoPorId, idCompeticaoSeguinte } from "@/lib/copa";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
 /** Data por extenso, para o texto das notificações. */
 function dataPT(iso: string | null | undefined): string {
   if (!iso) return "em breve";
@@ -170,26 +167,24 @@ function dataPT(iso: string | null | undefined): string {
   if (!Number.isFinite(t)) return "em breve";
   return new Date(t).toLocaleDateString("pt-PT", { day: "2-digit", month: "long" });
 }
-
 /**
- * Quantas competições dura uma copa de `tamanho` participantes.
- *
- * É o logaritmo de base 2: 32 -> 5, 16 -> 4, 8 -> 3, 4 -> 2, 2 -> 1. As semis
- * correm na mesma competição que a 1ª ronda de repescagem, e a final na mesma
- * que os dois bronzes — por isso não há rondas a mais por causa da repescagem.
- */
+* Quantas competições dura uma copa de `tamanho` participantes.
+*
+* É o logaritmo de base 2: 32 -> 5, 16 -> 4, 8 -> 3, 4 -> 2, 2 -> 1. As semis
+* correm na mesma competição que a 1ª ronda de repescagem, e a final na mesma
+* que os dois bronzes — por isso não há rondas a mais por causa da repescagem.
+*/
 function rondasDaCopa(tamanho: number): number {
   let r = 0;
   let p = tamanho;
   while (p > 1) { p = Math.floor(p / 2); r++; }
   return Math.max(1, r);
 }
-
 /**
- * A competição em que a copa SEGUINTE vai começar: a primeira depois de esta
- * acabar. Anda no calendário `rondas` passos a partir da competição inicial.
- * Devolve null se o calendário acabar pelo meio (fim do ano).
- */
+* A competição em que a copa SEGUINTE vai começar: a primeira depois de esta
+* acabar. Anda no calendário `rondas` passos a partir da competição inicial.
+* Devolve null se o calendário acabar pelo meio (fim do ano).
+*/
 function competicaoDepoisDaCopa(idInicial: string, rondas: number): string | null {
   let id: string | null = idInicial;
   for (let i = 0; i < rondas; i++) {
@@ -198,7 +193,6 @@ function competicaoDepoisDaCopa(idInicial: string, rondas: number): string | nul
   }
   return id;
 }
-
 /** Véspera de uma competição, às 23:59. null se a data não for conhecida. */
 function vesperaDe(idComp: string | null): string | null {
   if (!idComp) return null;
@@ -210,7 +204,6 @@ function vesperaDe(idComp: string | null): string | null {
   d.setUTCHours(23, 59, 0, 0);
   return d.toISOString();
 }
-
 /** Quem está a pedir, a partir do token da sessão. */
 async function uidDoPedido(req: Request): Promise<string | null> {
   try {
@@ -221,9 +214,9 @@ async function uidDoPedido(req: Request): Promise<string | null> {
     const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
     if (!url || !pub) return null;
     const sb = createClient(url, pub, {
-      global: { headers: { Authorization: `Bearer ${t}` } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+        global: { headers: { Authorization: `Bearer ${t}` } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
     const { data, error } = await sb.auth.getUser();
     if (error) return null;
     return data?.user?.id ?? null;
@@ -231,7 +224,6 @@ async function uidDoPedido(req: Request): Promise<string | null> {
     return null;
   }
 }
-
 // ---------------------------------------------------------------------------
 // GET — a edição atual, ou o sorteio.
 // ---------------------------------------------------------------------------
@@ -239,9 +231,7 @@ export async function GET(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
   }
-
   const { searchParams } = new URL(req.url);
-
   // --- SORTEIO (cron ou disparo manual) ---
   if (searchParams.get("sortear") === "1") {
     const key = (searchParams.get("key") || "").trim();
@@ -250,7 +240,6 @@ export async function GET(req: Request) {
     }
     return sortear(searchParams.get("simular") === "1");
   }
-
   // --- Estado atual ---
   // NOTA: 'preparada' fica de fora de propósito. Uma edição preparada existe
   // mas ninguém a vê — serve para deixar tudo pronto e só abrir as inscrições
@@ -259,36 +248,31 @@ export async function GET(req: Request) {
   //
   // Sem .maybeSingle(): podem vir DUAS (ver a nota no topo do ficheiro).
   const { data: edicoes } = await supabaseAdmin
-    .from("dodo_edicoes")
-    .select("*")
-    .in("estado", ["inscricoes", "sorteada", "a_decorrer"])
-    .order("numero", { ascending: false });
-
+  .from("dodo_edicoes")
+  .select("*")
+  .in("estado", ["inscricoes", "sorteada", "a_decorrer"])
+  .order("numero", { ascending: false });
   const todas = (edicoes || []) as Record<string, unknown>[];
   // A mais recente de cada tipo. Ordenadas por número decrescente, a primeira
   // que corresponder é sempre a mais nova.
   const edInscricoes = todas.find((e) => String(e.estado) === "inscricoes") ?? null;
   const edDecorrer = todas.find((e) => ["sorteada", "a_decorrer"].includes(String(e.estado))) ?? null;
-
   const uid = await uidDoPedido(req);
-
   // Estou na chave de ALGUMA Copa a decorrer? É o que bloqueia a inscrição na
   // seguinte. Olha para todas as que estão a jogar-se, não só para a mais
   // recente (ver a nota no topo do ficheiro).
   const idsEmCurso = todas
-    .filter((e) => ["sorteada", "a_decorrer"].includes(String(e.estado)))
-    .map((e) => String(e.id));
-
+  .filter((e) => ["sorteada", "a_decorrer"].includes(String(e.estado)))
+  .map((e) => String(e.id));
   /** Edições a decorrer em que estou na chave. */
   let minhasEmCurso: string[] = [];
   if (uid && idsEmCurso.length > 0) {
     const { data: m } = await supabaseAdmin
-      .from("dodo_inscricoes").select("edicao_id")
-      .eq("user_id", uid).eq("sorteada", true).in("edicao_id", idsEmCurso);
+    .from("dodo_inscricoes").select("edicao_id")
+    .eq("user_id", uid).eq("sorteada", true).in("edicao_id", idsEmCurso);
     minhasEmCurso = (m || []).map((x) => String((x as Record<string, unknown>).edicao_id));
   }
   const naChaveAtual = minhasEmCurso.length > 0;
-
   if (!edInscricoes && !edDecorrer) {
     // Não há edição visível — mas se houver uma PREPARADA com data de abertura,
     // dizemos QUANDO abre. A página mostra a contagem; a edição continua
@@ -297,69 +281,59 @@ export async function GET(req: Request) {
     let abre_em: string | null = null;
     try {
       const { data: prep } = await supabaseAdmin
-        .from("dodo_edicoes")
-        .select("*")
-        .eq("estado", "preparada")
-        .order("numero", { ascending: true })
-        .limit(1);
+      .from("dodo_edicoes")
+      .select("*")
+      .eq("estado", "preparada")
+      .order("numero", { ascending: true })
+      .limit(1);
       // Coluna opcional: se ainda não existir na tabela, fica null e a página
       // volta ao texto genérico. Nada rebenta por causa disto.
       const d = ((prep || [])[0] as Record<string, unknown> | undefined)?.inscricoes_de;
       if (d) abre_em = String(d);
     } catch { /* sem data: a página diz apenas "em breve" */ }
-
     return NextResponse.json({
-      ok: true, edicao: null, aDecorrer: null, inscricoes: null,
-      abre_em, vagasPorContinente: VAGAS_POR_CONTINENTE, totalVagas: TOTAL_VAGAS,
-      nota: "Não há edição a decorrer.",
-    });
+        ok: true, edicao: null, aDecorrer: null, inscricoes: null,
+        abre_em, vagasPorContinente: VAGAS_POR_CONTINENTE, totalVagas: TOTAL_VAGAS,
+        nota: "Não há edição a decorrer.",
+      });
   }
-
   const nomeDe = (e: Record<string, unknown>) =>
-    `${e.numero}ª Copa do Dôdo entre Continentes · ${e.ano || new Date().getFullYear()}`;
-
+  `${e.numero}ª Copa do Dôdo entre Continentes · ${e.ano || new Date().getFullYear()}`;
   // ---- A edição que está a RECEBER INSCRIÇÕES ----
   let inscricoesOut: Record<string, unknown> | null = null;
   let porContinente: Record<string, number> = {};
   let nInscritos = 0;
   let eu: { inscrito: boolean; sorteada: boolean | null; podeInscrever: boolean; motivo?: string } | null = null;
-
   if (edInscricoes) {
     const { data: inscritos } = await supabaseAdmin
-      .from("dodo_inscricoes")
-      .select("continente, sorteada")
-      .eq("edicao_id", edInscricoes.id);
-
+    .from("dodo_inscricoes")
+    .select("continente, sorteada")
+    .eq("edicao_id", edInscricoes.id);
     for (const i of inscritos || []) {
       const c = String((i as Record<string, unknown>).continente);
       porContinente[c] = (porContinente[c] ?? 0) + 1;
     }
     nInscritos = (inscritos || []).length;
-
     const aberto = !!edInscricoes.inscricoes_ate
-      && Date.now() < Date.parse(String(edInscricoes.inscricoes_ate));
-
+    && Date.now() < Date.parse(String(edInscricoes.inscricoes_ate));
     if (uid) {
       const { data: u } = await supabaseAdmin
-        .from("users").select("is_pro, is_pro_max").eq("id", uid).maybeSingle();
+      .from("users").select("is_pro, is_pro_max").eq("id", uid).maybeSingle();
       const ehPro = !!u?.is_pro || !!u?.is_pro_max;
-
       const { data: minha } = await supabaseAdmin
-        .from("dodo_inscricoes").select("sorteada")
-        .eq("edicao_id", edInscricoes.id).eq("user_id", uid).maybeSingle();
-
+      .from("dodo_inscricoes").select("sorteada")
+      .eq("edicao_id", edInscricoes.id).eq("user_id", uid).maybeSingle();
       eu = {
         inscrito: !!minha,
         sorteada: minha ? (minha.sorteada as boolean | null) : null,
         podeInscrever: ehPro && aberto && !minha && !naChaveAtual,
         motivo: !ehPro
-          ? "O Mata-Mata do Dôdo é para membros Ippon Pro."
-          : naChaveAtual
-            ? "Estás a disputar uma Copa. Podes inscrever-te assim que ela terminar — normalmente a tempo da edição seguinte a esta."
-            : !aberto ? "As inscrições já fecharam." : undefined,
+        ? "O Mata-Mata do Dôdo é para membros Ippon Pro."
+        : naChaveAtual
+        ? "Estás a disputar uma Copa. Podes inscrever-te assim que ela terminar — normalmente a tempo da edição seguinte a esta."
+        : !aberto ? "As inscrições já fecharam." : undefined,
       };
     }
-
     inscricoesOut = {
       id: edInscricoes.id, numero: edInscricoes.numero, ano: edInscricoes.ano,
       estado: edInscricoes.estado, nome: nomeDe(edInscricoes),
@@ -367,21 +341,18 @@ export async function GET(req: Request) {
       aberta: aberto, inscritos: nInscritos, porContinente, eu,
     };
   }
-
   // ---- A edição que está a SER JOGADA ----
   let decorrerOut: Record<string, unknown> | null = null;
-
   if (edDecorrer) {
     // O código de convite da liga, para a página abrir a chave direto.
     let invite_code: string | null = null;
     if (edDecorrer.league_id) {
       try {
         const { data: lg } = await supabaseAdmin
-          .from("leagues").select("invite_code").eq("id", edDecorrer.league_id).maybeSingle();
+        .from("leagues").select("invite_code").eq("id", edDecorrer.league_id).maybeSingle();
         if (lg?.invite_code) invite_code = String(lg.invite_code);
       } catch { /* sem código: a página cai em /ligas */ }
     }
-
     decorrerOut = {
       id: edDecorrer.id, numero: edDecorrer.numero, ano: edDecorrer.ano,
       estado: edDecorrer.estado, nome: nomeDe(edDecorrer),
@@ -390,144 +361,154 @@ export async function GET(req: Request) {
       naChave: minhasEmCurso.includes(String(edDecorrer.id)),
     };
   }
-
   // ---- Compatibilidade ----
   // `edicao` e companhia continuam a existir, a apontar para a edição de
   // inscrições (é a que pede uma ação a quem chega). Sem inscrições abertas,
   // apontam para a que decorre. Os ecrãs antigos não dão pela diferença.
   const principal = edInscricoes ?? edDecorrer!;
   const principalEhInscricoes = !!edInscricoes;
-
   return NextResponse.json({
-    ok: true,
-    // --- campos novos ---
-    aDecorrer: decorrerOut,
-    inscricoes: inscricoesOut,
-    // --- campos antigos, mantidos ---
-    edicao: {
-      id: principal.id, numero: principal.numero, ano: principal.ano,
-      estado: principal.estado, nome: nomeDe(principal),
-      inscricoes_ate: principal.inscricoes_ate ?? null,
-      league_id: principal.league_id ?? null,
-      invite_code: principalEhInscricoes ? null : (decorrerOut?.invite_code ?? null),
-    },
-    inscritos: nInscritos,
-    porContinente,
-    vagasPorContinente: VAGAS_POR_CONTINENTE,
-    totalVagas: TOTAL_VAGAS,
-    eu,
-  });
+      ok: true,
+      // --- campos novos ---
+      aDecorrer: decorrerOut,
+      inscricoes: inscricoesOut,
+      // --- campos antigos, mantidos ---
+      edicao: {
+        id: principal.id, numero: principal.numero, ano: principal.ano,
+        estado: principal.estado, nome: nomeDe(principal),
+        inscricoes_ate: principal.inscricoes_ate ?? null,
+        league_id: principal.league_id ?? null,
+        invite_code: principalEhInscricoes ? null : (decorrerOut?.invite_code ?? null),
+      },
+      inscritos: nInscritos,
+      porContinente,
+      vagasPorContinente: VAGAS_POR_CONTINENTE,
+      totalVagas: TOTAL_VAGAS,
+      eu,
+    });
 }
-
 // ---------------------------------------------------------------------------
 // O SORTEIO
 // ---------------------------------------------------------------------------
 async function sortear(simular: boolean) {
   if (!supabaseAdmin) return NextResponse.json({ ok: false }, { status: 500 });
-
   // .limit(1) e não .maybeSingle(): se por alguma razão houver duas edições em
   // inscrições, sorteia-se a mais recente em vez de rebentar.
   const { data: linhas } = await supabaseAdmin
-    .from("dodo_edicoes").select("*").eq("estado", "inscricoes")
-    .order("numero", { ascending: false }).limit(1);
+  .from("dodo_edicoes").select("*").eq("estado", "inscricoes")
+  .order("numero", { ascending: false }).limit(1);
   const edicao = (linhas || [])[0];
-
   if (!edicao) return NextResponse.json({ ok: true, nada: "Nenhuma edição com inscrições abertas." });
-
   // Ainda dentro do prazo? O sorteio só acontece depois de fecharem.
   if (!edicao.inscricoes_ate || Date.now() < Date.parse(String(edicao.inscricoes_ate))) {
     return NextResponse.json({ ok: true, aguarda: true, inscricoes_ate: edicao.inscricoes_ate });
   }
-
   const { data: inscricoes } = await supabaseAdmin
-    .from("dodo_inscricoes").select("id, user_id, continente").eq("edicao_id", edicao.id);
-
+  .from("dodo_inscricoes").select("id, user_id, continente").eq("edicao_id", edicao.id);
   const lista: { id: string; user_id: string; continente: string }[] =
-    (inscricoes || []).map((i) => ({
-      id: String(i.id), user_id: String(i.user_id), continente: String(i.continente),
-    }));
-
+  (inscricoes || []).map((i) => ({
+        id: String(i.id), user_id: String(i.user_id), continente: String(i.continente),
+      }));
   // Com menos de 2, não há mata-mata. A edição fica à espera em vez de arrancar
   // vazia — e o prazo pode ser estendido à mão.
   if (lista.length < 2) {
     return NextResponse.json({ ok: true, poucos: true, inscritos: lista.length });
   }
-
   const r = sortearVagas(lista, Object.keys(NOME_CONTINENTE));
-
   // Entram TODOS os sorteados. A chave arredonda para cima e as vagas a mais
   // viram passagens automáticas na 1ª ronda (ver a nota no topo do ficheiro).
   const entram = r.sorteados;
   const tamanho = tamanhoChave(entram.length);
-
   if (simular) {
     return NextResponse.json({
-      ok: true, simulacao: true, edicao: edicao.numero,
-      inscritos: lista.length, sorteados: r.sorteados.length,
-      tamanhoChave: tamanho, passagensAutomaticas: tamanho - entram.length,
-      resumo: r.resumo,
-    });
+        ok: true, simulacao: true, edicao: edicao.numero,
+        inscritos: lista.length, sorteados: r.sorteados.length,
+        tamanhoChave: tamanho, passagensAutomaticas: tamanho - entram.length,
+        resumo: r.resumo,
+      });
   }
-
   // Marca quem entrou e quem não.
   const idsEntram = new Set(entram.map((e) => e.id));
   for (const s of r.sorteados) {
     await supabaseAdmin.from("dodo_inscricoes")
-      .update({ sorteada: idsEntram.has(s.id), por_redistribuicao: s.porRedistribuicao })
-      .eq("id", s.id);
+    .update({ sorteada: idsEntram.has(s.id), por_redistribuicao: s.porRedistribuicao })
+    .eq("id", s.id);
   }
   for (const e of r.excluidos) {
     await supabaseAdmin.from("dodo_inscricoes").update({ sorteada: false }).eq("id", e.id);
   }
-
   // Cria a liga que vai gerir a chave. Reaproveita toda a máquina de mata-mata
   // que já existe — confrontos, apuramento, herança de equipa, desempates.
   const alvo = focoMercado().alvo;
-  const { data: liga } = await supabaseAdmin.from("leagues").insert({
-    // O nome oficial da edição. Contínuo desde sempre (1.ª, 2.ª, 3.ª...), com o
-    // ano à parte: a 15.ª Copa vale mais como marca do que "a 3.ª de 2029".
-    name: `${edicao.numero}ª Copa do Dôdo entre Continentes · ${edicao.ano || new Date().getFullYear()}`,
-    type: "oficial",
-    formato: "copa",
-    privacidade: "fechada",
-    copa_estado: "inscricao",
-    copa_competicao_inicial: alvo.idCompeticao,
-    // GRAVADO AGORA (era o que faltava): sem esta data o /api/copa/sortear
-    // recusa-se a sortear. Fica com o instante em que as inscrições fecharam,
-    // que é a verdade — foi mesmo aí que a inscrição acabou.
-    copa_fecho_inscricao: edicao.inscricoes_ate,
-    estado: "ativa",
-  }).select("id, invite_code").maybeSingle();
+  const { data: liga, error: erroLiga } = await supabaseAdmin.from("leagues").insert({
+      // O nome oficial da edição. Contínuo desde sempre (1.ª, 2.ª, 3.ª...), com o
+      // ano à parte: a 15.ª Copa vale mais como marca do que "a 3.ª de 2029".
+      name: `${edicao.numero}ª Copa do Dôdo entre Continentes · ${edicao.ano || new Date().getFullYear()}`,
+      type: "oficial",
+      // OBRIGATÓRIO. A coluna `scope` é NOT NULL e só aceita mundial /
+      // continental / nacional / privada. Faltava aqui, e o insert falhava
+      // SEMPRE — em silêncio, porque o `error` era descartado.
+      //
+      // Consequência: a liga nunca nascia, o `if (liga?.id)` nunca corria, o
+      // estado da edição ficava em "inscricoes" para sempre, e o cron horário
+      // voltava a sortear e a NOTIFICAR de hora a hora. A edição 900 mandou 58
+      // notificações em três dias.
+      //
+      // "privada": a Copa é fechada e entra-se por sorteio. Não é "mundial"
+      // nem "continental" de propósito — são esses dois que o
+      // lib/ligasOficiais.ts gere, e ele remove das oficiais quem não devia lá
+      // estar. Com scope="privada", a Copa fica fora do alcance dele.
+      scope: "privada",
+      formato: "copa",
+      privacidade: "fechada",
+      copa_estado: "inscricao",
+      copa_competicao_inicial: alvo.idCompeticao,
+      // GRAVADO AGORA (era o que faltava): sem esta data o /api/copa/sortear
+      // recusa-se a sortear. Fica com o instante em que as inscrições fecharam,
+      // que é a verdade — foi mesmo aí que a inscrição acabou.
+      copa_fecho_inscricao: edicao.inscricoes_ate,
+      estado: "ativa",
+    }).select("id, invite_code").maybeSingle();
+
+  // O erro do insert TEM de ser visto. Antes era descartado, e por isso uma
+  // peça central falhou durante três dias sem deixar rasto nenhum — nem nos
+  // registos, nem na resposta da rota.
+  if (erroLiga || !liga?.id) {
+    return NextResponse.json({
+      ok: false,
+      erro: "Não foi possível criar a liga da Copa. O sorteio não foi concluído.",
+      detalhe: erroLiga?.message ?? "insert sem erro mas sem linha devolvida",
+      edicao: edicao.numero,
+    }, { status: 500 });
+  }
 
   let confrontosCriados = 0;
-
-  if (liga?.id) {
+  {
     for (const e of entram) {
       await supabaseAdmin.from("league_members").insert({
-        league_id: liga.id, user_id: e.user_id, score: 0, position: 0,
-        entrou_competicao: alvo.idCompeticao,
-      });
+          league_id: liga.id, user_id: e.user_id, score: 0, position: 0,
+          entrou_competicao: alvo.idCompeticao,
+        });
     }
-
     // --- A CHAVE ---
     // Gerada já. Não há motivo para esperar: os participantes estão decididos.
     try {
       const confrontos = gerarPrimeiraRonda(entram.map((e) => e.user_id), alvo.idCompeticao);
       const linhas = confrontos.map((c) => ({
-        league_id: liga.id,
-        ronda: c.ronda,
-        ordem: c.ordem,
-        fase: c.fase,
-        jogador_a: c.jogador_a,
-        jogador_b: c.jogador_b,
-        id_competicao: c.id_competicao,
-        estado: c.estado,
-        metade: c.metade,
-        // Confrontos com bye já vêm decididos (o jogador passa sozinho).
-        ...(c.jogador_b === null
-          ? { vencedor: c.jogador_a, decidido_por: "bye", estado: "decidido" }
-          : {}),
-      }));
+            league_id: liga.id,
+            ronda: c.ronda,
+            ordem: c.ordem,
+            fase: c.fase,
+            jogador_a: c.jogador_a,
+            jogador_b: c.jogador_b,
+            id_competicao: c.id_competicao,
+            estado: c.estado,
+            metade: c.metade,
+            // Confrontos com bye já vêm decididos (o jogador passa sozinho).
+            ...(c.jogador_b === null
+              ? { vencedor: c.jogador_a, decidido_por: "bye", estado: "decidido" }
+              : {}),
+          }));
       if (linhas.length > 0) {
         const { error: erroChave } = await supabaseAdmin.from("copa_confrontos").insert(linhas);
         if (!erroChave) {
@@ -536,16 +517,30 @@ async function sortear(simular: boolean) {
           // sorteada sem confrontos seria pior do que uma por sortear: o cron
           // passava a apurá-la e não encontrava nada para decidir.
           await supabaseAdmin.from("leagues")
-            .update({ copa_estado: "sorteada" }).eq("id", liga.id);
+          .update({ copa_estado: "sorteada" }).eq("id", liga.id);
         }
       }
     } catch { /* a chave falhou: a liga fica em 'inscricao' e pode ser sorteada à mão */ }
-
-    await supabaseAdmin.from("dodo_edicoes")
+    // A MARCA. Enquanto o estado for "inscricoes", o cron volta a chamar esta
+    // rota de hora a hora e repete tudo — incluindo as notificações. Sem esta
+    // linha gravada, a edição fica num ciclo infinito.
+    //
+    // Se falhar, NÃO se notifica ninguém: mais vale um sorteio por concluir do
+    // que 58 notificações iguais a cada utilizador.
+    const { error: erroEstado } = await supabaseAdmin.from("dodo_edicoes")
       .update({ estado: "sorteada", league_id: liga.id, competicao_inicial: alvo.idCompeticao })
       .eq("id", edicao.id);
-  }
 
+    if (erroEstado) {
+      return NextResponse.json({
+        ok: false,
+        erro: "A chave foi criada mas o estado da edição não ficou gravado. Ninguém foi notificado, para não repetir na próxima hora.",
+        detalhe: erroEstado.message,
+        edicao: edicao.numero,
+        league_id: liga.id,
+      }, { status: 500 });
+    }
+  }
   // --- ABRIR AS INSCRIÇÕES DA EDIÇÃO SEGUINTE ---
   // Aqui, e não noutro sítio: ver a nota do ciclo no topo do ficheiro.
   let seguinteAberta: number | null = null;
@@ -553,8 +548,7 @@ async function sortear(simular: boolean) {
     // Guarda: se por alguma razão já houver uma edição a receber inscritos,
     // não se abre outra. Duas em inscrições ao mesmo tempo não fazem sentido.
     const { data: jaAberta } = await supabaseAdmin
-      .from("dodo_edicoes").select("id").eq("estado", "inscricoes").limit(1);
-
+    .from("dodo_edicoes").select("id").eq("estado", "inscricoes").limit(1);
     if ((jaAberta || []).length === 0 && confrontosCriados > 0) {
       const rondas = rondasDaCopa(tamanho);
       const compSeguinte = competicaoDepoisDaCopa(alvo.idCompeticao, rondas);
@@ -563,59 +557,53 @@ async function sortear(simular: boolean) {
       // melhor uma data imperfeita do que uma edição sem prazo, que nunca
       // seria sorteada.
       const fecho = vesperaDe(compSeguinte)
-        ?? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-
+      ?? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
       const numeroSeguinte = Number(edicao.numero) + 1;
       const { error: erroNova } = await supabaseAdmin.from("dodo_edicoes").insert({
-        numero: numeroSeguinte,
-        ano: new Date(fecho).getUTCFullYear(),
-        estado: "inscricoes",
-        inscricoes_de: new Date().toISOString(),
-        inscricoes_ate: fecho,
-      });
+          numero: numeroSeguinte,
+          ano: new Date(fecho).getUTCFullYear(),
+          estado: "inscricoes",
+          inscricoes_de: new Date().toISOString(),
+          inscricoes_ate: fecho,
+        });
       if (!erroNova) seguinteAberta = numeroSeguinte;
     }
   } catch { /* o ciclo pode ser retomado à mão; o sorteio já está feito */ }
-
   // --- Avisar toda a gente ---
   // Depois de tudo gravado. Uma notificação que falhe não desfaz um sorteio.
   const linkChave = liga?.invite_code ? `/liga/${liga.invite_code}` : "/dodo";
   const nEntraram = entram.length;
-
   for (const e of entram) {
     try {
       await criarNotificacaoServidor({
-        paraUserId: e.user_id,
-        tipo: "dodo_sorteado",
-        titulo: `🏆 Entraste na ${edicao.numero}ª Copa do Dôdo!`,
-        corpo: `Parabéns — a tua vaga saiu no sorteio. És um dos ${nEntraram} em prova e, a partir de agora, cada rodada elimina metade. Fica atento às competições seguintes: os pontos da tua equipa contam a sério e não há segunda hipótese. Vais representar o teu país e o teu continente. Boa sorte, campeão!`,
-        link: linkChave,
-      });
+          paraUserId: e.user_id,
+          tipo: "dodo_sorteado",
+          titulo: `🏆 Entraste na ${edicao.numero}ª Copa do Dôdo!`,
+          corpo: `Parabéns — a tua vaga saiu no sorteio. És um dos ${nEntraram} em prova e, a partir de agora, cada rodada elimina metade. Fica atento às competições seguintes: os pontos da tua equipa contam a sério e não há segunda hipótese. Vais representar o teu país e o teu continente. Boa sorte, campeão!`,
+          link: linkChave,
+        });
     } catch { /* um push falhado não bloqueia os outros */ }
   }
-
   const idsQueEntraram = new Set(entram.map((e) => e.user_id));
   const foraIds = lista.map((i) => i.user_id).filter((u) => !idsQueEntraram.has(u));
   for (const u of foraIds) {
     try {
       await criarNotificacaoServidor({
-        paraUserId: u,
-        tipo: "dodo_nao_sorteado",
-        titulo: "A tua vaga não saiu no sorteio",
-        corpo: `Houve mais inscritos do que lugares na ${edicao.numero}ª Copa do Dôdo e o sorteio decidiu. Não teve nada a ver com o teu desempenho — foi mesmo sorte. A próxima edição volta a abrir com todas as vagas em jogo, e podes acompanhar esta Copa na mesma. Até lá, há as ligas Mundial e Continental a correr.`,
-        link: "/dodo",
-      });
+          paraUserId: u,
+          tipo: "dodo_nao_sorteado",
+          titulo: "A tua vaga não saiu no sorteio",
+          corpo: `Houve mais inscritos do que lugares na ${edicao.numero}ª Copa do Dôdo e o sorteio decidiu. Não teve nada a ver com o teu desempenho — foi mesmo sorte. A próxima edição volta a abrir com todas as vagas em jogo, e podes acompanhar esta Copa na mesma. Até lá, há as ligas Mundial e Continental a correr.`,
+          link: "/dodo",
+        });
     } catch { /* idem */ }
   }
-
   return NextResponse.json({
-    ok: true, edicao: edicao.numero, league_id: liga?.id ?? null,
-    inscritos: lista.length, entraram: entram.length,
-    tamanhoChave: tamanho, passagensAutomaticas: tamanho - entram.length,
-    confrontos: confrontosCriados, seguinteAberta, resumo: r.resumo,
-  });
+      ok: true, edicao: edicao.numero, league_id: liga?.id ?? null,
+      inscritos: lista.length, entraram: entram.length,
+      tamanhoChave: tamanho, passagensAutomaticas: tamanho - entram.length,
+      confrontos: confrontosCriados, seguinteAberta, resumo: r.resumo,
+    });
 }
-
 // ---------------------------------------------------------------------------
 // POST — inscrever-me, ou sair.
 // ---------------------------------------------------------------------------
@@ -623,111 +611,94 @@ export async function POST(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
   }
-
   const uid = await uidDoPedido(req);
   if (!uid) return NextResponse.json({ ok: false, erro: "Entra na tua conta." }, { status: 401 });
-
   let corpo: { acao?: string };
   try { corpo = await req.json(); } catch {
     return NextResponse.json({ ok: false, erro: "Pedido inválido." }, { status: 400 });
   }
-
   // Mesma razão do sortear: .limit(1) em vez de .maybeSingle().
   const { data: linhasEd } = await supabaseAdmin
-    .from("dodo_edicoes").select("id, numero, estado, inscricoes_ate")
-    .eq("estado", "inscricoes").order("numero", { ascending: false }).limit(1);
+  .from("dodo_edicoes").select("id, numero, estado, inscricoes_ate")
+  .eq("estado", "inscricoes").order("numero", { ascending: false }).limit(1);
   const edicao = (linhasEd || [])[0];
-
   if (!edicao) {
     return NextResponse.json({ ok: false, erro: "Não há inscrições abertas." }, { status: 409 });
   }
   if (!edicao.inscricoes_ate || Date.now() >= Date.parse(String(edicao.inscricoes_ate))) {
     return NextResponse.json({ ok: false, erro: "As inscrições já fecharam." }, { status: 409 });
   }
-
   if (corpo.acao === "sair") {
     await supabaseAdmin.from("dodo_inscricoes").delete()
-      .eq("edicao_id", edicao.id).eq("user_id", uid);
+    .eq("edicao_id", edicao.id).eq("user_id", uid);
     return NextResponse.json({ ok: true, saiu: true });
   }
-
   if (corpo.acao !== "inscrever") {
     return NextResponse.json({ ok: false, erro: "Ação desconhecida." }, { status: 400 });
   }
-
   // O plano: Pro OU Pro Max (níveis cumulativos).
   const { data: u } = await supabaseAdmin
-    .from("users").select("is_pro, is_pro_max, continente, country_code").eq("id", uid).maybeSingle();
-
+  .from("users").select("is_pro, is_pro_max, continente, country_code").eq("id", uid).maybeSingle();
   if (!u?.is_pro && !u?.is_pro_max) {
     return NextResponse.json({
-      ok: false, precisaPro: true,
-      erro: "O Mata-Mata do Dôdo é para membros Ippon Pro.",
-    }, { status: 403 });
+        ok: false, precisaPro: true,
+        erro: "O Mata-Mata do Dôdo é para membros Ippon Pro.",
+      }, { status: 403 });
   }
-
   // Já está a disputar alguma Copa? Então não entra nesta.
   // Verificado aqui, no servidor: o ecrã esconde o botão, mas a regra tem de
   // valer mesmo que o pedido chegue por outro caminho. E procura em TODAS as
   // edições a decorrer, não só na mais recente.
   const { data: emCurso } = await supabaseAdmin
-    .from("dodo_edicoes").select("id, numero")
-    .in("estado", ["sorteada", "a_decorrer"]);
-
+  .from("dodo_edicoes").select("id, numero")
+  .in("estado", ["sorteada", "a_decorrer"]);
   const emCursoLista = (emCurso || []) as Record<string, unknown>[];
   if (emCursoLista.length > 0) {
     const { data: minhas } = await supabaseAdmin
-      .from("dodo_inscricoes").select("edicao_id")
-      .eq("user_id", uid).eq("sorteada", true)
-      .in("edicao_id", emCursoLista.map((e) => String(e.id)));
-
+    .from("dodo_inscricoes").select("edicao_id")
+    .eq("user_id", uid).eq("sorteada", true)
+    .in("edicao_id", emCursoLista.map((e) => String(e.id)));
     const primeira = (minhas || [])[0] as Record<string, unknown> | undefined;
     if (primeira) {
       const dela = emCursoLista.find((e) => String(e.id) === String(primeira.edicao_id));
       const num = dela ? `${dela.numero}ª` : "atual";
       return NextResponse.json({
-        ok: false, naCopaAtual: true,
-        erro: `Estás a disputar a ${num} Copa. Podes inscrever-te assim que ela terminar — normalmente a tempo da edição seguinte a esta.`,
-      }, { status: 409 });
+          ok: false, naCopaAtual: true,
+          erro: `Estás a disputar a ${num} Copa. Podes inscrever-te assim que ela terminar — normalmente a tempo da edição seguinte a esta.`,
+        }, { status: 409 });
     }
   }
-
   const continente = String(u?.continente || "");
   if (!continente) {
     return NextResponse.json({
-      ok: false,
-      erro: "Falta o teu país no perfil — é ele que define por que continente concorres.",
-    }, { status: 400 });
+        ok: false,
+        erro: "Falta o teu país no perfil — é ele que define por que continente concorres.",
+      }, { status: 400 });
   }
-
   const { error } = await supabaseAdmin.from("dodo_inscricoes").insert({
-    edicao_id: edicao.id, user_id: uid,
-    // Gravado agora, e não lido no sorteio: ver a nota no topo.
-    continente, pais: u?.country_code ? String(u.country_code) : null,
-  });
-
+      edicao_id: edicao.id, user_id: uid,
+      // Gravado agora, e não lido no sorteio: ver a nota no topo.
+      continente, pais: u?.country_code ? String(u.country_code) : null,
+    });
   if (error) {
     // O índice único apanha a segunda inscrição da mesma pessoa. Não notifica
     // outra vez — é exatamente por isso que a notificação vive DEPOIS do insert
     // e não antes: uma pessoa, uma inscrição, uma mensagem.
     return NextResponse.json({ ok: true, jaEstava: true });
   }
-
   const nomeCont = NOME_CONTINENTE[continente as Continente] || continente;
-
   // Confirmação no sininho. Diz o que interessa: está feito, e QUANDO se sabe.
   try {
     await criarNotificacaoServidor({
-      paraUserId: uid,
-      tipo: "dodo_inscricao",
-      titulo: `Inscrição feita na ${edicao.numero}ª Copa do Dôdo`,
-      corpo: `Estás no sorteio, a concorrer pelas vagas d${nomeCont === "Ásia" || nomeCont === "África" || nomeCont === "América" ? "a" : "o"} ${nomeCont}. O sorteio sai a ${dataPT(edicao.inscricoes_ate)}, na véspera da competição que abre a Copa, e avisamos-te aqui no momento. Não é por ordem de chegada: teres-te inscrito hoje ou no último dia dá exatamente a mesma hipótese.`,
-      link: "/dodo",
-    });
+        paraUserId: uid,
+        tipo: "dodo_inscricao",
+        titulo: `Inscrição feita na ${edicao.numero}ª Copa do Dôdo`,
+        corpo: `Estás no sorteio, a concorrer pelas vagas d${nomeCont === "Ásia" || nomeCont === "África" || nomeCont === "América" ? "a" : "o"} ${nomeCont}. O sorteio sai a ${dataPT(edicao.inscricoes_ate)}, na véspera da competição que abre a Copa, e avisamos-te aqui no momento. Não é por ordem de chegada: teres-te inscrito hoje ou no último dia dá exatamente a mesma hipótese.`,
+        link: "/dodo",
+      });
   } catch { /* a inscrição está feita; o aviso é um extra */ }
-
   return NextResponse.json({
-    ok: true, inscrito: true,
-    continente, nomeContinente: nomeCont,
-  });
+      ok: true, inscrito: true,
+      continente, nomeContinente: nomeCont,
+    });
 }
