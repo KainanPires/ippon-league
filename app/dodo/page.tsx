@@ -134,6 +134,16 @@ export default function Dodo() {
   // são doze parágrafos que empurram a chave para o fundo da página e fazem o
   // ecrã parecer um folheto. Ficam atrás de um link, e quem quiser abre.
   const [verComoFunciona, setVerComoFunciona] = useState(false);
+  const [verContinentes, setVerContinentes] = useState(false);
+
+  // Escape fecha a janela. Numa janela que cobre o ecrã inteiro, não ter saída
+  // pelo teclado é das coisas que mais irrita.
+  useEffect(() => {
+    if (!verComoFunciona) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setVerComoFunciona(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [verComoFunciona]);
   const [temSessao, setTemSessao] = useState<boolean | null>(null);
   const [meuContinente, setMeuContinente] = useState<Continente | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
@@ -202,9 +212,6 @@ export default function Dodo() {
   const insc = dados?.inscricoes ?? null;
   const jogo = dados?.aDecorrer ?? null;
 
-  // Há chave para mostrar? É o que decide se as regras ficam abertas ou
-  // recolhidas — e a chave só existe depois do sorteio.
-  const temChave = !!jogo?.league_id && (jogo.estado === "sorteada" || jogo.estado === "a_decorrer");
   const eu = insc?.eu ?? null;
   const vagasCont = dados?.vagasPorContinente ?? 6;
   const totalVagas = dados?.totalVagas ?? 32;
@@ -289,32 +296,50 @@ export default function Dodo() {
           )}
         {/* ---- A COPA QUE ESTÁ A DECORRER ---- */}
         {jogo && <CopaADecorrer jogo={jogo} compacta={!!insc} />}
-        {/* ---- Continentes: só faz sentido com inscrições a contar ---- */}
+        {/* ---- Continentes: acordeão, não uma lista sempre aberta ----
+          Cinco linhas de estatística entre a inscrição e a chave afastam uma
+          da outra. Quem quer saber onde a vaga está mais disputada abre; quem
+          vem ver a chave não tropeça nisto. */}
         {insc && (
             <>
-            <Section style={{ marginTop: 20 }}>Onde há mais concorrência</Section>
-            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>
-            Quantas pessoas se inscreveram em cada continente. De cada um saem {vagasCont} no sorteio, por isso quanto mais inscritos ali, mais disputada é a vaga.
-            </p>
-            {(Object.keys(NOME_CONTINENTE) as Continente[]).map((c) => {
-                  const n = insc.porContinente?.[c] ?? 0;
-                  return (
-                    <LinhaContinente
-                    key={c}
-                    nome={NOME_CONTINENTE[c]}
-                    n={n}
-                    maior={maiorContinente}
-                    meu={meuContinente === c}
-                    />
-                  );
-                })}
+            <button
+            onClick={() => setVerContinentes((v) => !v)}
+            style={{ width: "100%", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#121815", border: "1px solid #243029", borderRadius: 12, padding: "12px 14px", cursor: "pointer", textAlign: "left" }}
+            >
+            <span>
+            <span style={{ display: "block", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cfd8d2" }}>
+            Onde há mais concorrência
+            </span>
+            <span style={{ display: "block", fontSize: 11, color: "#7c8a82", marginTop: 2 }}>
+            {insc.inscritos} inscritos · {vagasCont} vagas por continente
+            </span>
+            </span>
+            <span style={{ flexShrink: 0, color: "#7c8a82", fontSize: 16, transform: verContinentes ? "rotate(180deg)" : "none", transition: "transform .15s" }}>⌄</span>
+            </button>
+
+            {verContinentes && (
+                <div style={{ marginTop: 10 }}>
+                <p style={{ fontSize: 12, color: "#7c8a82", margin: "0 0 12px", lineHeight: 1.5 }}>
+                De cada continente saem {vagasCont} no sorteio, por isso quanto mais inscritos ali, mais disputada é a vaga.
+                </p>
+                {(Object.keys(NOME_CONTINENTE) as Continente[]).map((c) => {
+                      const n = insc.porContinente?.[c] ?? 0;
+                      return (
+                        <LinhaContinente
+                        key={c}
+                        nome={NOME_CONTINENTE[c]}
+                        n={n}
+                        maior={maiorContinente}
+                        meu={meuContinente === c}
+                        />
+                      );
+                    })}
+                </div>
+              )}
             </>
           )}
         </>
       )}
-    {/* --- REGRAS --- Fora do ramo da edição de propósito: quem chega aqui
-      entre Copas tem de sair a saber o que é, quem pode entrar e como se
-      joga. Uma página que só diz "não há edição" não angaria ninguém. */}
     {/* --- A CHAVE ---
         Aparece assim que o sorteio corre, e é visível a TODA A GENTE: quem não
         é Pro não pode disputar, mas vê quem enfrenta quem. É a melhor angariação
@@ -322,6 +347,18 @@ export default function Dodo() {
 
         Desenhada pelo components/Chave.tsx, o mesmo do /chave-atletas. Uma
         chave deve ter sempre o mesmo aspeto, seja de atletas ou de equipas. */}
+    {/* O botão das regras existe SEMPRE, mesmo sem edição a decorrer: quem
+        chega aqui entre Copas tem de sair a saber o que isto é. Antes as
+        regras estavam sempre abertas por baixo; agora estão a um toque. */}
+    {!aCarregar && !jogo?.league_id && (
+        <button
+        onClick={() => setVerComoFunciona(true)}
+        style={{ marginTop: 20, background: "transparent", border: "1px solid #2a3a33", color: "#9fb0a7", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", padding: "9px 14px", borderRadius: 999, cursor: "pointer" }}
+        >
+        Como funciona a Copa
+        </button>
+      )}
+
     {!aCarregar && jogo?.league_id && (
         <>
         {/* DOIS BOTÕES, por cima da chave.
@@ -338,10 +375,10 @@ export default function Dodo() {
             pior do que não oferecer. */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 9, marginTop: 20, alignItems: "center" }}>
         <button
-        onClick={() => setVerComoFunciona((v) => !v)}
+        onClick={() => setVerComoFunciona(true)}
         style={{ background: "transparent", border: "1px solid #2a3a33", color: "#9fb0a7", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", padding: "9px 14px", borderRadius: 999, cursor: "pointer" }}
         >
-        {verComoFunciona ? "Esconder as regras" : "Como funciona a Copa"}
+        Como funciona a Copa
         </button>
 
         {insc && aberta && eu?.podeInscrever && !eu?.inscrito && (
@@ -377,9 +414,6 @@ export default function Dodo() {
         MAS com uma chave sorteada no ecrã, a ação principal passa a ser vê-la.
         Aí as regras recolhem-se para trás do "Como funciona", logo por cima da
         chave, e só aparecem a quem as pedir. */}
-    {!aCarregar && (temChave ? verComoFunciona : true) && (
-        <Regras vagasCont={vagasCont} totalVagas={totalVagas} />
-      )}
     </div>
     {/* Confirmação de saída. */}
     {confirmarSaida && (
@@ -396,6 +430,40 @@ export default function Dodo() {
         </div>
         </div>
       )}
+    {/* --- COMO FUNCIONA: JANELA AO CENTRO ---
+        Estava por baixo da chave, no fluxo da página. Com uma chave de 32 isso
+        significa abrir um texto que fica a três ecrãs de distância de quem
+        carregou no botão — ou seja, não abrir nada.
+
+        Ao centro, por cima de tudo, a resposta aparece onde a pergunta foi
+        feita. Fecha-se no X, no fundo escuro ou com Escape. */}
+    {verComoFunciona && (
+        <div
+        onClick={() => setVerComoFunciona(false)}
+        style={{ position: "fixed", inset: 0, zIndex: 120, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 14px", overflowY: "auto" }}
+        >
+        <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 460, background: "#0f1411", border: "1px solid #2a3a33", borderRadius: 16, padding: "16px 16px 22px", margin: "auto 0" }}
+        >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 6, position: "sticky", top: 0, background: "#0f1411", paddingBottom: 8 }}>
+        <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#f1ede2" }}>
+        Como funciona a Copa
+        </span>
+        <button
+        onClick={() => setVerComoFunciona(false)}
+        aria-label="Fechar"
+        style={{ flexShrink: 0, width: 30, height: 30, borderRadius: "50%", border: "1px solid #2a3a33", background: "transparent", color: "#cfd8d2", cursor: "pointer", fontSize: 14, lineHeight: 1 }}
+        >
+        ✕
+        </button>
+        </div>
+
+        <Regras vagasCont={vagasCont} totalVagas={totalVagas} />
+        </div>
+        </div>
+      )}
+
     <BarraInferior ativo="ligas" />
     </main>
   );
