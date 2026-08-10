@@ -46,13 +46,14 @@
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 
-export type Lingua = "pt" | "en" | "es" | "fr";
+export type Lingua = "pt" | "en" | "es" | "fr" | "de";
 
 export const LINGUAS: { id: Lingua; nome: string; bandeira: string }[] = [
   { id: "pt", nome: "Português", bandeira: "🇵🇹" },
   { id: "en", nome: "English", bandeira: "🇬🇧" },
   { id: "es", nome: "Español", bandeira: "🇪🇸" },
   { id: "fr", nome: "Français", bandeira: "🇫🇷" },
+  { id: "de", nome: "Deutsch", bandeira: "🇩🇪" },
 ];
 
 const CHAVE_LOCAL = "ippon_lingua";
@@ -779,7 +780,192 @@ const FR: Dicionario = {
   "perfil.sair": "Se déconnecter",
 };
 
-const DICIONARIOS: Record<Lingua, Dicionario> = { pt: PT, en: EN, es: ES, fr: FR };
+const DE: Dicionario = {
+
+  // --- comum ---
+  "comum.voltar": "Zurück",
+  "comum.continuar": "Weiter",
+  "comum.seguinte": "Weiter",
+  "comum.anterior": "Zurück",
+  "comum.cancelar": "Abbrechen",
+  "comum.guardar": "Speichern",
+  "comum.fechar": "Schließen",
+  "comum.confirmar": "Bestätigen",
+  "comum.carregando": "Wird geladen…",
+  "comum.erro": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+  "comum.pular": "Überspringen",
+  "comum.naoMostrarMais": "Nicht mehr anzeigen",
+  "comum.verMais": "Mehr anzeigen",
+  "comum.de": "von",
+  "comum.pontos": "Punkte",
+  "comum.pts": "Pkt",
+
+  // --- entrar / registo ---
+  "entrar.titulo": "Anmelden",
+  "entrar.email": "E-Mail",
+  "entrar.senha": "Passwort",
+  "entrar.mostrarSenha": "Passwort anzeigen",
+  "entrar.esqueci": "Passwort vergessen?",
+  "entrar.semConta": "Noch kein Konto?",
+  "entrar.criarConta": "Konto erstellen",
+  "entrar.aEntrar": "Anmeldung…",
+  "entrar.credenciaisErradas": "E-Mail oder Passwort falsch.",
+  "entrar.dojo": "Betritt das Dojo",
+  "entrar.slogan": "Das offizielle Spiel für Judo-Fans",
+  "entrar.placeholderEmail": "du@email.com",
+  "entrar.preencher": "Gib E-Mail und Passwort ein.",
+  "entrar.esconderSenha": "Passwort verbergen",
+  "entrar.aProcessar": "Wird verarbeitet…",
+  "entrar.simCorrigir": "Ja, korrigieren",
+  "entrar.servidor": "Die Serververbindung ist nicht eingerichtet. Bitte später versuchen.",
+  "entrar.naoConfirmado": "Du hast deine E-Mail noch nicht bestätigt. Sieh in deinem Postfach nach.",
+  "entrar.falhou": "Anmeldung nicht möglich. Bitte versuche es erneut.",
+  "entrar.recEscreveEmail": "Gib zuerst deine E-Mail ein, damit wir dir den Link schicken können.",
+  "entrar.recFalhou": "Der Link konnte nicht gesendet werden. Bitte versuche es erneut.",
+  "entrar.recEnviado": "Wir haben einen Link an {email} geschickt. Öffne ihn, um ein neues Passwort zu setzen.",
+
+  "comecar.titulo": "Erstelle dein Konto",
+  "comecar.nome": "Name",
+  "comecar.dataNasc": "Geburtsdatum",
+  "comecar.telefone": "Telefon (optional)",
+  "comecar.faixa": "Dein Gürtel",
+  "comecar.pais": "Dein Land",
+  "comecar.semFaixa": "Ich habe noch keinen Gürtel",
+  "comecar.criar": "Konto erstellen",
+  "comecar.aCriar": "Wird erstellt…",
+  "comecar.jaTenhoConta": "Ich habe schon ein Konto",
+  "comecar.contaCriada": "Konto erstellt!",
+  "comecar.podesEntrar": "Du kannst dich anmelden und dein Team aufstellen.",
+  "comecar.emailConfirmacao": "Wir schicken eine E-Mail an {email}, damit du deine Adresse bestätigen kannst. Du musst nicht warten — bestätige aber, sobald du kannst, um keine Runden-Hinweise zu verpassen.",
+
+  // erros do formulário
+  "comecar.beta": "Beta",
+  "comecar.entrarAgora": "Jetzt anmelden",
+  "comecar.phEmail": "email@beispiel.com",
+  "comecar.entraNoJogo": "Steig ins Spiel ein",
+  "comecar.sub": "Erstelle dein Konto, stelle dein Team auf und miss dich mit Judo-Fans aus aller Welt.",
+  "comecar.phNome": "Dein Name",
+  "comecar.phSenha": "Mindestens 6 Zeichen",
+  "comecar.phTelemovel": "Handynummer",
+  "comecar.contacto": "Kontakt (optional)",
+  "comecar.selecionaFaixa": "Wähle deinen Gürtel",
+  "comecar.selecionaPais": "Wähle dein Land",
+  "comecar.procurar": "Suchen…",
+  "comecar.procurarPais": "Land suchen…",
+  "comecar.semResultados": "Keine Ergebnisse",
+  "comecar.comecarJogar": "Losspielen",
+  "comecar.jaTens": "Hast du schon ein Konto?",
+  "comecar.entrar": "Anmelden",
+  "comecar.novidades": "Wenn du fortfährst, erklärst du dich damit einverstanden, Neuigkeiten von Ippon League zu erhalten.",
+  "comecar.temCerteza": "Bist du sicher, dass es {email} ist?",
+  "comecar.naoCorrigir": "Nein, ändern in {sugestao}",
+  "comecar.seEstiverCerto": "Wenn es stimmt, tippe erneut auf Konto erstellen.",
+  "decl.titulo": "Bestätige deine Angaben",
+  "decl.corpo": "Du erklärst, dass alle angegebenen Informationen, einschließlich deines {dataNasc}, {verdadeiras} sind.",
+  "decl.dataNasc": "Geburtsdatums",
+  "decl.verdadeiras": "wahr und richtig",
+  "decl.aviso": "Falsche Angaben können zur Schließung des Kontos führen. Mit der Bestätigung akzeptierst du die",
+  "decl.termos": "Nutzungsbedingungen",
+  "decl.e": "und die",
+  "decl.privacidade": "Datenschutzerklärung",
+  "decl.confirmar": "Bestätigen und Konto erstellen",
+  "decl.aCriarConta": "Konto wird erstellt…",
+  "decl.voltarRever": "Zurück und prüfen",
+
+  "erro.nome": "Sag uns deinen Namen.",
+  "erro.emailFalta": "Wir brauchen deine E-Mail.",
+  "erro.emailInvalido": "Diese E-Mail sieht nicht gültig aus.",
+  "erro.senhaFalta": "Erstelle ein Passwort.",
+  "erro.senhaCurta": "Das Passwort braucht mindestens 6 Zeichen.",
+  "erro.dataFalta": "Gib dein Geburtsdatum an.",
+  "erro.dataFutura": "Dieses Datum kann nicht in der Zukunft liegen.",
+  "erro.faixaFalta": "Wähle deinen Gürtel.",
+  "erro.paisFalta": "Wähle dein Land.",
+  "erro.emailExiste": "Es gibt bereits ein Konto mit dieser E-Mail. Versuche dich anzumelden.",
+  "erro.senhaRecusada": "Dieses Passwort wurde nicht akzeptiert. Versuche ein anderes (mind. 6 Zeichen).",
+  "erro.contaFalhou": "Das Konto konnte nicht erstellt werden. Bitte versuche es erneut.",
+
+  // --- navegação ---
+  "nav.inicio": "Start",
+  "nav.competicoes": "Wettkämpfe",
+  "nav.atletas": "Athleten",
+  "nav.pro": "Pro",
+  "nav.proNovidade": "{label} — neu",
+
+  // --- equipa ---
+  "equipa.meuTime": "Mein Team",
+  "equipa.patrimonio": "Vermögen",
+  "equipa.saldo": "Guthaben",
+  "equipa.capitao": "Kapitän",
+  "equipa.editar": "Team bearbeiten",
+  "equipa.guardada": "Team gespeichert",
+  "equipa.semEquipa": "Du hast für diesen Wettkampf noch kein Team gespeichert.",
+  "equipa.rodadaADecorrer": "Die Runde läuft!",
+  "equipa.valorEquipa": "Teamwert: JC {valor}",
+
+  // --- mercado ---
+  "mercado.titulo": "Markt",
+  "mercado.aberto": "Markt offen",
+  "mercado.fechado": "Markt geschlossen",
+  "mercado.fechaEm": "Schließt in {tempo}",
+  "mercado.procurar": "Athlet suchen",
+  "mercado.comprar": "Kaufen",
+  "mercado.vender": "Verkaufen",
+  "mercado.semSaldo": "Nicht genug Guthaben für diesen Athleten.",
+
+  // --- ligas ---
+  "ligas.titulo": "Wettkämpfe",
+  "ligas.minhasLigas": "Meine Ligen",
+  "ligas.criarLiga": "Liga erstellen",
+  "ligas.entrarComCodigo": "Mit Code beitreten",
+  "ligas.mundial": "Weltliga",
+  "ligas.continental": "Liga {continente}",
+  "ligas.membros": "{n} Mitglieder",
+  "ligas.escalou": "Team steht",
+  "ligas.naoEscalou": "Noch kein Team",
+
+  // --- chave ---
+  "chave.principal": "Hauptturnierbaum",
+  "chave.repescagem": "Trostrunde und Bronze",
+  "chave.vazia": "Der Turnierbaum erscheint nach der Auslosung.",
+  "chave.deslize": "wischen, um den ganzen Baum zu sehen",
+  "chave.passou": "Freilos (kein Gegner)",
+  "chave.aAguardar": "wartet",
+  "chave.proximoConfronto": "Nächster Kampf",
+
+  // --- pro ---
+  "pro.central": "Meine Pro-Zentrale",
+  "pro.centralMax": "Meine Pro-Max-Zentrale",
+  "pro.membro": "Ippon-Pro-Mitglied",
+  "pro.membroMax": "Pro-Max-Mitglied",
+  "pro.serMax": "Werde Pro Max",
+  "pro.passarMax": "Auf Pro Max upgraden",
+  "pro.rever": "Ansehen, was mir {plano} bringt",
+  "pro.comunidade": "Pro-Max-Community",
+  "pro.comunidadeSub": "WhatsApp-Gruppe: Neuigkeiten, Runden und Judo-Gespräche. Der Beitritt wird von einem Admin freigegeben.",
+
+  // --- preços ---
+  "precos.porMes": "/Monat",
+  "precos.notaMoeda": "Abrechnung in deiner Landeswährung, zum Tageskurs.",
+  "precos.contratar": "{plano} holen",
+  "precos.aAbrir": "Wird geöffnet…",
+
+  // --- faixas (o NOME da faixa não se traduz; o rótulo sim) ---
+  "faixa.atual": "Aktueller Gürtel",
+  "faixa.subiste": "Du bist zum {faixa} Gürtel aufgestiegen!",
+  "faixa.desceste": "Du bist zum {faixa} Gürtel abgestiegen. Hol ihn dir in der nächsten Runde zurück.",
+
+  // --- perfil ---
+  "perfil.titulo": "Profil",
+  "perfil.lingua": "Sprache",
+  "perfil.assinatura": "Mein Abo",
+  "perfil.seguranca": "Sicherheit",
+  "perfil.alterarSenha": "Passwort ändern",
+  "perfil.notificacoes": "Benachrichtigungen",
+  "perfil.sair": "Abmelden",
+};
+
+const DICIONARIOS: Record<Lingua, Dicionario> = { pt: PT, en: EN, es: ES, fr: FR, de: DE };
 
 // ---------------------------------------------------------------------------
 // QUE LÍNGUA MOSTRAR
@@ -798,7 +984,7 @@ export function linguaDoBrowser(): Lingua {
     const bruto = (navigator.language || "pt").slice(0, 2).toLowerCase();
     // pt-BR e pt-PT partilham dicionário: as diferenças de vocabulário do jogo
     // são poucas e o judo fala a mesma língua nos dois lados.
-    if (bruto === "en" || bruto === "es" || bruto === "fr" || bruto === "pt") return bruto as Lingua;
+    if (bruto === "en" || bruto === "es" || bruto === "fr" || bruto === "de" || bruto === "pt") return bruto as Lingua;
   } catch {
     /* servidor, ou browser sem navigator */
   }
@@ -808,7 +994,7 @@ export function linguaDoBrowser(): Lingua {
 export function linguaGuardadaLocal(): Lingua | null {
   try {
     const l = localStorage.getItem(CHAVE_LOCAL);
-    if (l === "pt" || l === "en" || l === "es" || l === "fr") return l;
+    if (l === "pt" || l === "en" || l === "es" || l === "fr" || l === "de") return l;
   } catch {}
   return null;
 }
@@ -827,7 +1013,7 @@ async function linguaDaConta(): Promise<Lingua | null> {
     const { data } = await supabase.auth.getSession();
     const meta = data.session?.user?.user_metadata as { lingua?: string } | undefined;
     const l = meta?.lingua;
-    if (l === "pt" || l === "en" || l === "es" || l === "fr") return l;
+    if (l === "pt" || l === "en" || l === "es" || l === "fr" || l === "de") return l;
   } catch {}
   return null;
 }
