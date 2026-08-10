@@ -563,6 +563,11 @@ async function pontosPorJogador(
 async function fecharEdicaoDoDodo(league_id: string): Promise<{ passo: string; erro?: string; gravados?: number }> {
   if (!supabaseAdmin) return { passo: "sem_ligacao" };
 
+  // Declarados aqui, e não dentro do bloco do pódio: são lidos no return final,
+  // que está fora dele.
+  let gravados = 0;
+  let erroDoLivro: string | undefined;
+
   try {
     const { data: edicoes } = await supabaseAdmin
       .from("dodo_edicoes")
@@ -633,8 +638,6 @@ async function fecharEdicaoDoDodo(league_id: string): Promise<{ passo: string; e
       }
 
       const ano = Number(edicao.ano) || new Date().getFullYear();
-      let gravados = 0;
-      let erroDoLivro: string | undefined;
 
       for (const p of podio) {
         // Nome e escudo da equipa, para o livro não depender de a equipa
