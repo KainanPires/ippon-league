@@ -58,11 +58,20 @@ export async function sincronizarLigasOficiais(uid: string): Promise<void> {
 
     const temAcesso = !!u.is_pro || !!u.is_pro_max;
 
-    // 2) Todas as ligas oficiais existentes.
+    // 2) As ligas oficiais que ESTA função gere: a Mundial e as continentais.
+    //
+    // O filtro pelo `scope` é essencial. A liga da Copa do Dôdo também é
+    // type="oficial", e sem este filtro ela entrava na lista de "oficiais" —
+    // com o efeito de que o passo 6, ao remover o que não é devido, EXPULSAVA
+    // da Copa toda a gente na primeira sincronização depois de um pagamento.
+    //
+    // A Copa tem scope="privada" e é gerida pelo /api/dodo, por sorteio.
+    // Aqui não se lhe toca.
     const { data: oficiais } = await supabaseAdmin
       .from("leagues")
       .select("id, name, scope")
-      .eq("type", "oficial");
+      .eq("type", "oficial")
+      .in("scope", ["mundial", "continental"]);
 
     const todas = oficiais || [];
     if (todas.length === 0) return;
