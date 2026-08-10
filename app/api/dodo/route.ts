@@ -520,7 +520,34 @@ async function sortear(simular: boolean) {
           .update({ copa_estado: "sorteada" }).eq("id", liga.id);
         }
       }
-    } catch { /* a chave falhou: a liga fica em 'inscricao' e pode ser sorteada à mão */ }
+    } catch (e) {
+      // A chave rebentou. O erro TEM de sair na resposta: se ficar num catch
+      // vazio, o sorteio parece ter corrido bem e ninguém descobre que não há
+      // confrontos até alguém abrir a página.
+      return NextResponse.json({
+        ok: false,
+        erro: "O sorteio correu mas a chave não foi criada. A edição não foi fechada.",
+        detalhe: e instanceof Error ? e.message : String(e),
+        edicao: edicao.numero,
+        league_id: liga.id,
+      }, { status: 500 });
+    }
+
+    // A EDIÇÃO SÓ É MARCADA COM A CHAVE GRAVADA.
+    //
+    // Este update estava FORA do bloco acima. Quando o insert dos confrontos
+    // falhava, a liga ficava em 'inscricao' (correto) mas a edição passava a
+    // 'sorteada' na mesma — duas tabelas a descrever o mesmo facto e a
+    // discordar. A edição dizia que tinha sido sorteada sem existir um único
+    // confronto, e o ciclo seguia em frente sobre uma mentira.
+    if (confrontosCriados === 0) {
+      return NextResponse.json({
+        ok: false,
+        erro: "Nenhum confronto foi gravado. A edição fica por sortear.",
+        edicao: edicao.numero,
+        league_id: liga.id,
+      }, { status: 500 });
+    }
     // A MARCA. Enquanto o estado for "inscricoes", o cron volta a chamar esta
     // rota de hora a hora e repete tudo — incluindo as notificações. Sem esta
     // linha gravada, a edição fica num ciclo infinito.
@@ -544,6 +571,7 @@ async function sortear(simular: boolean) {
   // --- ABRIR AS INSCRIÇÕES DA EDIÇÃO SEGUINTE ---
   // Aqui, e não noutro sítio: ver a nota do ciclo no topo do ficheiro.
   let seguinteAberta: number | null = null;
+  let erroDoCiclo: string | undefined;
   try {
     // Guarda: se por alguma razão já houver uma edição a receber inscritos,
     // não se abre outra. Duas em inscrições ao mesmo tempo não fazem sentido.
@@ -567,8 +595,14 @@ async function sortear(simular: boolean) {
           inscricoes_ate: fecho,
         });
       if (!erroNova) seguinteAberta = numeroSeguinte;
+      else erroDoCiclo = erroNova.message;
     }
-  } catch { /* o ciclo pode ser retomado à mão; o sorteio já está feito */ }
+  } catch (e) {
+    // Aqui o silêncio é aceitável — o sorteio JÁ está feito e gravado, e uma
+    // edição por abrir resolve-se à mão. Mas o motivo vai na resposta: sem ele,
+    // descobre-se que o ciclo parou meses depois, sem saber porquê.
+    erroDoCiclo = e instanceof Error ? e.message : String(e);
+  }
   // --- Avisar toda a gente ---
   // Depois de tudo gravado. Uma notificação que falhe não desfaz um sorteio.
   const linkChave = liga?.invite_code ? `/liga/${liga.invite_code}` : "/dodo";
@@ -601,7 +635,7 @@ async function sortear(simular: boolean) {
       ok: true, edicao: edicao.numero, league_id: liga?.id ?? null,
       inscritos: lista.length, entraram: entram.length,
       tamanhoChave: tamanho, passagensAutomaticas: tamanho - entram.length,
-      confrontos: confrontosCriados, seguinteAberta, resumo: r.resumo,
+      confrontos: confrontosCriados, seguinteAberta, erroDoCiclo, resumo: r.resumo,
     });
 }
 // ---------------------------------------------------------------------------
