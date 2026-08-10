@@ -130,6 +130,10 @@ export default function Dodo() {
   const [erro, setErro] = useState("");
   const [erroEhPro, setErroEhPro] = useState(false);
   const [confirmarSaida, setConfirmarSaida] = useState(false);
+  // Com uma chave no ecrã, as regras deixam de estar abertas por baixo dela:
+  // são doze parágrafos que empurram a chave para o fundo da página e fazem o
+  // ecrã parecer um folheto. Ficam atrás de um link, e quem quiser abre.
+  const [verComoFunciona, setVerComoFunciona] = useState(false);
   const [temSessao, setTemSessao] = useState<boolean | null>(null);
   const [meuContinente, setMeuContinente] = useState<Continente | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
@@ -197,6 +201,10 @@ export default function Dodo() {
   }
   const insc = dados?.inscricoes ?? null;
   const jogo = dados?.aDecorrer ?? null;
+
+  // Há chave para mostrar? É o que decide se as regras ficam abertas ou
+  // recolhidas — e a chave só existe depois do sorteio.
+  const temChave = !!jogo?.league_id && (jogo.estado === "sorteada" || jogo.estado === "a_decorrer");
   const eu = insc?.eu ?? null;
   const vagasCont = dados?.vagasPorContinente ?? 6;
   const totalVagas = dados?.totalVagas ?? 32;
@@ -315,10 +323,27 @@ export default function Dodo() {
         Desenhada pelo components/Chave.tsx, o mesmo do /chave-atletas. Uma
         chave deve ter sempre o mesmo aspeto, seja de atletas ou de equipas. */}
     {!aCarregar && jogo?.league_id && (
+        <>
+        <button
+        onClick={() => setVerComoFunciona((v) => !v)}
+        style={{ marginTop: 20, background: "transparent", border: "1px solid #2a3a33", color: "#9fb0a7", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", padding: "9px 14px", borderRadius: 999, cursor: "pointer" }}
+        >
+        {verComoFunciona ? "Esconder as regras" : "Como funciona a Copa"}
+        </button>
         <ChaveDaCopa leagueId={jogo.league_id} numero={jogo.numero} />
+        </>
       )}
 
-    {!aCarregar && <Regras vagasCont={vagasCont} totalVagas={totalVagas} />}
+    {/* --- REGRAS --- Fora do ramo da edição de propósito: quem chega aqui
+        entre Copas tem de sair a saber o que é, quem pode entrar e como se
+        joga. Uma página que só diz "não há edição" não angaria ninguém.
+
+        MAS com uma chave sorteada no ecrã, a ação principal passa a ser vê-la.
+        Aí as regras recolhem-se para trás do "Como funciona", logo por cima da
+        chave, e só aparecem a quem as pedir. */}
+    {!aCarregar && (temChave ? verComoFunciona : true) && (
+        <Regras vagasCont={vagasCont} totalVagas={totalVagas} />
+      )}
     </div>
     {/* Confirmação de saída. */}
     {confirmarSaida && (
@@ -508,6 +533,7 @@ interface ConfrontoChave {
 function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number }) {
   const [confrontos, setConfrontos] = useState<ConfrontoChave[]>([]);
   const [identidades, setIdentidades] = useState<Record<string, IdentidadeChave>>({});
+  const [totalRondas, setTotalRondas] = useState(0);
   const [aLer, setALer] = useState(true);
 
   useEffect(() => {
@@ -519,6 +545,7 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
         if (!vivo) return;
         setConfrontos(Array.isArray(j.confrontos) ? j.confrontos : []);
         setIdentidades(j.identidades || {});
+        setTotalRondas(Number(j.totalRondas) || 0);
       } catch {
         /* sem chave: a secção não aparece */
       } finally {
@@ -531,34 +558,48 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
   if (aLer || confrontos.length === 0) return null;
 
   // Constrói a árvore a partir de (ronda, ordem).
-  function montar(lista: ConfrontoChave[]): { arvores: NoChave[]; arestas: Aresta[] } {
+  //
+  // DE CIMA PARA BAIXO, e não a partir do que existe. Uma chave só parece uma
+  // chave quando se vê o caminho todo até à final — mesmo antes de os
+  // confrontos das rondas seguintes serem criados.
+  //
+  // A base de dados só grava um confronto quando os dois lados são conhecidos.
+  // Por isso, os lugares que ainda não existem são desenhados na mesma, vazios:
+  // é o afunilamento que dá forma à árvore.
+  function montar(lista: ConfrontoChave[], rondas: number): { arvores: NoChave[]; arestas: Aresta[] } {
     const porRondaOrdem = new Map<string, ConfrontoChave>();
     for (const c of lista) porRondaOrdem.set(`${c.ronda}:${c.ordem}`, c);
 
     const arestas: Aresta[] = [];
-    const maxRonda = Math.max(...lista.map((c) => c.ronda));
+    const topo = Math.max(rondas, ...lista.map((c) => c.ronda));
 
-    function no(c: ConfrontoChave): NoChave {
-      const key = c.id;
+    function no(r: number, o: number): NoChave {
+      const existente = porRondaOrdem.get(`${r}:${o}`);
+      const key = existente ? existente.id : `vazio:${r}:${o}`;
 
-      // Passagem automática: um lado só, sem filhos.
-      if (!c.jogador_b && c.decidido_por === "bye") {
-        return { tipo: "bye", key, dados: c };
+      // Passagem automática: um lado só, sem nada a alimentá-la.
+      if (existente && !existente.jogador_b && existente.decidido_por === "bye") {
+        return { tipo: "bye", key, dados: existente };
       }
 
+      // A primeira ronda é o fim da descida: ninguém a alimenta.
       const filhos: NoChave[] = [];
-      for (const oi of [c.ordem * 2, c.ordem * 2 + 1]) {
-        const f = porRondaOrdem.get(`${c.ronda - 1}:${oi}`);
-        if (f) {
-          filhos.push(no(f));
-          arestas.push({ de: f.id, para: key });
+      if (r > 1) {
+        for (const oi of [o * 2, o * 2 + 1]) {
+          const f = no(r - 1, oi);
+          filhos.push(f);
+          arestas.push({ de: f.key, para: key });
         }
       }
 
-      return { tipo: "luta", key, dados: c, filhos };
+      return { tipo: "luta", key, dados: existente ?? null, filhos };
     }
 
-    const raizes = lista.filter((c) => c.ronda === maxRonda).map((c) => no(c));
+    // O topo tem um confronto (a final). Cada ronda abaixo tem o dobro.
+    const nRaizes = topo >= 1 ? 1 : 0;
+    const raizes: NoChave[] = [];
+    for (let i = 0; i < nRaizes; i++) raizes.push(no(topo, i));
+
     return { arvores: raizes, arestas };
   }
 
@@ -566,8 +607,8 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
   const principais = confrontos.filter((c) => c.fase === "normal");
   const outros = confrontos.filter((c) => c.fase !== "normal");
 
-  const bloco1 = montar(principais);
-  const bloco2 = outros.length > 0 ? montar(outros) : null;
+  const bloco1 = montar(principais, totalRondas);
+  const bloco2 = outros.length > 0 ? montar(outros, 0) : null;
 
   // O próximo confronto por decidir: é o que ganha o ponto verde.
   const proximo = confrontos.find((c) => c.estado !== "decidido")?.id ?? null;
@@ -585,8 +626,15 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
   }
 
   function Caixa({ no }: { no: NoChave }) {
-    const c = no.dados as ConfrontoChave;
+    const c = no.dados as ConfrontoChave | null;
     const emDestaque = useEmDestaque(no.key);
+
+    // Lugar por preencher: a ronda ainda não chegou aqui. Desenha-se na mesma,
+    // porque é o que mostra o caminho que falta até à final.
+    if (!c) {
+      return <CaixaConfronto a={{ titulo: "—", vazio: true }} b={{ titulo: "—", vazio: true }} />;
+    }
+
     const decidida = c.estado === "decidido" && !!c.vencedor;
 
     if (no.tipo === "bye") {
