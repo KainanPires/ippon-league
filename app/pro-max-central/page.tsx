@@ -60,6 +60,17 @@ export default function ProMaxCentral() {
     marcarAreaProVista();
   }, []);
 
+  useEffect(() => {
+      try {
+        if (localStorage.getItem("ippon_promax_boasvindas_fechada") === "1") setVerBoasVindas(false);
+        if (localStorage.getItem("ippon_promax_vantagens_fechada") === "1") setVerVantagens(false);
+      } catch {}
+    }, []);
+  // Nível da tabela `users`. Substituiu uma dança de duas leituras ao
+  // user_metadata (a segunda "fresca", à espera que a primeira estivesse
+    // desatualizada) — que só existia porque o metadata não era de confiar.
+  const { ehPro, ehProMax, pronto } = useNivel();
+
   // Qual percurso? Quem NUNCA viu o do Pro veio direto de grátis para Pro Max —
   // e nesse caso mostra-se tudo, Pro e Max juntos. Quem já viu o do Pro só
   // precisa da diferença. Decide-se depois de o nível estar confirmado.
@@ -76,16 +87,6 @@ export default function ProMaxCentral() {
     })();
     return () => { vivo = false; };
   }, [pronto, ehProMax]);
-  useEffect(() => {
-      try {
-        if (localStorage.getItem("ippon_promax_boasvindas_fechada") === "1") setVerBoasVindas(false);
-        if (localStorage.getItem("ippon_promax_vantagens_fechada") === "1") setVerVantagens(false);
-      } catch {}
-    }, []);
-  // Nível da tabela `users`. Substituiu uma dança de duas leituras ao
-  // user_metadata (a segunda "fresca", à espera que a primeira estivesse
-    // desatualizada) — que só existia porque o metadata não era de confiar.
-  const { ehPro, ehProMax, pronto } = useNivel();
   useEffect(() => {
       let active = true;
       (async () => {
