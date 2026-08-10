@@ -222,3 +222,92 @@ export function flagEmoji(iso2: string): string {
     .toUpperCase()
     .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
 }
+// ---------------------------------------------------------------------------
+// OS NOMES DOS PAÍSES SÃO TRADUZIDOS PELO BROWSER — não à mão.
+//
+// A lista COUNTRIES acima tem os nomes em PORTUGUÊS. Servem de recurso, mas o
+// nome mostrado ao utilizador passa a vir daqui:
+//
+//   nomeDoPais("DE", "pt") -> "Alemanha"
+//   nomeDoPais("DE", "en") -> "Germany"
+//   nomeDoPais("DE", "fr") -> "Allemagne"
+//   nomeDoPais("ZA", "es") -> "Sudáfrica"
+//
+// PORQUÊ: são ~200 países. Traduzi-los à mão para quatro línguas seriam 800
+// traduções, com erros garantidos e manutenção eterna. O browser já sabe os
+// nomes oficiais de todos os países em todas as línguas — e mantém-nos
+// atualizados quando um país muda de nome.
+//
+// O `dial` e o `iso2` NÃO se traduzem: são universais.
+// ---------------------------------------------------------------------------
+
+// Cache: o Intl.DisplayNames é barato mas não é grátis, e estas listas são
+// percorridas a cada tecla numa caixa de pesquisa.
+const cacheNomesPais = new Map<string, string>();
+let cacheDisplay: { lingua: string; dn: Intl.DisplayNames } | null = null;
+
+function displayNames(lingua: string): Intl.DisplayNames | null {
+  try {
+    if (cacheDisplay && cacheDisplay.lingua === lingua) return cacheDisplay.dn;
+    const dn = new Intl.DisplayNames([lingua], { type: "region" });
+    cacheDisplay = { lingua, dn };
+    return dn;
+  } catch {
+    // Browser antigo, ou ambiente sem Intl completo: fica o nome português.
+    return null;
+  }
+}
+
+/**
+ * O nome do país na língua pedida. Recorre ao nome português da lista se o
+ * browser não souber responder — nunca devolve o código cru.
+ */
+export function nomeDoPais(iso2: string, lingua: string = "pt"): string {
+  const chave = `${lingua}:${iso2}`;
+  const guardado = cacheNomesPais.get(chave);
+  if (guardado) return guardado;
+
+  const dn = displayNames(lingua);
+  let nome = "";
+  try {
+    nome = dn?.of(iso2) ?? "";
+  } catch {
+    nome = "";
+  }
+
+  // O Intl devolve o próprio código quando não conhece a região.
+  if (!nome || nome === iso2) {
+    nome = COUNTRIES.find((c) => c.iso2 === iso2)?.name ?? iso2;
+  }
+
+  cacheNomesPais.set(chave, nome);
+  return nome;
+}
+
+const semAcentos = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/**
+ * Procura países por nome (na língua atual E em português), código ou
+ * indicativo. Devolve a lista toda quando a procura está vazia.
+ *
+ * Procurar TAMBÉM em português é de propósito: um brasileiro com a app em
+ * inglês continua a escrever "Alemanha" sem pensar.
+ */
+export function procurarPaises(query: string, lingua: string = "pt"): Country[] {
+  const q = semAcentos(query.trim());
+  if (!q) return COUNTRIES;
+  return COUNTRIES.filter(
+    (c) =>
+      semAcentos(nomeDoPais(c.iso2, lingua)).includes(q) ||
+      semAcentos(c.name).includes(q) ||
+      c.iso2.toLowerCase().includes(q) ||
+      c.dial.includes(query.trim())
+  );
+}
+
+/** Ordena por nome na língua pedida — "Germany" e "Alemanha" não caem no mesmo sítio. */
+export function paisesOrdenados(lingua: string = "pt"): Country[] {
+  return [...COUNTRIES].sort((a, b) =>
+    nomeDoPais(a.iso2, lingua).localeCompare(nomeDoPais(b.iso2, lingua), lingua)
+  );
+}
