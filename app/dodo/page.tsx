@@ -786,14 +786,18 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
 // O cartão da Copa que está a ser jogada. Quando há inscrições abertas em cima,
 // vem em versão compacta — nesse ecrã a ação principal é inscrever-se, e um
 // segundo cartão do mesmo tamanho competia com ela pela atenção.
+//
+// SEM BOTÃO "VER A CHAVE". Ele existia de quando a chave vivia noutra página.
+// Hoje a chave está logo aqui em baixo — mandar a pessoa a outro sítio ver o
+// que já está no ecrã são dois caminhos para a mesma coisa, e o segundo leva a
+// uma página com outro desenho. Isto agora é um rótulo, não uma ligação.
 function CopaADecorrer({ jogo, compacta }: { jogo: EdicaoDecorrer; compacta: boolean }) {
-  const destino = jogo.invite_code ? `/liga/${jogo.invite_code}` : "/ligas";
   const sub = jogo.naChave
   ? "Estás nesta chave"
   : jogo.estado === "sorteada" ? "Sorteio feito · à espera da primeira ronda" : "A decorrer";
   if (compacta) {
     return (
-      <a href={destino} style={{ textDecoration: "none", display: "block", marginTop: 12 }}>
+      <div style={{ marginTop: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px" }}>
       <div style={{ flexShrink: 0, display: "flex", width: 34, justifyContent: "center" }}>
       <TrofeuDodo size={32} base={false} titulo="Copa a decorrer" />
@@ -802,9 +806,8 @@ function CopaADecorrer({ jogo, compacta }: { jogo: EdicaoDecorrer; compacta: boo
       <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2" }}>{jogo.numero}ª Copa · a decorrer</div>
       <div style={{ fontSize: 11, color: jogo.naChave ? GOLD : "#93a39a" }}>{sub}</div>
       </div>
-      <span style={{ background: "#e67e22", color: "#1b0f06", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 12px", borderRadius: 8, whiteSpace: "nowrap" }}>Ver a chave</span>
       </div>
-      </a>
+      </div>
     );
   }
   return (
@@ -823,7 +826,6 @@ function CopaADecorrer({ jogo, compacta }: { jogo: EdicaoDecorrer; compacta: boo
       : "Esta edição já arrancou. As inscrições da seguinte abrem mais para a frente."}
     </div>
     </div>
-    <a href={destino} style={botaoPrimario}>Ver a chave</a>
     </div>
   );
 }
