@@ -261,7 +261,7 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
               titulo: nome(uid),
               resultado: pts == null ? null : String(pts),
               vencedor: venceu,
-              marca: <Escudo identity={escudoDe(uid)} size={18} />,
+              marca: <Escudo config={escudoDe(uid)} size={18} />,
             };
           };
 
