@@ -131,6 +131,25 @@ if (confrontos.length === 0) {
 }
 const pendentes = confrontos.filter((c) => c.estado === "pendente");
 if (pendentes.length === 0) {
+  // REDE DE SEGURANÇA: tudo decidido, mas a copa não está fechada.
+  //
+  // Acontece quando o fecho falha a meio — o apuramento decide o último
+  // confronto e algo rebenta antes de gravar o desfecho. Nas chamadas
+  // seguintes esta função saía por aqui, "não há nada pendente", e a copa
+  // ficava encravada PARA SEMPRE: sem campeão, sem pódio, sem certificado, e
+  // com a edição seguinte à espera de uma que nunca acaba.
+  //
+  // Foi exatamente o que aconteceu à 901ª. Fechar aqui torna a operação
+  // repetível: correr o apuramento outra vez resolve, em vez de não fazer nada.
+  if (liga.copa_estado !== "terminada") {
+    await supabaseAdmin.from("leagues").update({ copa_estado: "terminada" }).eq("id", league_id);
+    await fecharEdicaoDoDodo(league_id);
+    return NextResponse.json({ ok: true, apurou: false, semPendentes: true, fechadaAgora: true, estado: "terminada" });
+  }
+
+  // Já estava fechada, mas o livro de campeões pode ter falhado (é gravado
+  // dentro de um try). Voltar a chamar é seguro: o upsert não duplica.
+  await fecharEdicaoDoDodo(league_id);
   return NextResponse.json({ ok: true, apurou: false, semPendentes: true, estado: liga.copa_estado });
 }
 const rondaAtual = Math.min(...pendentes.map((c) => c.ronda));
@@ -550,8 +569,15 @@ async function fecharEdicaoDoDodo(league_id: string): Promise<void> {
       .limit(1);
 
     const edicao = (edicoes || [])[0];
-    if (!edicao) return;                     // copa de amigos: nada a fazer
-    if (edicao.estado === "terminada") return; // já fechada
+    if (!edicao) return; // copa de amigos: nada a fazer
+
+    // NÃO se sai aqui quando a edição já está terminada. O livro de campeões é
+    // gravado mais abaixo, dentro de um try, e pode ter falhado enquanto a
+    // edição fechava bem — foi o que aconteceu à 901ª, com a coluna
+    // `continente` a recusar nulos. Sair mais cedo tornava isso irrecuperável.
+    //
+    // Correr isto de novo é seguro: o update grava os mesmos valores e o upsert
+    // do livro não duplica.
 
     // O campeão é quem venceu o confronto da final.
     const { data: finais } = await supabaseAdmin
@@ -581,22 +607,27 @@ async function fecharEdicaoDoDodo(league_id: string): Promise<void> {
     if (campeao) {
       const { data: confrontos } = await supabaseAdmin
         .from("copa_confrontos")
-        .select("fase, jogador_a, jogador_b, vencedor")
+        .select("fase, jogador_a, jogador_b, vencedor, pontos_a, pontos_b")
         .eq("league_id", league_id);
 
       const lista = confrontos || [];
       const final = lista.find((c) => c.fase === "final");
 
-      const podio: { user_id: string; posicao: number }[] = [];
+      const podio: { user_id: string; posicao: number; pontos: number }[] = [];
       if (final) {
         const vice = final.vencedor === final.jogador_a ? final.jogador_b : final.jogador_a;
-        podio.push({ user_id: String(campeao), posicao: 1 });
-        if (vice) podio.push({ user_id: String(vice), posicao: 2 });
+        const ptsA = Number(final.pontos_a ?? 0);
+        const ptsB = Number(final.pontos_b ?? 0);
+        const ptsDe = (u: string | null) => (u && u === final.jogador_a ? ptsA : u === final.jogador_b ? ptsB : 0);
+
+        podio.push({ user_id: String(campeao), posicao: 1, pontos: ptsDe(String(campeao)) });
+        if (vice) podio.push({ user_id: String(vice), posicao: 2, pontos: ptsDe(String(vice)) });
       }
 
       // No judo há DOIS bronzes, e é assim que a Copa foi desenhada.
       for (const c of lista.filter((x) => x.fase === "bronze" && x.vencedor)) {
-        podio.push({ user_id: String(c.vencedor), posicao: 3 });
+        const pts = c.vencedor === c.jogador_a ? Number(c.pontos_a ?? 0) : Number(c.pontos_b ?? 0);
+        podio.push({ user_id: String(c.vencedor), posicao: 3, pontos: pts });
       }
 
       const ano = Number(edicao.ano) || new Date().getFullYear();
@@ -624,13 +655,18 @@ async function fecharEdicaoDoDodo(league_id: string): Promise<void> {
             {
               ano,
               tipo: "copa_dodo",
-              continente: null,
+              // NOT NULL, com "" por omissão — é a convenção que as ligas
+              // mundiais já usam nesta tabela (só as continentais preenchem).
+              // A Copa é mundial, por isso segue a mesma regra.
+              continente: "",
               edicao: Number(edicao.numero) || null,
               posicao: p.posicao,
               user_id: p.user_id,
               nome_time,
               escudo,
-              pontos: null,
+              // NOT NULL. Os pontos do confronto que deu o lugar: a final para
+              // o campeão e o vice, o bronze para os terceiros.
+              pontos: Math.round(p.pontos * 10) / 10,
             },
             { onConflict: "ano,tipo,continente,edicao,posicao" }
           );
