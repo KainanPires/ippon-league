@@ -19,49 +19,49 @@ import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 //
 // Agora é ao contrário, e com três travões:
 //
-//   1. ORDEM. Primeiro o que não pode falhar (congelar, apurar, notificar).
-//      Os preços vão para o FIM, com o tempo que sobrar. Preços atrasados umas
-//      horas são um incómodo; pontos por congelar são um jogo partido.
+// 1. ORDEM. Primeiro o que não pode falhar (congelar, apurar, notificar).
+// Os preços vão para o FIM, com o tempo que sobrar. Preços atrasados umas
+// horas são um incómodo; pontos por congelar são um jogo partido.
 //
-//   2. CURSOR nos preços. Cada corrida faz as categorias que couberem e guarda
-//      onde ficou (linha _cursor_precos no atletas_cache). A corrida seguinte
-//      continua dali. O cursor reinicia quando muda a competição-alvo OU quando
-//      muda o dia — garante uma passagem completa por dia, fatiada.
+// 2. CURSOR nos preços. Cada corrida faz as categorias que couberem e guarda
+// onde ficou (linha _cursor_precos no atletas_cache). A corrida seguinte
+// continua dali. O cursor reinicia quando muda a competição-alvo OU quando
+// muda o dia — garante uma passagem completa por dia, fatiada.
 //
-//   3. ORÇAMENTO. Nenhuma etapa nova arranca depois de MS_ORCAMENTO menos a sua
-//      margem. O cron termina sempre com resposta, nunca a meio.
+// 3. ORÇAMENTO. Nenhuma etapa nova arranca depois de MS_ORCAMENTO menos a sua
+// margem. O cron termina sempre com resposta, nunca a meio.
 //
 // PRESSUPOSTO: este cron passa a correr DE HORA A HORA (cron-job.org), não 1x/dia.
 // Com ~5 categorias por corrida, a passagem completa dos preços fecha em ~3h.
 // Todas as outras etapas são idempotentes (congelar tem retoma; mercado e datas
-// têm travão por dia/competição; faixas só notificam quem muda mesmo), por isso
+  // têm travão por dia/competição; faixas só notificam quem muda mesmo), por isso
 // correr de hora a hora não duplica nada.
 //
-//   /api/cron                  -> corrida normal (congelar → apurar → avisar → preços)
-//   /api/cron?comp=ID          -> força a competição-alvo dos preços
-//   /api/cron?key=SEGREDO      -> disparo MANUAL para teste (em vez do cabeçalho da Vercel)
-//   /api/cron?congelar=ID      -> força CONGELAR uma competição específica
-//   /api/cron?recongelar=ID    -> limpa e volta a congelar do zero
-//   /api/cron?precos=1         -> força as 14 categorias de uma vez (ignora cursor e orçamento)
-//   /api/cron?diag=1           -> NÃO congela: mostra as contas do filtro de candidatas
-//   /api/cron?datas=1          -> força SÓ as notificações de datas especiais
-//   /api/cron?mercado=1        -> força SÓ as notificações de mercado
-//   /api/cron?melhores=ID      -> força os Melhores da Rodada de uma competição
-//   /api/cron?encerrar=1       -> força SÓ o encerramento de ligas terminadas
-//   /api/cron?apurar=LEAGUE_ID -> força apurar uma copa
-//   /api/cron?fecharano=AAAA   -> fecha a época de um ano JÁ TERMINADO
+// /api/cron -> corrida normal (congelar → apurar → avisar → preços)
+// /api/cron?comp=ID -> força a competição-alvo dos preços
+// /api/cron?key=SEGREDO -> disparo MANUAL para teste (em vez do cabeçalho da Vercel)
+// /api/cron?congelar=ID -> força CONGELAR uma competição específica
+// /api/cron?recongelar=ID -> limpa e volta a congelar do zero
+// /api/cron?precos=1 -> força as 14 categorias de uma vez (ignora cursor e orçamento)
+// /api/cron?diag=1 -> NÃO congela: mostra as contas do filtro de candidatas
+// /api/cron?datas=1 -> força SÓ as notificações de datas especiais
+// /api/cron?mercado=1 -> força SÓ as notificações de mercado
+// /api/cron?melhores=ID -> força os Melhores da Rodada de uma competição
+// /api/cron?encerrar=1 -> força SÓ o encerramento de ligas terminadas
+// /api/cron?apurar=LEAGUE_ID -> força apurar uma copa
+// /api/cron?fecharano=AAAA -> fecha a época de um ano JÁ TERMINADO
 //
 // Etapas, pela ordem em que correm:
-//   (A) atualiza "a competir agora" (aviso no Mercado)
-//   (C) CONGELA as competições recentes terminadas (motor lib/congelar)
-//   (C-quater) MELHORES DA RODADA das competições recém-congeladas
-//   (C-bis) APURA as copas ativas (mata-mata)
-//   (C-ter) ENCERRA as ligas de pontos corridos cuja janela acabou
-//   (D) no dia 1, recalcula as faixas do mês anterior (users.belt)
-//   (D-bis) a 1 de janeiro, fecha a época oficial do ano anterior
-//   (E) notificações de mercado (aberto/fechado)
-//   (F) notificações de DATAS ESPECIAIS (aniversário, Dia do Judô)
-//   (B) PREÇOS da competição que se aproxima — por cursor, com o que sobrar
+// (A) atualiza "a competir agora" (aviso no Mercado)
+// (C) CONGELA as competições recentes terminadas (motor lib/congelar)
+// (C-quater) MELHORES DA RODADA das competições recém-congeladas
+// (C-bis) APURA as copas ativas (mata-mata)
+// (C-ter) ENCERRA as ligas de pontos corridos cuja janela acabou
+// (D) no dia 1, recalcula as faixas do mês anterior (users.belt)
+// (D-bis) a 1 de janeiro, fecha a época oficial do ano anterior
+// (E) notificações de mercado (aberto/fechado)
+// (F) notificações de DATAS ESPECIAIS (aniversário, Dia do Judô)
+// (B) PREÇOS da competição que se aproxima — por cursor, com o que sobrar
 //
 // Protegido por CRON_SECRET: a Vercel envia "Authorization: Bearer <CRON_SECRET>"
 // automaticamente; em alternativa aceitamos ?key=<CRON_SECRET> para testares à mão.
@@ -81,9 +81,9 @@ const CHAVE_AO_VIVO = "_a_competir_agora";
 // tarefa "do dia 1" corria a cada corrida do cron — e como ele passou a correr
 // de HORA A HORA, isso deu 24 recálculos de faixa a 1 de agosto, com 24 rondas
 // de notificações a cada utilizador. (Foi assim que aconteceu: a guarda "só no
-// dia 1" bastava quando o cron era diário, e deixou de bastar sem ninguém
-// reparar. Tarefas de "uma vez por período" precisam de marca própria, não de
-// depender da frequência com que o cron é chamado.)
+  // dia 1" bastava quando o cron era diário, e deixou de bastar sem ninguém
+  // reparar. Tarefas de "uma vez por período" precisam de marca própria, não de
+  // depender da frequência com que o cron é chamado.)
 const CHAVE_FEITO = "_feito_uma_vez";
 // Linha especial no cache que guarda o CURSOR dos preços: { comp, dia, indice }.
 // Vive no atletas_cache para não precisar de tabela nova (mesmo padrão do ao-vivo).
@@ -91,7 +91,7 @@ const CHAVE_CURSOR_PRECOS = "_cursor_precos";
 // A partir de quantos jogadores ativos os percentis de faixa "ligam".
 //
 // Com poucos jogadores, um percentil não significa nada ("top 5%" de 4 pessoas
-// é zero pessoas), por isso o normal é 100 e, abaixo disso, fica toda a gente na
+  // é zero pessoas), por isso o normal é 100 e, abaixo disso, fica toda a gente na
 // branca. MAS isso torna as faixas impossíveis de TESTAR antes do lançamento —
 // a virada do mês passava em silêncio e ninguém sabia se o motor funcionava.
 //
@@ -105,11 +105,11 @@ const CHAVE_CURSOR_PRECOS = "_cursor_precos";
 // silêncio nos 100 e a virada do mês passava sem faixas. Assim, "2", '2', ' 2 '
 // e =2 funcionam todos.
 const MIN_JOGADORES = (() => {
-  const bruto = String(process.env.FAIXAS_MIN_JOGADORES ?? "");
-  const achado = bruto.match(/\d+/);
-  const v = achado ? parseInt(achado[0], 10) : NaN;
-  return Number.isFinite(v) && v > 0 ? v : 100;
-})();
+    const bruto = String(process.env.FAIXAS_MIN_JOGADORES ?? "");
+    const achado = bruto.match(/\d+/);
+    const v = achado ? parseInt(achado[0], 10) : NaN;
+    return Number.isFinite(v) && v > 0 ? v : 100;
+  })();
 // Janela (dias) para procurar competições recém-terminadas a congelar.
 const JANELA_DIAS = 21;
 // ---------------------------------------------------------------------------
@@ -119,9 +119,9 @@ const JANELA_DIAS = 21;
 // tempo que essa etapa precisa, no pior caso, para não ficar a meio.
 // ---------------------------------------------------------------------------
 const MS_ORCAMENTO = 240_000;
-const MS_MARGEM_ETAPA = 20_000;        // etapas curtas (notificações, faixas)
-const MS_MARGEM_CATEGORIA = 30_000;    // uma categoria de preços (~18s + folga)
-const MS_MARGEM_COMPETICAO = 45_000;   // congelar uma competição
+const MS_MARGEM_ETAPA = 20_000; // etapas curtas (notificações, faixas)
+const MS_MARGEM_CATEGORIA = 30_000; // uma categoria de preços (~18s + folga)
+const MS_MARGEM_COMPETICAO = 45_000; // congelar uma competição
 /** Ainda há tempo para começar uma etapa que precisa de `margem` ms? */
 function haTempo(t0: number, margem: number): boolean {
   return Date.now() - t0 < MS_ORCAMENTO - margem;
@@ -157,7 +157,7 @@ async function lerFeitos(): Promise<Record<string, string>> {
   if (!supabaseAdmin) return {};
   try {
     const { data } = await supabaseAdmin
-      .from("atletas_cache").select("atletas").eq("id_competition", CHAVE_FEITO).maybeSingle();
+    .from("atletas_cache").select("atletas").eq("id_competition", CHAVE_FEITO).maybeSingle();
     const a = data?.atletas;
     return (a && typeof a === "object" && !Array.isArray(a)) ? (a as Record<string, string>) : {};
   } catch { return {}; }
@@ -190,18 +190,18 @@ function jaComecou(c: SemanaCalendario, hoje: Date): boolean {
 // ---------------------------------------------------------------------------
 // CURSOR DOS PREÇOS — onde ficámos na última corrida.
 // Guardado como { comp, dia, indice } na linha _cursor_precos do atletas_cache.
-//   comp   = competição-alvo (se mudar, recomeça do zero)
-//   dia    = "AAAA-MM-DD" (se mudar, recomeça: uma passagem completa por dia)
-//   indice = próxima categoria a fazer (0..CATS.length)
+// comp = competição-alvo (se mudar, recomeça do zero)
+// dia = "AAAA-MM-DD" (se mudar, recomeça: uma passagem completa por dia)
+// indice = próxima categoria a fazer (0..CATS.length)
 // ---------------------------------------------------------------------------
 async function lerCursorPrecos(): Promise<{ comp: string; dia: string; indice: number } | null> {
   if (!supabaseAdmin) return null;
   try {
     const { data } = await supabaseAdmin
-      .from("atletas_cache")
-      .select("atletas")
-      .eq("id_competition", CHAVE_CURSOR_PRECOS)
-      .maybeSingle();
+    .from("atletas_cache")
+    .select("atletas")
+    .eq("id_competition", CHAVE_CURSOR_PRECOS)
+    .maybeSingle();
     const a = data?.atletas as { comp?: unknown; dia?: unknown; indice?: unknown } | null;
     if (!a || typeof a !== "object" || Array.isArray(a)) return null;
     const indice = Number(a.indice);
@@ -262,10 +262,10 @@ async function congelarRecentes(hoje: Date, t0: number): Promise<{ feitos: Resum
   const agora = hoje.getTime();
   const janelaMs = JANELA_DIAS * 24 * 60 * 60 * 1000;
   const candidatas = CALENDARIO_2026.filter((s) => {
-    const inicio = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
-    const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
-    return dentroDaJanela && competicaoFechada(s, hoje); // só as JÁ TERMINADAS (60h)
-  });
+      const inicio = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
+      const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
+      return dentroDaJanela && competicaoFechada(s, hoje); // só as JÁ TERMINADAS (60h)
+    });
   const feitos: ResumoCongelamento[] = [];
   let parouPorTempo = false;
   for (const s of candidatas) {
@@ -288,19 +288,19 @@ async function congelarRecentes(hoje: Date, t0: number): Promise<{ feitos: Resum
 async function apurarCopasAtivas(base: string, t0: number): Promise<{ league_id: string; nome: string; apurou: boolean }[]> {
   if (!supabaseAdmin) return [];
   const { data: copas } = await supabaseAdmin
-    .from("leagues")
-    .select("id, name, copa_estado")
-    .eq("formato", "copa")
-    .in("copa_estado", ["sorteada", "a_decorrer"]);
+  .from("leagues")
+  .select("id, name, copa_estado")
+  .eq("formato", "copa")
+  .in("copa_estado", ["sorteada", "a_decorrer"]);
   const out: { league_id: string; nome: string; apurou: boolean }[] = [];
   for (const liga of copas || []) {
     if (!haTempo(t0, MS_MARGEM_ETAPA)) break;
     try {
       const r = await fetch(`${base}/api/copa/apurar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ league_id: liga.id }),
-      });
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ league_id: liga.id }),
+        });
       const j = await r.json().catch(() => null);
       out.push({ league_id: String(liga.id), nome: String(liga.name || ""), apurou: !!(j && j.apurou) });
     } catch {
@@ -312,19 +312,19 @@ async function apurarCopasAtivas(base: string, t0: number): Promise<{ league_id:
 // (C-ter) ENCERRA as ligas de PONTOS CORRIDOS cuja janela início→fim já acabou.
 // Marca estado='terminada'. Critério: hoje já passou o FIM EFETIVO da janela
 // (para fim por mês, o fim do mês; para fim por competição, a data dessa
-// competição). Não notifica (decidido: só marcar). Só toca em ligas 'ativa' com
+  // competição). Não notifica (decidido: só marcar). Só toca em ligas 'ativa' com
 // fim definido — ligas antigas (sem fim) e copas ficam de fora.
 async function encerrarLigasTerminadas(hoje: Date): Promise<{ encerradas: number; ids: string[] }> {
   if (!supabaseAdmin) return { encerradas: 0, ids: [] };
   const { data: ligas } = await supabaseAdmin
-    .from("leagues")
-    .select("id, fim_tipo, fim_valor, fim_data, estado, formato")
-    .eq("formato", "pontos")
-    .eq("estado", "ativa");
+  .from("leagues")
+  .select("id, fim_tipo, fim_valor, fim_data, estado, formato")
+  .eq("formato", "pontos")
+  .eq("estado", "ativa");
   const idsParaEncerrar: string[] = [];
   for (const liga of ligas || []) {
     const fimEfetivo = fimEfetivoDaLiga(liga);
-    if (!fimEfetivo) continue;          // sem fim definido (liga antiga): não toca
+    if (!fimEfetivo) continue; // sem fim definido (liga antiga): não toca
     if (hoje > fimEfetivo) idsParaEncerrar.push(String(liga.id));
   }
   for (const id of idsParaEncerrar) {
@@ -333,9 +333,9 @@ async function encerrarLigasTerminadas(hoje: Date): Promise<{ encerradas: number
   return { encerradas: idsParaEncerrar.length, ids: idsParaEncerrar };
 }
 // FIM EFETIVO de uma liga de pontos corridos (mesma regra da Peça 4 / liga-geral):
-//  • fim por mês        → último instante do mês de fim (a competição do mês conta);
-//  • fim por competição → a data dessa competição (fim do dia);
-//  • recurso            → a fim_data crua, se nada acima resolver.
+// • fim por mês → último instante do mês de fim (a competição do mês conta);
+// • fim por competição → a data dessa competição (fim do dia);
+// • recurso → a fim_data crua, se nada acima resolver.
 // Devolve null se a liga não tem fim definido.
 function fimEfetivoDaLiga(liga: { fim_tipo?: unknown; fim_valor?: unknown; fim_data?: unknown }): Date | null {
   const fimTipo = String(liga.fim_tipo || "");
@@ -398,7 +398,7 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
   }
   // Faixas ANTIGAS (antes de gravar), para sabermos quem mudou e em que sentido.
   // Só precisamos disto se o percentil estiver ativo (senão está toda a gente na
-  // branca e não há mudança real a celebrar).
+    // branca e não há mudança real a celebrar).
   const faixaAntiga = new Map<string, string>();
   if (percentilAtivo) {
     const ids = atualizacoes.map((a) => a.user_id);
@@ -434,7 +434,7 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
   // Notificação de fecho do mês. TODA A GENTE recebe uma — subiu, desceu ou
   // manteve. Antes só havia subida e descida, e quem mantinha a faixa não sabia
   // de nada: virava o mês e ficava sem perceber como tinha corrido. (Pedido do
-  // Kainan.) Só quando o percentil está ativo (≥ MIN_JOGADORES); abaixo disso
+    // Kainan.) Só quando o percentil está ativo (≥ MIN_JOGADORES); abaixo disso
   // está toda a gente na branca e não há nada de real a dizer.
   if (percentilAtivo) {
     for (const a of atualizacoes) {
@@ -444,20 +444,20 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
         const subiu = ordemFaixa(a.faixa) > ordemFaixa(antes);
         if (subiu) {
           await criarNotificacaoServidor({
-            paraUserId: a.user_id,
-            tipo: "faixa_subiu",
-            titulo: `🥋 Subiste para a faixa ${nomeFaixa(a.faixa)}!`,
-            corpo: `Parabéns! O teu desempenho levou-te à faixa ${nomeFaixa(a.faixa)}. Estás entre os melhores — continua assim e vai mais longe!`,
-            link: "/inicio",
-          });
+              paraUserId: a.user_id,
+              tipo: "faixa_subiu",
+              titulo: `🥋 Subiste para a faixa ${nomeFaixa(a.faixa)}!`,
+              corpo: `Parabéns! O teu desempenho levou-te à faixa ${nomeFaixa(a.faixa)}. Estás entre os melhores — continua assim e vai mais longe!`,
+              link: "/inicio",
+            });
         } else {
           await criarNotificacaoServidor({
-            paraUserId: a.user_id,
-            tipo: "faixa_desceu",
-            titulo: `Faixa ${nomeFaixa(a.faixa)} — a próxima é tua`,
-            corpo: `Desta vez desceste para a faixa ${nomeFaixa(a.faixa)}, mas isto faz parte do jogo. Monta uma boa equipa na próxima rodada e recupera o teu lugar — acreditamos em ti!`,
-            link: "/inicio",
-          });
+              paraUserId: a.user_id,
+              tipo: "faixa_desceu",
+              titulo: `Faixa ${nomeFaixa(a.faixa)} — a próxima é tua`,
+              corpo: `Desta vez desceste para a faixa ${nomeFaixa(a.faixa)}, mas isto faz parte do jogo. Monta uma boa equipa na próxima rodada e recupera o teu lugar — acreditamos em ti!`,
+              link: "/inicio",
+            });
         }
         continue;
       }
@@ -465,17 +465,17 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
       // acabar num vazio. Quem já é preta está no topo: não há "seguinte".
       const falta = pontosParaFaixaAcima(a.faixa, a.user_id, jogadores, limites, totalDe);
       const corpo = falta === null
-        ? `Fechaste o mês na faixa ${nomeFaixa(a.faixa)} — o topo da Ippon League. Agora é aguentar lá em cima: no próximo mês há quem venha atrás do teu lugar.`
-        : falta <= 0
-          ? `Fechaste o mês na faixa ${nomeFaixa(a.faixa)}, mesmo à porta da seguinte. No próximo mês é tua.`
-          : `Fechaste o mês na faixa ${nomeFaixa(a.faixa)}. Faltaram ${falta} pontos para a ${nomeFaixa(faixaAcimaDe(a.faixa))} — dá para ir buscá-los no próximo mês!`;
+      ? `Fechaste o mês na faixa ${nomeFaixa(a.faixa)} — o topo da Ippon League. Agora é aguentar lá em cima: no próximo mês há quem venha atrás do teu lugar.`
+      : falta <= 0
+      ? `Fechaste o mês na faixa ${nomeFaixa(a.faixa)}, mesmo à porta da seguinte. No próximo mês é tua.`
+      : `Fechaste o mês na faixa ${nomeFaixa(a.faixa)}. Faltaram ${falta} pontos para a ${nomeFaixa(faixaAcimaDe(a.faixa))} — dá para ir buscá-los no próximo mês!`;
       await criarNotificacaoServidor({
-        paraUserId: a.user_id,
-        tipo: "faixa_mantida",
-        titulo: `🥋 Mantiveste a faixa ${nomeFaixa(a.faixa)}`,
-        corpo,
-        link: "/inicio",
-      });
+          paraUserId: a.user_id,
+          tipo: "faixa_mantida",
+          titulo: `🥋 Mantiveste a faixa ${nomeFaixa(a.faixa)}`,
+          corpo,
+          link: "/inicio",
+        });
     }
   }
   return {
@@ -514,8 +514,8 @@ function pontosParaFaixaAcima(
   totalDe: Map<string, number>
 ): number | null {
   const d = degrauDaFaixa(faixa);
-  if (d <= 0) return null;                 // preta: está no topo
-  const alvo = limites[d - 1];             // o corte da faixa acima
+  if (d <= 0) return null; // preta: está no topo
+  const alvo = limites[d - 1]; // o corte da faixa acima
   if (!alvo || alvo.ate <= 0) return null;
   const idxCorte = Math.min(alvo.ate - 1, jogadores.length - 1);
   const pontosDoCorte = jogadores[idxCorte]?.total ?? 0;
@@ -551,11 +551,11 @@ function mesAnteriorDe(d: Date): string {
 // push=true — hoje, aniversário e Dia Mundial do Judô. As grandes competições
 // estão a push=false (já há o aviso de mercado), por isso não entram.
 //
-//  • Dia do Judô (e outros eventos GLOBAIS push=true): a todos os utilizadores.
-//  • Aniversário: só a quem faz anos hoje.
+// • Dia do Judô (e outros eventos GLOBAIS push=true): a todos os utilizadores.
+// • Aniversário: só a quem faz anos hoje.
 //
 // Idempotente por dia: antes de enviar, vê quem já recebeu HOJE esse tipo (via
-// tabela notificacoes), para um re-disparo manual não duplicar. É isto que
+  // tabela notificacoes), para um re-disparo manual não duplicar. É isto que
 // permite o cron correr de hora a hora sem inundar ninguém.
 //
 // Escala (nota honesta): o envio do Dia do Judô percorre todos os utilizadores
@@ -583,43 +583,43 @@ async function notificarDatasEspeciais(hoje: Date): Promise<{ dia_do_judo: numbe
   if (tiposCheck.length > 0) {
     try {
       const { data } = await supabaseAdmin
-        .from("notificacoes")
-        .select("user_id, tipo")
-        .gte("criada_em", inicioDia)
-        .in("tipo", tiposCheck);
+      .from("notificacoes")
+      .select("user_id, tipo")
+      .gte("criada_em", inicioDia)
+      .in("tipo", tiposCheck);
       for (const r of data || []) jaFeito.add(`${r.tipo}::${r.user_id}`);
     } catch { /* sem idempotência prévia: segue */ }
   }
   // 1) GLOBAIS → todos os utilizadores.
-  if (globais.length > 0) {
-    const ids = await todosOsUserIds();
-    for (const m of globais) {
-      const tipo = `evento_${m.tipo}`;
-      for (const uid of ids) {
-        if (jaFeito.has(`${tipo}::${uid}`)) continue;
-        try {
-          await criarNotificacaoServidor({ paraUserId: uid, tipo, titulo: m.titulo, corpo: m.texto, link: "/inicio" });
-          jaFeito.add(`${tipo}::${uid}`);
-          if (m.tipo === "dia_do_judo") out.dia_do_judo++; else out.outras_globais++;
-        } catch { /* falha de um utilizador não bloqueia os outros */ }
-      }
+if (globais.length > 0) {
+  const ids = await todosOsUserIds();
+  for (const m of globais) {
+    const tipo = `evento_${m.tipo}`;
+    for (const uid of ids) {
+      if (jaFeito.has(`${tipo}::${uid}`)) continue;
+      try {
+        await criarNotificacaoServidor({ paraUserId: uid, tipo, titulo: m.titulo, corpo: m.texto, link: "/inicio" });
+        jaFeito.add(`${tipo}::${uid}`);
+        if (m.tipo === "dia_do_judo") out.dia_do_judo++; else out.outras_globais++;
+      } catch { /* falha de um utilizador não bloqueia os outros */ }
     }
   }
-  // 2) ANIVERSÁRIOS → só quem faz anos hoje. O motor devolve o texto certo a
-  //    partir da data de nascimento (sem nome, para push genérico mas correto).
-  for (const u of aniversariantes) {
-    const tipo = "evento_aniversario";
-    if (jaFeito.has(`${tipo}::${u.id}`)) continue;
-    const msg = mensagensModaisDeHoje(hoje, { nome: null, dataNascimento: u.dataNascimento, continente: null }, null)
-      .find((x) => x.tipo === "aniversario");
-    if (!msg) continue;
-    try {
-      await criarNotificacaoServidor({ paraUserId: u.id, tipo, titulo: msg.titulo, corpo: msg.texto, link: "/inicio" });
-      jaFeito.add(`${tipo}::${u.id}`);
-      out.aniversarios++;
-    } catch { /* não bloqueia os outros */ }
-  }
-  return out;
+}
+// 2) ANIVERSÁRIOS → só quem faz anos hoje. O motor devolve o texto certo a
+// partir da data de nascimento (sem nome, para push genérico mas correto).
+for (const u of aniversariantes) {
+  const tipo = "evento_aniversario";
+  if (jaFeito.has(`${tipo}::${u.id}`)) continue;
+  const msg = mensagensModaisDeHoje(hoje, { nome: null, dataNascimento: u.dataNascimento, continente: null }, null)
+  .find((x) => x.tipo === "aniversario");
+  if (!msg) continue;
+  try {
+    await criarNotificacaoServidor({ paraUserId: u.id, tipo, titulo: msg.titulo, corpo: msg.texto, link: "/inicio" });
+    jaFeito.add(`${tipo}::${u.id}`);
+    out.aniversarios++;
+  } catch { /* não bloqueia os outros */ }
+}
+return out;
 }
 // Todos os IDs de utilizadores (paginado, para passar o limite de 1000 do PostgREST).
 async function todosOsUserIds(): Promise<string[]> {
@@ -643,10 +643,10 @@ async function userIdsComAniversario(hoje: Date): Promise<{ id: string; dataNasc
   const PAG = 1000;
   for (let from = 0; from < 100000; from += PAG) {
     const { data, error } = await supabaseAdmin
-      .from("users")
-      .select("id, data_nascimento")
-      .not("data_nascimento", "is", null)
-      .range(from, from + PAG - 1);
+    .from("users")
+    .select("id, data_nascimento")
+    .not("data_nascimento", "is", null)
+    .range(from, from + PAG - 1);
     if (error || !data || data.length === 0) break;
     for (const r of data) {
       const dn = r.data_nascimento ? String(r.data_nascimento) : "";
@@ -664,11 +664,11 @@ function nomeContinentePT(cont: string): string {
 // ---------------------------------------------------------------------------
 // MELHORES DA RODADA. Para uma competição JÁ CONGELADA e COMPLETA, calcula o
 // vencedor da rodada (só Pro, como na liga oficial) e grava em melhores_rodada:
-//   • mundial      → o nº1 do mundo. Como o nº1 do mundo é sempre também o nº1 do
-//                    seu continente, este certificado é COMBINADO (Mundial + esse
-//                    continente). Guardamos o continente dele para o rótulo.
-//   • continental  → o nº1 de cada continente cujo melhor NÃO seja o nº1 do mundo
-//                    (esse já está coberto pelo combinado).
+// • mundial → o nº1 do mundo. Como o nº1 do mundo é sempre também o nº1 do
+// seu continente, este certificado é COMBINADO (Mundial + esse
+  // continente). Guardamos o continente dele para o rótulo.
+// • continental → o nº1 de cada continente cujo melhor NÃO seja o nº1 do mundo
+// (esse já está coberto pelo combinado).
 // Só conta quem pontuou (> 0). Empates no topo: todos os empatados ganham.
 // Idempotente: se já há linhas para esta competição, não repete (nem push).
 // ---------------------------------------------------------------------------
@@ -679,63 +679,63 @@ async function registrarMelhoresRodada(comp: string, nomeComp: string): Promise<
   const { data: ja } = await supabaseAdmin.from("melhores_rodada").select("id").eq("id_competicao", comp).limit(1);
   if (ja && ja.length > 0) { out.jaExistia = true; return out; }
   // 1) Pontos da rodada por utilizador (já congelado em resultados_rodada).
-  const { data: rod } = await supabaseAdmin.from("resultados_rodada").select("user_id, pontos_rodada").eq("id_competicao", comp);
-  const pts = new Map<string, number>();
-  for (const r of rod || []) pts.set(String(r.user_id), Number(r.pontos_rodada ?? 0));
-  if (pts.size === 0) return out;
-  const ids = [...pts.keys()];
-  // 2) Só Pro entram (consistente com a liga oficial). Lê is_pro + continente em lotes.
-  const proCont = new Map<string, string>(); // user_id -> continente ("" se desconhecido)
-  for (let i = 0; i < ids.length; i += 500) {
-    const lote = ids.slice(i, i + 500);
-    const { data } = await supabaseAdmin.from("users").select("id, is_pro, continente").in("id", lote);
-    for (const u of data || []) if (u.is_pro) proCont.set(String(u.id), u.continente ? String(u.continente) : "");
+const { data: rod } = await supabaseAdmin.from("resultados_rodada").select("user_id, pontos_rodada").eq("id_competicao", comp);
+const pts = new Map<string, number>();
+for (const r of rod || []) pts.set(String(r.user_id), Number(r.pontos_rodada ?? 0));
+if (pts.size === 0) return out;
+const ids = [...pts.keys()];
+// 2) Só Pro entram (consistente com a liga oficial). Lê is_pro + continente em lotes.
+const proCont = new Map<string, string>(); // user_id -> continente ("" se desconhecido)
+for (let i = 0; i < ids.length; i += 500) {
+  const lote = ids.slice(i, i + 500);
+  const { data } = await supabaseAdmin.from("users").select("id, is_pro, continente").in("id", lote);
+  for (const u of data || []) if (u.is_pro) proCont.set(String(u.id), u.continente ? String(u.continente) : "");
+}
+if (proCont.size === 0) return out;
+// Nº de participantes (Pro que escalaram) por âmbito — para o "entre N participantes".
+const nMundial = proCont.size;
+const nPorCont = new Map<string, number>();
+for (const c of proCont.values()) if (c) nPorCont.set(c, (nPorCont.get(c) ?? 0) + 1);
+// Candidatos a vencedor: Pro com pontos > 0.
+const cand = [...proCont.entries()]
+.map(([user_id, continente]) => ({ user_id, continente, pontos: pts.get(user_id) ?? 0 }))
+.filter((c) => c.pontos > 0);
+if (cand.length === 0) return out;
+// 3) Identidade (nome + escudo) da equipa nesta competição.
+const identDe = new Map<string, { nome: string; escudo: unknown }>();
+for (let i = 0; i < ids.length; i += 500) {
+  const lote = ids.slice(i, i + 500);
+  const { data } = await supabaseAdmin.from("equipas").select("user_id, nome, escudo").eq("id_competicao", comp).in("user_id", lote);
+  for (const e of data || []) identDe.set(String(e.user_id), { nome: e.nome ?? "Equipa", escudo: e.escudo ?? null });
+}
+// 4) Vencedor(es) MUNDIAL = máximo global (com empates).
+const maxGlobal = Math.max(...cand.map((c) => c.pontos));
+const mundialWinners = cand.filter((c) => c.pontos === maxGlobal);
+const mundialIds = new Set(mundialWinners.map((c) => c.user_id));
+// 5) Vencedor(es) CONTINENTAIS = máximo de cada continente, EXCLUINDO os
+// vencedores mundiais (cobertos pelo certificado combinado).
+const porCont = new Map<string, typeof cand>();
+for (const c of cand) {
+  if (!c.continente) continue;
+  if (!porCont.has(c.continente)) porCont.set(c.continente, []);
+  porCont.get(c.continente)!.push(c);
+}
+type Linha = { escopo: "mundial" | "continental"; continente: string; combinado: boolean; user_id: string; pontos: number; nPart: number };
+const linhas: Linha[] = [];
+for (const w of mundialWinners) {
+  linhas.push({ escopo: "mundial", continente: w.continente, combinado: true, user_id: w.user_id, pontos: w.pontos, nPart: nMundial });
+}
+for (const [cont, lista] of porCont.entries()) {
+  const maxK = Math.max(...lista.map((c) => c.pontos));
+  const venc = lista.filter((c) => c.pontos === maxK && !mundialIds.has(c.user_id));
+  for (const v of venc) {
+    linhas.push({ escopo: "continental", continente: cont, combinado: false, user_id: v.user_id, pontos: v.pontos, nPart: nPorCont.get(cont) ?? lista.length });
   }
-  if (proCont.size === 0) return out;
-  // Nº de participantes (Pro que escalaram) por âmbito — para o "entre N participantes".
-  const nMundial = proCont.size;
-  const nPorCont = new Map<string, number>();
-  for (const c of proCont.values()) if (c) nPorCont.set(c, (nPorCont.get(c) ?? 0) + 1);
-  // Candidatos a vencedor: Pro com pontos > 0.
-  const cand = [...proCont.entries()]
-    .map(([user_id, continente]) => ({ user_id, continente, pontos: pts.get(user_id) ?? 0 }))
-    .filter((c) => c.pontos > 0);
-  if (cand.length === 0) return out;
-  // 3) Identidade (nome + escudo) da equipa nesta competição.
-  const identDe = new Map<string, { nome: string; escudo: unknown }>();
-  for (let i = 0; i < ids.length; i += 500) {
-    const lote = ids.slice(i, i + 500);
-    const { data } = await supabaseAdmin.from("equipas").select("user_id, nome, escudo").eq("id_competicao", comp).in("user_id", lote);
-    for (const e of data || []) identDe.set(String(e.user_id), { nome: e.nome ?? "Equipa", escudo: e.escudo ?? null });
-  }
-  // 4) Vencedor(es) MUNDIAL = máximo global (com empates).
-  const maxGlobal = Math.max(...cand.map((c) => c.pontos));
-  const mundialWinners = cand.filter((c) => c.pontos === maxGlobal);
-  const mundialIds = new Set(mundialWinners.map((c) => c.user_id));
-  // 5) Vencedor(es) CONTINENTAIS = máximo de cada continente, EXCLUINDO os
-  //    vencedores mundiais (cobertos pelo certificado combinado).
-  const porCont = new Map<string, typeof cand>();
-  for (const c of cand) {
-    if (!c.continente) continue;
-    if (!porCont.has(c.continente)) porCont.set(c.continente, []);
-    porCont.get(c.continente)!.push(c);
-  }
-  type Linha = { escopo: "mundial" | "continental"; continente: string; combinado: boolean; user_id: string; pontos: number; nPart: number };
-  const linhas: Linha[] = [];
-  for (const w of mundialWinners) {
-    linhas.push({ escopo: "mundial", continente: w.continente, combinado: true, user_id: w.user_id, pontos: w.pontos, nPart: nMundial });
-  }
-  for (const [cont, lista] of porCont.entries()) {
-    const maxK = Math.max(...lista.map((c) => c.pontos));
-    const venc = lista.filter((c) => c.pontos === maxK && !mundialIds.has(c.user_id));
-    for (const v of venc) {
-      linhas.push({ escopo: "continental", continente: cont, combinado: false, user_id: v.user_id, pontos: v.pontos, nPart: nPorCont.get(cont) ?? lista.length });
-    }
-  }
-  // 6) Grava (upsert idempotente) e notifica cada vencedor (sino + push).
-  for (const l of linhas) {
-    const ident = identDe.get(l.user_id) || { nome: "Equipa", escudo: null };
-    const { error } = await supabaseAdmin.from("melhores_rodada").upsert({
+}
+// 6) Grava (upsert idempotente) e notifica cada vencedor (sino + push).
+for (const l of linhas) {
+  const ident = identDe.get(l.user_id) || { nome: "Equipa", escudo: null };
+  const { error } = await supabaseAdmin.from("melhores_rodada").upsert({
       id_competicao: comp,
       nome_competicao: nomeComp,
       escopo: l.escopo,
@@ -747,24 +747,24 @@ async function registrarMelhoresRodada(comp: string, nomeComp: string): Promise<
       pontos: Math.round(l.pontos * 10) / 10,
       n_participantes: l.nPart,
     }, { onConflict: "id_competicao,escopo,continente,user_id" });
-    if (error) continue;
-    out.gravados++;
-    const rotulo = l.escopo === "mundial"
-      ? `Mundial${l.continente ? ` + ${nomeContinentePT(l.continente)}` : ""}`
-      : nomeContinentePT(l.continente);
-    const ondeFoi = l.escopo === "mundial" ? "do mundo" : `de ${nomeContinentePT(l.continente)}`;
-    try {
-      await criarNotificacaoServidor({
+  if (error) continue;
+  out.gravados++;
+  const rotulo = l.escopo === "mundial"
+  ? `Mundial${l.continente ? ` + ${nomeContinentePT(l.continente)}` : ""}`
+  : nomeContinentePT(l.continente);
+  const ondeFoi = l.escopo === "mundial" ? "do mundo" : `de ${nomeContinentePT(l.continente)}`;
+  try {
+    await criarNotificacaoServidor({
         paraUserId: l.user_id,
         tipo: "melhor_rodada",
         titulo: `🥇 És o Melhor da Rodada — ${rotulo}!`,
         corpo: `Parabéns! Foste o nº1 ${ondeFoi} em ${nomeComp}. Vê e partilha o teu certificado na liga oficial.`,
         link: l.escopo === "mundial" ? "/oficial/mundial" : "/oficial/continental",
       });
-      out.push++;
-    } catch { /* push de um vencedor não bloqueia os outros */ }
-  }
-  return out;
+    out.push++;
+  } catch { /* push de um vencedor não bloqueia os outros */ }
+}
+return out;
 }
 // FECHO DA ÉPOCA OFICIAL (anual). Calcula o pódio do ANO indicado — Mundial e
 // cada Continental — e grava em campeoes_oficiais (livro de campeões). Só Pro
@@ -784,78 +784,78 @@ async function fecharAnoOficial(ano: number): Promise<{ ano: number; mundial: nu
     return a === ano;
   };
   // 1) Quem é Pro e qual o seu continente (mundial = todos; continental = por grupo).
-  const { data: pros } = await supabaseAdmin
-    .from("users")
-    .select("id, continente, patrimony_jc")
-    .eq("is_pro", true);
-  const prosLista = (pros || []).map((p) => ({ id: String(p.id), continente: (p.continente ? String(p.continente) : null) }));
-  if (prosLista.length === 0) return out;
-  const idsPro = new Set(prosLista.map((p) => p.id));
-  // 2) Soma dos pontos do ano, por utilizador Pro.
-  const { data: rodadas } = await supabaseAdmin
-    .from("resultados_rodada")
-    .select("user_id, pontos_rodada, id_competicao");
-  const pontosPorUser = new Map<string, number>();
-  for (const r of rodadas || []) {
-    const u = String(r.user_id);
-    if (!idsPro.has(u)) continue;
-    if (!noAno(String(r.id_competicao))) continue;
-    pontosPorUser.set(u, (pontosPorUser.get(u) ?? 0) + Number(r.pontos_rodada ?? 0));
+const { data: pros } = await supabaseAdmin
+.from("users")
+.select("id, continente, patrimony_jc")
+.eq("is_pro", true);
+const prosLista = (pros || []).map((p) => ({ id: String(p.id), continente: (p.continente ? String(p.continente) : null) }));
+if (prosLista.length === 0) return out;
+const idsPro = new Set(prosLista.map((p) => p.id));
+// 2) Soma dos pontos do ano, por utilizador Pro.
+const { data: rodadas } = await supabaseAdmin
+.from("resultados_rodada")
+.select("user_id, pontos_rodada, id_competicao");
+const pontosPorUser = new Map<string, number>();
+for (const r of rodadas || []) {
+  const u = String(r.user_id);
+  if (!idsPro.has(u)) continue;
+  if (!noAno(String(r.id_competicao))) continue;
+  pontosPorUser.set(u, (pontosPorUser.get(u) ?? 0) + Number(r.pontos_rodada ?? 0));
+}
+// 3) Identidade (nome + escudo) de cada Pro, da equipa mais recente.
+const { data: eqs } = await supabaseAdmin
+.from("equipas")
+.select("user_id, nome, escudo, id_competicao")
+.in("user_id", prosLista.map((p) => p.id))
+.order("id_competicao", { ascending: false });
+const identDe = new Map<string, { nome: string; escudo: unknown }>();
+for (const e of eqs || []) {
+  const u = String(e.user_id);
+  if (!identDe.has(u)) identDe.set(u, { nome: e.nome ?? "Equipa", escudo: e.escudo ?? null });
+}
+// Grava o pódio (top 3 por pontos > 0) de um grupo de utilizadores.
+// Nota: no mundial guardamos continente='' (não null) para casar com o índice
+// único (ano,tipo,COALESCE(continente,''),posicao) e o upsert funcionar.
+async function gravarPodio(tipo: "mundial" | "continental", continente: string, userIds: string[]) {
+  const ordenados = userIds
+  .map((u) => ({ u, pts: pontosPorUser.get(u) ?? 0 }))
+  .filter((x) => x.pts > 0)
+  .sort((a, b) => b.pts - a.pts)
+  .slice(0, 3);
+  let gravados = 0;
+  for (let i = 0; i < ordenados.length; i++) {
+    const { u, pts } = ordenados[i];
+    const ident = identDe.get(u) || { nome: "Equipa", escudo: null };
+    const { error } = await supabaseAdmin!
+    .from("campeoes_oficiais")
+    .upsert(
+      {
+        ano, tipo, continente,
+        posicao: i + 1,
+        user_id: u,
+        nome_time: ident.nome,
+        escudo: ident.escudo,
+        pontos: Math.round(pts * 10) / 10,
+      },
+      { onConflict: "ano,tipo,continente,posicao" }
+    );
+    if (!error) gravados++; // conta só o que GRAVOU de facto (não o que tentou)
   }
-  // 3) Identidade (nome + escudo) de cada Pro, da equipa mais recente.
-  const { data: eqs } = await supabaseAdmin
-    .from("equipas")
-    .select("user_id, nome, escudo, id_competicao")
-    .in("user_id", prosLista.map((p) => p.id))
-    .order("id_competicao", { ascending: false });
-  const identDe = new Map<string, { nome: string; escudo: unknown }>();
-  for (const e of eqs || []) {
-    const u = String(e.user_id);
-    if (!identDe.has(u)) identDe.set(u, { nome: e.nome ?? "Equipa", escudo: e.escudo ?? null });
-  }
-  // Grava o pódio (top 3 por pontos > 0) de um grupo de utilizadores.
-  // Nota: no mundial guardamos continente='' (não null) para casar com o índice
-  // único (ano,tipo,COALESCE(continente,''),posicao) e o upsert funcionar.
-  async function gravarPodio(tipo: "mundial" | "continental", continente: string, userIds: string[]) {
-    const ordenados = userIds
-      .map((u) => ({ u, pts: pontosPorUser.get(u) ?? 0 }))
-      .filter((x) => x.pts > 0)
-      .sort((a, b) => b.pts - a.pts)
-      .slice(0, 3);
-    let gravados = 0;
-    for (let i = 0; i < ordenados.length; i++) {
-      const { u, pts } = ordenados[i];
-      const ident = identDe.get(u) || { nome: "Equipa", escudo: null };
-      const { error } = await supabaseAdmin!
-        .from("campeoes_oficiais")
-        .upsert(
-          {
-            ano, tipo, continente,
-            posicao: i + 1,
-            user_id: u,
-            nome_time: ident.nome,
-            escudo: ident.escudo,
-            pontos: Math.round(pts * 10) / 10,
-          },
-          { onConflict: "ano,tipo,continente,posicao" }
-        );
-      if (!error) gravados++; // conta só o que GRAVOU de facto (não o que tentou)
-    }
-    return gravados;
-  }
-  // 4) Mundial: todos os Pro.
-  out.mundial = await gravarPodio("mundial", "", prosLista.map((p) => p.id));
-  // 5) Continental: um pódio por continente que tenha Pro.
-  const porContinente = new Map<string, string[]>();
-  for (const p of prosLista) {
-    if (!p.continente) continue;
-    if (!porContinente.has(p.continente)) porContinente.set(p.continente, []);
-    porContinente.get(p.continente)!.push(p.id);
-  }
-  for (const [cont, ids] of porContinente.entries()) {
-    out.continentais[cont] = await gravarPodio("continental", cont, ids);
-  }
-  return out;
+  return gravados;
+}
+// 4) Mundial: todos os Pro.
+out.mundial = await gravarPodio("mundial", "", prosLista.map((p) => p.id));
+// 5) Continental: um pódio por continente que tenha Pro.
+const porContinente = new Map<string, string[]>();
+for (const p of prosLista) {
+  if (!p.continente) continue;
+  if (!porContinente.has(p.continente)) porContinente.set(p.continente, []);
+  porContinente.get(p.continente)!.push(p.id);
+}
+for (const [cont, ids] of porContinente.entries()) {
+  out.continentais[cont] = await gravarPodio("continental", cont, ids);
+}
+return out;
 }
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -863,26 +863,26 @@ export async function GET(req: Request) {
   if (!autorizado(req, key)) {
     // DIAGNÓSTICO do 401. Não revela o segredo — só tamanhos e sim/não. Chega
     // para distinguir as três causas possíveis de "Não autorizado":
-    //   tem_segredo:false          -> a variável CRON_SECRET não está a chegar à
-    //                                 função (não existe, ou está definida noutro
-    //                                 ambiente/âmbito que este deployment não vê)
-    //   tamanhos diferentes        -> a chave enviada no ?key= não é a mesma
-    //                                 (valor trocado, ou o URL cortou-a num
-    //                                 caractere especial como & # + %)
-    //   segredo_com_espacos:true   -> ficou um espaço/newline colado ao valor ao
-    //                                 guardar; invisível na Vercel, mas quebra a
-    //                                 comparação exata
+    // tem_segredo:false -> a variável CRON_SECRET não está a chegar à
+    // função (não existe, ou está definida noutro
+      // ambiente/âmbito que este deployment não vê)
+    // tamanhos diferentes -> a chave enviada no ?key= não é a mesma
+    // (valor trocado, ou o URL cortou-a num
+      // caractere especial como & # + %)
+    // segredo_com_espacos:true -> ficou um espaço/newline colado ao valor ao
+    // guardar; invisível na Vercel, mas quebra a
+    // comparação exata
     const seg = process.env.CRON_SECRET || "";
     return NextResponse.json({
-      erro: "Não autorizado.",
-      diag: {
-        tem_segredo: !!process.env.CRON_SECRET,
-        tamanho_segredo: seg.length,
-        tamanho_chave_recebida: (key || "").length,
-        segredo_com_espacos: seg !== seg.trim(),
-        recebeu_cabecalho: !!req.headers.get("authorization"),
-      },
-    }, { status: 401 });
+        erro: "Não autorizado.",
+        diag: {
+          tem_segredo: !!process.env.CRON_SECRET,
+          tamanho_segredo: seg.length,
+          tamanho_chave_recebida: (key || "").length,
+          segredo_com_espacos: seg !== seg.trim(),
+          recebeu_cabecalho: !!req.headers.get("authorization"),
+        },
+      }, { status: 401 });
   }
   const base = baseUrl(req);
   const t0 = Date.now();
@@ -896,37 +896,37 @@ export async function GET(req: Request) {
     const agora = hoje.getTime();
     const janelaMs = JANELA_DIAS * 24 * 60 * 60 * 1000;
     const linhas = CALENDARIO_2026.map((s) => {
-      const inicio = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
-      const horas = Math.round(((agora - inicio) / 3600000) * 10) / 10;
-      const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
-      const terminada = competicaoFechada(s, hoje);
-      return {
-        id: s.idCompeticao, nome: s.nome, de: s.de,
-        inicio_iso: new Date(inicio).toISOString(),
-        horas_desde_inicio: horas,
-        dentroDaJanela, terminada,
-        candidata: dentroDaJanela && terminada,
-      };
-    }).filter((l) => l.horas_desde_inicio > -720 && l.horas_desde_inicio < 1440);
+        const inicio = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
+        const horas = Math.round(((agora - inicio) / 3600000) * 10) / 10;
+        const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
+        const terminada = competicaoFechada(s, hoje);
+        return {
+          id: s.idCompeticao, nome: s.nome, de: s.de,
+          inicio_iso: new Date(inicio).toISOString(),
+          horas_desde_inicio: horas,
+          dentroDaJanela, terminada,
+          candidata: dentroDaJanela && terminada,
+        };
+      }).filter((l) => l.horas_desde_inicio > -720 && l.horas_desde_inicio < 1440);
     return NextResponse.json({
-      feito: true, modo: "diagnostico",
-      servidor_agora_iso: hoje.toISOString(),
-      servidor_agora_local: hoje.toString(),
-      fuso_offset_min: hoje.getTimezoneOffset(), // 0 na Vercel = UTC
-      cursor_precos: await lerCursorPrecos(),
-      candidatas: linhas.filter((l) => l.candidata).map((l) => l.id),
-      linhas, ms_total: Date.now() - t0,
-    });
+        feito: true, modo: "diagnostico",
+        servidor_agora_iso: hoje.toISOString(),
+        servidor_agora_local: hoje.toString(),
+        fuso_offset_min: hoje.getTimezoneOffset(), // 0 na Vercel = UTC
+        cursor_precos: await lerCursorPrecos(),
+        candidatas: linhas.filter((l) => l.candidata).map((l) => l.id),
+        linhas, ms_total: Date.now() - t0,
+      });
   }
   // Disparo manual de APURAR uma copa específica (teste): ?apurar=LEAGUE_ID
   const apurarId = (searchParams.get("apurar") || "").trim();
   if (apurarId) {
     try {
       const r = await fetch(`${base}/api/copa/apurar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ league_id: apurarId }),
-      });
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ league_id: apurarId }),
+        });
       const j = await r.json().catch(() => null);
       return NextResponse.json({ feito: true, modo: "apurar_forcado", resultado: j, ms_total: Date.now() - t0 });
     } catch (e) {
@@ -984,15 +984,24 @@ export async function GET(req: Request) {
     const s = CALENDARIO_2026.find((c) => c.idCompeticao === soMelhores);
     const nome = s ? s.nome : soMelhores;
     let r: { gravados: number; jaExistia: boolean; push: number } = { gravados: 0, jaExistia: false, push: 0 };
-    try { r = await registrarMelhoresRodada(soMelhores, nome); } catch { /* não bloqueia */ }
-    return NextResponse.json({ feito: true, modo: "melhores_forcado", comp: soMelhores, refez: refazer, resultado: r, ms_total: Date.now() - t0 });
+    // Disparo MANUAL: o erro tem de aparecer. Num catch vazio, a resposta vem
+    // com `feito: true` e zeros, e não se distingue "correu e não havia nada"
+    // de "rebentou" — e este é o caminho que se usa justamente quando algo já
+    // correu mal.
+    let erroMelhores: string | undefined;
+    try { r = await registrarMelhoresRodada(soMelhores, nome); }
+    catch (e) { erroMelhores = e instanceof Error ? e.message : String(e); }
+    return NextResponse.json({ feito: !erroMelhores, modo: "melhores_forcado", comp: soMelhores, refez: refazer, resultado: r, erro: erroMelhores, ms_total: Date.now() - t0 });
   }
   // Disparo manual SÓ do encerramento de ligas terminadas (teste): ?encerrar=1
   const soEncerrar = (searchParams.get("encerrar") || "").trim();
   if (soEncerrar) {
     let r: { encerradas: number; ids: string[] } = { encerradas: 0, ids: [] };
-    try { r = await encerrarLigasTerminadas(hoje); } catch { /* não bloqueia */ }
-    return NextResponse.json({ feito: true, modo: "encerrar_forcado", ligas_encerradas: r, ms_total: Date.now() - t0 });
+    // Idem: disparo manual, o erro vai na resposta.
+    let erroEncerrar: string | undefined;
+    try { r = await encerrarLigasTerminadas(hoje); }
+    catch (e) { erroEncerrar = e instanceof Error ? e.message : String(e); }
+    return NextResponse.json({ feito: !erroEncerrar, modo: "encerrar_forcado", ligas_encerradas: r, erro: erroEncerrar, ms_total: Date.now() - t0 });
   }
   // Disparo manual do FECHO DA ÉPOCA OFICIAL de um ano: ?fecharano=AAAA
   // Calcula e grava o pódio anual (mundial + continentais) no livro de campeões.
@@ -1005,11 +1014,11 @@ export async function GET(req: Request) {
     const anoAtual = hoje.getFullYear();
     if (anoPedido >= anoAtual) {
       return NextResponse.json({
-        feito: false,
-        modo: "fechar_ano_recusado",
-        erro: `Só é possível fechar um ano já terminado. ${anoPedido} ${anoPedido === anoAtual ? "ainda está a decorrer" : "ainda não chegou"}. O ano em curso fecha-se sozinho a 1 de janeiro.`,
-        ms_total: Date.now() - t0,
-      }, { status: 400 });
+          feito: false,
+          modo: "fechar_ano_recusado",
+          erro: `Só é possível fechar um ano já terminado. ${anoPedido} ${anoPedido === anoAtual ? "ainda está a decorrer" : "ainda não chegou"}. O ano em curso fecha-se sozinho a 1 de janeiro.`,
+          ms_total: Date.now() - t0,
+        }, { status: 400 });
     }
     let r: { ano: number; mundial: number; continentais: Record<string, number> } | null = null;
     try { r = await fecharAnoOficial(anoPedido); } catch { /* não bloqueia */ }
@@ -1064,7 +1073,7 @@ export async function GET(req: Request) {
   // indistinguível de uma que falhou em silêncio.
   const jaFeitoHoje: string[] = [];
   // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
-  //     também forçar via ?faixas=AAAA-MM para teste manual.
+  // também forçar via ?faixas=AAAA-MM para teste manual.
   let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; gravadas: number; falhadas: number; primeiroErro: string | null; minJogadores: number; minVindoDoAmbiente: boolean; minBruto: string | null } | null = null;
   const forcarFaixas = (searchParams.get("faixas") || "").trim();
   try {
@@ -1089,13 +1098,13 @@ export async function GET(req: Request) {
     }
   } catch { /* não bloqueia */ }
   // (D-bis) FECHO DA ÉPOCA OFICIAL: no dia 1 de JANEIRO, fecha o ano que acabou
-  //         (grava o pódio anual mundial + continentais no livro de campeões).
+  // (grava o pódio anual mundial + continentais no livro de campeões).
   let fechoAnual: { ano: number; mundial: number; continentais: Record<string, number> } | null = null;
   try {
     if (hoje.getDate() === 1 && hoje.getMonth() === 0 && haTempo(t0, MS_MARGEM_ETAPA)) { // 1 de janeiro
       // UMA VEZ POR ANO, pela mesma razão das faixas: a 1 de janeiro o cron
       // corre 24 vezes, e sem marca reescrevia o pódio (e as notificações de
-      // campeão) a cada hora.
+        // campeão) a cada hora.
       const anoFechar = hoje.getFullYear() - 1;
       const feitos = await lerFeitos();
       const marca = `ano_${anoFechar}`;
@@ -1108,7 +1117,7 @@ export async function GET(req: Request) {
     }
   } catch { /* não bloqueia */ }
   // (E) Notificações de MERCADO (aberto/fechado), idempotentes. Uma vez por
-  //     competição. Não bloqueia o resto do cron se falhar.
+  // competição. Não bloqueia o resto do cron se falhar.
   let mercado: { aberto: string | null; vespera: string | null; fechado: string | null } | null = null;
   try {
     if (haTempo(t0, MS_MARGEM_ETAPA)) mercado = await notificarMercado(hoje);
@@ -1120,13 +1129,12 @@ export async function GET(req: Request) {
   try {
     if (haTempo(t0, MS_MARGEM_ETAPA)) {
       const r = await fetch(`${base}/api/verificar-email?cron=1&key=${encodeURIComponent(process.env.CRON_SECRET || "")}`, {
-        method: "POST",
-      });
+          method: "POST",
+        });
       const j = await r.json().catch(() => null);
       if (j && j.ok) emailsVerificacao = { candidatos: Number(j.candidatos || 0), enviados: Number(j.enviados || 0) };
     }
   } catch { /* não bloqueia o resto do cron */ }
-
   // (E-ter) CONTAS INATIVAS — avisa quem está prestes a perder a conta, e apaga
   // quem passou o ano. A rota trata do "uma vez por dia" (guarda de 20h), por
   // isso é seguro chamá-la de hora a hora.
@@ -1138,7 +1146,6 @@ export async function GET(req: Request) {
       if (j && j.ok) contasInativas = { avisados: Number(j.avisados || 0), apagados: Number(j.apagados || 0) };
     }
   } catch { /* não bloqueia o resto do cron */ }
-
   // (E-quater) HUB DA COMUNIDADE — gera as notícias das competições já
   // congeladas. A rota verifica se cada notícia já existe antes de a escrever,
   // por isso é seguro chamá-la de hora a hora.
@@ -1150,7 +1157,6 @@ export async function GET(req: Request) {
       if (j && j.ok) hubNoticias = { candidatas: Number(j.candidatas || 0), gravadas: Number(j.gravadas || 0) };
     }
   } catch { /* não bloqueia o resto do cron */ }
-
   // (E-quinquies) Notícias AGENDADAS que já chegaram à hora. Uma notícia
   // escrita para sair às 9h fica invisível até lá — assim o editor pode
   // preparar a semana toda de uma vez.
@@ -1163,7 +1169,6 @@ export async function GET(req: Request) {
       await supabaseAdmin.rpc("ippon_limpar_destaques");
     }
   } catch { /* não bloqueia o resto do cron */ }
-
   // (E-sexies) MATA-MATA DO DÔDO: sorteia quando as inscrições fecham, e retira
   // quem deixou de ter Pro (o adversário avança). Ambas as rotas não fazem nada
   // quando não há edição a decorrer, por isso é barato chamá-las sempre.
@@ -1186,9 +1191,8 @@ export async function GET(req: Request) {
       dodo = { sorteio: rs?.ok ? rs : null, desqualificados: Number(rv?.desqualificados || 0), edicao_aberta: abriu };
     }
   } catch { /* não bloqueia o resto do cron */ }
-
   // (F) Notificações de DATAS ESPECIAIS por push (aniversário + Dia do Judô).
-  //     Idempotente por dia. Não bloqueia o resto do cron se falhar.
+  // Idempotente por dia. Não bloqueia o resto do cron se falhar.
   let datas: { dia_do_judo: number; aniversarios: number; outras_globais: number } | null = null;
   try {
     if (haTempo(t0, MS_MARGEM_ETAPA)) datas = await notificarDatasEspeciais(hoje);
@@ -1231,12 +1235,12 @@ export async function GET(req: Request) {
       const r = await fetch(url, { cache: "no-store" });
       const j = (await r.json()) as { sucesso?: boolean; atualizados?: number; ms?: number; nota?: string; erro?: string };
       passos.push({
-        categoria: `${cat} ${gender}`,
-        ok: !!j?.sucesso || typeof j?.atualizados === "number",
-        atualizados: j?.atualizados,
-        ms: j?.ms,
-        nota: j?.erro || j?.nota,
-      });
+          categoria: `${cat} ${gender}`,
+          ok: !!j?.sucesso || typeof j?.atualizados === "number",
+          atualizados: j?.atualizados,
+          ms: j?.ms,
+          nota: j?.erro || j?.nota,
+        });
     } catch (e) {
       passos.push({ categoria: `${cat} ${gender}`, ok: false, nota: (e as { message?: string })?.message || "falha" });
     }
@@ -1248,39 +1252,39 @@ export async function GET(req: Request) {
   const totalAtualizados = passos.reduce((s, p) => s + (p.atualizados || 0), 0);
   const ok = passos.filter((p) => p.ok).length;
   return NextResponse.json({
-    feito: true,
-    comp,
-    competicao: alvo ? alvo.nome : "(forçada por id)",
-    classico: alvo ? alvo.classico : undefined,
-    a_competir_agora: aoVivo.ao_vivo,
-    atletas_a_competir_agora: aoVivo.atletas_ao_vivo,
-    congelamentos,
-    congelamento_parou_por_tempo: congelamentoParou,
-    melhores_rodada: melhoresRodada,
-    copas,
-    ligas_encerradas: ligasEncerradas,
-    faixas,
-    fecho_anual: fechoAnual,
-    ja_feito: jaFeitoHoje,
-    mercado,
-    datas,
-    emails_verificacao: emailsVerificacao,
-    contas_inativas: contasInativas,
-    hub_noticias: hubNoticias,
-    dodo,
-    noticias_agendadas_publicadas: agendadasPublicadas,
-    // Estado dos preços nesta corrida (cursor): de onde partiu, onde ficou.
-    precos: {
-      dia: diaHoje,
-      de_categoria: inicio,
-      ate_categoria: i,
-      total_categorias: CATS.length,
-      passagem_completa: i >= CATS.length,
-      forcado: forcarPrecos,
-      categorias_ok: `${ok}/${passos.length}`,
-      total_atletas_atualizados: totalAtualizados,
-    },
-    ms_total: Date.now() - t0,
-    passos,
-  });
+      feito: true,
+      comp,
+      competicao: alvo ? alvo.nome : "(forçada por id)",
+      classico: alvo ? alvo.classico : undefined,
+      a_competir_agora: aoVivo.ao_vivo,
+      atletas_a_competir_agora: aoVivo.atletas_ao_vivo,
+      congelamentos,
+      congelamento_parou_por_tempo: congelamentoParou,
+      melhores_rodada: melhoresRodada,
+      copas,
+      ligas_encerradas: ligasEncerradas,
+      faixas,
+      fecho_anual: fechoAnual,
+      ja_feito: jaFeitoHoje,
+      mercado,
+      datas,
+      emails_verificacao: emailsVerificacao,
+      contas_inativas: contasInativas,
+      hub_noticias: hubNoticias,
+      dodo,
+      noticias_agendadas_publicadas: agendadasPublicadas,
+      // Estado dos preços nesta corrida (cursor): de onde partiu, onde ficou.
+      precos: {
+        dia: diaHoje,
+        de_categoria: inicio,
+        ate_categoria: i,
+        total_categorias: CATS.length,
+        passagem_completa: i >= CATS.length,
+        forcado: forcarPrecos,
+        categorias_ok: `${ok}/${passos.length}`,
+        total_atletas_atualizados: totalAtualizados,
+      },
+      ms_total: Date.now() - t0,
+      passos,
+    });
 }
