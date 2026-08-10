@@ -10,8 +10,8 @@
 // MOTOR (Fase 2+3): usa gerarRondaSeguinteComRepescagem (lib/copa) — eliminação +
 // repescagem em paralelo com as semis + bloco final com 2 bronzes cruzados. A
 // escalação de cada confronto é decidida pela cascata (pontos -> capitão ->
-// sorteio) e os pontos vêm de resultados_atletas (CONGELADO pelo motor
-// lib/congelar). A `metade` (lado da chave) é lida e propagada para a
+  // sorteio) e os pontos vêm de resultados_atletas (CONGELADO pelo motor
+  // lib/congelar). A `metade` (lado da chave) é lida e propagada para a
 // repescagem/cruzamento funcionarem; a `fase` aceita o valor "repescagem".
 //
 // ---------------------------------------------------------------------------
@@ -22,21 +22,21 @@
 // premiava quem teve bye (passou sem lutar mas levava os pontos dessa rodada).
 //
 // AGORA: a janela do acumulado ABRE NA FINAL e vai PARA A FRENTE.
-//   • Os finalistas ficam conhecidos mais cedo do que os medalhistas de bronze,
-//     porque a repescagem ainda está a decorrer. Esse tempo de espera não é
-//     tempo morto: cada competição que acontece durante a espera conta para os
-//     dois finalistas.
-//   • O último dia da repescagem é também o último dia de fazer pontos na final.
-//   • Nada do que fizeram nos quartos ou nas semifinais conta para o título.
+// • Os finalistas ficam conhecidos mais cedo do que os medalhistas de bronze,
+// porque a repescagem ainda está a decorrer. Esse tempo de espera não é
+// tempo morto: cada competição que acontece durante a espera conta para os
+// dois finalistas.
+// • O último dia da repescagem é também o último dia de fazer pontos na final.
+// • Nada do que fizeram nos quartos ou nas semifinais conta para o título.
 //
 // Na prática isto traduz-se em duas regras no código:
-//   1) A final SÓ é decidida quando não sobra mais nenhum confronto pendente na
-//      copa (a repescagem e os bronzes decidem-se primeiro). Até lá fica
-//      pendente, à espera.
-//   2) Quando é decidida, somam-se os pontos dos finalistas em TODAS as
-//      competições da janela: da competição da final (inclusive) até à última
-//      competição usada por qualquer confronto desta copa. Se alguma dessas
-//      competições ainda não estiver congelada, a final espera mais.
+// 1) A final SÓ é decidida quando não sobra mais nenhum confronto pendente na
+// copa (a repescagem e os bronzes decidem-se primeiro). Até lá fica
+// pendente, à espera.
+// 2) Quando é decidida, somam-se os pontos dos finalistas em TODAS as
+// competições da janela: da competição da final (inclusive) até à última
+// competição usada por qualquer confronto desta copa. Se alguma dessas
+// competições ainda não estiver congelada, a final espera mais.
 //
 // Numa chave pequena (final e bronze na mesma competição) a janela tem uma só
 // competição — a final vale pela sua própria rodada, como se espera.
@@ -46,15 +46,15 @@
 // Quem não montar equipa numa rodada NÃO fica zerado: herda a última equipa que
 // guardou, e continua a herdá-la sucessivamente até salvar uma nova. Só os
 // atletas que lutaram nessa competição pontuam (os outros valem 0, naturalmente,
-// porque não estão em resultados_atletas). A ordem "última equipa" é a do
+  // porque não estão em resultados_atletas). A ordem "última equipa" é a do
 // CALENDÁRIO (semana da rodada), não a ordem alfabética dos ids.
 //
 // O que faz:
-//   1) encontra a ronda mais baixa com confrontos PENDENTES
-//   2) confirma que a competição dessa ronda já está CONGELADA — se não, não apura
-//   3) decide os confrontos NÃO-finais dessa ronda
-//   4) se já não sobrar nada pendente, decide a FINAL pela janela acumulada
-//   5) quando a ronda fica toda decidida, gera a ronda seguinte (com repescagem)
+// 1) encontra a ronda mais baixa com confrontos PENDENTES
+// 2) confirma que a competição dessa ronda já está CONGELADA — se não, não apura
+// 3) decide os confrontos NÃO-finais dessa ronda
+// 4) se já não sobrar nada pendente, decide a FINAL pela janela acumulada
+// 5) quando a ronda fica toda decidida, gera a ronda seguinte (com repescagem)
 //
 // Recebe (POST): { league_id }
 // Devolve: { ok, apurou, ronda, decididos, gerouProxima, terminada, finalAEsperar }
@@ -67,7 +67,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 // Ordem CRONOLÓGICA de uma competição (a sua semana no calendário). É o que
 // permite dizer "esta rodada é anterior àquela" sem depender do id (os
-// clássicos têm ids baixos mas podem estar no fim do ano). -1 = desconhecida.
+  // clássicos têm ids baixos mas podem estar no fim do ano). -1 = desconhecida.
 function ordemDaComp(idComp: string): number {
   const n = numeroDaRodada(String(idComp));
   return n ?? -1;
@@ -77,9 +77,9 @@ function ordemDaComp(idComp: string): number {
 async function pontuacaoCongelada(comp: string): Promise<{ pontos: Record<string, number>; nAtletas: number }> {
   if (!supabaseAdmin) return { pontos: {}, nAtletas: 0 };
   const { data } = await supabaseAdmin
-    .from("resultados_atletas")
-    .select("id_person, pontos")
-    .eq("id_competicao", comp);
+  .from("resultados_atletas")
+  .select("id_person, pontos")
+  .eq("id_competicao", comp);
   const pontos: Record<string, number> = {};
   for (const r of data || []) pontos[String(r.id_person)] = Number(r.pontos) || 0;
   return { pontos, nAtletas: (data || []).length };
@@ -95,10 +95,10 @@ export async function POST(req: Request) {
   const league_id = (corpo.league_id || "").trim();
   if (!league_id) return NextResponse.json({ ok: false, erro: "Falta league_id." }, { status: 400 });
   const { data: liga } = await supabaseAdmin
-    .from("leagues")
-    .select("*")
-    .eq("id", league_id)
-    .maybeSingle();
+  .from("leagues")
+  .select("*")
+  .eq("id", league_id)
+  .maybeSingle();
   if (!liga) return NextResponse.json({ ok: false, erro: "Liga não encontrada." }, { status: 404 });
   if (liga.formato !== "copa") return NextResponse.json({ ok: false, erro: "Não é uma copa." }, { status: 400 });
   if (liga.copa_estado !== "sorteada" && liga.copa_estado !== "a_decorrer") {
@@ -116,319 +116,321 @@ export async function POST(req: Request) {
   const linkCopa = codigoLiga ? `/liga/${codigoLiga}/chave` : "/ligas";
   // As CONQUISTAS (campeão, vice, 3º) viram um "resultado" e devem abrir a aba de
   // Resultados (onde estão os títulos). As notificações de andamento (avançou,
-  // eliminado, repescagem) continuam a ir para a chave (linkCopa).
+    // eliminado, repescagem) continuam a ir para a chave (linkCopa).
   const linkResultados = "/ligas?aba=resultados";
   // 1) Todos os confrontos da liga (inclui `metade`, necessária à repescagem).
-  const { data: todos } = await supabaseAdmin
-    .from("copa_confrontos")
-    .select("id, ronda, ordem, fase, jogador_a, jogador_b, id_competicao, vencedor, estado, metade")
-    .eq("league_id", league_id)
-    .order("ronda", { ascending: true })
-    .order("ordem", { ascending: true });
-  const confrontos = todos || [];
-  if (confrontos.length === 0) {
-    return NextResponse.json({ ok: false, erro: "Esta copa ainda não tem chave." }, { status: 400 });
-  }
-  const pendentes = confrontos.filter((c) => c.estado === "pendente");
-  if (pendentes.length === 0) {
-    return NextResponse.json({ ok: true, apurou: false, semPendentes: true, estado: liga.copa_estado });
-  }
-  const rondaAtual = Math.min(...pendentes.map((c) => c.ronda));
-  const confrontosRonda = confrontos.filter((c) => c.ronda === rondaAtual);
-  const pendentesRonda = confrontosRonda.filter((c) => c.estado === "pendente");
-  const comp = pendentesRonda[0].id_competicao;
-  if (!comp) return NextResponse.json({ ok: false, erro: "Ronda sem competição definida." }, { status: 400 });
-  // 2) A competição já está CONGELADA? (tem resultados em resultados_atletas).
-  // É a fonte fiável: o motor de congelamento já calculou os pontos corretos.
-  // Se ainda não congelou, não apuramos (a competição não terminou / não foi
+const { data: todos } = await supabaseAdmin
+.from("copa_confrontos")
+.select("id, ronda, ordem, fase, jogador_a, jogador_b, id_competicao, vencedor, estado, metade")
+.eq("league_id", league_id)
+.order("ronda", { ascending: true })
+.order("ordem", { ascending: true });
+const confrontos = todos || [];
+if (confrontos.length === 0) {
+  return NextResponse.json({ ok: false, erro: "Esta copa ainda não tem chave." }, { status: 400 });
+}
+const pendentes = confrontos.filter((c) => c.estado === "pendente");
+if (pendentes.length === 0) {
+  return NextResponse.json({ ok: true, apurou: false, semPendentes: true, estado: liga.copa_estado });
+}
+const rondaAtual = Math.min(...pendentes.map((c) => c.ronda));
+const confrontosRonda = confrontos.filter((c) => c.ronda === rondaAtual);
+const pendentesRonda = confrontosRonda.filter((c) => c.estado === "pendente");
+const comp = pendentesRonda[0].id_competicao;
+if (!comp) return NextResponse.json({ ok: false, erro: "Ronda sem competição definida." }, { status: 400 });
+// 2) A competição já está CONGELADA? (tem resultados em resultados_atletas).
+// É a fonte fiável: o motor de congelamento já calculou os pontos corretos.
+// Se ainda não congelou, não apuramos (a competição não terminou / não foi
   // processada pelo cron ainda).
-  const { pontos: pontosAtleta, nAtletas } = await pontuacaoCongelada(comp);
-  if (nAtletas === 0) {
-    return NextResponse.json({ ok: true, apurou: false, aDecorrer: true, ronda: rondaAtual, motivo: "competicao_nao_congelada" });
-  }
-  // Marca como "a decorrer" assim que começamos a apurar a 1ª ronda.
-  if (liga.copa_estado === "sorteada") {
-    await supabaseAdmin.from("leagues").update({ copa_estado: "a_decorrer" }).eq("id", league_id);
-  }
-  // 3) Pontos de cada JOGADOR (equipa) envolvido nesta ronda.
-  const jogadores = new Set<string>();
-  for (const c of pendentesRonda) {
-    if (c.jogador_a) jogadores.add(c.jogador_a);
-    if (c.jogador_b) jogadores.add(c.jogador_b);
-  }
-  const pontosJogador = await pontosPorJogador(Array.from(jogadores), comp, pontosAtleta);
-  // Separa a(s) FINAL(is) do resto: a final é sempre a última a decidir-se.
-  const pendentesFinal = pendentesRonda.filter((c) => String(c.fase) === "final");
-  const pendentesOutros = pendentesRonda.filter((c) => String(c.fase) !== "final");
-  let decididos = 0;
-  // Grava a decisão de um confronto e envia as notificações da sua fase.
-  async function processarConfronto(
-    c: { id: string; fase: string | null; jogador_a: string; jogador_b: string | null },
-    pa: PontosJogador,
-    pb: PontosJogador
-  ) {
-    if (!supabaseAdmin) return;
-    if (!c.jogador_b) {
-      await supabaseAdmin.from("copa_confrontos").update({
+const { pontos: pontosAtleta, nAtletas } = await pontuacaoCongelada(comp);
+if (nAtletas === 0) {
+  return NextResponse.json({ ok: true, apurou: false, aDecorrer: true, ronda: rondaAtual, motivo: "competicao_nao_congelada" });
+}
+// Marca como "a decorrer" assim que começamos a apurar a 1ª ronda.
+if (liga.copa_estado === "sorteada") {
+  await supabaseAdmin.from("leagues").update({ copa_estado: "a_decorrer" }).eq("id", league_id);
+}
+// 3) Pontos de cada JOGADOR (equipa) envolvido nesta ronda.
+const jogadores = new Set<string>();
+for (const c of pendentesRonda) {
+  if (c.jogador_a) jogadores.add(c.jogador_a);
+  if (c.jogador_b) jogadores.add(c.jogador_b);
+}
+const pontosJogador = await pontosPorJogador(Array.from(jogadores), comp, pontosAtleta);
+// Separa a(s) FINAL(is) do resto: a final é sempre a última a decidir-se.
+const pendentesFinal = pendentesRonda.filter((c) => String(c.fase) === "final");
+const pendentesOutros = pendentesRonda.filter((c) => String(c.fase) !== "final");
+let decididos = 0;
+// Grava a decisão de um confronto e envia as notificações da sua fase.
+async function processarConfronto(
+  c: { id: string; fase: string | null; jogador_a: string; jogador_b: string | null },
+  pa: PontosJogador,
+  pb: PontosJogador
+) {
+  if (!supabaseAdmin) return;
+  if (!c.jogador_b) {
+    await supabaseAdmin.from("copa_confrontos").update({
         vencedor: c.jogador_a, decidido_por: "bye", estado: "decidido",
       }).eq("id", c.id);
-      decididos++;
-      // UM BRONZE SEM ADVERSÁRIO AINDA É UM BRONZE.
-      //
-      // Acontece sempre que não há quem repescar daquele lado da chave: numa
-      // copa de 4, os dois perdedores das meias ficam ambos em 3º sem lutar; em
-      // chaves pequenas, um dos dois bronzes sai assim. Com a regra dos dois
-      // terceiros isto deixou de ser exceção e passou a ser o caso comum.
-      //
-      // Sem esta notificação, a pessoa subia ao pódio e recebia um certificado
-      // que nunca soube que tinha. As outras passagens automáticas (rondas
+    decididos++;
+    // UM BRONZE SEM ADVERSÁRIO AINDA É UM BRONZE.
+    //
+    // Acontece sempre que não há quem repescar daquele lado da chave: numa
+    // copa de 4, os dois perdedores das meias ficam ambos em 3º sem lutar; em
+    // chaves pequenas, um dos dois bronzes sai assim. Com a regra dos dois
+    // terceiros isto deixou de ser exceção e passou a ser o caso comum.
+    //
+    // Sem esta notificação, a pessoa subia ao pódio e recebia um certificado
+    // que nunca soube que tinha. As outras passagens automáticas (rondas
       // normais e repescagem) não avisam de propósito: avançar sem jogar não é
-      // notícia, e a pessoa é avisada quando o confronto a sério acontecer.
-      if (String(c.fase || "") === "bronze") {
-        await criarNotificacaoServidor({
+    // notícia, e a pessoa é avisada quando o confronto a sério acontecer.
+    if (String(c.fase || "") === "bronze") {
+      await criarNotificacaoServidor({
           paraUserId: c.jogador_a,
           tipo: "copa_avancou",
           titulo: "3º lugar na Copa Ippon 🥉",
           corpo: `Subiste ao pódio da Copa "${nomeLiga}". Não houve ninguém para disputar o bronze do teu lado da chave, por isso o 3º lugar é teu. Grande campanha!`,
           link: linkResultados,
         });
-      }
-      return;
     }
-    const r = decidirConfronto(c.jogador_a, c.jogador_b, pa, pb);
-    await supabaseAdmin.from("copa_confrontos").update({
+    return;
+  }
+  const r = decidirConfronto(c.jogador_a, c.jogador_b, pa, pb);
+  await supabaseAdmin.from("copa_confrontos").update({
       pontos_a: r.pontos_a,
       pontos_b: r.pontos_b,
       vencedor: r.vencedor,
       decidido_por: r.decidido_por,
       estado: "decidido",
     }).eq("id", c.id);
-    decididos++;
-    const vencedor = r.vencedor;
-    const perdedor = vencedor === c.jogador_a ? c.jogador_b : c.jogador_a;
-    const fase = String(c.fase || "");
-    if (fase === "final") {
-      await criarNotificacaoServidor({
+  decididos++;
+  const vencedor = r.vencedor;
+  const perdedor = vencedor === c.jogador_a ? c.jogador_b : c.jogador_a;
+  const fase = String(c.fase || "");
+  if (fase === "final") {
+    await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_campeao",
         titulo: "És o CAMPEÃO da Copa Ippon! 🏆",
         corpo: `Venceste a final e és o campeão da Copa "${nomeLiga}". Que conquista!`,
         link: linkResultados,
       });
-      if (perdedor) {
-        await criarNotificacaoServidor({
+    if (perdedor) {
+      await criarNotificacaoServidor({
           paraUserId: perdedor,
           tipo: "copa_eliminado",
           titulo: "Vice-campeão da Copa Ippon 🥈",
           corpo: `Chegaste à final da Copa "${nomeLiga}" e ficaste em 2º. Grande campanha!`,
           link: linkResultados,
         });
-      }
-    } else if (fase === "bronze") {
-      // Vencedor do bronze sobe ao pódio (3º). O perdedor fica às portas do pódio.
-      await criarNotificacaoServidor({
+    }
+  } else if (fase === "bronze") {
+    // Vencedor do bronze sobe ao pódio (3º). O perdedor fica às portas do pódio.
+    await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_avancou",
         titulo: "3º lugar na Copa Ippon 🥉",
         corpo: `Venceste a disputa do bronze na Copa "${nomeLiga}". Subiste ao pódio!`,
         link: linkResultados,
       });
-      if (perdedor) {
-        await criarNotificacaoServidor({
+    if (perdedor) {
+      await criarNotificacaoServidor({
           paraUserId: perdedor,
           tipo: "copa_eliminado",
           titulo: "Às portas do pódio",
           corpo: `Perdeste a disputa do bronze na Copa "${nomeLiga}", mas chegaste muito longe. Que campanha!`,
           link: linkCopa,
         });
-      }
-    } else if (fase === "repescagem") {
-      // A repescagem é a última chance: quem ganha segue para o bronze; quem
-      // perde, aí sim, está eliminado.
-      await criarNotificacaoServidor({
+    }
+  } else if (fase === "repescagem") {
+    // A repescagem é a última chance: quem ganha segue para o bronze; quem
+    // perde, aí sim, está eliminado.
+    await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_avancou",
         titulo: "Venceste na repescagem! 🔁",
         corpo: `Ganhaste o teu confronto de repescagem na Copa "${nomeLiga}" e segues para a disputa do bronze. A segunda chance é tua!`,
         link: linkCopa,
       });
-      if (perdedor) {
-        await criarNotificacaoServidor({
+    if (perdedor) {
+      await criarNotificacaoServidor({
           paraUserId: perdedor,
           tipo: "copa_eliminado",
           titulo: "Eliminado na repescagem",
           corpo: `Perdeste o confronto de repescagem na Copa "${nomeLiga}". Foi uma boa campanha — para a próxima, a revanche é tua!`,
           link: linkCopa,
         });
-      }
-    } else {
-      // Fase "normal" (quartos/semis): o VENCEDOR avança. O PERDEDOR NÃO é
-      // notificado de eliminação — no judô há repescagem: quem perde um quarto
-      // vai à repescagem, quem perde uma semi vai ao bronze. Será notificado
-      // nessa fase (ganhar/perder a repescagem, ou o bronze). Evita o falso
-      // "foste eliminado" a quem ainda tem campanha pela frente.
-      await criarNotificacaoServidor({
+    }
+  } else {
+    // Fase "normal" (quartos/semis): o VENCEDOR avança. O PERDEDOR NÃO é
+    // notificado de eliminação — no judô há repescagem: quem perde um quarto
+    // vai à repescagem, quem perde uma semi vai ao bronze. Será notificado
+    // nessa fase (ganhar/perder a repescagem, ou o bronze). Evita o falso
+    // "foste eliminado" a quem ainda tem campanha pela frente.
+    await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_avancou",
         titulo: "Avançaste na Copa! ⚔️",
         corpo: `Venceste o teu confronto na Copa "${nomeLiga}". Segues em frente — prepara a próxima ronda!`,
         link: linkCopa,
       });
+  }
+}
+// 3a) Decide primeiro tudo o que NÃO é final (bronzes, repescagens, normais).
+for (const c of pendentesOutros) {
+  const pa = pontosJogador[c.jogador_a] ?? { total: 0, capitao: 0, escalou: false };
+  const pb = c.jogador_b ? (pontosJogador[c.jogador_b] ?? { total: 0, capitao: 0, escalou: false }) : { total: 0, capitao: 0, escalou: false };
+  await processarConfronto(c, pa, pb);
+}
+// 3b) A FINAL. Só se decide quando mais nada está pendente na copa — é isso
+// que dá aos finalistas o tempo de espera durante a repescagem, e é esse
+// tempo que a janela do acumulado mede.
+let finalAEsperar = false;
+let janelaFinal: string[] = [];
+if (pendentesFinal.length > 0) {
+  const { data: aindaPendentes } = await supabaseAdmin
+  .from("copa_confrontos")
+  .select("id, fase")
+  .eq("league_id", league_id)
+  .eq("estado", "pendente");
+  const sobramNaoFinais = (aindaPendentes || []).filter((c) => String(c.fase) !== "final").length;
+  if (sobramNaoFinais > 0) {
+    finalAEsperar = true; // a repescagem/bronze ainda decorre: a final espera
+  } else {
+    // JANELA: da competição da final (inclusive) até à última competição
+    // usada por qualquer confronto desta copa, por ordem de calendário.
+    const compFinal = String(pendentesFinal[0].id_competicao || comp);
+    const ordemFinal = ordemDaComp(compFinal);
+    const idsUsados: string[] = [];
+    for (const c of confrontos) {
+      const id = String((c as { id_competicao?: unknown }).id_competicao ?? "");
+      if (id) idsUsados.push(id);
+    }
+    janelaFinal = Array.from(new Set(idsUsados))
+    .filter((id) => ordemDaComp(id) >= ordemFinal)
+    .sort((a, b) => ordemDaComp(a) - ordemDaComp(b));
+    if (janelaFinal.length === 0) janelaFinal = [compFinal];
+    const finalistas = pendentesFinal
+    .flatMap((c) => [c.jogador_a, c.jogador_b])
+    .filter((x): x is string => !!x);
+    // Soma os pontos dos finalistas em cada competição da janela. Se alguma
+    // ainda não estiver congelada, a final espera mais (não se decide a meio).
+    const acum: Record<string, PontosJogador> = {};
+    for (const f of finalistas) acum[f] = { total: 0, capitao: 0, escalou: false };
+    let janelaCompleta = true;
+    for (const idc of janelaFinal) {
+      const { pontos: pAtl, nAtletas: n } = await pontuacaoCongelada(idc);
+      if (n === 0) { janelaCompleta = false; break; }
+      const pj = await pontosPorJogador(finalistas, idc, pAtl);
+      for (const f of finalistas) {
+        const x = pj[f] ?? { total: 0, capitao: 0, escalou: false };
+        acum[f] = {
+          total: Math.round((acum[f].total + x.total) * 10) / 10,
+          capitao: Math.round((acum[f].capitao + x.capitao) * 10) / 10,
+          escalou: acum[f].escalou || x.escalou,
+        };
+      }
+    }
+    if (!janelaCompleta) {
+      finalAEsperar = true;
+    } else {
+      for (const c of pendentesFinal) {
+        const pa = acum[c.jogador_a] ?? { total: 0, capitao: 0, escalou: false };
+        const pb = c.jogador_b ? (acum[c.jogador_b] ?? { total: 0, capitao: 0, escalou: false }) : { total: 0, capitao: 0, escalou: false };
+        await processarConfronto(c, pa, pb);
+      }
     }
   }
-  // 3a) Decide primeiro tudo o que NÃO é final (bronzes, repescagens, normais).
-  for (const c of pendentesOutros) {
-    const pa = pontosJogador[c.jogador_a] ?? { total: 0, capitao: 0, escalou: false };
-    const pb = c.jogador_b ? (pontosJogador[c.jogador_b] ?? { total: 0, capitao: 0, escalou: false }) : { total: 0, capitao: 0, escalou: false };
-    await processarConfronto(c, pa, pb);
-  }
-  // 3b) A FINAL. Só se decide quando mais nada está pendente na copa — é isso
-  //     que dá aos finalistas o tempo de espera durante a repescagem, e é esse
-  //     tempo que a janela do acumulado mede.
-  let finalAEsperar = false;
-  let janelaFinal: string[] = [];
-  if (pendentesFinal.length > 0) {
-    const { data: aindaPendentes } = await supabaseAdmin
-      .from("copa_confrontos")
-      .select("id, fase")
-      .eq("league_id", league_id)
-      .eq("estado", "pendente");
-    const sobramNaoFinais = (aindaPendentes || []).filter((c) => String(c.fase) !== "final").length;
-    if (sobramNaoFinais > 0) {
-      finalAEsperar = true; // a repescagem/bronze ainda decorre: a final espera
-    } else {
-      // JANELA: da competição da final (inclusive) até à última competição
-      // usada por qualquer confronto desta copa, por ordem de calendário.
-      const compFinal = String(pendentesFinal[0].id_competicao || comp);
-      const ordemFinal = ordemDaComp(compFinal);
-      const idsUsados: string[] = [];
-      for (const c of confrontos) {
-        const id = String((c as { id_competicao?: unknown }).id_competicao ?? "");
-        if (id) idsUsados.push(id);
-      }
-      janelaFinal = Array.from(new Set(idsUsados))
-        .filter((id) => ordemDaComp(id) >= ordemFinal)
-        .sort((a, b) => ordemDaComp(a) - ordemDaComp(b));
-      if (janelaFinal.length === 0) janelaFinal = [compFinal];
-      const finalistas = pendentesFinal
-        .flatMap((c) => [c.jogador_a, c.jogador_b])
-        .filter((x): x is string => !!x);
-      // Soma os pontos dos finalistas em cada competição da janela. Se alguma
-      // ainda não estiver congelada, a final espera mais (não se decide a meio).
-      const acum: Record<string, PontosJogador> = {};
-      for (const f of finalistas) acum[f] = { total: 0, capitao: 0, escalou: false };
-      let janelaCompleta = true;
-      for (const idc of janelaFinal) {
-        const { pontos: pAtl, nAtletas: n } = await pontuacaoCongelada(idc);
-        if (n === 0) { janelaCompleta = false; break; }
-        const pj = await pontosPorJogador(finalistas, idc, pAtl);
-        for (const f of finalistas) {
-          const x = pj[f] ?? { total: 0, capitao: 0, escalou: false };
-          acum[f] = {
-            total: Math.round((acum[f].total + x.total) * 10) / 10,
-            capitao: Math.round((acum[f].capitao + x.capitao) * 10) / 10,
-            escalou: acum[f].escalou || x.escalou,
-          };
-        }
-      }
-      if (!janelaCompleta) {
-        finalAEsperar = true;
+}
+// 4) A ronda ficou toda decidida? Gera a ronda seguinte (com repescagem).
+const { data: rondaFinal } = await supabaseAdmin
+.from("copa_confrontos")
+.select("ronda, ordem, fase, jogador_a, jogador_b, vencedor, estado, metade")
+.eq("league_id", league_id)
+.eq("ronda", rondaAtual)
+.order("ordem", { ascending: true });
+const todaDecidida = (rondaFinal || []).every((c) => c.estado === "decidido");
+let gerouProxima = false;
+let terminada = false;
+if (todaDecidida) {
+  const eraFinal = (rondaFinal || []).some((c) => c.fase === "final");
+  if (eraFinal) {
+    await supabaseAdmin.from("leagues").update({ copa_estado: "terminada" }).eq("id", league_id);
+    await fecharEdicaoDoDodo(league_id);
+    terminada = true;
+  } else {
+    const idProxima = idCompeticaoSeguinte(comp);
+    if (idProxima) {
+      const novos = gerarRondaSeguinteComRepescagem(rondaFinal as ConfrontoRonda[], idProxima);
+      if (novos.length > 0) {
+        const linhas = novos.map((n) => ({
+              league_id,
+              ronda: n.ronda,
+              ordem: n.ordem,
+              fase: n.fase,
+              jogador_a: n.jogador_a,
+              jogador_b: n.jogador_b,
+              id_competicao: n.id_competicao,
+              metade: n.metade,
+              estado: "pendente",
+              ...(n.jogador_b === null ? { vencedor: n.jogador_a, decidido_por: "bye", estado: "decidido" } : {}),
+            }));
+        await supabaseAdmin.from("copa_confrontos").insert(linhas);
+        gerouProxima = true;
       } else {
-        for (const c of pendentesFinal) {
-          const pa = acum[c.jogador_a] ?? { total: 0, capitao: 0, escalou: false };
-          const pb = c.jogador_b ? (acum[c.jogador_b] ?? { total: 0, capitao: 0, escalou: false }) : { total: 0, capitao: 0, escalou: false };
-          await processarConfronto(c, pa, pb);
+        // REDE DE SEGURANÇA: a ronda ficou decidida e não há nada para gerar
+        // a seguir. Normalmente isto não acontece — a última ronda tem sempre
+        // fase "final" e é apanhada no ramo de cima. Mas se por alguma razão
+        // uma copa chegar aqui sem final, é melhor terminá-la do que deixá-la
+        // em 'a_decorrer' para sempre: uma copa encravada nunca dá pódio,
+        // nunca dá certificado, e o cron passa a apurá-la todas as horas sem
+        // nada para decidir.
+        await supabaseAdmin.from("leagues").update({ copa_estado: "terminada" }).eq("id", league_id);
+        await fecharEdicaoDoDodo(league_id);
+        terminada = true;
+      }
+      // NOTIFICAÇÃO AO PERDEDOR de confronto NORMAL (opção B, validada com o
+        // Kainan): usamos os confrontos REALMENTE gerados (`novos`) como fonte da
+      // verdade — quem ficou numa repescagem ou bronze TEM segunda chance; quem
+      // perdeu e não aparece em lado nenhum foi ELIMINADO. Assim nunca prometemos
+      // uma repescagem que não existe (ex.: rondas cedo de chaves grandes).
+      const continuam = new Set<string>();
+      for (const n of novos) {
+        if (n.fase === "repescagem" || n.fase === "bronze") {
+          if (n.jogador_a) continuam.add(n.jogador_a);
+          if (n.jogador_b) continuam.add(n.jogador_b);
         }
       }
-    }
-  }
-  // 4) A ronda ficou toda decidida? Gera a ronda seguinte (com repescagem).
-  const { data: rondaFinal } = await supabaseAdmin
-    .from("copa_confrontos")
-    .select("ronda, ordem, fase, jogador_a, jogador_b, vencedor, estado, metade")
-    .eq("league_id", league_id)
-    .eq("ronda", rondaAtual)
-    .order("ordem", { ascending: true });
-  const todaDecidida = (rondaFinal || []).every((c) => c.estado === "decidido");
-  let gerouProxima = false;
-  let terminada = false;
-  if (todaDecidida) {
-    const eraFinal = (rondaFinal || []).some((c) => c.fase === "final");
-    if (eraFinal) {
-      await supabaseAdmin.from("leagues").update({ copa_estado: "terminada" }).eq("id", league_id);
-      terminada = true;
-    } else {
-      const idProxima = idCompeticaoSeguinte(comp);
-      if (idProxima) {
-        const novos = gerarRondaSeguinteComRepescagem(rondaFinal as ConfrontoRonda[], idProxima);
-        if (novos.length > 0) {
-          const linhas = novos.map((n) => ({
-            league_id,
-            ronda: n.ronda,
-            ordem: n.ordem,
-            fase: n.fase,
-            jogador_a: n.jogador_a,
-            jogador_b: n.jogador_b,
-            id_competicao: n.id_competicao,
-            metade: n.metade,
-            estado: "pendente",
-            ...(n.jogador_b === null ? { vencedor: n.jogador_a, decidido_por: "bye", estado: "decidido" } : {}),
-          }));
-          await supabaseAdmin.from("copa_confrontos").insert(linhas);
-          gerouProxima = true;
-        } else {
-          // REDE DE SEGURANÇA: a ronda ficou decidida e não há nada para gerar
-          // a seguir. Normalmente isto não acontece — a última ronda tem sempre
-          // fase "final" e é apanhada no ramo de cima. Mas se por alguma razão
-          // uma copa chegar aqui sem final, é melhor terminá-la do que deixá-la
-          // em 'a_decorrer' para sempre: uma copa encravada nunca dá pódio,
-          // nunca dá certificado, e o cron passa a apurá-la todas as horas sem
-          // nada para decidir.
-          await supabaseAdmin.from("leagues").update({ copa_estado: "terminada" }).eq("id", league_id);
-          terminada = true;
-        }
-        // NOTIFICAÇÃO AO PERDEDOR de confronto NORMAL (opção B, validada com o
-        // Kainan): usamos os confrontos REALMENTE gerados (`novos`) como fonte da
-        // verdade — quem ficou numa repescagem ou bronze TEM segunda chance; quem
-        // perdeu e não aparece em lado nenhum foi ELIMINADO. Assim nunca prometemos
-        // uma repescagem que não existe (ex.: rondas cedo de chaves grandes).
-        const continuam = new Set<string>();
-        for (const n of novos) {
-          if (n.fase === "repescagem" || n.fase === "bronze") {
-            if (n.jogador_a) continuam.add(n.jogador_a);
-            if (n.jogador_b) continuam.add(n.jogador_b);
-          }
-        }
-        // Perdedores dos confrontos NORMAIS desta ronda (com adversário real).
-        const normaisDaRonda = (rondaFinal || []).filter((c) => String(c.fase) === "normal");
-        for (const c of normaisDaRonda) {
-          if (!c.jogador_b) continue; // bye não tem perdedor
-          const perdedorN = c.vencedor === c.jogador_a ? c.jogador_b : c.jogador_a;
-          if (!perdedorN) continue;
-          if (continuam.has(perdedorN)) {
-            // Ainda tem campanha: vai à repescagem ou ao bronze.
-            await criarNotificacaoServidor({
+      // Perdedores dos confrontos NORMAIS desta ronda (com adversário real).
+      const normaisDaRonda = (rondaFinal || []).filter((c) => String(c.fase) === "normal");
+      for (const c of normaisDaRonda) {
+        if (!c.jogador_b) continue; // bye não tem perdedor
+        const perdedorN = c.vencedor === c.jogador_a ? c.jogador_b : c.jogador_a;
+        if (!perdedorN) continue;
+        if (continuam.has(perdedorN)) {
+          // Ainda tem campanha: vai à repescagem ou ao bronze.
+          await criarNotificacaoServidor({
               paraUserId: perdedorN,
               tipo: "copa_eliminado",
               titulo: "Perdeste este confronto — mas não acabou! 🔁",
               corpo: `Foste eliminado deste confronto na Copa "${nomeLiga}", mas a tua campanha continua: ainda podes lutar pelo 3º lugar. Não desanimes — vamos a essa repescagem!`,
               link: linkCopa,
             });
-          } else {
-            // Sem segunda chance: eliminado da Copa.
-            await criarNotificacaoServidor({
+        } else {
+          // Sem segunda chance: eliminado da Copa.
+          await criarNotificacaoServidor({
               paraUserId: perdedorN,
               tipo: "copa_eliminado",
               titulo: "Eliminado da Copa",
               corpo: `Foste eliminado da Copa "${nomeLiga}". Foi uma boa campanha — para a próxima, a revanche é tua!`,
               link: linkCopa,
             });
-          }
         }
       }
     }
   }
-  return NextResponse.json({
+}
+return NextResponse.json({
     ok: true,
     apurou: true,
     ronda: rondaAtual,
@@ -436,12 +438,12 @@ export async function POST(req: Request) {
     todaDecidida,
     gerouProxima,
     terminada,
-    finalAEsperar,                                     // a final está à espera da repescagem
+    finalAEsperar, // a final está à espera da repescagem
     janela_final: janelaFinal.length > 0 ? janelaFinal : undefined, // competições que contaram para o título
   });
 }
 // Para cada jogador, calcula os pontos da equipa dele na competição (capitão a
-// dobrar) e os pontos BASE do capitão (para o desempate). Mesma lógica do ranking.
+  // dobrar) e os pontos BASE do capitão (para o desempate). Mesma lógica do ranking.
 //
 // HERANÇA: quem não guardou equipa NESTA competição herda a última equipa que
 // guardou numa rodada ANTERIOR (por ordem de calendário). Continua a herdá-la
@@ -455,10 +457,10 @@ async function pontosPorJogador(
   const out: Record<string, PontosJogador> = {};
   if (!supabaseAdmin || userIds.length === 0) return out;
   const { data: equipas } = await supabaseAdmin
-    .from("equipas")
-    .select("user_id, atletas, capitao")
-    .eq("id_competicao", comp)
-    .in("user_id", userIds);
+  .from("equipas")
+  .select("user_id, atletas, capitao")
+  .eq("id_competicao", comp)
+  .in("user_id", userIds);
   const equipaDe = new Map<string, { atletas: string[]; capitao: string | null }>();
   for (const e of equipas || []) {
     const ids = Array.isArray(e.atletas) ? (e.atletas as string[]).map(String) : [];
@@ -469,15 +471,15 @@ async function pontosPorJogador(
   if (semEquipa.length > 0) {
     const ordemAlvo = ordemDaComp(comp);
     const { data: antigas } = await supabaseAdmin
-      .from("equipas")
-      .select("user_id, atletas, capitao, id_competicao")
-      .in("user_id", semEquipa);
+    .from("equipas")
+    .select("user_id, atletas, capitao, id_competicao")
+    .in("user_id", semEquipa);
     // Para cada jogador, fica com a equipa da rodada ANTERIOR mais recente.
     const melhor = new Map<string, { ordem: number; atletas: string[]; capitao: string | null }>();
     for (const e of antigas || []) {
       const o = ordemDaComp(String(e.id_competicao));
-      if (o < 0) continue;                              // competição fora do calendário
-      if (ordemAlvo >= 0 && o >= ordemAlvo) continue;   // só rodadas anteriores
+      if (o < 0) continue; // competição fora do calendário
+      if (ordemAlvo >= 0 && o >= ordemAlvo) continue; // só rodadas anteriores
       const ids = Array.isArray(e.atletas) ? (e.atletas as string[]).map(String) : [];
       if (ids.length === 0) continue;
       const uid = String(e.user_id);
@@ -513,4 +515,130 @@ async function pontosPorJogador(
     };
   }
   return out;
+}
+
+
+// ---------------------------------------------------------------------------
+// FECHAR A EDIÇÃO DA COPA DO DÔDO
+//
+// PORQUE ISTO FALTAVA
+// O apuramento fechava a LIGA (`leagues.copa_estado`) e mais nada. A tabela
+// `dodo_edicoes` — que é quem sabe qual é a edição em curso, quem foi campeão
+// e quando acabou — nunca era tocada por ninguém:
+//   • o apuramento não sabia que ela existe
+//   • o /api/dodo cria edições e sorteia, mas não tem nada que as feche
+//   • o cron só grava campeões no fecho ANUAL das ligas oficiais
+//
+// Resultado: a 901ª Copa decidiu o campeão e ficou em `sorteada` para sempre,
+// sem campeão gravado e sem data de fim. O ciclo nunca passava à seguinte.
+//
+// Vive AQUI e não no cron porque o fecho deve acontecer no instante em que a
+// final se decide, não até uma hora depois.
+//
+// COPAS DE AMIGOS: não têm edição nenhuma ligada à liga. A consulta não
+// encontra nada e a função sai sem fazer coisa alguma — por isso o apuramento
+// continua a servir os dois casos.
+// ---------------------------------------------------------------------------
+async function fecharEdicaoDoDodo(league_id: string): Promise<void> {
+  if (!supabaseAdmin) return;
+
+  try {
+    const { data: edicoes } = await supabaseAdmin
+      .from("dodo_edicoes")
+      .select("id, numero, ano, estado")
+      .eq("league_id", league_id)
+      .limit(1);
+
+    const edicao = (edicoes || [])[0];
+    if (!edicao) return;                     // copa de amigos: nada a fazer
+    if (edicao.estado === "terminada") return; // já fechada
+
+    // O campeão é quem venceu o confronto da final.
+    const { data: finais } = await supabaseAdmin
+      .from("copa_confrontos")
+      .select("vencedor")
+      .eq("league_id", league_id)
+      .eq("fase", "final")
+      .limit(1);
+
+    const campeao = (finais || [])[0]?.vencedor ?? null;
+
+    await supabaseAdmin
+      .from("dodo_edicoes")
+      .update({
+        estado: "terminada",
+        campeao_user_id: campeao,
+        terminada_em: new Date().toISOString(),
+      })
+      .eq("id", edicao.id);
+
+    // --- O LIVRO DE CAMPEÕES ---
+    // Pódio da Copa em `campeoes_oficiais`, ao lado dos campeões das ligas
+    // anuais. É de lá que sai o certificado.
+    //
+    // `edicao` distingue duas Copas do mesmo ano — sem isso, a segunda
+    // sobrepunha a primeira.
+    if (campeao) {
+      const { data: confrontos } = await supabaseAdmin
+        .from("copa_confrontos")
+        .select("fase, jogador_a, jogador_b, vencedor")
+        .eq("league_id", league_id);
+
+      const lista = confrontos || [];
+      const final = lista.find((c) => c.fase === "final");
+
+      const podio: { user_id: string; posicao: number }[] = [];
+      if (final) {
+        const vice = final.vencedor === final.jogador_a ? final.jogador_b : final.jogador_a;
+        podio.push({ user_id: String(campeao), posicao: 1 });
+        if (vice) podio.push({ user_id: String(vice), posicao: 2 });
+      }
+
+      // No judo há DOIS bronzes, e é assim que a Copa foi desenhada.
+      for (const c of lista.filter((x) => x.fase === "bronze" && x.vencedor)) {
+        podio.push({ user_id: String(c.vencedor), posicao: 3 });
+      }
+
+      const ano = Number(edicao.ano) || new Date().getFullYear();
+
+      for (const p of podio) {
+        // Nome e escudo da equipa, para o livro não depender de a equipa
+        // continuar a existir mais tarde.
+        let nome_time = "Equipa";
+        let escudo: unknown = null;
+        try {
+          const { data: eq } = await supabaseAdmin
+            .from("equipas")
+            .select("nome, escudo")
+            .eq("user_id", p.user_id)
+            .order("id_competicao", { ascending: false })
+            .limit(1);
+          if ((eq || [])[0]) {
+            nome_time = (eq || [])[0].nome ?? "Equipa";
+            escudo = (eq || [])[0].escudo ?? null;
+          }
+        } catch { /* fica o valor por omissão */ }
+
+        try {
+          await supabaseAdmin.from("campeoes_oficiais").upsert(
+            {
+              ano,
+              tipo: "copa_dodo",
+              continente: null,
+              edicao: Number(edicao.numero) || null,
+              posicao: p.posicao,
+              user_id: p.user_id,
+              nome_time,
+              escudo,
+              pontos: null,
+            },
+            { onConflict: "ano,tipo,continente,edicao,posicao" }
+          );
+        } catch { /* o livro falhar não desfaz o fecho da edição */ }
+      }
+    }
+  } catch {
+    // A edição pode ser fechada à mão. Não se deixa o apuramento rebentar por
+    // causa disto — a chave já está decidida e é isso que importa ao jogador.
+  }
 }
