@@ -7,6 +7,9 @@ import { supabase } from "@/lib/supabase";
 import { useNivel } from "@/lib/useNivel";
 import { ScoutDoTime } from "@/components/ScoutDoTime";
 import { marcarAreaProVista } from "@/components/BarraInferior";
+import { TutorialBoasVindas } from "@/components/TutorialBoasVindas";
+import { deveMostrarTutorial } from "@/lib/tutorials";
+import { useFaixa } from "@/lib/useFaixa";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -29,6 +32,12 @@ export default function DashboardPro() {
   // Acabou de comprar Pro Max? (o checkout devolve ?novo=promax)
   const [acabouDeComprarMax, setAcabouDeComprarMax] = useState(false);
 
+  // BOAS-VINDAS. Aparece uma vez a quem é Pro e ainda não viu — não só a quem
+  // acabou de pagar. Quem já era subscritor antes disto existir também merece
+  // saber o que tem.
+  const [verBoasVindasPro, setVerBoasVindasPro] = useState(false);
+  const { cor: corFaixa } = useFaixa();
+
   // A verdade sobre o nível: lida da tabela `users`, nunca do metadata.
   const { ehPro, ehProMax: ehProMaxReal, pronto: nivelPronto } = useNivel();
 
@@ -36,6 +45,17 @@ export default function DashboardPro() {
   useEffect(() => {
     marcarAreaProVista();
   }, []);
+
+  // Decide DEPOIS de o nível estar confirmado — nunca antes, senão decidia-se
+  // com "gratis" e o tutorial não aparecia a quem devia.
+  useEffect(() => {
+    if (!nivelPronto || !ehPro) return;
+    let vivo = true;
+    deveMostrarTutorial("ippon_boasvindas_pro").then((mostrar) => {
+      if (vivo && mostrar) setVerBoasVindasPro(true);
+    });
+    return () => { vivo = false; };
+  }, [nivelPronto, ehPro]);
 
   // Lê o ?novo= da barra de endereço.
   //
@@ -122,6 +142,14 @@ export default function DashboardPro() {
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+      {verBoasVindasPro && (
+          <TutorialBoasVindas
+          percurso="pro"
+          cor={corFaixa}
+          nome={nome}
+          onFechar={() => setVerBoasVindasPro(false)}
+          />
+        )}
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 48px" }}>
 
         <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
@@ -183,6 +211,16 @@ export default function DashboardPro() {
 
         {/* SCOUT — componente partilhado (também usado na central Pro Max). */}
         <ScoutDoTime />
+
+        {/* REVER AS BOAS-VINDAS. Quem saltou por engano, ou quem quer relembrar
+            o que o plano lhe dá, não tinha como voltar — todos os tutoriais da
+            app eram de sentido único. */}
+        <button
+        onClick={() => setVerBoasVindasPro(true)}
+        style={{ display: "block", width: "100%", marginTop: 18, background: "transparent", border: "1px solid #2a3a33", color: "#7c8a82", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", padding: "10px", borderRadius: 10, cursor: "pointer" }}
+        >
+        Rever o que tenho com o Pro
+        </button>
 
       </div>
     </main>
