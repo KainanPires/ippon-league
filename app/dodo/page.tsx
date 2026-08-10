@@ -324,12 +324,48 @@ export default function Dodo() {
         chave deve ter sempre o mesmo aspeto, seja de atletas ou de equipas. */}
     {!aCarregar && jogo?.league_id && (
         <>
+        {/* DOIS BOTÕES, por cima da chave.
+
+            O primeiro abre as regras, que deixaram de estar empilhadas por
+            baixo — com uma chave no ecrã, doze parágrafos empurram-na para o
+            fundo da página.
+
+            O segundo inscreve na edição SEGUINTE, e só aparece a quem
+            realmente pode: o `podeInscrever` vem do servidor. Quem está a
+            disputar esta Copa está bloqueado da seguinte por desenho (o ciclo
+            faz saltar uma edição a quem joga), e a esses mostra-se o motivo em
+            vez de um botão que ia ser recusado. Prometer o que não se cumpre é
+            pior do que não oferecer. */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 9, marginTop: 20, alignItems: "center" }}>
         <button
         onClick={() => setVerComoFunciona((v) => !v)}
-        style={{ marginTop: 20, background: "transparent", border: "1px solid #2a3a33", color: "#9fb0a7", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", padding: "9px 14px", borderRadius: 999, cursor: "pointer" }}
+        style={{ background: "transparent", border: "1px solid #2a3a33", color: "#9fb0a7", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", padding: "9px 14px", borderRadius: 999, cursor: "pointer" }}
         >
         {verComoFunciona ? "Esconder as regras" : "Como funciona a Copa"}
         </button>
+
+        {insc && aberta && eu?.podeInscrever && !eu?.inscrito && (
+            <button
+            onClick={() => acao("inscrever")}
+            disabled={aEnviar}
+            style={{ background: GOLD, border: "none", color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", padding: "9px 16px", borderRadius: 999, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar ? 0.6 : 1 }}
+            >
+            {aEnviar ? "A inscrever…" : `Inscrever-me na ${insc.numero}ª`}
+            </button>
+          )}
+
+        {insc && aberta && eu?.inscrito && (
+            <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: VERDE, padding: "9px 4px" }}>
+            ✓ Inscrito na {insc.numero}ª
+            </span>
+          )}
+
+        {insc && aberta && eu && !eu.podeInscrever && !eu.inscrito && eu.motivo && (
+            <span style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.45, padding: "4px 2px", flexBasis: "100%" }}>
+            {eu.motivo}
+            </span>
+          )}
+        </div>
         <ChaveDaCopa leagueId={jogo.league_id} numero={jogo.numero} />
         </>
       )}
