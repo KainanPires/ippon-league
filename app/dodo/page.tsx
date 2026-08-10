@@ -34,11 +34,19 @@ import { supabase } from "@/lib/supabase";
 import { NOME_CONTINENTE, continenteDoPais, type Continente } from "@/lib/continentes";
 import { useNivel } from "@/lib/useNivel";
 import { TrofeuDodo } from "@/components/TrofeuDodo";
-
 // A barra inferior deixou de estar copiada em cada página. Vive uma vez em
 // components/BarraInferior.tsx, e é lá que o separador Pro pulsa a dourado
 // para quem tem Pro e ainda não visitou a área.
 import { BarraInferior } from "@/components/BarraInferior";
+import {
+  BlocoChave,
+  CaixaConfronto,
+  CaixaBye,
+  useEmDestaque,
+  type NoChave,
+  type Aresta,
+  type LadoCaixa,
+} from "@/components/Chave";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -299,6 +307,17 @@ export default function Dodo() {
     {/* --- REGRAS --- Fora do ramo da edição de propósito: quem chega aqui
       entre Copas tem de sair a saber o que é, quem pode entrar e como se
       joga. Uma página que só diz "não há edição" não angaria ninguém. */}
+    {/* --- A CHAVE ---
+        Aparece assim que o sorteio corre, e é visível a TODA A GENTE: quem não
+        é Pro não pode disputar, mas vê quem enfrenta quem. É a melhor angariação
+        que a página tem — ver a chave dá vontade de estar nela.
+
+        Desenhada pelo components/Chave.tsx, o mesmo do /chave-atletas. Uma
+        chave deve ter sempre o mesmo aspeto, seja de atletas ou de equipas. */}
+    {!aCarregar && jogo?.league_id && (
+        <ChaveDaCopa leagueId={jogo.league_id} numero={jogo.numero} />
+      )}
+
     {!aCarregar && <Regras vagasCont={vagasCont} totalVagas={totalVagas} />}
     </div>
     {/* Confirmação de saída. */}
@@ -316,7 +335,7 @@ export default function Dodo() {
         </div>
         </div>
       )}
-      <BarraInferior ativo="ligas" />
+    <BarraInferior ativo="ligas" />
     </main>
   );
 }
@@ -447,6 +466,171 @@ function Selo({ estado, aberta }: { estado: string; aberta: boolean }) {
     <span style={{ display: "inline-block", background: fundo, border: `1px solid ${borda}`, color: cor, fontFamily: FD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 9px", borderRadius: 999 }}>{texto}</span>
   );
 }
+
+// ---------------------------------------------------------------------------
+// A CHAVE DA COPA
+//
+// Vai buscar os confrontos a /api/copa/chave e desenha-os com o mesmo
+// componente do /chave-atletas. Visível a toda a gente, inclusive a quem não
+// pode disputar: ver a chave é o melhor convite que esta página tem.
+//
+// A ÁRVORE. Os confrontos vêm em lista, com `ronda` e `ordem`. A regra de
+// reconstrução é a de qualquer mata-mata: o confronto (r, o) é alimentado
+// pelos confrontos (r-1, 2o) e (r-1, 2o+1). A partir daí, as ligações saem
+// sozinhas e o desenho trata do resto.
+//
+// Um confronto sem `jogador_b` é uma passagem automática — acontece quando os
+// inscritos não enchem a chave.
+// ---------------------------------------------------------------------------
+
+interface IdentidadeChave {
+  user_id: string;
+  nome_time: string;
+  escudo: unknown;
+  continente: string | null;
+  pais: string | null;
+}
+
+interface ConfrontoChave {
+  id: string;
+  ronda: number;
+  ordem: number;
+  fase: string;
+  jogador_a: string | null;
+  jogador_b: string | null;
+  pontos_a: number | null;
+  pontos_b: number | null;
+  vencedor: string | null;
+  decidido_por: string | null;
+  estado: string;
+}
+
+function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number }) {
+  const [confrontos, setConfrontos] = useState<ConfrontoChave[]>([]);
+  const [identidades, setIdentidades] = useState<Record<string, IdentidadeChave>>({});
+  const [aLer, setALer] = useState(true);
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/copa/chave?id=${encodeURIComponent(leagueId)}`);
+        const j = await res.json();
+        if (!vivo) return;
+        setConfrontos(Array.isArray(j.confrontos) ? j.confrontos : []);
+        setIdentidades(j.identidades || {});
+      } catch {
+        /* sem chave: a secção não aparece */
+      } finally {
+        if (vivo) setALer(false);
+      }
+    })();
+    return () => { vivo = false; };
+  }, [leagueId]);
+
+  if (aLer || confrontos.length === 0) return null;
+
+  // Constrói a árvore a partir de (ronda, ordem).
+  function montar(lista: ConfrontoChave[]): { arvores: NoChave[]; arestas: Aresta[] } {
+    const porRondaOrdem = new Map<string, ConfrontoChave>();
+    for (const c of lista) porRondaOrdem.set(`${c.ronda}:${c.ordem}`, c);
+
+    const arestas: Aresta[] = [];
+    const maxRonda = Math.max(...lista.map((c) => c.ronda));
+
+    function no(c: ConfrontoChave): NoChave {
+      const key = c.id;
+
+      // Passagem automática: um lado só, sem filhos.
+      if (!c.jogador_b && c.decidido_por === "bye") {
+        return { tipo: "bye", key, dados: c };
+      }
+
+      const filhos: NoChave[] = [];
+      for (const oi of [c.ordem * 2, c.ordem * 2 + 1]) {
+        const f = porRondaOrdem.get(`${c.ronda - 1}:${oi}`);
+        if (f) {
+          filhos.push(no(f));
+          arestas.push({ de: f.id, para: key });
+        }
+      }
+
+      return { tipo: "luta", key, dados: c, filhos };
+    }
+
+    const raizes = lista.filter((c) => c.ronda === maxRonda).map((c) => no(c));
+    return { arvores: raizes, arestas };
+  }
+
+  // A chave principal e a repescagem são blocos separados, como no judo.
+  const principais = confrontos.filter((c) => c.fase === "normal");
+  const outros = confrontos.filter((c) => c.fase !== "normal");
+
+  const bloco1 = montar(principais);
+  const bloco2 = outros.length > 0 ? montar(outros) : null;
+
+  // O próximo confronto por decidir: é o que ganha o ponto verde.
+  const proximo = confrontos.find((c) => c.estado !== "decidido")?.id ?? null;
+
+  function ladoDe(uid: string | null, pts: number | null, venceu: boolean): LadoCaixa {
+    if (!uid) return { titulo: "—", vazio: true };
+    const i = identidades[uid];
+    return {
+      titulo: i?.nome_time || "Equipa",
+      // O continente é o que dá sentido a uma Copa "entre continentes".
+      subtitulo: [i?.continente, i?.pais].filter(Boolean).join(" · ") || null,
+      resultado: pts == null ? null : String(pts),
+      vencedor: venceu,
+    };
+  }
+
+  function Caixa({ no }: { no: NoChave }) {
+    const c = no.dados as ConfrontoChave;
+    const emDestaque = useEmDestaque(no.key);
+    const decidida = c.estado === "decidido" && !!c.vencedor;
+
+    if (no.tipo === "bye") {
+      return <CaixaBye lado={ladoDe(c.jogador_a, null, false)} />;
+    }
+
+    return (
+      <CaixaConfronto
+        a={ladoDe(c.jogador_a, c.pontos_a, c.vencedor === c.jogador_a)}
+        b={ladoDe(c.jogador_b, c.pontos_b, c.vencedor === c.jogador_b)}
+        decidida={decidida}
+        emDestaque={emDestaque}
+      />
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: GOLD }}>
+        {numero}ª Copa do Dôdo · a chave
+      </div>
+
+      <BlocoChave
+        titulo="Chave principal"
+        arvores={bloco1.arvores}
+        arestas={bloco1.arestas}
+        destaque={proximo}
+        renderCaixa={(no) => <Caixa no={no} />}
+        textoVazio="A chave é sorteada quando as inscrições fecharem."
+      />
+
+      {bloco2 && (
+        <BlocoChave
+          titulo="Repescagem e bronzes"
+          arvores={bloco2.arvores}
+          arestas={bloco2.arestas}
+          destaque={proximo}
+          renderCaixa={(no) => <Caixa no={no} />}
+        />
+      )}
+    </div>
+  );
+}
+
 // O cartão da Copa que está a ser jogada. Quando há inscrições abertas em cima,
 // vem em versão compacta — nesse ecrã a ação principal é inscrever-se, e um
 // segundo cartão do mesmo tamanho competia com ela pela atenção.
