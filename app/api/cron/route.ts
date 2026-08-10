@@ -162,11 +162,21 @@ async function lerFeitos(): Promise<Record<string, string>> {
     return (a && typeof a === "object" && !Array.isArray(a)) ? (a as Record<string, string>) : {};
   } catch { return {}; }
 }
-async function marcarFeito(marca: string): Promise<void> {
-  if (!supabaseAdmin) return;
+// DEVOLVE SE GRAVOU. O comentário antigo dizia "se falhar, no pior caso
+// repete-se — não se perde trabalho". Isso é falso para as tarefas que
+// NOTIFICAM.
+//
+// A marca das faixas existe precisamente porque, no dia 1, o cron corre 24
+// vezes: sem ela, cada jogador recebia 24 notificações de mudança de faixa. Se
+// o recálculo corre e a marca não grava, a hora seguinte repete tudo — e é
+// exatamente o cenário das 58 notificações da Copa do Dôdo.
+//
+// Quem chama tem de saber, e a resposta do cron tem de o dizer.
+async function marcarFeito(marca: string): Promise<boolean> {
+  if (!supabaseAdmin) return false;
   try {
     const atuais = await lerFeitos();
-    await supabaseAdmin.from("atletas_cache").upsert(
+    const { error } = await supabaseAdmin.from("atletas_cache").upsert(
       {
         id_competition: CHAVE_FEITO,
         atletas: { ...atuais, [marca]: new Date().toISOString() },
@@ -175,7 +185,15 @@ async function marcarFeito(marca: string): Promise<void> {
       },
       { onConflict: "id_competition" }
     );
-  } catch { /* se falhar, no pior caso repete-se — não se perde trabalho */ }
+    if (error) {
+      console.error(`[cron] marca "${marca}" NÃO gravou: ${error.message}`);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error(`[cron] marca "${marca}" rebentou:`, e);
+    return false;
+  }
 }
 /** Chave do dia ("AAAA-MM-DD") para o cursor reiniciar todos os dias. */
 function chaveDia(d: Date): string {
@@ -234,20 +252,27 @@ async function atualizarAoVivo(hoje: Date): Promise<{ ao_vivo: string | null; at
   const atual = competicaoDaSemana(hoje);
   const aDecorrer = jaComecou(atual, hoje);
   if (!aDecorrer) {
-    await supabaseAdmin.from("atletas_cache").upsert(
+    // LIMPA a lista de "a competir agora". Se este upsert falhar, a app fica a
+    // dizer que há atletas em prova quando a competição já acabou — um aviso
+    // errado é pior do que aviso nenhum, por isso o erro vai na resposta.
+    const { error } = await supabaseAdmin.from("atletas_cache").upsert(
       { id_competition: CHAVE_AO_VIVO, atletas: [], total: 0, atualizado_em: new Date().toISOString() },
       { onConflict: "id_competition" }
     );
+    if (error) return { ao_vivo: `erro ao limpar: ${error.message}`, atletas_ao_vivo: 0 };
     return { ao_vivo: null, atletas_ao_vivo: 0 };
   }
   const raw = await getCompetitionCompetitorsRaw(atual.idCompeticao);
   const atletas = mapCompetitorsToAthletes(raw);
   const ids = atletas.map((a) => a.id).filter(Boolean);
   const payload = { id_competicao: atual.idCompeticao, nome: atual.nome, ids };
-  await supabaseAdmin.from("atletas_cache").upsert(
+  const { error } = await supabaseAdmin.from("atletas_cache").upsert(
     { id_competition: CHAVE_AO_VIVO, atletas: payload, total: ids.length, atualizado_em: new Date().toISOString() },
     { onConflict: "id_competition" }
   );
+  // Se falhar, a lista fica a do ciclo anterior. O erro sobe na resposta em vez
+  // de a app mostrar atletas desatualizados sem ninguém saber porquê.
+  if (error) return { ao_vivo: `erro ao gravar: ${error.message}`, atletas_ao_vivo: 0 };
   return { ao_vivo: atual.nome, atletas_ao_vivo: ids.length };
 }
 // (C) CONGELA as competições recentes que já TERMINARAM (regra das 60h).
@@ -1072,6 +1097,10 @@ export async function GET(req: Request) {
   // feitas. Vai na resposta: sem isto, uma corrida que não faz nada é
   // indistinguível de uma que falhou em silêncio.
   const jaFeitoHoje: string[] = [];
+
+  // Marcas que a tarefa correu mas NÃO conseguiu gravar. Se aparecer aqui algo,
+  // a tarefa vai repetir-se na próxima hora — com as notificações incluídas.
+  const marcasFalhadas: string[] = [];
   // (D) No início do mês (dia 1), recalcula as faixas do mês anterior. Permite
   // também forçar via ?faixas=AAAA-MM para teste manual.
   let faixas: { mes: string; jogadores: number; percentilAtivo: boolean; distribuicao: Record<string, number>; gravadas: number; falhadas: number; primeiroErro: string | null; minJogadores: number; minVindoDoAmbiente: boolean; minBruto: string | null } | null = null;
@@ -1091,7 +1120,10 @@ export async function GET(req: Request) {
       if (!feitos[marca]) {
         const r = await recalcularFaixas(mes);
         faixas = { mes, ...r };
-        await marcarFeito(marca);
+        // Se a marca não gravar, a corrida seguinte volta a recalcular E A
+        // NOTIFICAR. Fica registado na resposta para se ver logo, em vez de os
+        // jogadores receberem a mesma notificação de hora a hora.
+        if (!(await marcarFeito(marca))) marcasFalhadas.push(marca);
       } else {
         jaFeitoHoje.push(marca);
       }
@@ -1110,7 +1142,9 @@ export async function GET(req: Request) {
       const marca = `ano_${anoFechar}`;
       if (!feitos[marca]) {
         fechoAnual = await fecharAnoOficial(anoFechar);
-        await marcarFeito(marca);
+        // Idem: sem marca, o pódio do ano é reescrito (e os campeões
+        // notificados) a cada hora do dia 1 de janeiro.
+        if (!(await marcarFeito(marca))) marcasFalhadas.push(marca);
       } else {
         jaFeitoHoje.push(marca);
       }
@@ -1266,6 +1300,7 @@ export async function GET(req: Request) {
       faixas,
       fecho_anual: fechoAnual,
       ja_feito: jaFeitoHoje,
+      marcas_falhadas: marcasFalhadas,
       mercado,
       datas,
       emails_verificacao: emailsVerificacao,
