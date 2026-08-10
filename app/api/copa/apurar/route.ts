@@ -143,14 +143,14 @@ if (pendentes.length === 0) {
   // repetível: correr o apuramento outra vez resolve, em vez de não fazer nada.
   if (liga.copa_estado !== "terminada") {
     await supabaseAdmin.from("leagues").update({ copa_estado: "terminada" }).eq("id", league_id);
-    await fecharEdicaoDoDodo(league_id);
-    return NextResponse.json({ ok: true, apurou: false, semPendentes: true, fechadaAgora: true, estado: "terminada" });
+    const fecho = await fecharEdicaoDoDodo(league_id);
+    return NextResponse.json({ ok: true, apurou: false, semPendentes: true, fechadaAgora: true, estado: "terminada", fecho });
   }
 
   // Já estava fechada, mas o livro de campeões pode ter falhado (é gravado
   // dentro de um try). Voltar a chamar é seguro: o upsert não duplica.
-  await fecharEdicaoDoDodo(league_id);
-  return NextResponse.json({ ok: true, apurou: false, semPendentes: true, estado: liga.copa_estado });
+  const fecho = await fecharEdicaoDoDodo(league_id);
+  return NextResponse.json({ ok: true, apurou: false, semPendentes: true, estado: liga.copa_estado, fecho });
 }
 const rondaAtual = Math.min(...pendentes.map((c) => c.ronda));
 const confrontosRonda = confrontos.filter((c) => c.ronda === rondaAtual);
@@ -371,6 +371,7 @@ const { data: rondaFinal } = await supabaseAdmin
 const todaDecidida = (rondaFinal || []).every((c) => c.estado === "decidido");
 let gerouProxima = false;
 let terminada = false;
+let fecho: { passo: string; erro?: string; gravados?: number } | null = null;
 if (todaDecidida) {
   const eraFinal = (rondaFinal || []).some((c) => c.fase === "final");
   if (eraFinal) {
@@ -405,7 +406,7 @@ if (todaDecidida) {
         // nunca dá certificado, e o cron passa a apurá-la todas as horas sem
         // nada para decidir.
         await supabaseAdmin.from("leagues").update({ copa_estado: "terminada" }).eq("id", league_id);
-        await fecharEdicaoDoDodo(league_id);
+        fecho = await fecharEdicaoDoDodo(league_id);
         terminada = true;
       }
       // NOTIFICAÇÃO AO PERDEDOR de confronto NORMAL (opção B, validada com o
@@ -457,6 +458,7 @@ return NextResponse.json({
     todaDecidida,
     gerouProxima,
     terminada,
+    fecho,
     finalAEsperar, // a final está à espera da repescagem
     janela_final: janelaFinal.length > 0 ? janelaFinal : undefined, // competições que contaram para o título
   });
@@ -558,8 +560,8 @@ async function pontosPorJogador(
 // encontra nada e a função sai sem fazer coisa alguma — por isso o apuramento
 // continua a servir os dois casos.
 // ---------------------------------------------------------------------------
-async function fecharEdicaoDoDodo(league_id: string): Promise<void> {
-  if (!supabaseAdmin) return;
+async function fecharEdicaoDoDodo(league_id: string): Promise<{ passo: string; erro?: string; gravados?: number }> {
+  if (!supabaseAdmin) return { passo: "sem_ligacao" };
 
   try {
     const { data: edicoes } = await supabaseAdmin
@@ -569,7 +571,7 @@ async function fecharEdicaoDoDodo(league_id: string): Promise<void> {
       .limit(1);
 
     const edicao = (edicoes || [])[0];
-    if (!edicao) return; // copa de amigos: nada a fazer
+    if (!edicao) return { passo: "sem_edicao" }; // copa de amigos: nada a fazer
 
     // NÃO se sai aqui quando a edição já está terminada. O livro de campeões é
     // gravado mais abaixo, dentro de um try, e pode ter falhado enquanto a
@@ -631,6 +633,8 @@ async function fecharEdicaoDoDodo(league_id: string): Promise<void> {
       }
 
       const ano = Number(edicao.ano) || new Date().getFullYear();
+      let gravados = 0;
+      let erroDoLivro: string | undefined;
 
       for (const p of podio) {
         // Nome e escudo da equipa, para o livro não depender de a equipa
@@ -650,8 +654,8 @@ async function fecharEdicaoDoDodo(league_id: string): Promise<void> {
           }
         } catch { /* fica o valor por omissão */ }
 
-        try {
-          await supabaseAdmin.from("campeoes_oficiais").upsert(
+        {
+          const { error: erroLivro } = await supabaseAdmin.from("campeoes_oficiais").upsert(
             {
               ano,
               tipo: "copa_dodo",
@@ -670,11 +674,20 @@ async function fecharEdicaoDoDodo(league_id: string): Promise<void> {
             },
             { onConflict: "ano,tipo,continente,edicao,posicao" }
           );
-        } catch { /* o livro falhar não desfaz o fecho da edição */ }
+
+          // O ERRO TEM DE SER VISTO. Estava dentro de um catch vazio, e por
+          // isso o pódio da 901ª falhou três vezes seguidas sem deixar rasto —
+          // a mesma armadilha do insert da liga da Copa.
+          if (erroLivro) erroDoLivro = erroLivro.message;
+          else gravados++;
+        }
       }
     }
-  } catch {
+    return { passo: "fechada", gravados, erro: erroDoLivro };
+  } catch (e) {
     // A edição pode ser fechada à mão. Não se deixa o apuramento rebentar por
     // causa disto — a chave já está decidida e é isso que importa ao jogador.
+    // Mas o motivo vai na resposta, para não se perder outra vez.
+    return { passo: "excecao", erro: e instanceof Error ? e.message : String(e) };
   }
 }
