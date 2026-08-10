@@ -49,7 +49,7 @@ export default function ProMaxCentral() {
 
   // BOAS-VINDAS DO PRO MAX. Chave própria, separada da do Pro: quem sobe de Pro
   // para Pro Max já viu o percurso do Pro e tem de ver o do Max na mesma.
-  const [verBoasVindas, setVerBoasVindas] = useState(false);
+  const [verTutorial, setVerTutorial] = useState(false);
   const [percurso, setPercurso] = useState<"promax" | "promax_direto">("promax");
   const { cor: corFaixa } = useFaixa();
   const [verBoasVindas, setVerBoasVindas] = useState(true);
@@ -72,7 +72,7 @@ export default function ProMaxCentral() {
       const nuncaViuPro = await deveMostrarTutorial("ippon_boasvindas_pro");
       if (!vivo) return;
       setPercurso(nuncaViuPro ? "promax_direto" : "promax");
-      setVerBoasVindas(true);
+      setVerTutorial(true);
     })();
     return () => { vivo = false; };
   }, [pronto, ehProMax]);
@@ -124,12 +124,12 @@ export default function ProMaxCentral() {
   }
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-    {verBoasVindas && (
+    {verTutorial && (
         <TutorialBoasVindas
         percurso={percurso}
         cor={corFaixa}
         nome={nome}
-        onFechar={() => setVerBoasVindas(false)}
+        onFechar={() => setVerTutorial(false)}
         />
       )}
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 48px" }}>
@@ -208,7 +208,7 @@ export default function ProMaxCentral() {
 
     {/* REVER AS BOAS-VINDAS — ver a nota na central Pro. */}
     <button
-    onClick={() => { setPercurso("promax"); setVerBoasVindas(true); }}
+    onClick={() => { setPercurso("promax"); setVerTutorial(true); }}
     style={{ display: "block", width: "100%", marginTop: 18, background: "transparent", border: "1px solid #2a3a33", color: "#7c8a82", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", padding: "10px", borderRadius: 10, cursor: "pointer" }}
     >
     Rever o que tenho com o Pro Max
