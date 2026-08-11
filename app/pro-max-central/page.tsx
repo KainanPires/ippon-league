@@ -252,7 +252,7 @@ function SeletorTatameCentral() {
                 <div style={{ border: `2px solid ${tt.foraBorda}`, background: tt.foraBg, borderRadius: 9, padding: 5 }}>
                 <div style={{ border: `2px solid ${tt.dentroBorda}`, background: tt.dentroBg, borderRadius: 6, height: 30 }} />
                 </div>
-                <span style={{ fontSize: 11, color: escolhido ? "#7fd1a3" : "#cfd8d2", fontWeight: 700, textAlign: "center" }}>{tt.nome}</span>
+                <span style={{ fontSize: 11, color: escolhido ? "#7fd1a3" : "#cfd8d2", fontWeight: 700, textAlign: "center" }}>{tt.id.split("_").map((c) => t("cor." + c)).join(" / ")}</span>
                 {escolhido && (
                     <span style={{ position: "absolute", top: -8, right: -7, background: "#7fd1a3", color: "#0c1a12", borderRadius: "50%", width: 19, height: 19, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
