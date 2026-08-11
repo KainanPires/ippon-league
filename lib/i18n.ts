@@ -240,6 +240,24 @@ const PT: Dicionario = {
   "precos.contratar": "Contratar {plano}",
   "precos.aAbrir": "A abrir…",
 
+  // --- calendario + cores do tatame (acrescentado) ---
+  "cor.amarelo": "Amarelo",
+  "cor.azul": "Azul",
+  "cor.vermelho": "Vermelho",
+  "cor.verde": "Verde",
+  "cal.titulo": "Calendário 2026",
+  "cal.oQueClassico": "O que é um clássico?",
+  "cal.classicoTexto": "Um clássico é uma grande competição dos últimos anos — %A% — que reavivamos nas semanas sem competição oficial. Serve de base à pontuação e relembra grandes momentos do judô, para haver jogo toda a semana. Vês o %B%, mas %C%.",
+  "cal.classicoA": "Grand Prix, Grand Slam, Mundiais e Olimpíadas",
+  "cal.classicoB": "nível e o ano",
+  "cal.classicoC": "o nome só se revela no dia",
+  "cal.rodada": "Rodada",
+  "cal.classicoN": "Clássico Nº {n}",
+  "cal.classicoBadge": "Clássico",
+  "cal.proxima": "próxima",
+  "cal.aDecorrer": "a decorrer",
+  "cal.terminada": "terminada",
+
   // --- perfil (acrescentado) ---
   "perfil.voltarInicio": "Voltar ao início",
   "perfil.tocaFechar": "Toca para fechar",
@@ -1094,6 +1112,24 @@ const EN: Dicionario = {
   "precos.contratar": "Get {plano}",
   "precos.aAbrir": "Opening…",
 
+  // --- calendario + cores do tatame (acrescentado) ---
+  "cor.amarelo": "Yellow",
+  "cor.azul": "Blue",
+  "cor.vermelho": "Red",
+  "cor.verde": "Green",
+  "cal.titulo": "2026 Calendar",
+  "cal.oQueClassico": "What is a classic?",
+  "cal.classicoTexto": "A classic is a major competition from recent years — %A% — that we revive in the weeks without an official competition. It's the basis for scoring and brings back great judo moments, so there's a game every week. You see the %B%, but %C%.",
+  "cal.classicoA": "Grand Prix, Grand Slam, Worlds and Olympics",
+  "cal.classicoB": "level and the year",
+  "cal.classicoC": "the name is only revealed on the day",
+  "cal.rodada": "Round",
+  "cal.classicoN": "Classic no. {n}",
+  "cal.classicoBadge": "Classic",
+  "cal.proxima": "next",
+  "cal.aDecorrer": "live",
+  "cal.terminada": "finished",
+
   // --- perfil (acrescentado) ---
   "perfil.voltarInicio": "Back to home",
   "perfil.tocaFechar": "Tap to close",
@@ -1929,6 +1965,24 @@ const ES: Dicionario = {
   "precos.contratar": "Contratar {plano}",
   "precos.aAbrir": "Abriendo…",
 
+  // --- calendario + cores do tatame (acrescentado) ---
+  "cor.amarelo": "Amarillo",
+  "cor.azul": "Azul",
+  "cor.vermelho": "Rojo",
+  "cor.verde": "Verde",
+  "cal.titulo": "Calendario 2026",
+  "cal.oQueClassico": "¿Qué es un clásico?",
+  "cal.classicoTexto": "Un clásico es una gran competición de los últimos años — %A% — que revivimos en las semanas sin competición oficial. Sirve de base a la puntuación y recuerda grandes momentos del judo, para que haya juego cada semana. Ves el %B%, pero %C%.",
+  "cal.classicoA": "Grand Prix, Grand Slam, Mundiales y Juegos Olímpicos",
+  "cal.classicoB": "nivel y el año",
+  "cal.classicoC": "el nombre solo se revela el día",
+  "cal.rodada": "Jornada",
+  "cal.classicoN": "Clásico Nº {n}",
+  "cal.classicoBadge": "Clásico",
+  "cal.proxima": "próxima",
+  "cal.aDecorrer": "en curso",
+  "cal.terminada": "terminada",
+
   // --- perfil (acrescentado) ---
   "perfil.voltarInicio": "Volver al inicio",
   "perfil.tocaFechar": "Toca para cerrar",
@@ -2763,6 +2817,24 @@ const FR: Dicionario = {
   "precos.notaMoeda": "Facturé dans ta monnaie locale, au taux du jour.",
   "precos.contratar": "Souscrire {plano}",
   "precos.aAbrir": "Ouverture…",
+
+  // --- calendario + cores do tatame (acrescentado) ---
+  "cor.amarelo": "Jaune",
+  "cor.azul": "Bleu",
+  "cor.vermelho": "Rouge",
+  "cor.verde": "Vert",
+  "cal.titulo": "Calendrier 2026",
+  "cal.oQueClassico": "Qu'est-ce qu'un classique ?",
+  "cal.classicoTexto": "Un classique est une grande compétition des dernières années — %A% — que nous faisons revivre les semaines sans compétition officielle. Il sert de base à la notation et rappelle de grands moments du judo, pour qu'il y ait du jeu chaque semaine. Tu vois le %B%, mais %C%.",
+  "cal.classicoA": "Grand Prix, Grand Slam, Championnats du monde et Jeux olympiques",
+  "cal.classicoB": "niveau et l'année",
+  "cal.classicoC": "le nom n'est révélé que le jour même",
+  "cal.rodada": "Journée",
+  "cal.classicoN": "Classique n° {n}",
+  "cal.classicoBadge": "Classique",
+  "cal.proxima": "prochaine",
+  "cal.aDecorrer": "en cours",
+  "cal.terminada": "terminée",
 
   // --- perfil (acrescentado) ---
   "perfil.voltarInicio": "Retour à l'accueil",
@@ -3606,6 +3678,24 @@ const DE: Dicionario = {
   "precos.notaMoeda": "Abrechnung in deiner Landeswährung, zum Tageskurs.",
   "precos.contratar": "{plano} holen",
   "precos.aAbrir": "Wird geöffnet…",
+
+  // --- calendario + cores do tatame (acrescentado) ---
+  "cor.amarelo": "Gelb",
+  "cor.azul": "Blau",
+  "cor.vermelho": "Rot",
+  "cor.verde": "Grün",
+  "cal.titulo": "Kalender 2026",
+  "cal.oQueClassico": "Was ist ein Klassiker?",
+  "cal.classicoTexto": "Ein Klassiker ist ein großer Wettkampf der letzten Jahre — %A% —, den wir in den Wochen ohne offiziellen Wettkampf wieder aufleben lassen. Er dient als Grundlage für die Punktevergabe und ruft große Judo-Momente in Erinnerung, damit es jede Woche ein Spiel gibt. Du siehst %B%, aber %C%.",
+  "cal.classicoA": "Grand Prix, Grand Slam, Weltmeisterschaften und Olympia",
+  "cal.classicoB": "das Niveau und das Jahr",
+  "cal.classicoC": "der Name wird erst am Tag verraten",
+  "cal.rodada": "Runde",
+  "cal.classicoN": "Klassiker Nr. {n}",
+  "cal.classicoBadge": "Klassiker",
+  "cal.proxima": "nächste",
+  "cal.aDecorrer": "läuft",
+  "cal.terminada": "beendet",
 
   // --- perfil (acrescentado) ---
   "perfil.voltarInicio": "Zurück zum Start",
