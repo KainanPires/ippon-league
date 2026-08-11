@@ -1,71 +1,190 @@
 "use client";
-
+import { useState } from "react";
 import { Mascot } from "@/components/Mascot";
-
+import { PRECO } from "@/lib/precos";
+import { supabase } from "@/lib/supabase";
+import { NotaMoeda } from "@/components/NotaMoeda";
+import { useT } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-
-const BENEFITS: { t: string; x: string }[] = [
-  { t: "Scout avançado", x: "Vê o histórico completo, tendências e estatísticas de cada atleta." },
-  { t: "Valorização esperada", x: "Sabe quanto um atleta pode valorizar antes de escalares." },
-  { t: "Mínimo para valorizar", x: "Descobre o que o atleta precisa de fazer para ganhares JC." },
-  { t: "Dicas e capitães da rodada", x: "Sugestões de quem escalar e em quem apostar a braçadeira." },
-  { t: "Barganhas da rodada", x: "Atletas subvalorizados com boa probabilidade de render." },
-  { t: "Ligas e badges exclusivos", x: "Distinções e ligas só para membros Ippon Pro." },
+const MAX = "#7fb8f5"; // tom do Pro Max, para o distinguir do Pro (dourado)
+// O que cada nível dá. Princípio: só informação e ferramentas — nunca decidir o
+// time pela pessoa, nunca prometer resultado. (Fase de testes: sem prémios.)
+//
+// CHAVE: o Pro vê o chaveamento no INÍCIO (quando sai) e no FIM (com resultados),
+// e fica guardado até à competição seguinte. O Pro Max vê também o MEIO — a chave
+// AO VIVO durante a competição — além dos extras.
+//
+// Estes arrays são avaliados no ARRANQUE do módulo, quando o `t` ainda não
+// existe — por isso guardam CHAVES, não frases. A tradução acontece no render,
+// com {t(chave)}. (Regra de estrutura do guião.)
+const PRO: string[] = [
+  // As duas primeiras são as que distinguem o Pro de uma ferramenta de consulta:
+  // deixam de ser dados e passam a ser competição a sério.
+  //
+  // A LINGUAGEM AQUI É DELIBERADA. Nas ligas oficiais a pessoa CONCORRE, porque
+  // basta ser Pro e escalar. Na Copa do Dôdo tem a POSSIBILIDADE de entrar,
+  // porque as vagas são sorteadas — prometer participação a quem pode não ser
+  // sorteado seria vender uma coisa que talvez não receba.
+  "pro.bLigasOficiais",
+  "pro.bCopa",
+  "pro.bScout",
+  "pro.bAnaliseTime",
+  "pro.bCapitao",
+  "pro.bValorizacao",
+  "pro.bChaveamento",
+  "pro.bAoVivo",
+  "pro.b5Ligas",
+  "pro.bDesign",
 ];
-
+// O Pro Max TEM tudo o que o Pro tem, MAIS estes extras.
+const MAX_EXTRA: string[] = [
+  "pro.mChaveAoVivo",
+  "pro.mAlerta",
+  "pro.m10Ligas",
+  "pro.mAnaliseChave",
+  "pro.mGrupo",
+  "pro.mLayout",
+];
 export default function IpponPro() {
+  const t = useT();
+  const [aEnviar, setAEnviar] = useState<"pro" | "promax" | null>(null);
+  const [erro, setErro] = useState("");
+  // Abre o pagamento. O acesso NÃO é dado aqui nem no regresso: quem o dá é o
+  // webhook, quando a Stripe confirmar que o dinheiro entrou. Isto limita-se a
+  // levar a pessoa ao ecrã de pagamento.
+  async function contratar(alvo: "pro" | "promax") {
+    setErro("");
+    setAEnviar(alvo);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const tok = sess.session?.access_token;
+      if (!tok) {
+        // Sem sessão não há a quem atribuir a subscrição. Manda entrar e volta.
+        window.location.href = "/entrar?voltar=/ippon-pro";
+        return;
+      }
+      const res = await fetch("/api/stripe/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+          body: JSON.stringify({ alvo }),
+        });
+      const j = await res.json();
+      if (j?.ok && j.url) { window.location.href = j.url; return; }
+      setErro(j?.erro || t("pro.erroAbrirPagamento"));
+    } catch {
+      setErro(t("dd.falhaLigacao"));
+    }
+    setAEnviar(null);
+  }
+  // A montra: o NÚMERO vem do precos.ts (fonte única, tem de bater com a Stripe);
+  // o TEXTO ("/mês", etiqueta, duração, prémios) vem do i18n. Cada um na sua fonte.
+  const porMes = t("precos.porMes");
+  const duracao = t("precos.duracaoDesconto", { meses: PRECO.mesesDesconto });
+  // Frase com destaque a negrito no meio. Partir a frase em pedaços não sobrevive
+  // à tradução (noutras línguas a ordem muda); por isso a frase inteira vive numa
+  // chave, com o marcador %D% onde entra o negrito, e dividimos aqui.
+  const partesHonesto = t("pro.honestoMontam").split("%D%");
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 40px" }}>
-        <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 10 }}>
-          <a href="/inicio" aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-          </a>
-          <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Ippon Pro</h1>
-        </header>
-
-        {/* Hero */}
-        <div style={{ textAlign: "center", background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "22px 18px", marginBottom: 16 }}>
-          <div style={{ width: 92, height: 92, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="sabio" /></div>
-          <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.1 }}>Joga com vantagem</div>
-          <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "8px 0 14px" }}>Descobre atletas subvalorizados, vê a valorização esperada e recebe as dicas da rodada antes de escalares.</p>
-          <div>
-            <span style={{ fontSize: 15, color: "#7c8a82", textDecoration: "line-through" }}>9,90€</span>{" "}
-            <span style={{ fontFamily: FD, fontSize: 36, fontWeight: 700, color: GOLD }}>4,90€</span>
-            <span style={{ fontSize: 13, color: "#93a39a" }}>/mês</span>
-          </div>
-          <div style={{ fontSize: 11, color: GOLD, marginTop: 2 }}>Oferta de lançamento · cancela quando quiseres</div>
-        </div>
-
-        {/* Benefícios */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
-          {BENEFITS.map((b) => (
-            <div key={b.t} style={{ display: "flex", gap: 11, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px" }}>
-              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#3a2f12", color: GOLD, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}>✓</div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>{b.t}</div>
-                <div style={{ fontSize: 12, color: "#93a39a", marginTop: 2, lineHeight: 1.45 }}>{b.x}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", marginBottom: 14, lineHeight: 1.5 }}>
-          Sem anúncios · prioridade em sorteios e experiências · apoia o crescimento da Ippon League. 🥋
-        </div>
-      </div>
-
-      {/* Barra fixa de assinatura */}
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "12px 16px" }}>
-        <div style={{ maxWidth: 460, margin: "0 auto" }}>
-          <button onClick={() => alert("Pagamento em breve! Estamos a preparar o Ippon Pro.")} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 15, borderRadius: 12, fontSize: 16, cursor: "pointer" }}>
-            Assinar por 4,90€/mês
-          </button>
-          <a href="/inicio" style={{ display: "block", textAlign: "center", marginTop: 8, color: "#93a39a", fontSize: 12, textDecoration: "none", fontFamily: FB }}>Agora não</a>
-        </div>
-      </div>
+    <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 40px" }}>
+    <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 10 }}>
+    <a href="/inicio" aria-label={t("comum.voltar")} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+    </a>
+    <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Ippon Pro</h1>
+    </header>
+    {/* Hero */}
+    <div style={{ textAlign: "center", background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", marginBottom: 16 }}>
+    <div style={{ width: 80, height: 80, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="sabio" /></div>
+    <div style={{ fontFamily: FD, fontSize: 23, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.1 }}>{t("pro.heroTitulo")}</div>
+    <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "8px 0 0" }}>{t("precos.premios")}. {t("pro.estrategiaTua")}</p>
+    {PRECO.emPromocao && <div style={{ fontSize: 11.5, color: GOLD, marginTop: 8, fontWeight: 700 }}>{t("precos.etiqueta")} · {duracao} · {t("pro.seteDiasGratis")}</div>}
+    </div>
+    {/* CARTÃO PRO */}
+    <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "18px 16px", marginBottom: 14 }}>
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
+    <span style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Pro</span>
+    <span>
+    {PRECO.emPromocao && <span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through", marginRight: 6 }}>{PRECO.normal}</span>}
+    <span style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
+    <span style={{ fontSize: 12, color: "#93a39a" }}>{porMes}</span>
+    </span>
+    </div>
+    <p style={{ fontSize: 12, color: "#93a39a", margin: "0 0 12px" }}>{t("pro.proDesc")}</p>
+    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+    {PRO.map((chave) => (
+          <li key={chave} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+          <span style={{ color: GOLD, fontWeight: 700, flexShrink: 0 }}>✓</span>
+          <span style={{ fontSize: 13, color: "#dfe6e0", lineHeight: 1.45 }}>{t(chave)}</span>
+          </li>
+        ))}
+    </ul>
+    <button onClick={() => contratar("pro")} disabled={aEnviar !== null} style={{ width: "100%", marginTop: 16, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 13, borderRadius: 11, fontSize: 14, cursor: "pointer" }}>
+    {aEnviar === "pro" ? t("precos.aAbrir") : `${t("precos.contratar", { plano: "Pro" })} · ${PRECO.atual}${porMes}`}
+    </button>
+    </div>
+    {/* CARTÃO PRO MAX — destacado (é o upsell) */}
+    <div style={{ background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 18, padding: "18px 16px", marginBottom: 18, position: "relative" }}>
+    <div style={{ position: "absolute", top: -10, left: 16, background: MAX, color: "#0b1220", fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "3px 10px", borderRadius: 6 }}>{t("pro.maisCompleto")}</div>
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4, marginTop: 4 }}>
+    <span style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", color: MAX }}>Pro Max</span>
+    <span>
+    {PRECO.emPromocao && <span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through", marginRight: 6 }}>{PRECO.maxNormal}</span>}
+    <span style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: MAX }}>{PRECO.maxAtual}</span>
+    <span style={{ fontSize: 12, color: "#93a39a" }}>{porMes}</span>
+    </span>
+    </div>
+    <p style={{ fontSize: 12, color: "#9fb3cc", margin: "0 0 12px" }}>{t("pro.maxDesc")}</p>
+    {/* Linha "tudo o que o Pro tem" */}
+    <div style={{ display: "flex", gap: 9, alignItems: "center", background: "rgba(127,184,245,0.08)", border: "1px solid #24364a", borderRadius: 10, padding: "9px 11px", marginBottom: 12 }}>
+    <span style={{ color: MAX, fontWeight: 700 }}>★</span>
+    <span style={{ fontSize: 12.5, color: "#dfe6e0", fontWeight: 700 }}>{t("pro.tudoDoProInclui")}</span>
+    </div>
+    {/* Extras do Max */}
+    <div style={{ fontSize: 11, color: "#9fb3cc", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, marginBottom: 8 }}>{t("pro.eAindaSoMax")}</div>
+    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+    {MAX_EXTRA.map((chave) => (
+          <li key={chave} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+          <span style={{ color: MAX, fontWeight: 700, flexShrink: 0 }}>✓</span>
+          <span style={{ fontSize: 13, color: "#eaf1f8", lineHeight: 1.45 }}>{t(chave)}</span>
+          </li>
+        ))}
+    </ul>
+    <button onClick={() => contratar("promax")} disabled={aEnviar !== null} style={{ width: "100%", marginTop: 16, background: MAX, color: "#0b1220", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 13, borderRadius: 11, fontSize: 14, cursor: "pointer" }}>
+    {aEnviar === "promax" ? t("precos.aAbrir") : `${t("precos.contratar", { plano: "Pro Max" })} · ${PRECO.maxAtual}${porMes}`}
+    </button>
+    </div>
+    {/* Um aviso só, por baixo dos dois cartões: a Stripe converte no checkout
+        (Adaptive Pricing), por isso quem está fora da zona euro lê euros aqui
+        e vê a sua moeda ao pagar. */}
+    <NotaMoeda style={{ marginBottom: 16 }} />
+    {/* Nota honesta: o que o Pro NÃO faz */}
+    <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px", marginBottom: 16 }}>
+    <div style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.6 }}>
+    {partesHonesto[0]}<strong style={{ color: "#cfd8d2" }}>{t("pro.honestoMontamDestaque")}</strong>{partesHonesto[1]}
+    </div>
+    <div style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.55, marginTop: 10 }}>
+    {t("pro.notaClassicos")}
+    </div>
+    {/* Sobre os prémios: dito à frente e sem letra pequena. Prometer um
+      prémio concreto numa página de vendas obriga a entregá-lo, e os
+      prémios dependem de patrocinadores que mudam de época para época.
+      O que se promete é o direito a concorrer — isso sim é sempre certo. */}
+    <div style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.55, marginTop: 10 }}>
+    {t("pro.notaPremios")}
+    </div>
+    {/* A Copa é sorteio, e isso não pode ficar escondido numa linha só. */}
+    <div style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.55, marginTop: 10 }}>
+    {t("pro.notaCopaSorteio")}
+    </div>
+    </div>
+    <div style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", lineHeight: 1.5 }}>
+    {erro && <span style={{ display: "block", color: "#ef8d83", marginBottom: 8 }}>{erro}</span>}
+    {t("pro.rodape")} · {t("precos.etiqueta").toLowerCase()} ({duracao}). 🥋
+    </div>
+    </div>
     </main>
   );
 }
