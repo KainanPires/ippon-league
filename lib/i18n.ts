@@ -254,6 +254,52 @@ const PT: Dicionario = {
   "perfil.notificacoes": "Notificações",
   "perfil.sair": "Terminar sessão",
 
+  // --- chave da copa ---
+  "ck.titulo": "Chave da Copa",
+  "ck.aCarregar": "A carregar a chave…",
+  "ck.voltarCompeticoes": "Voltar às competições",
+  "ck.comoFunciona": "Como funciona",
+  "ck.repescagemBronze": "Repescagem e bronze",
+  "ck.segundaChance": "Há sempre uma segunda chance",
+  "ck.repescagem": "repescagem",
+  "ck.bronze": "bronze",
+  "ck.doisBronzes": "dois bronzes",
+  "ck.verComoFunciona": "Ver como funciona →",
+  "ck.final": "final",
+  "ck.passouSemAdversario": "passou (sem adversário)",
+  "ck.finalRonda": "Final",
+  "ck.semifinais": "Semifinais",
+  "ck.rondaN": "Ronda {n}",
+  "ck.quartas": "Quartas de final",
+  "ck.oitavas": "Oitavas de final",
+  "ck.ronda32": "Ronda de 32",
+  "ck.erroCarregar": "Não foi possível carregar a chave.",
+  "ck.comRepescagem": "com repescagem",
+  "ck.estao": "estão",
+  "ck.disputaBronze": "Disputa de bronze",
+  "ck.decididoCapitao": "decidido pelo capitão",
+  "ck.porSorteio": "decidido por sorteio",
+  "ck.decidido": "decidido",
+  "ck.aAguardar": "a aguardar",
+  "ck.campeao": "Campeão",
+  "ck.vice": "Vice-campeão",
+  "ck.mataMataCompeticoes": "Mata-mata por competições",
+  "ck.eliminacaoMeias": "Eliminação até às meias",
+  "ck.esqueceuEscalar": "Esqueceste-te de escalar?",
+  "ck.finalPorPontos": "A final é por pontos",
+
+  // --- certificados ---
+  "cert.titulo": "Certificados",
+  "cert.concluidaA": "Copa concluída a {data}",
+  "cert.aPreparar": "A preparar os certificados…",
+  "cert.copaNaoTerminou": "A copa ainda não terminou",
+  "cert.copaNaoTerminouSub": "Os certificados do pódio aparecem aqui quando a final estiver decidida.",
+  "cert.campeaoCopa": "Campeão da Copa Ippon",
+  "cert.segundoLugar": "Ficou em segundo lugar na Copa Ippon",
+  "cert.terceiroLugar": "Ficou em terceiro lugar na Copa Ippon",
+  "cert.pontosCopa": "Pontos na copa",
+  "cert.mediaRodada": "Média por rodada",
+
   // --- continentes: o CÓDIGO fica, o nome traduz-se ---
   "cont.EUR": "Europa",
   "cont.PAN": "América",
@@ -716,6 +762,50 @@ const EN: Dicionario = {
   "perfil.notificacoes": "Notifications",
   "perfil.sair": "Sign out",
 
+  "ck.titulo": "Cup bracket",
+  "ck.aCarregar": "Loading the bracket…",
+  "ck.voltarCompeticoes": "Back to competitions",
+  "ck.comoFunciona": "How it works",
+  "ck.repescagemBronze": "Repechage and bronze",
+  "ck.segundaChance": "There's always a second chance",
+  "ck.repescagem": "repechage",
+  "ck.bronze": "bronze",
+  "ck.doisBronzes": "two bronzes",
+  "ck.verComoFunciona": "See how it works →",
+  "ck.final": "final",
+  "ck.passouSemAdversario": "bye (no opponent)",
+  "ck.finalRonda": "Final",
+  "ck.semifinais": "Semi-finals",
+  "ck.rondaN": "Round {n}",
+  "ck.quartas": "Quarter-finals",
+  "ck.oitavas": "Round of 16",
+  "ck.ronda32": "Round of 32",
+  "ck.erroCarregar": "We couldn't load the bracket.",
+  "ck.comRepescagem": "with repechage",
+  "ck.estao": "are",
+  "ck.disputaBronze": "Bronze match",
+  "ck.decididoCapitao": "decided by the captain",
+  "ck.porSorteio": "decided by draw",
+  "ck.decidido": "decided",
+  "ck.aAguardar": "waiting",
+  "ck.campeao": "Champion",
+  "ck.vice": "Runner-up",
+  "ck.mataMataCompeticoes": "Knockout by competitions",
+  "ck.eliminacaoMeias": "Elimination up to the semis",
+  "ck.esqueceuEscalar": "Forgot to pick a team?",
+  "ck.finalPorPontos": "The final is on points",
+
+  "cert.titulo": "Certificates",
+  "cert.concluidaA": "Cup completed on {data}",
+  "cert.aPreparar": "Preparing the certificates…",
+  "cert.copaNaoTerminou": "The cup hasn't finished yet",
+  "cert.copaNaoTerminouSub": "The podium certificates appear here once the final is decided.",
+  "cert.campeaoCopa": "Ippon Cup champion",
+  "cert.segundoLugar": "Finished second in the Ippon Cup",
+  "cert.terceiroLugar": "Finished third in the Ippon Cup",
+  "cert.pontosCopa": "Points in the cup",
+  "cert.mediaRodada": "Average per round",
+
   "cont.EUR": "Europe",
   "cont.PAN": "Americas",
   "cont.ASI": "Asia",
@@ -1166,6 +1256,50 @@ const ES: Dicionario = {
   "perfil.notificacoes": "Notificaciones",
   "perfil.sair": "Cerrar sesión",
 
+  "ck.titulo": "Cuadro de la Copa",
+  "ck.aCarregar": "Cargando el cuadro…",
+  "ck.voltarCompeticoes": "Volver a las competiciones",
+  "ck.comoFunciona": "Cómo funciona",
+  "ck.repescagemBronze": "Repesca y bronce",
+  "ck.segundaChance": "Siempre hay una segunda oportunidad",
+  "ck.repescagem": "repesca",
+  "ck.bronze": "bronce",
+  "ck.doisBronzes": "dos bronces",
+  "ck.verComoFunciona": "Ver cómo funciona →",
+  "ck.final": "final",
+  "ck.passouSemAdversario": "pasó (sin rival)",
+  "ck.finalRonda": "Final",
+  "ck.semifinais": "Semifinales",
+  "ck.rondaN": "Ronda {n}",
+  "ck.quartas": "Cuartos de final",
+  "ck.oitavas": "Octavos de final",
+  "ck.ronda32": "Ronda de 32",
+  "ck.erroCarregar": "No pudimos cargar el cuadro.",
+  "ck.comRepescagem": "con repesca",
+  "ck.estao": "están",
+  "ck.disputaBronze": "Combate por el bronce",
+  "ck.decididoCapitao": "decidido por el capitán",
+  "ck.porSorteio": "decidido por sorteo",
+  "ck.decidido": "decidido",
+  "ck.aAguardar": "esperando",
+  "ck.campeao": "Campeón",
+  "ck.vice": "Subcampeón",
+  "ck.mataMataCompeticoes": "Eliminatoria por competiciones",
+  "ck.eliminacaoMeias": "Eliminación hasta semifinales",
+  "ck.esqueceuEscalar": "¿Se te olvidó alinear?",
+  "ck.finalPorPontos": "La final es por puntos",
+
+  "cert.titulo": "Certificados",
+  "cert.concluidaA": "Copa concluida el {data}",
+  "cert.aPreparar": "Preparando los certificados…",
+  "cert.copaNaoTerminou": "La copa aún no ha terminado",
+  "cert.copaNaoTerminouSub": "Los certificados del podio aparecen aquí cuando la final esté decidida.",
+  "cert.campeaoCopa": "Campeón de la Copa Ippon",
+  "cert.segundoLugar": "Quedó segundo en la Copa Ippon",
+  "cert.terceiroLugar": "Quedó tercero en la Copa Ippon",
+  "cert.pontosCopa": "Puntos en la copa",
+  "cert.mediaRodada": "Media por jornada",
+
   "cont.EUR": "Europa",
   "cont.PAN": "América",
   "cont.ASI": "Asia",
@@ -1615,6 +1749,50 @@ const FR: Dicionario = {
   "perfil.alterarSenha": "Changer le mot de passe",
   "perfil.notificacoes": "Notifications",
   "perfil.sair": "Se déconnecter",
+
+  "ck.titulo": "Tableau de la Coupe",
+  "ck.aCarregar": "Chargement du tableau…",
+  "ck.voltarCompeticoes": "Retour aux compétitions",
+  "ck.comoFunciona": "Comment ça marche",
+  "ck.repescagemBronze": "Repêchage et bronze",
+  "ck.segundaChance": "Il y a toujours une seconde chance",
+  "ck.repescagem": "repêchage",
+  "ck.bronze": "bronze",
+  "ck.doisBronzes": "deux bronzes",
+  "ck.verComoFunciona": "Voir comment ça marche →",
+  "ck.final": "finale",
+  "ck.passouSemAdversario": "exempté (sans adversaire)",
+  "ck.finalRonda": "Finale",
+  "ck.semifinais": "Demi-finales",
+  "ck.rondaN": "Tour {n}",
+  "ck.quartas": "Quarts de finale",
+  "ck.oitavas": "Huitièmes de finale",
+  "ck.ronda32": "Tour de 32",
+  "ck.erroCarregar": "Impossible de charger le tableau.",
+  "ck.comRepescagem": "avec repêchage",
+  "ck.estao": "sont",
+  "ck.disputaBronze": "Match pour le bronze",
+  "ck.decididoCapitao": "décidé par le capitaine",
+  "ck.porSorteio": "décidé par tirage",
+  "ck.decidido": "décidé",
+  "ck.aAguardar": "en attente",
+  "ck.campeao": "Champion",
+  "ck.vice": "Finaliste",
+  "ck.mataMataCompeticoes": "Élimination par compétitions",
+  "ck.eliminacaoMeias": "Élimination jusqu'aux demies",
+  "ck.esqueceuEscalar": "Tu as oublié de composer ?",
+  "ck.finalPorPontos": "La finale se joue aux points",
+
+  "cert.titulo": "Certificats",
+  "cert.concluidaA": "Coupe terminée le {data}",
+  "cert.aPreparar": "Préparation des certificats…",
+  "cert.copaNaoTerminou": "La coupe n'est pas encore terminée",
+  "cert.copaNaoTerminouSub": "Les certificats du podium apparaissent ici une fois la finale décidée.",
+  "cert.campeaoCopa": "Champion de la Coupe Ippon",
+  "cert.segundoLugar": "Deuxième de la Coupe Ippon",
+  "cert.terceiroLugar": "Troisième de la Coupe Ippon",
+  "cert.pontosCopa": "Points dans la coupe",
+  "cert.mediaRodada": "Moyenne par journée",
 
   "cont.EUR": "Europe",
   "cont.PAN": "Amériques",
@@ -2076,6 +2254,50 @@ const DE: Dicionario = {
   "perfil.notificacoes": "Benachrichtigungen",
   "perfil.sair": "Abmelden",
 
+  "ck.titulo": "Turnierbaum des Pokals",
+  "ck.aCarregar": "Turnierbaum wird geladen…",
+  "ck.voltarCompeticoes": "Zurück zu den Wettkämpfen",
+  "ck.comoFunciona": "So funktioniert es",
+  "ck.repescagemBronze": "Trostrunde und Bronze",
+  "ck.segundaChance": "Es gibt immer eine zweite Chance",
+  "ck.repescagem": "Trostrunde",
+  "ck.bronze": "Bronze",
+  "ck.doisBronzes": "zwei Bronzemedaillen",
+  "ck.verComoFunciona": "Ansehen, wie es funktioniert →",
+  "ck.final": "Finale",
+  "ck.passouSemAdversario": "Freilos (kein Gegner)",
+  "ck.finalRonda": "Finale",
+  "ck.semifinais": "Halbfinale",
+  "ck.rondaN": "Runde {n}",
+  "ck.quartas": "Viertelfinale",
+  "ck.oitavas": "Achtelfinale",
+  "ck.ronda32": "Runde der 32",
+  "ck.erroCarregar": "Der Turnierbaum konnte nicht geladen werden.",
+  "ck.comRepescagem": "mit Trostrunde",
+  "ck.estao": "sind",
+  "ck.disputaBronze": "Kampf um Bronze",
+  "ck.decididoCapitao": "durch den Kapitän entschieden",
+  "ck.porSorteio": "durch Losentscheid",
+  "ck.decidido": "entschieden",
+  "ck.aAguardar": "wartet",
+  "ck.campeao": "Champion",
+  "ck.vice": "Zweitplatzierter",
+  "ck.mataMataCompeticoes": "K.-o.-System nach Wettkämpfen",
+  "ck.eliminacaoMeias": "Ausscheidung bis zum Halbfinale",
+  "ck.esqueceuEscalar": "Aufstellen vergessen?",
+  "ck.finalPorPontos": "Das Finale wird nach Punkten entschieden",
+
+  "cert.titulo": "Zertifikate",
+  "cert.concluidaA": "Pokal abgeschlossen am {data}",
+  "cert.aPreparar": "Zertifikate werden vorbereitet…",
+  "cert.copaNaoTerminou": "Der Pokal ist noch nicht zu Ende",
+  "cert.copaNaoTerminouSub": "Die Podest-Zertifikate erscheinen hier, sobald das Finale entschieden ist.",
+  "cert.campeaoCopa": "Sieger des Ippon-Pokals",
+  "cert.segundoLugar": "Zweiter im Ippon-Pokal",
+  "cert.terceiroLugar": "Dritter im Ippon-Pokal",
+  "cert.pontosCopa": "Punkte im Pokal",
+  "cert.mediaRodada": "Schnitt pro Runde",
+
   "cont.EUR": "Europa",
   "cont.PAN": "Amerika",
   "cont.ASI": "Asien",
@@ -2471,6 +2693,57 @@ export function useT(): (chave: string, vars?: Record<string, string | number>) 
   // rebentar. Um ecrã em português é melhor do que um ecrã em branco.
   if (!ctx) return (chave, vars) => traduzir("pt", chave, vars);
   return ctx.t;
+}
+
+// ---------------------------------------------------------------------------
+// DATAS E MESES — pelo browser, não à mão
+//
+// Havia listas de meses escritas em português espalhadas pelos ecrãs
+// ("Janeiro", "Fevereiro"…). Traduzi-las seriam 12 nomes × 5 línguas, com o
+// problema extra de cada língua ter as suas regras (o alemão capitaliza, o
+// francês não; o inglês diz "3 March 2026", o português "3 de março de 2026").
+//
+// O Intl já sabe tudo isto. Mesmo princípio dos países.
+// ---------------------------------------------------------------------------
+
+/** "Março", "March", "Mars", "März". `mes` de 1 a 12. */
+export function nomeDoMes(mes: number, lingua: Lingua, maiuscula = true): string {
+  try {
+    const d = new Date(2000, Math.max(0, Math.min(11, mes - 1)), 1);
+    const nome = new Intl.DateTimeFormat(lingua, { month: "long" }).format(d);
+    return maiuscula ? nome.charAt(0).toUpperCase() + nome.slice(1) : nome;
+  } catch {
+    return String(mes);
+  }
+}
+
+/**
+ * Uma data por extenso, na língua e nas convenções de cada uma.
+ * Aceita "AAAA/MM/DD" (o formato do calendário) ou "AAAA-MM-DD".
+ */
+export function dataPorExtenso(iso: string | null | undefined, lingua: Lingua): string {
+  if (!iso) return "";
+  try {
+    const [a, m, d] = iso.replace(/-/g, "/").split("/").map((x) => parseInt(x, 10));
+    if (!a || !m || !d) return String(iso);
+    return new Intl.DateTimeFormat(lingua, { day: "numeric", month: "long", year: "numeric" })
+      .format(new Date(a, m - 1, d));
+  } catch {
+    return String(iso);
+  }
+}
+
+/** Hooks para os ecrãs. */
+export function useNomeDoMes(): (mes: number, maiuscula?: boolean) => string {
+  const ctx = useContext(LinguaContexto);
+  const lingua = ctx?.lingua ?? "pt";
+  return (mes, maiuscula = true) => nomeDoMes(mes, lingua, maiuscula);
+}
+
+export function useDataPorExtenso(): (iso: string | null | undefined) => string {
+  const ctx = useContext(LinguaContexto);
+  const lingua = ctx?.lingua ?? "pt";
+  return (iso) => dataPorExtenso(iso, lingua);
 }
 
 // ---------------------------------------------------------------------------
