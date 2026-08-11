@@ -10,6 +10,7 @@ import { marcarAreaProVista } from "@/components/BarraInferior";
 import { TutorialBoasVindas } from "@/components/TutorialBoasVindas";
 import { deveMostrarTutorial } from "@/lib/tutorials";
 import { useFaixa } from "@/lib/useFaixa";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -22,8 +23,9 @@ const MAX = "#7fb8f5"; // tom do Pro Max
 
 export default function DashboardPro() {
   const router = useRouter();
+  const t = useT();
   const [estado, setEstado] = useState<"carregando" | "pro">("carregando");
-  const [nome, setNome] = useState("Campeão");
+  const [nome, setNome] = useState(t("pro.campeao"));
   const [verBoasVindas, setVerBoasVindas] = useState(true); // caixa de boas-vindas fechável
 
   // Convite "Sê Pro Max" só aparece a quem NÃO é Pro Max (não fazer propaganda a quem já é Max).
@@ -118,7 +120,7 @@ export default function DashboardPro() {
         const { data } = await supabase.auth.getSession();
         if (!active) return;
         const m = (data.session?.user?.user_metadata || {}) as { nome?: string };
-        setNome(String(m.nome || "").trim().split(" ")[0] || "Campeão");
+        setNome(String(m.nome || "").trim().split(" ")[0] || t("pro.campeao"));
       } catch { /* fica "Campeão" */ }
 
       if (active) setEstado("pro");
@@ -135,7 +137,7 @@ export default function DashboardPro() {
   if (estado === "carregando") {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "#7c8a82", fontSize: 14 }}>A carregar…</p>
+        <p style={{ color: "#7c8a82", fontSize: 14 }}>{t("comum.carregando")}</p>
       </main>
     );
   }
@@ -153,10 +155,10 @@ export default function DashboardPro() {
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 48px" }}>
 
         <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
-          <a href="/inicio" aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+          <a href="/inicio" aria-label={t("comum.voltar")} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           </a>
-          <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>A minha central Pro</h1>
+          <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>{t("pro.central")}</h1>
         </header>
 
         {/* ACABOU DE COMPRAR PRO MAX — mensagem de estreia, uma vez.
@@ -166,9 +168,9 @@ export default function DashboardPro() {
           <section style={{ textAlign: "center", background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 18, padding: "20px 18px", marginBottom: 18 }}>
             <div style={{ width: 72, height: 72, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="comemorando" /></div>
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: MAX }}>★ Ippon Pro Max ★</div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Bem-vindo, {nome}!</h2>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>{t("pro.bemVindoNome", { nome })}</h2>
             <p style={{ fontSize: 13.5, color: "#dfe6e0", lineHeight: 1.55, margin: 0 }}>
-              Tens agora a chave ao vivo, o alerta de favoritos, mais ligas e a Copa do Dôdo.
+              {t("pro.maxEstreiaCorpo")}
             </p>
           </section>
         )}
@@ -176,11 +178,11 @@ export default function DashboardPro() {
         {/* Boas-vindas Pro — fechável (permanente) */}
         {verBoasVindas && !acabouDeComprarMax && (
           <section style={{ position: "relative", textAlign: "center", background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 18, padding: "20px 18px", marginBottom: 18 }}>
-            <button onClick={fecharBoasVindas} aria-label="Fechar" style={{ position: "absolute", top: 10, right: 10, width: 26, height: 26, borderRadius: "50%", border: "1px solid #4a3d18", background: "rgba(0,0,0,0.25)", color: "#c9b878", cursor: "pointer", fontSize: 13, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            <button onClick={fecharBoasVindas} aria-label={t("comum.fechar")} style={{ position: "absolute", top: 10, right: 10, width: 26, height: 26, borderRadius: "50%", border: "1px solid #4a3d18", background: "rgba(0,0,0,0.25)", color: "#c9b878", cursor: "pointer", fontSize: 13, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             <div style={{ width: 72, height: 72, margin: "0 auto 6px" }}><Mascot belt="#141110" expression="comemorando" /></div>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: GOLD }}>★ Membro Ippon Pro ★</div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px" }}>Olá, {nome}!</h2>
-            <p style={{ fontSize: 13.5, color: "#dfe6e0", lineHeight: 1.55, margin: 0 }}>Esta é a tua central de vantagens. Toca em cada atleta para veres a análise profunda do scout.</p>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: GOLD }}>★ {t("pro.membro")} ★</div>
+            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px" }}>{t("pro.olaNome", { nome })}</h2>
+            <p style={{ fontSize: 13.5, color: "#dfe6e0", lineHeight: 1.55, margin: 0 }}>{t("pro.centralVantagensCorpo")}</p>
           </section>
         )}
 
@@ -191,8 +193,8 @@ export default function DashboardPro() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aee9c9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Chave de atletas</div>
-            <div style={{ fontSize: 12, color: "#c9b878", marginTop: 1, lineHeight: 1.4 }}>Vê o quadro de cada categoria e o resultado final.</div>
+            <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{t("pro.chaveAtletas")}</div>
+            <div style={{ fontSize: 12, color: "#c9b878", marginTop: 1, lineHeight: 1.4 }}>{t("pro.chaveAtletasSub")}</div>
           </div>
           <span style={{ color: GOLD, fontSize: 20, flexShrink: 0 }}>›</span>
         </a>
@@ -202,8 +204,8 @@ export default function DashboardPro() {
           <a href="/pro-max" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", background: "linear-gradient(160deg,#16243a,#0d1116)", border: `1.5px solid ${MAX}`, borderRadius: 14, padding: "13px 14px", marginBottom: 18 }}>
             <div style={{ width: 30, height: 30, borderRadius: "50%", background: MAX, color: "#0b1220", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontFamily: FD, fontWeight: 700 }}>★</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: MAX }}>Sê Pro Max</div>
-              <div style={{ fontSize: 12, color: "#9fb3cc", marginTop: 1, lineHeight: 1.4 }}>Chave ao vivo, alerta de favoritos, mais ligas, análise da chave e grupo exclusivo.</div>
+              <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: MAX }}>{t("pro.serMax")}</div>
+              <div style={{ fontSize: 12, color: "#9fb3cc", marginTop: 1, lineHeight: 1.4 }}>{t("pro.serMaxSub")}</div>
             </div>
             <span style={{ color: MAX, fontSize: 20, flexShrink: 0 }}>›</span>
           </a>
@@ -219,7 +221,7 @@ export default function DashboardPro() {
         onClick={() => setVerBoasVindasPro(true)}
         style={{ display: "block", width: "100%", marginTop: 18, background: "transparent", border: "1px solid #2a3a33", color: "#7c8a82", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", padding: "10px", borderRadius: 10, cursor: "pointer" }}
         >
-        Rever o que tenho com o Pro
+        {t("pro.rever", { plano: "Pro" })}
         </button>
 
       </div>
