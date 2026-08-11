@@ -151,7 +151,6 @@ export default function PaginaChave() {
   );
 }
 function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEquipa }: {
-    const t = useT();
     dados: RespostaChave;
     nome: (uid: string | null) => string;
     escudoDe: (uid: string | null) => Identity;
@@ -159,6 +158,7 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
     onAbrirTutorial: () => void;
     onVerEquipa: (uid: string, comp: string) => void;
   }) {
+  const t = useT();
   const { confrontos, totalRondas, podio, liga, nInscritos, nParticiparam } = dados;
   const terminada = liga.copa_estado === "terminada";
   // Quem está REALMENTE na chave. Quem entrou na liga depois do sorteio conta
@@ -369,7 +369,6 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
 // `janelaFinal` (só na final) diz que rodadas entraram na soma — sem isto, um
 // "+70" ao lado de uma equipa que fez -59 naquela competição parece um erro.
 function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa, janelaFinal }: {
-    const t = useT();
     c: ConfrontoAPI;
     nome: (uid: string | null) => string;
     escudoDe: (uid: string | null) => Identity;
@@ -378,6 +377,7 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa
     onVerEquipa: (uid: string, comp: string) => void;
     janelaFinal?: string[];
   }) {
+  const t = useT();
   const decidido = c.estado === "decidido";
   const bye = c.jogador_b === null;
   const venceuA = decidido && c.vencedor === c.jogador_a;
@@ -471,7 +471,6 @@ function LinhaJogador({ uid, pontos, venceu, perdeu, trancado, nome, escudoDe, o
   );
 }
 function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
-    const t = useT();
     podio: { campeao?: string; vice?: string; terceiro?: string };
     nome: (uid: string | null) => string;
     escudoDe: (uid: string | null) => Identity;
@@ -479,6 +478,7 @@ function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
     nomeCopa: string;
     nParticipantes: number;
   }) {
+  const t = useT();
   // Certificado aberto (a posição que o utilizador clicou para partilhar).
   const [certificado, setCertificado] = useState<PosicaoPodio | null>(null);
   const linha = (uid: string | undefined, medalha: string, label: string, cor: string, pos: PosicaoPodio) => {
