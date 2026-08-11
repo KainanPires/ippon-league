@@ -187,14 +187,14 @@ export default function Dodo() {
     setErroEhPro(false);
     setAEnviar(true);
     try {
-      const t = await tokenDaSessao();
-      if (!t) {
+      const tok = await tokenDaSessao();
+      if (!tok) {
         window.location.href = "/entrar?voltar=/dodo";
         return;
       }
       const res = await fetch("/api/dodo", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
           body: JSON.stringify({ acao: qual }),
       });
       const j = (await res.json()) as { ok?: boolean; erro?: string; precisaPro?: boolean };
@@ -795,7 +795,6 @@ function CopaADecorrer({ jogo, compacta }: { jogo: EdicaoDecorrer; compacta: boo
   );
 }
 function MeuEstado({
-  const t = useT();
     eu, temSessao, souPro, nivelPronto, aberta, aEnviar, dataSorteio, onInscrever, onSair,
   }: {
     eu: EuEstado | null;
@@ -808,6 +807,7 @@ function MeuEstado({
     onInscrever: () => void;
     onSair: () => void;
 }) {
+  const t = useT();
   // Sem sessão: convida a entrar, e volta para aqui.
   if (!temSessao || !eu) {
     return (
