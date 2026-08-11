@@ -7,14 +7,14 @@ import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { TrofeuDodo } from "@/components/TrofeuDodo";
 import { supabase } from "@/lib/supabase";
 import { focoMercado } from "@/lib/calendario";
-import { nomeContinenteDoPais } from "@/lib/continentes";
+import { continenteDoPais } from "@/lib/continentes";
 import { CalendarioConteudo } from "@/components/CalendarioConteudo";
 import { ResultadosConteudo } from "@/components/ResultadosConteudo";
-
 // A barra inferior deixou de estar copiada em cada página. Vive uma vez em
 // components/BarraInferior.tsx, e é lá que o separador Pro pulsa a dourado
 // para quem tem Pro e ainda não visitou a área.
 import { BarraInferior } from "@/components/BarraInferior";
+import { useT } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -84,6 +84,7 @@ interface EstadoDodo {
   } | null;
 }
 export default function Ligas() {
+  const t = useT();
   const [tab, setTab] = useState<Tab>("ativas");
   // Permite abrir já numa aba específica via URL (?aba=resultados|mercado|
     // calendario|ativas). É assim que as notificações de conquista levam direto à
@@ -113,7 +114,7 @@ export default function Ligas() {
   | null
   >(null);
   // Ligas oficiais: nome do continente + posição do utilizador em cada uma.
-  const [nomeContinente, setNomeContinente] = useState<string | null>(null);
+  const [continente, setContinente] = useState<string | null>(null);
   const [posMundial, setPosMundial] = useState<PosOficial | null>(null);
   const [posContinental, setPosContinental] = useState<PosOficial | null>(null);
   // A Copa do Dôdo. O cartão aparece SEMPRE, com ou sem edição aberta — é uma
@@ -135,7 +136,8 @@ export default function Ligas() {
           const uid = sess.session?.user?.id;
           const meta = sess.session?.user?.user_metadata as { pais_iso?: string } | undefined;
           if (vivo) {
-            setNomeContinente(nomeContinenteDoPais(meta?.pais_iso));
+            // O CÓDIGO do continente, não o nome: o nome traduz-se no render.
+            setContinente(continenteDoPais(meta?.pais_iso));
           }
           if (!uid) { if (vivo) { setMine([]); setACarregar(false); } return; }
           try {
@@ -237,7 +239,7 @@ export default function Ligas() {
   }
   async function entrarPorCodigo(confirmar = false) {
     const c = codigo.trim().toUpperCase();
-    if (c.length < 4) { setErroEntrar("Código demasiado curto."); return; }
+    if (c.length < 4) { setErroEntrar(t("lg.codigoCurto")); return; }
     setErroEntrar("");
     setAEntrar(true);
     try {
@@ -262,13 +264,13 @@ export default function Ligas() {
         return;
       }
       if (!j.ok) {
-        setErroEntrar(j.erro || "Não encontrámos essa liga.");
+        setErroEntrar(j.erro || t("lg.ligaNaoEncontrada"));
         setAEntrar(false);
         return;
       }
       window.location.href = `/liga/${j.liga.invite_code}`;
     } catch {
-      setErroEntrar("Falha de ligação.");
+      setErroEntrar(t("lg.falhaLigacao"));
       setAEntrar(false);
     }
   }
@@ -308,7 +310,7 @@ export default function Ligas() {
         return;
       }
       if (!j.ok) {
-        setErroMercado(j.erro || "Não foi possível concluir.");
+        setErroMercado(j.erro || t("lg.naoConcluir"));
         setAEntrarId(null);
         return;
       }
@@ -323,7 +325,7 @@ export default function Ligas() {
       }
       window.location.href = `/liga/${liga.invite_code}`;
     } catch {
-      setErroMercado("Falha de ligação.");
+      setErroMercado(t("lg.falhaLigacao"));
       setAEntrarId(null);
     }
   }
@@ -360,27 +362,29 @@ export default function Ligas() {
     <a href="/inicio" aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none" }}>
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
     </a>
-    <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Ligas</h1>
+    <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>{t("ligas.titulo")}</h1>
     </div>
     <a href="/criar-liga" aria-label="Criar liga" style={{ width: 36, height: 36, borderRadius: "50%", background: GOLD, color: "#1b211e", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
     </a>
     </header>
     <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #1a221d" }}>
-    {(["ativas", "mercado", "calendario", "resultados"] as Tab[]).map((t) => (
-          <button key={t} onClick={() => mudarTab(t)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${tab === t ? GOLD : "transparent"}`, color: tab === t ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>
-          {t === "ativas" ? "Ativas" : t === "mercado" ? "Mercado" : t === "calendario" ? "Calendário" : "Resultados"}
+    {/* A variável do map chama-se `tb`, não `t`: `t` é o tradutor e um parâmetro
+      com o mesmo nome tapa-o dentro do bloco. */}
+    {(["ativas", "mercado", "calendario", "resultados"] as Tab[]).map((tb) => (
+          <button key={tb} onClick={() => mudarTab(tb)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${tab === tb ? GOLD : "transparent"}`, color: tab === tb ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>
+          {t(tb === "ativas" ? "lg.ativas" : tb === "mercado" ? "mk.mercado" : tb === "calendario" ? "lg.calendario" : "lg.resultados")}
           </button>
         ))}
     </div>
     {tab === "ativas" && (
         <>
-        <Section>Ligas oficiais · prémios</Section>
+        <Section>{t("lg.oficiais")}</Section>
         {/* Mundial — abre para todos; mostra a posição se estiver no ranking. */}
         <OficialRow
         cfg={cfgMundial}
-        name="Liga Mundial"
-        sub="Concorre aos prémios mundiais"
+        name={t("lg.ligaMundial")}
+        sub={t("lg.premiosMundiais")}
         href="/oficial/mundial"
         pos={posMundial}
         souPro={souPro}
@@ -388,8 +392,8 @@ export default function Ligas() {
         {/* Continental — nome do continente real; abre para todos. */}
         <OficialRow
         cfg={cfgContinental}
-        name={nomeContinente ? `Liga ${nomeContinente}` : "Liga Continental"}
-        sub="Concorre aos prémios do teu continente"
+        name={continente ? t("ligas.continental", { continente: t(`cont.${continente}`) }) : t("lg.ligaContinental")}
+        sub={t("lg.premiosContinente")}
         href="/oficial/continental"
         pos={posContinental}
         souPro={souPro}
@@ -404,7 +408,7 @@ export default function Ligas() {
             </a>
           )}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, marginBottom: 10 }}>
-        <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>Ligas de amigos</span>
+        <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>{t("lg.amigos")}</span>
         {!aCarregar && (
             <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, display: "flex", gap: 8 }}>
             <span style={{ color: cheioPontos ? "#e0894f" : "#7c8a82" }}>Ligas {nPontos}/{lim.pontos}</span>
@@ -413,18 +417,18 @@ export default function Ligas() {
           )}
         </div>
         {aCarregar ? (
-            <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
+            <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("comum.carregando")}</div>
           ) : ativas.length > 0 ? (
             <>
             {ativas.map((l) => (
                   <a key={l.id} href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}>
-                  <LeagueRow cfg={l.escudo || DEFAULT_IDENTITY} name={l.name} sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`} right={<ActionBtn kind="ver">Abrir</ActionBtn>} />
+                  <LeagueRow cfg={l.escudo || DEFAULT_IDENTITY} name={l.name} sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`} right={<ActionBtn kind="ver">{t("lg.abrir")}</ActionBtn>} />
                   </a>
                 ))}
             {semEspaco ? (
                 <LimiteCard
                 souPro={souPro}
-                titulo="Atingiste o máximo"
+                titulo={t("lg.atingisteMaximo")}
                 texto={nivel === "promax"
                   ? `Já estás em ${lim.pontos} ligas e ${lim.copa} mata-matas — é o máximo, mesmo com Pro Max.`
                   : nivel === "pro"
@@ -437,15 +441,15 @@ export default function Ligas() {
             </>
           ) : (
             <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "18px 14px", textAlign: "center" }}>
-            <div style={{ fontSize: 13, color: "#c7d0c9", marginBottom: 12, lineHeight: 1.5 }}>Ainda não tens ligas de amigos.<br />Cria uma e desafia o teu dojo!</div>
-            <a href="/criar-liga" style={{ display: "inline-block", background: "#3f8f5a", color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>Criar liga</a>
+            <div style={{ fontSize: 13, color: "#c7d0c9", marginBottom: 12, lineHeight: 1.5 }}>{t("lg.semAmigos")}<br />{t("lg.semAmigosSub")}</div>
+            <a href="/criar-liga" style={{ display: "inline-block", background: "#3f8f5a", color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>{t("lg.criarLiga")}</a>
             </div>
           )}
-        <Section style={{ marginTop: 18 }}>Entrar com código</Section>
+        <Section style={{ marginTop: 18 }}>{t("lg.entrarCodigo")}</Section>
         {semEspaco ? (
             <LimiteCard
             souPro={souPro}
-            titulo="Sem espaço para mais"
+            titulo={t("lg.semEspaco")}
             texto={nivel === "promax"
               ? `Já estás em ${lim.pontos} ligas e ${lim.copa} mata-matas — é o máximo. Para entrares noutra liga, sai de uma; os mata-matas libertam-se quando terminarem.`
               : nivel === "pro"
@@ -455,7 +459,7 @@ export default function Ligas() {
           ) : (
             <>
             <div style={{ display: "flex", gap: 8 }}>
-            <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} placeholder="Código de convite" maxLength={8} style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 13px", color: "#f1ede2", fontSize: 15, fontFamily: FD, letterSpacing: "0.1em", outline: "none", textTransform: "uppercase" }} />
+            <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} placeholder={t("lg.codigoConvite")} maxLength={8} style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 13px", color: "#f1ede2", fontSize: 15, fontFamily: FD, letterSpacing: "0.1em", outline: "none", textTransform: "uppercase" }} />
             <button onClick={() => entrarPorCodigo()} disabled={aEntrar} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{aEntrar ? "…" : "Entrar"}</button>
             </div>
             {erroEntrar && (
@@ -471,14 +475,14 @@ export default function Ligas() {
       )}
     {tab === "mercado" && (
         <>
-        <Section>Ligas abertas</Section>
+        <Section>{t("lg.abertas")}</Section>
         <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>Ligas públicas. Nas abertas entras já; nas por aprovação o dono aceita o teu pedido. As fechadas não aparecem aqui — só por código.</p>
         {mercado === null || aCarregarMercado ? (
-            <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
+            <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("comum.carregando")}</div>
           ) : mercado.length === 0 ? (
             <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
-            <div style={{ fontSize: 13, color: "#c7d0c9", marginBottom: 12, lineHeight: 1.5 }}>Ainda não há ligas abertas.<br />Cria a tua e deixa-a <strong>aberta</strong> para todos entrarem!</div>
-            <a href="/criar-liga" style={{ display: "inline-block", background: "#3f8f5a", color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>Criar liga</a>
+            <div style={{ fontSize: 13, color: "#c7d0c9", marginBottom: 12, lineHeight: 1.5 }}>{t("lg.semAbertas")}<br />{t("lg.criaTuaAberta", { aberta: t("lg.aberta") })}</div>
+            <a href="/criar-liga" style={{ display: "inline-block", background: "#3f8f5a", color: "#06140d", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>{t("lg.criarLiga")}</a>
             </div>
           ) : (
             <>
@@ -490,9 +494,9 @@ export default function Ligas() {
                   sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`}
                   right={
                     l.sou_membro ? (
-                      <a href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}><ActionBtn kind="ver">Abrir</ActionBtn></a>
+                      <a href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}><ActionBtn kind="ver">{t("lg.abrir")}</ActionBtn></a>
                     ) : pedidoEnviado[l.id] ? (
-                      <span style={{ background: "#23291f", color: "#93a39a", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, padding: "7px 11px", borderRadius: 8, whiteSpace: "nowrap" }}>Pedido enviado</span>
+                      <span style={{ background: "#23291f", color: "#93a39a", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, padding: "7px 11px", borderRadius: 8, whiteSpace: "nowrap" }}>{t("lg.pedidoEnviado")}</span>
                     ) : (
                       <button onClick={() => acaoMercado(l)} disabled={aEntrarId === l.id} style={{ background: l.privacidade === "mediante_pedido" ? "#3a2f12" : "#3f8f5a", color: l.privacidade === "mediante_pedido" ? GOLD : "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 14px", borderRadius: 8, whiteSpace: "nowrap", cursor: aEntrarId === l.id ? "default" : "pointer", opacity: aEntrarId === l.id ? 0.7 : 1 }}>{aEntrarId === l.id ? "…" : l.privacidade === "mediante_pedido" ? "Solicitar" : "Entrar"}</button>
                     )
@@ -518,19 +522,19 @@ export default function Ligas() {
         <div onClick={() => setConfirmacao(null)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
         <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "#121815", border: "1px solid #2a3a33", borderRadius: 16, padding: "20px 18px" }}>
         <div style={{ textAlign: "center", fontSize: 30, marginBottom: 8 }}>⏱️</div>
-        <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "#f1ede2", textAlign: "center", marginBottom: 10 }}>Esta liga já começou</div>
+        <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "#f1ede2", textAlign: "center", marginBottom: 10 }}>{t("lg.jaComecou")}</div>
         <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, textAlign: "center", margin: "0 0 6px" }}>
-        <strong style={{ color: "#f1ede2" }}>{confirmacao.nome}</strong> arrancou na rodada {confirmacao.rodadaInicio}. Se entrares agora, entras a partir da rodada {confirmacao.rodadaEntrada} e <strong style={{ color: GOLD }}>começas com 0 pontos</strong> — não recuperas as rodadas já jogadas.
+        <strong style={{ color: "#f1ede2" }}>{confirmacao.nome}</strong> arrancou na rodada {confirmacao.rodadaInicio}. Se entrares agora, entras a partir da rodada {confirmacao.rodadaEntrada} e <strong style={{ color: GOLD }}>{t("lg.comecasZero")}</strong> — não recuperas as rodadas já jogadas.
         </p>
-        <p style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.5, textAlign: "center", margin: "0 0 16px" }}>Queres entrar mesmo assim?</p>
+        <p style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.5, textAlign: "center", margin: "0 0 16px" }}>{t("lg.entrarAssim")}</p>
         <div style={{ display: "flex", gap: 9 }}>
-        <button onClick={() => setConfirmacao(null)} style={{ flex: 1, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>Cancelar</button>
-        <button onClick={confirmarEntradaComecada} style={{ flex: 1, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>Entrar mesmo assim</button>
+        <button onClick={() => setConfirmacao(null)} style={{ flex: 1, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>{t("comum.cancelar")}</button>
+        <button onClick={confirmarEntradaComecada} style={{ flex: 1, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>{t("lg.entrarMesmoAssim")}</button>
         </div>
         </div>
         </div>
       )}
-      <BarraInferior ativo="ligas" />
+    <BarraInferior ativo="ligas" />
     </main>
   );
 }
@@ -552,21 +556,22 @@ function LeagueRow({ cfg, name, sub, right }: { cfg: Identity; name: string; sub
 // Cartão de liga oficial. Abre a página de ranking (para todos). À direita mostra
 // a posição do utilizador (se estiver no ranking) ou um convite a ver/ser Pro.
 function OficialRow({ cfg, name, sub, href, pos, souPro }: { cfg: Identity; name: string; sub: string; href: string; pos: PosOficial | null; souPro: boolean }) {
+  const t = useT();
   let right: React.ReactNode;
   if (pos && pos.posicao !== null) {
     // Está no ranking: mostra a posição em destaque.
     right = (
       <div style={{ textAlign: "right", flexShrink: 0 }}>
       <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: GOLD, lineHeight: 1 }}>{`#${pos.posicao.toLocaleString("pt-PT")}º`}</div>
-      <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase", marginTop: 2 }}>a tua posição</div>
+      <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase", marginTop: 2 }}>{t("lg.tuaPosicao")}</div>
       </div>
     );
   } else if (souPro) {
     // É Pro mas ainda não escalou nesta rodada.
-    right = <span style={{ fontFamily: FD, fontWeight: 700, color: "#7c8a82", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>Escala para entrar</span>;
+    right = <span style={{ fontFamily: FD, fontWeight: 700, color: "#7c8a82", fontSize: 11, textTransform: "uppercase", whiteSpace: "nowrap" }}>{t("lg.escalaParaEntrar")}</span>;
   } else {
     // Não-Pro: vê o ranking, mas não concorre.
-    right = <ActionBtn kind="ver">Ver ranking</ActionBtn>;
+    right = <ActionBtn kind="ver">{t("lg.verRanking")}</ActionBtn>;
   }
   return (
     <a href={href} style={{ textDecoration: "none", display: "block" }}>
@@ -590,11 +595,12 @@ function OficialRow({ cfg, name, sub, href, pos, souPro }: { cfg: Identity; name
 // O troféu no lugar do escudo, sem base: a 32 pixels a madeira virava uma mancha
 // castanha e roubava espaço ao Dôdo.
 function DodoRow({ dodo }: { dodo: EstadoDodo | null | undefined }) {
+  const t = useT();
   if (dodo === undefined) {
     return <LinhaDodo titulo="Copa do Dôdo" sub="A carregar…" botao="Ver" destaque={false} />;
   }
   if (dodo === null) {
-    return <LinhaDodo titulo="Copa do Dôdo" sub="A próxima edição abre em breve" botao="Ver" destaque={false} />;
+    return <LinhaDodo titulo="Copa do Dôdo" sub={t("lg.proximaEdicao")} botao="Ver" destaque={false} />;
   }
   const { inscricoes: insc, aDecorrer: jogo } = dodo;
   const linhas: React.ReactNode[] = [];
@@ -605,7 +611,7 @@ if (insc && insc.aberta) {
       <LinhaDodo
       key="insc"
       titulo={`${insc.numero}ª Copa · inscrição feita`}
-      sub="Já estás no sorteio"
+      sub={t("lg.jaNoSorteio")}
       botao="Ver"
       destaque={false}
       />
@@ -632,7 +638,7 @@ if (jogo) {
     <LinhaDodo
     key="jogo"
     titulo={`${jogo.numero}ª Copa · a decorrer`}
-    sub={jogo.naChave ? "Estás nesta chave" : "Acompanha a chave ao vivo"}
+    sub={jogo.naChave ? t("lg.nestaChave") : "Acompanha a chave ao vivo"}
     botao="Ver a chave"
     destaque={false}
     href={jogo.invite_code ? `/liga/${jogo.invite_code}` : "/dodo"}
@@ -643,7 +649,7 @@ if (jogo) {
 // Nem inscrição visível nem Copa a decorrer: uma linha neutra, para a Copa
 // nunca desaparecer da lista.
 if (linhas.length === 0) {
-  return <LinhaDodo titulo="Copa do Dôdo" sub="A próxima edição abre em breve" botao="Ver" destaque={false} />;
+  return <LinhaDodo titulo="Copa do Dôdo" sub={t("lg.proximaEdicao")} botao="Ver" destaque={false} />;
 }
 return <>{linhas}</>;
 }
@@ -680,6 +686,7 @@ function ActionBtn({ kind, children }: { kind: "ver" | "solicitar"; children: Re
 }
 // Cartão de limite atingido. Para free, convida ao Pro; para Pro, só informa.
 function LimiteCard({ souPro, titulo, texto }: { souPro: boolean; titulo: string; texto: string }) {
+  const t = useT();
   return (
     <div style={{ background: souPro ? "#121815" : "#2a2410", border: `1px solid ${souPro ? "#243029" : "#5a4a18"}`, borderRadius: 14, padding: "13px 15px", marginTop: 10 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
@@ -688,7 +695,7 @@ function LimiteCard({ souPro, titulo, texto }: { souPro: boolean; titulo: string
     </div>
     <p style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.5, margin: souPro ? 0 : "0 0 10px" }}>{texto}</p>
     {!souPro && (
-        <a href="/ippon-pro" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 12, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>Conhecer o Ippon Pro</a>
+        <a href="/ippon-pro" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 12, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>{t("lg.conhecerPro")}</a>
       )}
     </div>
   );
