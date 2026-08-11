@@ -5,6 +5,7 @@ import { Escudo, SymbolGlyph, loadIdentity, saveIdentity, SHAPES, PATTERNS, SYMB
 import { atualizarIdentidadeCloud, loadIdentityCloudFor } from "@/lib/team";
 import { focoMercado } from "@/lib/calendario";
 import { supabase } from "@/lib/supabase";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -13,20 +14,22 @@ const ORANGE = "#e67e22";
 
 // Slots de cor. Os cinco PRINCIPAIS são sempre visíveis; os dois da estampa só
 // aparecem quando há um padrão escolhido (deixa de fazer sentido no "Sólido").
+// Guardam a CHAVE de tradução (avaliados no arranque do módulo, sem `t`).
 type Slot = "bg1" | "bg2" | "border" | "icon" | "iconBorder" | "stamp1" | "stamp2";
 const SLOTS_PRINCIPAIS: { id: Slot; label: string }[] = [
-  { id: "bg1", label: "Fundo 1" },
-  { id: "bg2", label: "Fundo 2" },
-  { id: "border", label: "Borda do fundo" },
-  { id: "icon", label: "Ícone" },
-  { id: "iconBorder", label: "Borda do ícone" },
+  { id: "bg1", label: "escudo.fundo1" },
+  { id: "bg2", label: "escudo.fundo2" },
+  { id: "border", label: "escudo.bordaFundo" },
+  { id: "icon", label: "escudo.icone" },
+  { id: "iconBorder", label: "escudo.bordaIcone" },
 ];
 const SLOTS_ESTAMPA: { id: Slot; label: string }[] = [
-  { id: "stamp1", label: "Estampa 1" },
-  { id: "stamp2", label: "Estampa 2" },
+  { id: "stamp1", label: "escudo.estampa1" },
+  { id: "stamp2", label: "escudo.estampa2" },
 ];
 
 export default function EscudoEditorPage() {
+  const t = useT();
   const [id, setId] = useState<Identity | null>(null);
   // Lê os parâmetros do URL no cliente (sem useSearchParams, evita Suspense).
   const [voltar, setVoltar] = useState("/inicio");
@@ -55,6 +58,8 @@ export default function EscudoEditorPage() {
     // 1) Arranque rápido com o que está no dispositivo (local).
     const local = loadIdentity();
     const nomeLocal = (local.name || "").trim();
+    // Deteta o nome por defeito ANTIGO ("a minha equipa"), gravado em português:
+    // é uma comparação com valor histórico, por isso fica literal — não se traduz.
     const ehDefault = nomeLocal.toLowerCase() === "a minha equipa" || nomeLocal === "";
     setId(ehDefault ? { ...local, name: "" } : local);
     setNomeOriginal(ehDefault ? "" : nomeLocal);
@@ -123,7 +128,7 @@ export default function EscudoEditorPage() {
     const nome = (id!.name || "").trim();
     // NOME OBRIGATÓRIO: sem nome, não avança.
     if (nome.length < 2) {
-      setErro("Dá um nome ao teu time para continuar.");
+      setErro(t("escudo.erroNome"));
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -141,7 +146,7 @@ export default function EscudoEditorPage() {
       const res = await fetch(`/api/nome-disponivel?${params.toString()}`);
       const j = await res.json();
       if (j && j.ok && j.livre === false) {
-        setErro("Esse nome de time já está em uso. Escolhe outro:");
+        setErro(t("escudo.nomeEmUso"));
         setSugestoes(Array.isArray(j.sugestoes) ? j.sugestoes : []);
         setAVerificarNome(false);
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -187,6 +192,9 @@ export default function EscudoEditorPage() {
   const ocupado = (aGuardar || aVerificarNome) ? false : sugestoes.length > 0;
   // Valor atual do slot selecionado (a "Borda do ícone" pode estar vazia = nenhuma).
   const valorSlot = (id[slot] as string | undefined) || "";
+  // Frases com destaque a negrito no meio, divididas pelos marcadores.
+  const faltaPasso = t("escudo.faltaPasso").split("%D%");
+  const vaisTrocar = t("escudo.vaisTrocar").split(/%A%|%B%/);
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -198,34 +206,34 @@ export default function EscudoEditorPage() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
             </span>
           ) : (
-            <a href={voltar} aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+            <a href={voltar} aria-label={t("comum.voltar")} style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
             </a>
           )}
-          <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>Personalizar escudo</h1>
+          <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>{t("escudo.titulo")}</h1>
         </header>
 
         {obrigatorio && (
           <div style={{ margin: "0 16px 8px", background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 18 }}>🥋</span>
-            <div style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45 }}>Falta só um passo: <span style={{ color: GOLD, fontWeight: 700 }}>dá um nome ao teu time</span> para concluíres.</div>
+            <div style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45 }}>{faltaPasso[0]}<span style={{ color: GOLD, fontWeight: 700 }}>{t("escudo.faltaPassoDestaque")}</span>{faltaPasso[1]}</div>
           </div>
         )}
 
         <div style={{ background: "radial-gradient(circle at 50% 28%, #173029, #0c0e0d 72%)", borderTop: "1px solid #1a221d", borderBottom: "1px solid #1a221d", padding: "18px 16px 14px", textAlign: "center" }}>
           <div style={{ filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.5))", display: "inline-block" }}>
-            <Escudo config={{ ...id, name: id.name || "A minha equipa" }} size={128} />
+            <Escudo config={{ ...id, name: id.name || t("escudo.aMinhaEquipa") }} size={128} />
           </div>
-          <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", marginTop: 8, wordBreak: "break-word", color: nomeVazio ? "#5f6f67" : "#f1ede2" }}>{id.name.trim() || "Sem nome"}</div>
+          <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", marginTop: 8, wordBreak: "break-word", color: nomeVazio ? "#5f6f67" : "#f1ede2" }}>{id.name.trim() || t("escudo.semNome")}</div>
           <button onClick={sortear} style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 7, background: "transparent", border: "none", color: "#7fd1a3", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", cursor: "pointer" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
-            Sortear
+            {t("escudo.sortear")}
           </button>
         </div>
 
         <div style={{ padding: "18px 16px 0" }}>
-          <Label>Nome do time <span style={{ color: GOLD }}>*</span></Label>
-          <input value={id.name} onChange={(e) => set("name", e.target.value.slice(0, 24))} placeholder="Escreve o nome da tua equipa"
+          <Label>{t("escudo.nomeTime")} <span style={{ color: GOLD }}>*</span></Label>
+          <input value={id.name} onChange={(e) => set("name", e.target.value.slice(0, 24))} placeholder={t("escudo.phNome")}
             style={{ width: "100%", boxSizing: "border-box", background: "#141a17", border: `1px solid ${erro ? "#c0392b" : "#243029"}`, borderRadius: 12, padding: "12px 14px", color: "#f1ede2", fontSize: 15, fontFamily: FB, outline: "none", marginBottom: (erro || ocupado) ? 8 : 24 }} />
           {erro && <div style={{ fontSize: 12.5, color: "#ef8d83", marginBottom: ocupado ? 10 : 20, fontWeight: 700 }}>{erro}</div>}
 
@@ -233,7 +241,7 @@ export default function EscudoEditorPage() {
           {!erro && nomeOriginal === "" && (
             <div style={{ fontSize: 12, color: "#aee9c9", lineHeight: 1.5, margin: "-12px 0 20px", display: "flex", gap: 7, alignItems: "flex-start" }}>
               <span aria-hidden="true" style={{ flexShrink: 0 }}>ℹ️</span>
-              <span>Não existem dois times com o mesmo nome. Escolhe bem — este será a tua identidade na liga.</span>
+              <span>{t("escudo.nomeUnicoInfo")}</span>
             </div>
           )}
 
@@ -248,7 +256,7 @@ export default function EscudoEditorPage() {
             </div>
           )}
 
-          <CenterLabel>Escolher forma</CenterLabel>
+          <CenterLabel>{t("escudo.escolherForma")}</CenterLabel>
           <ScrollRow>
             {SHAPES.map((s) => (
               <Thumb key={s} on={id.shape === s} onClick={() => set("shape", s as ShapeId)}>
@@ -257,7 +265,7 @@ export default function EscudoEditorPage() {
             ))}
           </ScrollRow>
 
-          <CenterLabel>Escolher estampa</CenterLabel>
+          <CenterLabel>{t("escudo.escolherEstampa")}</CenterLabel>
           <ScrollRow>
             {PATTERNS.map((p) => (
               <Thumb key={p.id} on={id.pattern === p.id} onClick={() => set("pattern", p.id as PatternId)}>
@@ -269,12 +277,12 @@ export default function EscudoEditorPage() {
           {/* CORES — cada camada do escudo tem o seu controlo. A "Borda do ícone"
               pode ficar em "Nenhuma" (sem contorno). As cores da estampa só
               aparecem quando há um padrão escolhido. */}
-          <CenterLabel>Escolher cores</CenterLabel>
+          <CenterLabel>{t("escudo.escolherCores")}</CenterLabel>
 
           {/* 1) Que camada estou a pintar — numa única linha que desliza. */}
           <ScrollRow>
             {slotsVisiveis.map((s) => (
-              <button key={s.id} onClick={() => setSlot(s.id)} aria-label={s.label}
+              <button key={s.id} onClick={() => setSlot(s.id)} aria-label={t(s.label)}
                 style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "transparent", border: "none", cursor: "pointer", padding: 0, width: 64 }}>
                 <span style={{ position: "relative", width: 46, height: 46, borderRadius: "50%", background: ((id[s.id] as string | undefined) || "") || "transparent", border: `2px solid ${slot === s.id ? GOLD : "rgba(255,255,255,0.25)"}`, boxShadow: slot === s.id ? `0 0 0 3px rgba(217,164,65,0.35)` : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {/* Slot vazio (borda do ícone "nenhuma"): risca diagonal a indicar "sem cor". */}
@@ -284,19 +292,19 @@ export default function EscudoEditorPage() {
                     </svg>
                   )}
                 </span>
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: slot === s.id ? GOLD : "#93a39a", textAlign: "center", lineHeight: 1.2 }}>{s.label}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: slot === s.id ? GOLD : "#93a39a", textAlign: "center", lineHeight: 1.2 }}>{t(s.label)}</span>
               </button>
             ))}
           </ScrollRow>
 
           {/* 2) Paleta para a camada selecionada */}
           <div style={{ fontSize: 11, color: "#93a39a", textAlign: "center", marginBottom: 10 }}>
-            A pintar: <span style={{ color: GOLD, fontWeight: 700 }}>{slotsVisiveis.find((s) => s.id === slot)?.label}</span>
+            {t("escudo.aPintar")} <span style={{ color: GOLD, fontWeight: 700 }}>{t(slotsVisiveis.find((s) => s.id === slot)?.label || "")}</span>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10, marginBottom: 24 }}>
             {/* A "Borda do ícone" pode ser NENHUMA (sem contorno). */}
             {slot === "iconBorder" && (
-              <button onClick={() => set("iconBorder", "")} aria-label="Sem borda do ícone"
+              <button onClick={() => set("iconBorder", "")} aria-label={t("escudo.semBordaIcone")}
                 style={{ position: "relative", width: 34, height: 34, borderRadius: "50%", background: "#0c0e0d", border: `2px solid ${valorSlot === "" ? "#f1ede2" : "rgba(255,255,255,0.18)"}`, boxShadow: valorSlot === "" ? `0 0 0 2px ${GOLD}` : "none", cursor: "pointer" }}>
                 <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
                   <line x1="7" y1="23" x2="23" y2="7" stroke="#ef8d83" strokeWidth="2.2" />
@@ -309,7 +317,7 @@ export default function EscudoEditorPage() {
             })}
           </div>
 
-          <CenterLabel>Escolher adorno</CenterLabel>
+          <CenterLabel>{t("escudo.escolherAdorno")}</CenterLabel>
           <ScrollRow>
             {SYMBOLS.map((s) => (
               <Thumb key={s.id} on={id.symbol === s.id} onClick={() => set("symbol", s.id as SymbolId)}>
@@ -323,7 +331,7 @@ export default function EscudoEditorPage() {
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "12px 16px", zIndex: 50 }}>
         <div style={{ maxWidth: 460, margin: "0 auto" }}>
           <button onClick={guardar} disabled={aGuardar || aVerificarNome} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: nomeVazio ? "#3a2f12" : ORANGE, color: nomeVazio ? GOLD : "#1b0f06", fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", cursor: (aGuardar || aVerificarNome) ? "default" : "pointer" }}>
-            {aVerificarNome ? "A verificar o nome…" : aGuardar ? "A guardar…" : nomeVazio ? "Dá um nome para salvar" : "Salvar escudo"}
+            {aVerificarNome ? t("escudo.aVerificarNome") : aGuardar ? t("perfil.aGuardar") : nomeVazio ? t("escudo.daNomeSalvar") : t("escudo.salvarEscudo")}
           </button>
         </div>
       </div>
@@ -333,13 +341,13 @@ export default function EscudoEditorPage() {
         <div onClick={() => setConfirmarNome(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
             <div style={{ fontSize: 30, marginBottom: 6 }}>✏️</div>
-            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>Mudar o nome do time?</h2>
+            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>{t("escudo.mudarNomeTitulo")}</h2>
             <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 4px" }}>
-              Vais trocar <strong style={{ color: "#f1ede2" }}>{nomeOriginal}</strong> por <strong style={{ color: GOLD }}>{(id.name || "").trim()}</strong>.
+              {vaisTrocar[0]}<strong style={{ color: "#f1ede2" }}>{nomeOriginal}</strong>{vaisTrocar[1]}<strong style={{ color: GOLD }}>{(id.name || "").trim()}</strong>{vaisTrocar[2]}
             </p>
-            <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5, margin: "0 0 18px" }}>O nome anterior fica livre para outra pessoa. Tens a certeza?</p>
-            <button onClick={persistir} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Sim, mudar o nome</button>
-            <button onClick={() => setConfirmarNome(false)} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Cancelar</button>
+            <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5, margin: "0 0 18px" }}>{t("escudo.nomeAnteriorLivre")}</p>
+            <button onClick={persistir} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>{t("escudo.simMudarNome")}</button>
+            <button onClick={() => setConfirmarNome(false)} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>{t("comum.cancelar")}</button>
           </div>
         </div>
       )}
@@ -374,8 +382,9 @@ function ScrollRow({ children }: { children: React.ReactNode }) {
   );
 }
 function Arrow({ side, onClick }: { side: "left" | "right"; onClick: () => void }) {
+  const t = useT();
   return (
-    <button onClick={onClick} aria-label={side === "left" ? "Anterior" : "Seguinte"} style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", [side]: 0, width: 30, height: 30, borderRadius: "50%", background: "rgba(15,20,17,0.92)", border: "1px solid #2a3a33", color: "#f1ede2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 2 } as React.CSSProperties}>
+    <button onClick={onClick} aria-label={side === "left" ? t("escudo.anterior") : t("escudo.seguinte")} style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", [side]: 0, width: 30, height: 30, borderRadius: "50%", background: "rgba(15,20,17,0.92)", border: "1px solid #2a3a33", color: "#f1ede2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 2 } as React.CSSProperties}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d={side === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
       </svg>
