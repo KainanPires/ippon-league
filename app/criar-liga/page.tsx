@@ -6,31 +6,24 @@ import { supabase } from "@/lib/supabase";
 import { focoMercado, proximaDepoisDe, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
 import { useNivel } from "@/lib/useNivel";
 import { LIMITES } from "@/lib/planos";
+import { useT, useLingua } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-// Limites de criação por plano (espelho do servidor; a regra real está na rota).
-// Os limites vêm do lib/planos (LIMITES), a MESMA fonte que o servidor usa no
-// lib/limitesLiga. Estavam aqui escritos à mão como 1 e 5 — e não havia número
-// para o Pro Max, por isso um Pro Max era travado às 5 ligas quando tem 10.
-// Estava a pagar por dez e a conseguir cinco.
-// Slots de cor. Os cinco PRINCIPAIS são sempre visíveis; os dois da estampa só
-// aparecem quando há um padrão escolhido (deixa de fazer sentido no "Sólido").
-// É o mesmo modelo do editor do escudo do TIME, para a experiência ser igual.
+// Slots de cor. Guardam a CHAVE de tradução (mesmo modelo do editor do escudo).
 type Slot = "bg1" | "bg2" | "border" | "icon" | "iconBorder" | "stamp1" | "stamp2";
 const SLOTS_PRINCIPAIS: { id: Slot; label: string }[] = [
-  { id: "bg1", label: "Fundo 1" },
-  { id: "bg2", label: "Fundo 2" },
-  { id: "border", label: "Borda do fundo" },
-  { id: "icon", label: "Ícone" },
-  { id: "iconBorder", label: "Borda do ícone" },
+  { id: "bg1", label: "escudo.fundo1" },
+  { id: "bg2", label: "escudo.fundo2" },
+  { id: "border", label: "escudo.bordaFundo" },
+  { id: "icon", label: "escudo.icone" },
+  { id: "iconBorder", label: "escudo.bordaIcone" },
 ];
 const SLOTS_ESTAMPA: { id: Slot; label: string }[] = [
-  { id: "stamp1", label: "Estampa 1" },
-  { id: "stamp2", label: "Estampa 2" },
+  { id: "stamp1", label: "escudo.estampa1" },
+  { id: "stamp2", label: "escudo.estampa2" },
 ];
 const rnd = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 // "AAAA/MM/DD" (formato do calendário) -> Date local. Devolve null se inválido.
 function dataDe(s: string): Date | null {
   const p = (s || "").split("/");
@@ -40,8 +33,6 @@ function dataDe(s: string): Date | null {
 }
 // Competições REAIS (sem clássicos), ordenadas por data, a partir de HOJE e até
 // 1 ANO depois. É a "janela" de onde se escolhe o início e o fim por competição.
-// NÃO uso proximaDepoisDe em ciclo porque essa função "dá a volta" ao calendário
-// (repetia competições do início do ano). Aqui filtro por data, sem repetições.
 function janelaCompeticoes(): SemanaCalendario[] {
   const hoje = new Date();
   const limite = new Date(hoje.getFullYear() + 1, hoje.getMonth(), hoje.getDate());
@@ -56,22 +47,22 @@ function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 // Lista de meses possíveis para o "fim por mês": do mês a seguir ao mês de início
-// (ou ao mês atual, se ainda não há início) até, no máximo, o mesmo mês de hoje no
-// ANO SEGUINTE (teto de 1 ano). Devolve { valor: "AAAA-MM", rotulo: "Mês de AAAA" }.
-function mesesDeFim(dataInicio: Date | null): { valor: string; rotulo: string }[] {
+// (ou ao mês atual) até, no máximo, o mesmo mês de hoje no ANO SEGUINTE (teto de 1
+// ano). Devolve { valor: "AAAA-MM", ano, mes } — o rótulo localizado é montado no
+// ecrã, com o mês na língua da pessoa (via Intl).
+function mesesDeFim(dataInicio: Date | null): { valor: string; ano: number; mes: number }[] {
   const hoje = new Date();
   const base = dataInicio || hoje;
-  // começa no mês a seguir ao início
   let ano = base.getFullYear();
-  let mes = base.getMonth() + 1; // 0-based +1 = mês seguinte (ainda 0-based no fim)
+  let mes = base.getMonth() + 1; // mês seguinte (0-based)
   if (mes > 11) { mes = 0; ano += 1; }
   const tetoAno = hoje.getFullYear() + 1;
-  const tetoMes = hoje.getMonth(); // mesmo mês de hoje, ano seguinte
-  const out: { valor: string; rotulo: string }[] = [];
+  const tetoMes = hoje.getMonth();
+  const out: { valor: string; ano: number; mes: number }[] = [];
   let guardas = 0;
   while (guardas < 24) {
     if (ano > tetoAno || (ano === tetoAno && mes > tetoMes)) break;
-    out.push({ valor: `${ano}-${String(mes + 1).padStart(2, "0")}`, rotulo: `${MESES_PT[mes]} de ${ano}` });
+    out.push({ valor: `${ano}-${String(mes + 1).padStart(2, "0")}`, ano, mes });
     mes += 1;
     if (mes > 11) { mes = 0; ano += 1; }
     guardas += 1;
@@ -85,15 +76,22 @@ interface LigaCriada {
   formato: string;
   privacidade: string;
 }
+// Nome amigável do estado de privacidade — devolve a CHAVE de tradução.
+function nomePrivacidade(p: string): string {
+  if (p === "aberta") return "cl.aberta";
+  if (p === "mediante_pedido") return "cl.porAprovacao";
+  return "cl.fechada";
+}
 export default function CriarLiga() {
+  const t = useT();
+  const { lingua } = useLingua();
   const [step, setStep] = useState<"criar" | "convites">("criar");
   const [cfg, setCfg] = useState<Identity>(DEFAULT_LEAGUE_SHIELD);
   const [name, setName] = useState("");
   const [descricao, setDescricao] = useState("");
   const [format, setFormat] = useState<LeagueFormat>("pontos");
   // Copa: o admin escolhe a competição inicial (1ª ronda). O fecho da inscrição
-  // é automático (1h antes dessa competição começar). As próximas competições do
-  // calendário, a partir da de mercado aberto, para o admin escolher.
+  // é automático (1h antes dessa competição começar).
   const proximasComps: SemanaCalendario[] = (() => {
       const lista: SemanaCalendario[] = [];
       let c = focoMercado().alvo;
@@ -102,7 +100,6 @@ export default function CriarLiga() {
     })();
   const [copaCompInicial, setCopaCompInicial] = useState<string>(proximasComps[0]?.idCompeticao || "");
   // --- Ligas de PONTOS CORRIDOS: início e fim escolhidos pelo dono ---
-  // A janela (a partir de hoje, até 1 ano) é fixa; calcula-se uma vez.
   const janela: SemanaCalendario[] = (() => janelaCompeticoes())();
   const [ligaCompInicial, setLigaCompInicial] = useState<string>(janela[0]?.idCompeticao || "");
   const [fimTipo, setFimTipo] = useState<"competicao" | "mes">("competicao");
@@ -115,7 +112,6 @@ export default function CriarLiga() {
   const [a_criar, setACriar] = useState(false);
   const [erro, setErro] = useState("");
   // Verificação de limite à entrada: quantas ligas de amigos já criou?
-  // "a_verificar" enquanto carrega; "noLimite" se já atingiu o máximo do plano.
   const [aVerificar, setAVerificar] = useState(true);
   const [noLimite, setNoLimite] = useState(false);
   const [ehPro, setEhPro] = useState(false);
@@ -123,44 +119,29 @@ export default function CriarLiga() {
   const [maximo, setMaximo] = useState(0);
 
   // O NÍVEL VEM DO useNivel (tabela `users`), NÃO DO user_metadata.
-  //
-  // Esta página lia `user_metadata.is_pro`. O metadata deixou de ser
-  // sincronizado quando o trigger parou de o fazer, por isso um subscritor que
-  // pagou aparecia aqui como gratuito — via o cadeado e a mensagem de conta
-  // grátis. É a mesma família de bugs do /pro e do /api/liga.
   const { ehPro: proReal, ehProMax: proMaxReal, pronto: nivelPronto } = useNivel();
 
   useEffect(() => {
       let vivo = true;
-
       // Espera saber o nível. Sem isto decidia-se o limite com "gratis".
       if (!nivelPronto) return;
-
       (async () => {
           try {
             const { data: sess } = await supabase.auth.getSession();
             const uid = sess.session?.user?.id;
             if (!uid) { if (vivo) setAVerificar(false); return; } // sem sessão: deixa seguir (a rota trata)
-
             const nivel = proMaxReal ? "promax" : proReal ? "pro" : "gratis";
             const lim = LIMITES[nivel].pontos;
-
             const res = await fetch(`/api/liga/minhas?user_id=${uid}`);
             const j = await res.json();
             const minhas = Array.isArray(j.ligas) ? j.ligas : [];
-
-            // CONTA COMO O SERVIDOR CONTA (lib/limitesLiga.contarPorFormato):
-            // todas as ligas de AMIGOS de pontos corridos em que participa, não
-            // só as que criou; sem as terminadas; sem as oficiais.
-            //
-            // Antes contava-se `sou_dono`, o que dava um pré-aviso diferente do
-            // bloqueio real — a página deixava passar e a rota recusava depois.
+            // CONTA COMO O SERVIDOR CONTA: ligas de AMIGOS de pontos corridos em
+            // que participa; sem as terminadas; sem as oficiais; sem as copas.
             const usadas = minhas.filter((l: { type?: string | null; formato?: string; estado?: string | null; copa_estado?: string | null }) => {
                 if (String(l.type) === "oficial") return false;
                 if (String(l.formato) === "copa") return false;
                 return String(l.estado) !== "terminada";
               }).length;
-
             if (vivo) {
               setEhPro(proReal);
               setEhProMax(proMaxReal);
@@ -180,34 +161,35 @@ export default function CriarLiga() {
   function sortear() {
     setCfg((p) => ({ ...p, shape: rnd(SHAPES), pattern: rnd(PATTERNS).id, symbol: rnd(LEAGUE_SYMBOLS).id, bg1: rnd(COLORS), bg2: rnd(COLORS), stamp1: rnd(COLORS), stamp2: rnd(COLORS), border: rnd(COLORS), icon: rnd(COLORS), iconBorder: rnd(COLORS) }));
   }
-  // A estampa só importa quando há um padrão (não "Sólido"). Aí mostramos também
-  // os dois slots de cor da estampa.
+  // A estampa só importa quando há um padrão (não "Sólido").
   const temEstampa = cfg.pattern !== "solido";
   const slotsVisiveis = temEstampa ? [...SLOTS_PRINCIPAIS, ...SLOTS_ESTAMPA] : SLOTS_PRINCIPAIS;
   const valorSlot = (cfg[slot] as string | undefined) || "";
   // --- Derivados das escolhas (ligas de pontos corridos) ---
   const compInicialObj = janela.find((c) => c.idCompeticao === ligaCompInicial) || null;
   const dataInicio = compInicialObj ? dataDe(compInicialObj.de) : null;
-  // Competições de fim possíveis: as da janela que começam DEPOIS do início.
   const compsFim = janela.filter((c) => {
       if (!dataInicio) return false;
       const d = dataDe(c.de);
       return d != null && d > dataInicio && c.idCompeticao !== ligaCompInicial;
     });
   const mesesFim = mesesDeFim(dataInicio);
-  // Texto informativo (pré-visualização do que será mostrado a quem entra).
+  // Rótulo do mês localizado (ex.: "Março de 2026" / "March 2026" / "März 2026").
+  const rotuloMes = (m: { ano: number; mes: number }) => {
+    const s = new Date(m.ano, m.mes, 1).toLocaleDateString(lingua, { month: "long", year: "numeric" });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  };
   const compFimObj = compsFim.find((c) => c.idCompeticao === fimComp) || null;
   const mesFimObj = mesesFim.find((m) => m.valor === fimMes) || null;
+  // Texto informativo (pré-visualização do que será mostrado a quem entra).
   const informativo = (() => {
       if (!compInicialObj) return "";
       const ini = compInicialObj.nome;
-      if (fimTipo === "competicao" && compFimObj) return `Esta liga vai de ${ini} até ${compFimObj.nome}.`;
-      if (fimTipo === "mes" && mesFimObj) return `Esta liga começa em ${ini} e termina em ${mesFimObj.rotulo}.`;
+      if (fimTipo === "competicao" && compFimObj) return t("cl.infoAte", { ini, fim: compFimObj.nome });
+      if (fimTipo === "mes" && mesFimObj) return t("cl.infoMes", { ini, mesFim: rotuloMes(mesFimObj) });
       return "";
     })();
-  // O fim está escolhido e válido?
   const fimValido = fimTipo === "competicao" ? !!compFimObj : !!mesFimObj;
-  // Liga de pontos corridos exige início + fim; copa usa a sua própria validação.
   const pontosOk = format !== "pontos" || (!!compInicialObj && fimValido);
   const canCreate = name.trim().length >= 2 && pontosOk && !a_criar;
   async function criar() {
@@ -215,7 +197,6 @@ export default function CriarLiga() {
     setErro("");
     setACriar(true);
     try {
-      // Quem está a criar? Precisa de sessão.
       const { data: sess } = await supabase.auth.getSession();
       const user_id = sess.session?.user?.id;
       if (!user_id) {
@@ -240,14 +221,14 @@ export default function CriarLiga() {
         });
       const j = await res.json();
       if (!j.ok) {
-        setErro(j.erro || "Não foi possível criar a liga.");
+        setErro(j.erro || t("cl.erroCriar"));
         setACriar(false);
         return;
       }
       setCreated(j.liga);
       setStep("convites");
     } catch {
-      setErro("Falha de ligação. Tenta de novo.");
+      setErro(t("cl.falhaLigacao"));
       setACriar(false);
     }
   }
@@ -257,7 +238,7 @@ export default function CriarLiga() {
   }
   function partilhar() {
     if (!created) return;
-    const texto = `Entra na minha liga "${created.name}" na Ippon League! Código: ${created.invite_code}`;
+    const texto = t("cl.partilharTexto", { nome: created.name, codigo: created.invite_code });
     const navAny = navigator as unknown as { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
     if (navAny.share) {
       navAny.share({ title: "Ippon League", text: texto, url: inviteLink }).catch(() => {});
@@ -265,62 +246,55 @@ export default function CriarLiga() {
       try { navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch {}
     }
   }
+  // "Não há competições... Escolhe o fim <por mês>." — negrito no meio.
+  const semCompsFim = t("cl.semCompsFim").split("%D%");
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 40px" }}>
     <header style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
     {step === "criar" ? (
-        <a href="/ligas" aria-label="Voltar" style={backBtn}><BackArrow /></a>
+        <a href="/ligas" aria-label={t("comum.voltar")} style={backBtn}><BackArrow /></a>
       ) : (
-        <button onClick={() => setStep("criar")} aria-label="Voltar" style={{ ...backBtn, cursor: "pointer" }}><BackArrow /></button>
+        <button onClick={() => setStep("criar")} aria-label={t("comum.voltar")} style={{ ...backBtn, cursor: "pointer" }}><BackArrow /></button>
       )}
-    <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>{step === "criar" ? "Criar liga" : "Convidar"}</span>
+    <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>{step === "criar" ? t("cl.criarLiga") : t("cl.convidar")}</span>
     </header>
     {step === "criar" && aVerificar ? (
-        <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>
+        <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("comum.carregando")}</div>
       ) : step === "criar" && noLimite ? (
         <div style={{ background: ehPro ? "#121815" : "#2a2410", border: `1px solid ${ehPro ? "#243029" : "#5a4a18"}`, borderRadius: 16, padding: "22px 18px", textAlign: "center" }}>
         <div style={{ fontSize: 34, marginBottom: 8 }}>{ehPro ? "✓" : "🔒"}</div>
         <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", color: ehPro ? "#cfd8d2" : GOLD, marginBottom: 8 }}>
-        {ehPro ? "Atingiste o máximo de ligas" : "Já criaste a tua liga"}
+        {ehPro ? t("cl.atingisteMax") : t("cl.jaCriaste")}
         </div>
-        {/* A MENSAGEM DO LIMITE — e a oferta certa para cada nível.
-            Os números vêm do LIMITES, não escritos à mão: se a regra mudar no
-            lib/planos, esta frase acompanha.
-
-            Um Pro que bate no limite é a melhor altura para lhe falar do Pro
-            Max: acabou de sentir a falta exata que o Pro Max resolve. Antes, a
-            página dizia-lhe só "apaga uma das atuais" — um "não podes" a quem
-            estava disposto a pagar mais.
-
-            Ao Pro Max não se vende nada: já tem o máximo. */}
+        {/* A MENSAGEM DO LIMITE — e a oferta certa para cada nível. Os números
+            vêm do LIMITES, não escritos à mão. */}
         <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 18px" }}>
         {ehProMax
-          ? `Já estás em ${maximo} ligas — é o máximo, mesmo com Pro Max. Para entrares noutra, sai primeiro de uma das atuais.`
+          ? t("cl.limMax", { maximo })
           : ehPro
-          ? `Com o Ippon Pro podes estar em ${maximo} ligas — e já lá estás. Com o Pro Max sobes até ${LIMITES.promax.pontos}, e ficas com a chave ao vivo e o alerta dos teus atletas.`
-          : `Com a conta gratuita podes ter ${maximo} liga de amigos. Com o Ippon Pro sobes até ${LIMITES.pro.pontos} — e com o Pro Max até ${LIMITES.promax.pontos}.`}
+          ? t("cl.limPro", { maximo, promax: LIMITES.promax.pontos })
+          : t("cl.limGratis", { maximo, pro: LIMITES.pro.pontos, promax: LIMITES.promax.pontos })}
         </p>
-        {/* Pro sem Max: o passo seguinte é a subida, não a montra geral. */}
         {ehPro && !ehProMax && (
-            <a href="/pro-max" style={{ display: "inline-block", background: "#7fb8f5", color: "#0b1220", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "12px 22px", borderRadius: 11, textDecoration: "none", marginBottom: 12 }}>Passar a Pro Max</a>
+            <a href="/pro-max" style={{ display: "inline-block", background: "#7fb8f5", color: "#0b1220", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "12px 22px", borderRadius: 11, textDecoration: "none", marginBottom: 12 }}>{t("pro.passarMax")}</a>
           )}
         {!ehPro && (
-            <a href="/ippon-pro" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "12px 22px", borderRadius: 11, textDecoration: "none", marginBottom: 12 }}>Conhecer o Ippon Pro</a>
+            <a href="/ippon-pro" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "12px 22px", borderRadius: 11, textDecoration: "none", marginBottom: 12 }}>{t("lg.conhecerPro")}</a>
           )}
         <div>
-        <a href="/ligas" style={{ display: "inline-block", color: "#93a39a", fontSize: 13, fontFamily: FD, fontWeight: 700, textDecoration: "none" }}>← Voltar às ligas</a>
+        <a href="/ligas" style={{ display: "inline-block", color: "#93a39a", fontSize: 13, fontFamily: FD, fontWeight: 700, textDecoration: "none" }}>← {t("cl.voltarLigas")}</a>
         </div>
         </div>
       ) : step === "criar" ? (
         <>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 8 }}>
         <Escudo config={cfg} size={96} />
-        <button onClick={sortear} style={{ marginTop: 10, background: "#141a17", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "8px 16px", borderRadius: 10, cursor: "pointer" }}>↻ Sortear</button>
+        <button onClick={sortear} style={{ marginTop: 10, background: "#141a17", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "8px 16px", borderRadius: 10, cursor: "pointer" }}>↻ {t("escudo.sortear")}</button>
         </div>
-        <Label>Nome da liga</Label>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Liga do Dojo Lisboa" maxLength={28} style={inputStyle} />
-        <Label>Forma</Label>
+        <Label>{t("cl.nomeLiga")}</Label>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("cl.phNomeLiga")} maxLength={28} style={inputStyle} />
+        <Label>{t("cl.forma")}</Label>
         <ScrollRow>
         {SHAPES.map((s) => (
               <PickBox key={s} on={cfg.shape === s} onClick={() => set("shape", s)}>
@@ -328,7 +302,7 @@ export default function CriarLiga() {
               </PickBox>
             ))}
         </ScrollRow>
-        <Label>Estampa</Label>
+        <Label>{t("cl.estampa")}</Label>
         <ScrollRow>
         {PATTERNS.map((p) => (
               <PickBox key={p.id} on={cfg.pattern === p.id} onClick={() => set("pattern", p.id)} label={p.label}>
@@ -336,7 +310,7 @@ export default function CriarLiga() {
               </PickBox>
             ))}
         </ScrollRow>
-        <Label>Adorno</Label>
+        <Label>{t("cl.adorno")}</Label>
         <ScrollRow>
         {LEAGUE_SYMBOLS.map((sy) => (
               <PickBox key={sy.id} on={cfg.symbol === sy.id} onClick={() => set("symbol", sy.id)} label={sy.label}>
@@ -348,13 +322,11 @@ export default function CriarLiga() {
               </PickBox>
             ))}
         </ScrollRow>
-        {/* CORES — mesmo modelo do escudo do time: cinco camadas claras numa
-          linha que desliza, a estampa só quando há padrão, e a borda do
-          ícone pode ser "Nenhuma". */}
-        <Label>Cores</Label>
+        {/* CORES — mesmo modelo do escudo do time. */}
+        <Label>{t("cl.cores")}</Label>
         <ScrollRow>
         {slotsVisiveis.map((s) => (
-              <button key={s.id} onClick={() => setSlot(s.id)} aria-label={s.label}
+              <button key={s.id} onClick={() => setSlot(s.id)} aria-label={t(s.label)}
               style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, background: "transparent", border: "none", cursor: "pointer", padding: 0, width: 64 }}>
               <span style={{ position: "relative", width: 44, height: 44, borderRadius: "50%", background: ((cfg[s.id] as string | undefined) || "") || "transparent", border: `2px solid ${slot === s.id ? GOLD : "rgba(255,255,255,0.25)"}`, boxShadow: slot === s.id ? `0 0 0 3px rgba(217,164,65,0.35)` : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {!((cfg[s.id] as string | undefined) || "") && (
@@ -363,17 +335,17 @@ export default function CriarLiga() {
                   </svg>
                 )}
               </span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: slot === s.id ? GOLD : "#93a39a", textAlign: "center", lineHeight: 1.2 }}>{s.label}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: slot === s.id ? GOLD : "#93a39a", textAlign: "center", lineHeight: 1.2 }}>{t(s.label)}</span>
               </button>
             ))}
         </ScrollRow>
         <div style={{ fontSize: 11, color: "#93a39a", textAlign: "center", marginBottom: 10 }}>
-        A pintar: <span style={{ color: GOLD, fontWeight: 700 }}>{slotsVisiveis.find((s) => s.id === slot)?.label}</span>
+        {t("escudo.aPintar")} <span style={{ color: GOLD, fontWeight: 700 }}>{t(slotsVisiveis.find((s) => s.id === slot)?.label || "")}</span>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 9, marginBottom: 22 }}>
         {/* A "Borda do ícone" pode ser NENHUMA (sem contorno). */}
         {slot === "iconBorder" && (
-            <button onClick={() => set("iconBorder", "")} aria-label="Sem borda do ícone"
+            <button onClick={() => set("iconBorder", "")} aria-label={t("escudo.semBordaIcone")}
             style={{ position: "relative", width: 30, height: 30, borderRadius: "50%", background: "#0c0e0d", border: `2px solid ${valorSlot === "" ? "#f1ede2" : "#243029"}`, boxShadow: valorSlot === "" ? `0 0 0 2px ${GOLD}` : "none", cursor: "pointer" }}>
             <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
             <line x1="6" y1="20" x2="20" y2="6" stroke="#ef8d83" strokeWidth="2" />
@@ -385,16 +357,16 @@ export default function CriarLiga() {
               return <button key={c} onClick={() => set(slot, c)} aria-label={c} style={{ width: 30, height: 30, borderRadius: "50%", background: c, border: on ? `2px solid ${GOLD}` : "2px solid #243029", cursor: "pointer" }} />;
             })}
         </div>
-        <Label>Formato</Label>
+        <Label>{t("cl.formato")}</Label>
         <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
-        <FormatCard on={format === "pontos"} onClick={() => setFormat("pontos")} title="Pontos Corridos" desc="Soma de pontos rodada após rodada. Vence quem tiver mais no fim." icon="🏅" />
-        <FormatCard on={format === "copa"} onClick={() => setFormat("copa")} title="Copa Ippon" desc="Mata-mata: quem pontuar mais na rodada avança. Ideal para amigos." icon="🏆" />
+        <FormatCard on={format === "pontos"} onClick={() => setFormat("pontos")} title={t("cl.pontosTitulo")} desc={t("cl.pontosDesc")} icon="🏅" />
+        <FormatCard on={format === "copa"} onClick={() => setFormat("copa")} title="Copa Ippon" desc={t("cl.copaDesc")} icon="🏆" />
         </div>
         {format === "copa" && (
             <>
-            <Label>Competição de arranque</Label>
+            <Label>{t("cl.compArranque")}</Label>
             <p style={{ fontSize: 11.5, color: "#7c8a82", margin: "-2px 0 9px", lineHeight: 1.5 }}>
-            A 1ª ronda da chave joga-se nesta competição. As inscrições fecham 1h antes de ela começar, e o sorteio é automático. As rondas seguintes usam as competições seguintes do calendário.
+            {t("cl.copaHelp")}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 22 }}>
             {proximasComps.map((c) => (
@@ -413,13 +385,13 @@ export default function CriarLiga() {
           )}
         {format === "pontos" && (
             <>
-            <Label>Competição de arranque</Label>
+            <Label>{t("cl.compArranque")}</Label>
             <p style={{ fontSize: 11.5, color: "#7c8a82", margin: "-2px 0 9px", lineHeight: 1.5 }}>
-            A liga começa a contar pontos nesta competição. Esta escolha fica fixa quando abrires as inscrições.
+            {t("cl.pontosHelp")}
             </p>
             {janela.length === 0 ? (
                 <div style={{ background: "#2a1a18", border: "1px solid #5a2a24", color: "#ef8d83", fontSize: 12.5, padding: "10px 12px", borderRadius: 10, marginBottom: 22 }}>
-                Não há competições disponíveis no calendário neste momento. Tenta mais tarde.
+                {t("cl.semComps")}
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 22 }}>
@@ -436,19 +408,19 @@ export default function CriarLiga() {
                     ))}
                 </div>
               )}
-            <Label>Fim da liga</Label>
+            <Label>{t("cl.fimLiga")}</Label>
             <p style={{ fontSize: 11.5, color: "#7c8a82", margin: "-2px 0 9px", lineHeight: 1.5 }}>
-            A liga dura no máximo 1 ano. Escolhe terminar numa competição, ou num mês (útil quando o calendário ainda não chega lá).
+            {t("cl.fimHelp")}
             </p>
             {/* Abas: por competição | por mês */}
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button type="button" onClick={() => setFimTipo("competicao")} style={{ flex: 1, background: fimTipo === "competicao" ? "#16201b" : "#121815", border: `1.5px solid ${fimTipo === "competicao" ? GOLD : "#243029"}`, borderRadius: 10, padding: "9px 8px", cursor: "pointer", color: fimTipo === "competicao" ? "#f1ede2" : "#93a39a", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>Por competição</button>
-            <button type="button" onClick={() => setFimTipo("mes")} style={{ flex: 1, background: fimTipo === "mes" ? "#16201b" : "#121815", border: `1.5px solid ${fimTipo === "mes" ? GOLD : "#243029"}`, borderRadius: 10, padding: "9px 8px", cursor: "pointer", color: fimTipo === "mes" ? "#f1ede2" : "#93a39a", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>Por mês</button>
+            <button type="button" onClick={() => setFimTipo("competicao")} style={{ flex: 1, background: fimTipo === "competicao" ? "#16201b" : "#121815", border: `1.5px solid ${fimTipo === "competicao" ? GOLD : "#243029"}`, borderRadius: 10, padding: "9px 8px", cursor: "pointer", color: fimTipo === "competicao" ? "#f1ede2" : "#93a39a", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>{t("cl.porCompeticao")}</button>
+            <button type="button" onClick={() => setFimTipo("mes")} style={{ flex: 1, background: fimTipo === "mes" ? "#16201b" : "#121815", border: `1.5px solid ${fimTipo === "mes" ? GOLD : "#243029"}`, borderRadius: 10, padding: "9px 8px", cursor: "pointer", color: fimTipo === "mes" ? "#f1ede2" : "#93a39a", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>{t("cl.porMes")}</button>
             </div>
             {fimTipo === "competicao" ? (
                 compsFim.length === 0 ? (
                   <div style={{ background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontSize: 12.5, padding: "10px 12px", borderRadius: 10, marginBottom: 22, lineHeight: 1.45 }}>
-                  Não há competições no calendário depois do arranque (dentro de 1 ano). Escolhe o fim <strong>por mês</strong>.
+                  {semCompsFim[0]}<strong>{t("cl.semCompsFimDestaque")}</strong>{semCompsFim[1]}
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 22 }}>
@@ -466,10 +438,10 @@ export default function CriarLiga() {
                   </div>
                 )
               ) : (
-                <select value={fimMes} onChange={(e) => setFimMes(e.target.value)} aria-label="Mês de fim" style={{ ...inputStyle, marginBottom: 22, cursor: "pointer", color: fimMes ? "#f1ede2" : "#93a39a" }}>
-                <option value="">Escolhe o mês de fim…</option>
+                <select value={fimMes} onChange={(e) => setFimMes(e.target.value)} aria-label={t("cl.mesDeFim")} style={{ ...inputStyle, marginBottom: 22, cursor: "pointer", color: fimMes ? "#f1ede2" : "#93a39a" }}>
+                <option value="">{t("cl.escolheMes")}</option>
                 {mesesFim.map((m) => (
-                      <option key={m.valor} value={m.valor}>{m.rotulo}</option>
+                      <option key={m.valor} value={m.valor}>{rotuloMes(m)}</option>
                     ))}
                 </select>
               )}
@@ -482,21 +454,21 @@ export default function CriarLiga() {
               )}
             </>
           )}
-        <Label>Descrição da liga</Label>
+        <Label>{t("cl.descricao")}</Label>
         <textarea
         value={descricao}
         onChange={(e) => setDescricao(e.target.value)}
-        placeholder="Regras e informações da liga — opcional. Ex.: Vale tudo menos escalar lesionado! 🥋"
+        placeholder={t("cl.phDescricao")}
         maxLength={400}
         rows={4}
         style={{ ...inputStyle, marginBottom: 6, resize: "vertical", lineHeight: 1.5, fontFamily: FB }}
         />
         <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 22, textAlign: "right" }}>{descricao.length}/400</div>
-        <Label>Privacidade</Label>
+        <Label>{t("cl.privacidade")}</Label>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 26 }}>
-        <PrivacyRow on={privacy === "aberta"} onClick={() => setPrivacy("aberta")} title="Aberta" desc="Aparece no mercado de ligas. Qualquer um pode entrar." icon="🌍" />
-        <PrivacyRow on={privacy === "mediante_pedido"} onClick={() => setPrivacy("mediante_pedido")} title="Por aprovação" desc="Aparece no mercado. Tu aprovas quem entra." icon="✋" />
-        <PrivacyRow on={privacy === "fechada"} onClick={() => setPrivacy("fechada")} title="Fechada" desc="Não aparece no mercado. Só entra quem tiver o código." icon="🔒" />
+        <PrivacyRow on={privacy === "aberta"} onClick={() => setPrivacy("aberta")} title={t("cl.aberta")} desc={t("cl.abertaDesc")} icon="🌍" />
+        <PrivacyRow on={privacy === "mediante_pedido"} onClick={() => setPrivacy("mediante_pedido")} title={t("cl.porAprovacao")} desc={t("cl.porAprovacaoDesc")} icon="✋" />
+        <PrivacyRow on={privacy === "fechada"} onClick={() => setPrivacy("fechada")} title={t("cl.fechada")} desc={t("cl.fechadaDesc")} icon="🔒" />
         </div>
         {erro && (
             erro.includes("Pro") ? (
@@ -505,16 +477,16 @@ export default function CriarLiga() {
               <div style={{ background: "#2a1a18", border: "1px solid #5a2a24", color: "#ef8d83", fontSize: 12.5, padding: "10px 12px", borderRadius: 10, marginBottom: 12 }}>{erro}</div>
             )
           )}
-        <button onClick={criar} disabled={!canCreate} style={{ width: "100%", background: canCreate ? GOLD : "#23291f", color: canCreate ? "#1b211e" : "#5f6f67", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 15, borderRadius: 12, fontSize: 16, cursor: canCreate ? "pointer" : "default" }}>{a_criar ? "A criar…" : "Criar liga"}</button>
+        <button onClick={criar} disabled={!canCreate} style={{ width: "100%", background: canCreate ? GOLD : "#23291f", color: canCreate ? "#1b211e" : "#5f6f67", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 15, borderRadius: 12, fontSize: 16, cursor: canCreate ? "pointer" : "default" }}>{a_criar ? t("cl.aCriar") : t("cl.criarLiga")}</button>
         {!canCreate && !a_criar && (
             <div style={{ textAlign: "center", fontSize: 11, color: "#7c8a82", marginTop: 8 }}>
             {name.trim().length < 2
-              ? "Dá um nome à tua liga para continuar."
+              ? t("cl.daNomeLiga")
               : format === "pontos" && !compInicialObj
-              ? "Escolhe a competição de arranque."
+              ? t("cl.escolheArranque")
               : format === "pontos" && !fimValido
-              ? "Escolhe quando a liga termina."
-              : "Dá um nome à tua liga para continuar."}
+              ? t("cl.escolheFim")
+              : t("cl.daNomeLiga")}
             </div>
           )}
         </>
@@ -524,23 +496,23 @@ export default function CriarLiga() {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", marginBottom: 18 }}>
           <Escudo config={{ ...cfg, name: created.name }} size={84} />
           <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", marginTop: 10 }}>{created.name}</div>
-          <div style={{ fontSize: 12, color: "#7fd1a3", marginTop: 3 }}>Liga criada! Agora chama o teu dojo. 🥋</div>
-          <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{nomePrivacidade(created.privacidade)}</div>
+          <div style={{ fontSize: 12, color: "#7fd1a3", marginTop: 3 }}>{t("cl.ligaCriada")}</div>
+          <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{t(nomePrivacidade(created.privacidade))}</div>
           </div>
-          <Label>Convidar por link</Label>
+          <Label>{t("cl.convidarLink")}</Label>
           <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
           <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 12px", fontSize: 12.5, color: "#cfd8d2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center" }}>{inviteLink}</div>
-          <button onClick={copy} aria-label="Copiar link" style={{ background: copied ? "#3f8f5a" : "#141a17", color: copied ? "#06140d" : "#cfd8d2", border: "1px solid #243029", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 14px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{copied ? "✓" : "Copiar"}</button>
-          <button onClick={partilhar} aria-label="Partilhar link" style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 14px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
+          <button onClick={copy} aria-label={t("cl.copiarLink")} style={{ background: copied ? "#3f8f5a" : "#141a17", color: copied ? "#06140d" : "#cfd8d2", border: "1px solid #243029", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 14px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{copied ? "✓" : t("cl.copiar")}</button>
+          <button onClick={partilhar} aria-label={t("cl.partilharLink")} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 14px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
-          Partilhar
+          {t("cl.partilhar")}
           </button>
           </div>
           <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 12, padding: "12px 14px", marginBottom: 26, textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Código de convite</div>
+          <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{t("cl.codigoConvite")}</div>
           <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD, letterSpacing: "0.12em" }}>{created.invite_code}</div>
           </div>
-          <a href="/ligas" style={{ display: "block", textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 15, borderRadius: 12, fontSize: 16, textDecoration: "none" }}>Concluir</a>
+          <a href="/ligas" style={{ display: "block", textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 15, borderRadius: 12, fontSize: 16, textDecoration: "none" }}>{t("cl.concluir")}</a>
           </>
         )
       )}
@@ -555,12 +527,6 @@ function BackArrow() {
 }
 function Label({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 9 }}>{children}</div>;
-}
-// Nome amigável do estado de privacidade (para mostrar ao utilizador).
-function nomePrivacidade(p: string): string {
-  if (p === "aberta") return "Aberta";
-  if (p === "mediante_pedido") return "Por aprovação";
-  return "Fechada";
 }
 // Linha de privacidade empilhada (ícone + título + descrição, largura total).
 function PrivacyRow({ on, onClick, title, desc, icon }: { on: boolean; onClick: () => void; title: string; desc: string; icon: string }) {
@@ -608,8 +574,9 @@ function ScrollRow({ children }: { children: React.ReactNode }) {
   );
 }
 function Arrow({ side, onClick }: { side: "left" | "right"; onClick: () => void }) {
+  const t = useT();
   return (
-    <button onClick={onClick} aria-label={side === "left" ? "Anterior" : "Seguinte"} style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", [side]: 0, zIndex: 2, width: 28, height: 28, borderRadius: "50%", background: "#0c0e0d", border: "1px solid #243029", color: "#cfd8d2", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 } as React.CSSProperties}>
+    <button onClick={onClick} aria-label={side === "left" ? t("escudo.anterior") : t("escudo.seguinte")} style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", [side]: 0, zIndex: 2, width: 28, height: 28, borderRadius: "50%", background: "#0c0e0d", border: "1px solid #243029", color: "#cfd8d2", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 } as React.CSSProperties}>
     {side === "left" ? "‹" : "›"}
     </button>
   );
