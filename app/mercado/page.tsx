@@ -11,6 +11,7 @@ import { useNivel } from "@/lib/useNivel";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 import { useFaixa } from "@/lib/useFaixa";
+import { useT } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -33,30 +34,45 @@ const STATUS_COLORS: Record<AthleteStatus, [string, string]> = {
   "Aposta": ["#2a1f3a", "#b79be0"],
 };
 type SortId = "caros" | "baratos" | "valorizados" | "desvalorizados" | "media" | "min-valorizar";
+// CHAVES, não texto. Estes arrays vivem fora do componente e são avaliados no
+// arranque do módulo, quando o `t` ainda não existe. O texto resolve-se no
+// render, na língua da altura.
 const SORTS: { id: SortId; label: string; pro?: boolean }[] = [
-  { id: "caros", label: "Mais caros" },
-  { id: "baratos", label: "Mais baratos" },
-  { id: "valorizados", label: "Valorizados" },
-  { id: "desvalorizados", label: "Desvalorizados" },
-  { id: "media", label: "Maior média" },
-  { id: "min-valorizar", label: "Mínimo para valorizar", pro: true },
+  { id: "caros", label: "ord.caros" },
+  { id: "baratos", label: "ord.baratos" },
+  { id: "valorizados", label: "ord.valorizados" },
+  { id: "desvalorizados", label: "ord.desvalorizados" },
+  { id: "media", label: "ord.media" },
+  { id: "min-valorizar", label: "ord.minValorizar", pro: true },
 ];
-const sortLabel = (id: SortId) => SORTS.find((s) => s.id === id)?.label || "Ordenar";
+const sortLabelKey = (id: SortId) => SORTS.find((s) => s.id === id)?.label || "mk.ordenar";
 const PRICE_MIN = 2;
 const PRICE_MAX = 20;
 // dir: para onde a seta do tutorial aponta. "up" = alvo acima do balão (topo);
 // "down" = alvo abaixo (cards). A legenda não aponta para nada (central).
 const STEPS = [
-  { t: "Saldo JC", x: "Estes são os Judocoins que tens para gastar. Cada atleta tem um preço — geres os teus 100 JC para montar a melhor equipa.", target: "jc", dir: "up" as const },
-  { t: "Valorização", x: "O ▲/▼ ao lado do preço mostra se o atleta está a valorizar ou a desvalorizar. Fica atento a isto: faz toda a diferença no teu património.", target: "price", dir: "up" as const },
-  { t: "Médias e pontuação", x: "A média mostra o nível típico do atleta e a 'última' a pontuação mais recente. Usa-as para descobrir quem pode render mais — e ganhar JC.", target: "scout", dir: "up" as const },
-  { t: "Filtros e favoritos", x: "Lá em cima: a ★ mostra só os teus favoritos, e os botões Ordenar e Filtros (preço, país) ajudam-te a encontrar atletas. A ★ em cada card guarda o atleta como favorito.", target: "filters", dir: "up" as const },
-  { t: "O que significam os estados", target: "legend", dir: "none" as const },
+  { t: "ktut.saldo", x: "ktut.saldoSub", target: "jc", dir: "up" as const },
+  { t: "mt.valorizacao", x: "ktut.valorizacaoSub", target: "price", dir: "up" as const },
+  { t: "ktut.medias", x: "ktut.mediasSub", target: "scout", dir: "up" as const },
+  { t: "ktut.filtros", x: "ktut.filtrosSub", target: "filters", dir: "up" as const },
+  { t: "ktut.estados", target: "legend", dir: "none" as const },
 ];
+// O ESTADO do atleta ("Elite", "Em alta"…) é um valor interno: serve de chave
+// no STATUS_COLORS e vem do motor. NÃO se traduz o valor — só o rótulo que a
+// pessoa lê. Mesmo padrão das faixas e dos países.
+const CHAVE_ESTADO: Record<string, string> = {
+  "Elite": "estado.elite",
+  "Em alta": "estado.emAlta",
+  "Em baixa": "estado.emBaixa",
+  "Barganha": "estado.barganha",
+  "Aposta": "estado.aposta",
+};
+
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 const code3 = (iso: string) => iso;
 type SheetKind = "ord" | "fil" | null;
 function MercadoInner() {
+  const t = useT();
   // Marca "montar" (?montar=1): vem do lixo do Meu Time. Mantém o ciclo
   // mercado<->meu-time a montar uma equipa nova. Aqui só a usamos para: (a) partir
   // do rascunho vazio, e (b) o "Voltar ao Dojo" levar de volta a /meu-time?montar=1.
@@ -93,119 +109,119 @@ function MercadoInner() {
   const [userId, setUserId] = useState<string | null>(null);
   // Faixa REAL do jogador — a cor do Dôdo em todos os modais desta página.
   // Declarado com os outros hooks, ANTES de qualquer return condicional (o ecrã
-  // de "mercado fechado" faz um return cedo; hooks têm de correr sempre).
+    // de "mercado fechado" faz um return cedo; hooks têm de correr sempre).
   const { cor: corFaixa } = useFaixa();
   // LEMBRETE "esqueceste de salvar o teu time" — hook reutilizável (o mesmo da
-  // meu-time). É AQUI que ele mais conta: a edição real acontece no mercado, e
+    // meu-time). É AQUI que ele mais conta: a edição real acontece no mercado, e
   // sair daqui com um rascunho por salvar passa agora a agendar o lembrete.
   // Chamado SEMPRE (antes de qualquer return condicional, ex.: o ecrã de mercado
-  // fechado) para respeitar a ordem dos hooks. O servidor recusa agendar com o
+    // fechado) para respeitar a ordem dos hooks. O servidor recusa agendar com o
   // mercado fechado, por isso é seguro mesmo durante uma competição a decorrer.
   useLembreteSalvar(userId, COMPETICAO);
   // FAVORITOS — fonte de verdade é o SERVIDOR (tabela atletas_favoritos, a mesma
-  // que a página da chave e o alerta "o teu atleta é o próximo" usam). Quando o
+    // que a página da chave e o alerta "o teu atleta é o próximo" usam). Quando o
   // userId chega, buscamos a lista do servidor e alinhamos a interface + a cache
   // local. Sem isto, o mercado teria uma lista local separada que o alerta nunca
   // veria (era a desconexão que estava a partir o alerta).
   useEffect(() => {
-    if (!userId) return;
-    let active = true;
-    fetch(`/api/favoritos?user_id=${encodeURIComponent(userId)}`)
+      if (!userId) return;
+      let active = true;
+      fetch(`/api/favoritos?user_id=${encodeURIComponent(userId)}`)
       .then((r) => r.json())
       .then((j) => {
-        if (!active || !j?.ok || !Array.isArray(j.favoritos)) return;
-        const ids = j.favoritos.map((f: { id_person: string }) => String(f.id_person));
-        setFavs(ids);
-        try { localStorage.setItem(FAV_KEY, JSON.stringify(ids)); } catch {}
-      })
+          if (!active || !j?.ok || !Array.isArray(j.favoritos)) return;
+          const ids = j.favoritos.map((f: { id_person: string }) => String(f.id_person));
+          setFavs(ids);
+          try { localStorage.setItem(FAV_KEY, JSON.stringify(ids)); } catch {}
+        })
       .catch(() => {});
-    return () => { active = false; };
-  }, [userId]);
+      return () => { active = false; };
+    }, [userId]);
   // BLOQUEIO DO MERCADO: se há uma competição a decorrer, o mercado fecha por
   // completo (a equipa está trancada durante a rodada). Decidido pelo calendário,
   // como o resto da app. Não importa por que caminho se chega aqui — fica bloqueado.
   const focoAgora = focoMercado();
   const competicaoADecorrer = focoAgora.aDecorrer;
   useEffect(() => {
-    let active = true;
-    // Se o mercado está fechado (competição a decorrer), não carrega nada.
-    if (competicaoADecorrer) { setLoading(false); return; }
-    let draft: { ids: string[]; captain: string | null } = { ids: [], captain: null };
-    try {
-      // Com a marca "montar" (veio do lixo), o mercado parte do VAZIO: a equipa
-      // antiga não deve reaparecer no rascunho. Esvaziamos o rascunho desta
-      // competição uma vez, no arranque.
-      if (montar) {
-        saveDraftFor(COMPETICAO, { ids: [], captain: null });
-        setTeam([]);
-        setCaptain(null);
-      } else {
-        draft = loadDraftFor(COMPETICAO);
-        setTeam(draft.ids);
-        setCaptain(draft.captain);
-      }
-      const f = localStorage.getItem(FAV_KEY);
-      if (f) setFavs(JSON.parse(f)); // cache rápida; o servidor é a verdade (ver efeito abaixo)
-      // Guia do Mercado: só aparece se ainda não foi visto neste aparelho NEM na conta.
-      if (!tutorialVistoLocal("ippon_market_tutorial")) {
-        tutoriaisVistosConta().then((vistos) => {
-          if (!active) return;
-          if (vistos["ippon_market_tutorial"]) {
-            try { localStorage.setItem("ippon_market_tutorial", "done"); } catch {}
-          } else {
-            setGuide(0);
-          }
-        });
-      }
-    } catch {}
-    // O userId, para o hook do lembrete saber a quem agendar.
-    //
-    // O NÍVEL JÁ NÃO VEM DAQUI. Vinha do `user_metadata.is_pro`, que deixou de
-    // ser sincronizado: um subscritor Pro via as funcionalidades bloqueadas e a
-    // app a convidá-lo a comprar o que já tinha pago. Agora vem do useNivel, que
-    // lê da tabela `users` — a mesma fonte que o servidor usa.
-    supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
-      if (!active) return;
+      let active = true;
+      // Se o mercado está fechado (competição a decorrer), não carrega nada.
+      if (competicaoADecorrer) { setLoading(false); return; }
+      let draft: { ids: string[]; captain: string | null } = { ids: [], captain: null };
       try {
-        const sess = data.session as { user?: { id?: string } } | null;
-        if (sess?.user?.id) setUserId(sess.user.id);
+        // Com a marca "montar" (veio do lixo), o mercado parte do VAZIO: a equipa
+        // antiga não deve reaparecer no rascunho. Esvaziamos o rascunho desta
+        // competição uma vez, no arranque.
+        if (montar) {
+          saveDraftFor(COMPETICAO, { ids: [], captain: null });
+          setTeam([]);
+          setCaptain(null);
+        } else {
+          draft = loadDraftFor(COMPETICAO);
+          setTeam(draft.ids);
+          setCaptain(draft.captain);
+        }
+        const f = localStorage.getItem(FAV_KEY);
+        if (f) setFavs(JSON.parse(f)); // cache rápida; o servidor é a verdade (ver efeito abaixo)
+        // Guia do Mercado: só aparece se ainda não foi visto neste aparelho NEM na conta.
+        if (!tutorialVistoLocal("ippon_market_tutorial")) {
+          tutoriaisVistosConta().then((vistos) => {
+              if (!active) return;
+              if (vistos["ippon_market_tutorial"]) {
+                try { localStorage.setItem("ippon_market_tutorial", "done"); } catch {}
+              } else {
+                setGuide(0);
+              }
+            });
+        }
       } catch {}
-    });
-    fetch(`/api/atletas?id=${COMPETICAO}`)
+      // O userId, para o hook do lembrete saber a quem agendar.
+      //
+      // O NÍVEL JÁ NÃO VEM DAQUI. Vinha do `user_metadata.is_pro`, que deixou de
+      // ser sincronizado: um subscritor Pro via as funcionalidades bloqueadas e a
+      // app a convidá-lo a comprar o que já tinha pago. Agora vem do useNivel, que
+      // lê da tabela `users` — a mesma fonte que o servidor usa.
+      supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
+          if (!active) return;
+          try {
+            const sess = data.session as { user?: { id?: string } } | null;
+            if (sess?.user?.id) setUserId(sess.user.id);
+          } catch {}
+        });
+      fetch(`/api/atletas?id=${COMPETICAO}`)
       .then((r) => r.json())
       .then((j) => {
-        if (!active) return;
-        const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
-        setPool(list);
-        setAthletePool(list);
-        // Quem está a competir agora (vem do cron, via balcão). Só confiamos
-        // nesta marca se o CALENDÁRIO também concordar que há competição a
-        // decorrer — assim o aviso nunca contradiz a fonte de verdade. (Quando
-        // não há nada a decorrer, ex: competição ainda não começou, ignora-se.)
-        const av = j?.a_competir_agora;
-        if (competicaoADecorrer && av && Array.isArray(av.ids)) {
-          setAoVivoIds(new Set(av.ids as string[]));
-          // Nome a MOSTRAR: nomeCompeticao() esconde a cidade se for um clássico
-          // por abrir. Aqui o mercado já fechou (é o que decorre), por isso o
-          // nome sai por inteiro — mas passa pela função na mesma, para nunca
-          // haver um caminho que mostre o nome cru.
-          setAoVivoNome(competicaoADecorrer ? nomeCompeticao(competicaoADecorrer) : (av.nome ?? null));
-        }
-        setLoading(false);
-        // NOTA: não limpamos aqui o rascunho dos atletas não-inscritos. Só ABRIR
-        // o mercado não deve alterar a equipa — senão, voltar ao Dojo sem comprar
-        // nem vender faria a app pedir para guardar sem haver alterações reais.
-        // A limpeza de não-inscritos (carry-over) é feita no /criar-equipa, ao
-        // montar para uma nova competição. Aqui o mercado só compra/vende por ação.
-      })
+          if (!active) return;
+          const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
+          setPool(list);
+          setAthletePool(list);
+          // Quem está a competir agora (vem do cron, via balcão). Só confiamos
+          // nesta marca se o CALENDÁRIO também concordar que há competição a
+          // decorrer — assim o aviso nunca contradiz a fonte de verdade. (Quando
+            // não há nada a decorrer, ex: competição ainda não começou, ignora-se.)
+          const av = j?.a_competir_agora;
+          if (competicaoADecorrer && av && Array.isArray(av.ids)) {
+            setAoVivoIds(new Set(av.ids as string[]));
+            // Nome a MOSTRAR: nomeCompeticao() esconde a cidade se for um clássico
+            // por abrir. Aqui o mercado já fechou (é o que decorre), por isso o
+            // nome sai por inteiro — mas passa pela função na mesma, para nunca
+            // haver um caminho que mostre o nome cru.
+            setAoVivoNome(competicaoADecorrer ? nomeCompeticao(competicaoADecorrer) : (av.nome ?? null));
+          }
+          setLoading(false);
+          // NOTA: não limpamos aqui o rascunho dos atletas não-inscritos. Só ABRIR
+          // o mercado não deve alterar a equipa — senão, voltar ao Dojo sem comprar
+          // nem vender faria a app pedir para guardar sem haver alterações reais.
+          // A limpeza de não-inscritos (carry-over) é feita no /criar-equipa, ao
+          // montar para uma nova competição. Aqui o mercado só compra/vende por ação.
+        })
       .catch(() => {
-        if (!active) return;
-        setLoading(false);
-        setLoadErr("Não foi possível carregar os atletas. Tenta recarregar a página.");
-      });
-    return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+          if (!active) return;
+          setLoading(false);
+          setLoadErr(t("mk.erroCarregar"));
+        });
+      return () => { active = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
   function persist(next: string[]) {
     const cap = captain && next.includes(captain) ? captain : null;
     setTeam(next);
@@ -224,21 +240,21 @@ function MercadoInner() {
     try { localStorage.setItem(FAV_KEY, JSON.stringify(otimista)); } catch {}
     try {
       const res = await fetch("/api/favoritos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, id_person: id, nome: a.name, country_code: a.countryIso }),
-      });
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId, id_person: id, nome: a.name, country_code: a.countryIso }),
+        });
       const j = await res.json();
       if (!j?.ok) throw new Error("falhou");
       // Alinha ao estado real devolvido pelo servidor (favorito: true|false).
       setFavs((prev) => {
-        const tem = prev.includes(id);
-        let next = prev;
-        if (j.favorito && !tem) next = [...prev, id];
-        if (!j.favorito && tem) next = prev.filter((x) => x !== id);
-        try { localStorage.setItem(FAV_KEY, JSON.stringify(next)); } catch {}
-        return next;
-      });
+          const tem = prev.includes(id);
+          let next = prev;
+          if (j.favorito && !tem) next = [...prev, id];
+          if (!j.favorito && tem) next = prev.filter((x) => x !== id);
+          try { localStorage.setItem(FAV_KEY, JSON.stringify(next)); } catch {}
+          return next;
+        });
     } catch {
       // Reverte para o estado anterior (a operação não foi guardada).
       const revertido = eraFav ? [...otimista, id] : otimista.filter((x) => x !== id);
@@ -257,30 +273,30 @@ function MercadoInner() {
   if (competicaoADecorrer) {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-        <div style={{ maxWidth: 460, margin: "0 auto", padding: "12px 14px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
-            <a href="/inicio" aria-label="Voltar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-            </a>
-            <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>Mercado</span>
-          </div>
-          <div style={{ textAlign: "center", padding: "30px 18px", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16 }}>
-            <div style={{ width: 92, height: 92, margin: "0 auto 10px" }}><Mascot belt={corFaixa} expression="determinado" /></div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 999, padding: "5px 13px", marginBottom: 12 }}>
-              <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83" }}>Competição a decorrer</span>
-            </div>
-            <h2 style={{ fontFamily: FD, fontSize: 21, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>Mercado fechado</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 8px" }}>
-              {focoAgora.aDecorrer ? <><strong style={{ color: "#f1ede2" }}>{nomeCompeticao(focoAgora.aDecorrer)}</strong> está a decorrer.</> : "Há uma competição a decorrer."} Durante a rodada, a tua equipa fica trancada — não há compras nem vendas.
-            </p>
-            <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.5, margin: "0 0 20px" }}>
-              O mercado reabre para a próxima competição assim que esta terminar. Acompanha a tua equipa ao vivo entretanto!
-            </p>
-            <a href="/meu-time" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px 24px", borderRadius: 12, fontSize: 15, textDecoration: "none" }}>Ver a minha equipa</a>
-          </div>
-        </div>
-        <style>{`@keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite}`}</style>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+      <a href="/inicio" aria-label="Voltar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none" }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+      </a>
+      <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>{t("mk.mercado")}</span>
+      </div>
+      <div style={{ textAlign: "center", padding: "30px 18px", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16 }}>
+      <div style={{ width: 92, height: 92, margin: "0 auto 10px" }}><Mascot belt={corFaixa} expression="determinado" /></div>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 999, padding: "5px 13px", marginBottom: 12 }}>
+      <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
+      <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83" }}>{t("mk.competicaoADecorrer")}</span>
+      </div>
+      <h2 style={{ fontFamily: FD, fontSize: 21, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>{t("mercado.fechado")}</h2>
+      <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 8px" }}>
+      {focoAgora.aDecorrer ? <><strong style={{ color: "#f1ede2" }}>{nomeCompeticao(focoAgora.aDecorrer)}</strong> está a decorrer.</> : t("mk.haCompeticao")} Durante a rodada, a tua equipa fica trancada — não há compras nem vendas.
+      </p>
+      <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.5, margin: "0 0 20px" }}>
+      O mercado reabre para a próxima competição assim que esta terminar. Acompanha a tua equipa ao vivo entretanto!
+      </p>
+      <a href="/meu-time" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px 24px", borderRadius: 12, fontSize: 15, textDecoration: "none" }}>{t("inicio.verEquipa")}</a>
+      </div>
+      </div>
+      <style>{`@keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite}`}</style>
       </main>
     );
   }
@@ -293,25 +309,25 @@ function MercadoInner() {
   const takenF = new Set(teamAthletes.filter((a) => a.gender === "F").map((a) => a.category));
   const ALL_COUNTRIES = Array.from(new Set(pool.map((a) => a.countryIso))).sort((a, b) => a.localeCompare(b));
   let filtered = pool.filter((a) => {
-    if (a.gender !== gender) return false;
-    if (a.category !== cat) return false;
-    if (query.trim() && !a.name.toLowerCase().includes(query.trim().toLowerCase())) return false;
-    if (favOnly && !favs.includes(a.id)) return false;
-    if (a.priceJc < priceMin) return false;
-    if (priceMax < PRICE_MAX && a.priceJc > priceMax) return false;
-    if (countrySel.length > 0 && !countrySel.includes(a.countryIso)) return false;
-    return true;
-  });
+      if (a.gender !== gender) return false;
+      if (a.category !== cat) return false;
+      if (query.trim() && !a.name.toLowerCase().includes(query.trim().toLowerCase())) return false;
+      if (favOnly && !favs.includes(a.id)) return false;
+      if (a.priceJc < priceMin) return false;
+      if (priceMax < PRICE_MAX && a.priceJc > priceMax) return false;
+      if (countrySel.length > 0 && !countrySel.includes(a.countryIso)) return false;
+      return true;
+    });
   filtered = [...filtered].sort((a, b) => {
-    switch (sort) {
-      case "baratos": return a.priceJc - b.priceJc;
-      case "valorizados": return b.variation - a.variation;
-      case "desvalorizados": return a.variation - b.variation;
-      case "media": return b.avg - a.avg;
-      case "min-valorizar": return expEsperada(a) - expEsperada(b);
-      default: return b.priceJc - a.priceJc;
-    }
-  });
+      switch (sort) {
+        case "baratos": return a.priceJc - b.priceJc;
+        case "valorizados": return b.variation - a.variation;
+        case "desvalorizados": return a.variation - b.variation;
+        case "media": return b.avg - a.avg;
+        case "min-valorizar": return expEsperada(a) - expEsperada(b);
+        default: return b.priceJc - a.priceJc;
+      }
+    });
   function buttonState(a: Athlete) {
     const inTeam = team.includes(a.id);
     const genderCount = a.gender === "M" ? countM : countF;
@@ -354,230 +370,230 @@ function MercadoInner() {
   const jcGlow = guide === 0;
   const focus = guide === 1 ? "price" : guide === 2 ? "scout" : null;
   // Para onde volta o "Voltar ao Dojo" e a seta. Com a marca "montar" (veio do
-  // lixo), mantém o ciclo: volta sempre a /meu-time?montar=1 (para ver o vazio/o
-  // que está a montar). Sem a marca: se já tens equipa COMPLETA (8 + capitão),
+    // lixo), mantém o ciclo: volta sempre a /meu-time?montar=1 (para ver o vazio/o
+    // que está a montar). Sem a marca: se já tens equipa COMPLETA (8 + capitão),
   // vai para /meu-time; senão, para /criar-equipa.
   const voltarPara = montar
-    ? "/meu-time?montar=1"
-    : team.length === 8 && !!captain ? "/meu-time" : "/criar-equipa";
+  ? "/meu-time?montar=1"
+  : team.length === 8 && !!captain ? "/meu-time" : "/criar-equipa";
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none} @keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
-      <div style={{ maxWidth: 460, margin: "0 auto" }}>
-        <div style={{ position: "sticky", top: 0, background: "#0c0e0d", borderBottom: "1px solid #1a221d", zIndex: 5, padding: "12px 14px 10px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <a href={voltarPara} aria-label="Voltar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-              </a>
-              <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>Mercado</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button onClick={() => setShowSearch((v) => !v)} aria-label="Procurar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", background: showSearch ? "#1c3a2e" : "transparent", color: showSearch ? "#aee9c9" : "#93a39a", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-              </button>
-              <button onClick={() => setGuide(0)} aria-label="Como funciona" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontWeight: 700, cursor: "pointer" }}>?</button>
-              <span className={jcGlow ? "glow" : undefined} style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "6px 11px", fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 15 }}>JC {fmt(jcLeft)}</span>
-            </div>
-          </div>
-          {aoVivoIds.size > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 10, padding: "7px 11px", marginBottom: 9 }}>
-              <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a", flexShrink: 0 }} />
-              <span style={{ fontSize: 11.5, color: "#f1ede2", lineHeight: 1.35 }}>
-                <strong style={{ color: "#ef8d83" }}>A decorrer agora{aoVivoNome ? `: ${aoVivoNome}` : ""}.</strong> Os atletas marcados estão a competir — o preço pode mudar quando a competição acabar.
-              </span>
-            </div>
-          )}
-          {showSearch && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "8px 11px", marginBottom: 9 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93a39a" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-              <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar atleta..." style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB }} />
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8, marginBottom: 9 }}>
-            <button onClick={() => { setGender("M"); setCat(CATEGORIES.M[0]); }} style={genderBtn(gender === "M")}>Masculino {countM}/4</button>
-            <button onClick={() => { setGender("F"); setCat(CATEGORIES.F[0]); }} style={genderBtn(gender === "F")}>Feminino {countF}/4</button>
-          </div>
-          <div className="noscroll" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 9 }}>
-            <button onClick={() => setFavOnly((v) => !v)} aria-label="Só favoritos" className={guide === 3 ? "glow" : undefined} style={{ flexShrink: 0, width: 46, height: 42, borderRadius: 11, border: `1.5px solid ${guide === 3 ? GOLD : favOnly ? GOLD : "#2a3a33"}`, background: favOnly ? "#3a2f12" : "#121815", color: guide === 3 || favOnly ? GOLD : "#5f6f67", fontSize: 18, cursor: "pointer" }}>★</button>
-            <button onClick={() => setSheet("ord")} style={fbtn(false)}>
-              <SortIcon /> {sortLabel(sort)}
-            </button>
-            <button onClick={() => setSheet("fil")} style={fbtn(filtroCount > 0)}>
-              <SlidersIcon /> Filtros {filtroCount > 0 && <span style={cnt}>{filtroCount}</span>}
-            </button>
-          </div>
-          <div className="noscroll" style={{ display: "flex", gap: 7, overflowX: "auto" }}>
-            {CATEGORIES[gender].map((c) => (
-              <button key={c} onClick={() => setCat(c)} style={chip(c === cat)}>{c}</button>
-            ))}
-          </div>
+    <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none} @keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
+    <div style={{ maxWidth: 460, margin: "0 auto" }}>
+    <div style={{ position: "sticky", top: 0, background: "#0c0e0d", borderBottom: "1px solid #1a221d", zIndex: 5, padding: "12px 14px 10px" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <a href={voltarPara} aria-label="Voltar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none" }}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+    </a>
+    <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>{t("mk.mercado")}</span>
+    </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <button onClick={() => setShowSearch((v) => !v)} aria-label="Procurar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", background: showSearch ? "#1c3a2e" : "transparent", color: showSearch ? "#aee9c9" : "#93a39a", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
+    </button>
+    <button onClick={() => setGuide(0)} aria-label="Como funciona" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontWeight: 700, cursor: "pointer" }}>?</button>
+    <span className={jcGlow ? "glow" : undefined} style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "6px 11px", fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 15 }}>JC {fmt(jcLeft)}</span>
+    </div>
+    </div>
+    {aoVivoIds.size > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 10, padding: "7px 11px", marginBottom: 9 }}>
+        <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a", flexShrink: 0 }} />
+        <span style={{ fontSize: 11.5, color: "#f1ede2", lineHeight: 1.35 }}>
+        <strong style={{ color: "#ef8d83" }}>A decorrer agora{aoVivoNome ? `: ${aoVivoNome}` : ""}.</strong> Os atletas marcados estão a competir — o preço pode mudar quando a competição acabar.
+        </span>
         </div>
-        <div style={{ padding: "12px 14px 92px" }}>
-          {loading ? (
-            <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "40px 0" }}>A carregar atletas reais…</div>
-          ) : loadErr ? (
-            <div style={{ textAlign: "center", color: "#ef8d83", fontSize: 13, padding: "40px 0" }}>{loadErr}</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "30px 0" }}>
-              {favOnly ? "Ainda não tens favoritos nesta categoria. Toca na ★ de um atleta." : "Nenhum atleta nesta categoria com estes filtros."}
-            </div>
-          ) : (
-            filtered.map((a, idx) => {
-              const st = buttonState(a);
-              const inTeam = st.kind === "sell";
-              const dim = st.kind === "blocked" && st.label !== "Sem JC";
-              const vUp = a.variation >= 0;
-              const isFav = favs.includes(a.id);
-              const aVivo = aoVivoIds.has(a.id);
-              return (
-                <div key={a.id} style={{ background: "#121815", border: `1px solid ${aVivo ? "#5a3a36" : inTeam ? "#2f4a3c" : "#243029"}`, borderRadius: 14, padding: 12, marginBottom: 10, opacity: dim ? 0.7 : 1 }}>
-                  {aVivo && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                      <span className="ilvivo" style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", flexShrink: 0 }} />
-                      <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83" }}>A competir agora · preço pode mudar</span>
-                    </div>
-                  )}
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <Avatar code={code3(a.countryIso)} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {a.name}{inTeam && <span style={{ color: "#7fd1a3", fontSize: 11 }}> ✓ na equipa</span>}
-                      </div>
-                      <div style={{ fontSize: 11.5, color: "#93a39a", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden" }}>
-                        {code3(a.countryIso)} · {a.category}kg
-                      </div>
-                    </div>
-                    <span style={{ background: STATUS_COLORS[a.status][0], color: STATUS_COLORS[a.status][1], fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{a.status}</span>
-                    <button onClick={() => toggleFav(a)} aria-label={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"} style={{ background: "transparent", border: "none", cursor: "pointer", color: isFav ? GOLD : "#3c463f", fontSize: 20, lineHeight: 1, padding: 2, flexShrink: 0 }}>★</button>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 10 }}>
-                    <div>
-                      <span className={idx === 0 && focus === "price" ? "glow" : undefined} style={{ display: "inline-block", padding: "2px 4px" }}>
-                        <span style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: GOLD }}>JC {a.priceJc.toFixed(1)}</span>{" "}
-                        <span style={{ fontSize: 12, color: vUp ? "#7fd1a3" : "#ef8d83", fontWeight: 700 }}>{vUp ? "▲" : "▼"} {Math.abs(a.variation)}%</span>
-                      </span>
-                      <div className={idx === 0 && focus === "scout" ? "glow" : undefined} style={{ fontSize: 11, color: "#7c8a82", marginTop: 2, display: "inline-block", padding: "2px 4px" }}>
-                        Média {a.avg.toFixed(1)} · Última {a.last}
-                      </div>
-                      {isPro && (
-                        <div style={{ fontSize: 11, color: GOLD, marginTop: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
-                          <LockIcon /> Mínimo p/ valorizar: {fmt(expEsperada(a))} pts
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => toggle(a)}
-                      disabled={st.kind === "blocked"}
-                      style={{
-                        background: st.kind === "sell" ? "transparent" : st.kind === "buy" ? GOLD : "#23291f",
-                        color: st.kind === "sell" ? "#ef8d83" : st.kind === "buy" ? "#1b211e" : "#5f6f67",
-                        border: st.kind === "sell" ? "1px solid #5a2f2c" : "none",
-                        fontFamily: FD, fontSize: st.label === "Categoria ocupada" ? 10.5 : 13, fontWeight: 700,
-                        textTransform: "uppercase", padding: "9px 12px", borderRadius: 10,
-                        cursor: st.kind === "blocked" ? "default" : "pointer", whiteSpace: "nowrap",
-                      }}
-                    >
-                      {st.label}
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
+      )}
+    {showSearch && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "8px 11px", marginBottom: 9 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93a39a" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
+        <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Procurar atleta..." style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB }} />
         </div>
-      </div>
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 40 }}>
-        <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-          <div style={{ fontSize: 12, color: "#cfd8d2" }}>
-            <span style={{ fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 16 }}>{countM + countF}</span>
-            <span style={{ fontFamily: FD, fontWeight: 700, color: "#93a39a", fontSize: 13 }}>/8</span> atletas
-          </div>
-          <a href={voltarPara} style={{ background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 18px", borderRadius: 10, fontSize: 14, textDecoration: "none" }}>Voltar ao Dojo</a>
+      )}
+    <div style={{ display: "flex", gap: 8, marginBottom: 9 }}>
+    <button onClick={() => { setGender("M"); setCat(CATEGORIES.M[0]); }} style={genderBtn(gender === "M")}>Masculino {countM}/4</button>
+    <button onClick={() => { setGender("F"); setCat(CATEGORIES.F[0]); }} style={genderBtn(gender === "F")}>Feminino {countF}/4</button>
+    </div>
+    <div className="noscroll" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 9 }}>
+    <button onClick={() => setFavOnly((v) => !v)} aria-label={t("mk.soFavoritos")} className={guide === 3 ? "glow" : undefined} style={{ flexShrink: 0, width: 46, height: 42, borderRadius: 11, border: `1.5px solid ${guide === 3 ? GOLD : favOnly ? GOLD : "#2a3a33"}`, background: favOnly ? "#3a2f12" : "#121815", color: guide === 3 || favOnly ? GOLD : "#5f6f67", fontSize: 18, cursor: "pointer" }}>★</button>
+    <button onClick={() => setSheet("ord")} style={fbtn(false)}>
+    <SortIcon /> {t(sortLabelKey(sort))}
+    </button>
+    <button onClick={() => setSheet("fil")} style={fbtn(filtroCount > 0)}>
+    <SlidersIcon /> {t("mk.filtros")} {filtroCount > 0 && <span style={cnt}>{filtroCount}</span>}
+    </button>
+    </div>
+    <div className="noscroll" style={{ display: "flex", gap: 7, overflowX: "auto" }}>
+    {CATEGORIES[gender].map((c) => (
+          <button key={c} onClick={() => setCat(c)} style={chip(c === cat)}>{c}</button>
+        ))}
+    </div>
+    </div>
+    <div style={{ padding: "12px 14px 92px" }}>
+    {loading ? (
+        <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "40px 0" }}>{t("mk.aCarregarAtletas")}</div>
+      ) : loadErr ? (
+        <div style={{ textAlign: "center", color: "#ef8d83", fontSize: 13, padding: "40px 0" }}>{loadErr}</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: "center", color: "#93a39a", fontSize: 13, padding: "30px 0" }}>
+        {favOnly ? t("mk.semFavoritos") : t("mk.semAtletas")}
         </div>
-      </div>
-      {sheet === "ord" && (
-        <Sheet title="Ordenar" onClose={() => setSheet(null)}>
-          {SORTS.map((o) => {
-            const active = sort === o.id;
-            const bloqueada = o.pro && !isPro; // Pro pode usar; não-Pro vê bloqueada
+      ) : (
+        filtered.map((a, idx) => {
+            const st = buttonState(a);
+            const inTeam = st.kind === "sell";
+            const dim = st.kind === "blocked" && st.label !== "Sem JC";
+            const vUp = a.variation >= 0;
+            const isFav = favs.includes(a.id);
+            const aVivo = aoVivoIds.has(a.id);
             return (
-              <button key={o.id} onClick={() => { if (bloqueada) return; setSort(o.id); setSheet(null); }}
+              <div key={a.id} style={{ background: "#121815", border: `1px solid ${aVivo ? "#5a3a36" : inTeam ? "#2f4a3c" : "#243029"}`, borderRadius: 14, padding: 12, marginBottom: 10, opacity: dim ? 0.7 : 1 }}>
+              {aVivo && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                  <span className="ilvivo" style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", flexShrink: 0 }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83" }}>{t("mk.aCompetirAgora")}</span>
+                  </div>
+                )}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Avatar code={code3(a.countryIso)} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {a.name}{inTeam && <span style={{ color: "#7fd1a3", fontSize: 11 }}> ✓ na equipa</span>}
+              </div>
+              <div style={{ fontSize: 11.5, color: "#93a39a", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden" }}>
+              {code3(a.countryIso)} · {a.category}kg
+              </div>
+              </div>
+              <span style={{ background: STATUS_COLORS[a.status][0], color: STATUS_COLORS[a.status][1], fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{t(CHAVE_ESTADO[a.status] ?? a.status)}</span>
+              <button onClick={() => toggleFav(a)} aria-label={isFav ? t("mk.removerFavoritos") : "Adicionar aos favoritos"} style={{ background: "transparent", border: "none", cursor: "pointer", color: isFav ? GOLD : "#3c463f", fontSize: 20, lineHeight: 1, padding: 2, flexShrink: 0 }}>★</button>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 10 }}>
+              <div>
+              <span className={idx === 0 && focus === "price" ? "glow" : undefined} style={{ display: "inline-block", padding: "2px 4px" }}>
+              <span style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: GOLD }}>JC {a.priceJc.toFixed(1)}</span>{" "}
+              <span style={{ fontSize: 12, color: vUp ? "#7fd1a3" : "#ef8d83", fontWeight: 700 }}>{vUp ? "▲" : "▼"} {Math.abs(a.variation)}%</span>
+              </span>
+              <div className={idx === 0 && focus === "scout" ? "glow" : undefined} style={{ fontSize: 11, color: "#7c8a82", marginTop: 2, display: "inline-block", padding: "2px 4px" }}>
+              Média {a.avg.toFixed(1)} · Última {a.last}
+              </div>
+              {isPro && (
+                  <div style={{ fontSize: 11, color: GOLD, marginTop: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                  <LockIcon /> Mínimo p/ valorizar: {fmt(expEsperada(a))} pts
+                  </div>
+                )}
+              </div>
+              <button
+              onClick={() => toggle(a)}
+              disabled={st.kind === "blocked"}
+              style={{
+                  background: st.kind === "sell" ? "transparent" : st.kind === "buy" ? GOLD : "#23291f",
+                  color: st.kind === "sell" ? "#ef8d83" : st.kind === "buy" ? "#1b211e" : "#5f6f67",
+                  border: st.kind === "sell" ? "1px solid #5a2f2c" : "none",
+                  fontFamily: FD, fontSize: st.label === "Categoria ocupada" ? 10.5 : 13, fontWeight: 700,
+                  textTransform: "uppercase", padding: "9px 12px", borderRadius: 10,
+                  cursor: st.kind === "blocked" ? "default" : "pointer", whiteSpace: "nowrap",
+                }}
+              >
+              {st.label}
+              </button>
+              </div>
+              </div>
+            );
+          })
+      )}
+    </div>
+    </div>
+    <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 40 }}>
+    <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+    <div style={{ fontSize: 12, color: "#cfd8d2" }}>
+    <span style={{ fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 16 }}>{countM + countF}</span>
+    <span style={{ fontFamily: FD, fontWeight: 700, color: "#93a39a", fontSize: 13 }}>/8</span> atletas
+    </div>
+    <a href={voltarPara} style={{ background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 18px", borderRadius: 10, fontSize: 14, textDecoration: "none" }}>{t("mk.voltarDojo")}</a>
+    </div>
+    </div>
+    {sheet === "ord" && (
+        <Sheet title={t("mk.ordenar")} onClose={() => setSheet(null)}>
+        {SORTS.map((o) => {
+              const active = sort === o.id;
+              const bloqueada = o.pro && !isPro; // Pro pode usar; não-Pro vê bloqueada
+              return (
+                <button key={o.id} onClick={() => { if (bloqueada) return; setSort(o.id); setSheet(null); }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", background: active ? "#16201b" : "#121815", border: `1.5px solid ${active ? GOLD : "#2a3a33"}`, borderRadius: 11, padding: "13px 14px", marginBottom: 8, color: bloqueada ? "#cfd8d2" : "#f1ede2", fontSize: 14, fontFamily: FB, cursor: bloqueada ? "default" : "pointer", opacity: bloqueada ? 0.75 : 1 }}>
                 <span>{o.label}</span>
                 {o.pro && <span style={{ display: "flex", alignItems: "center", gap: 5, color: GOLD, fontSize: 11, fontWeight: 700 }}><LockIcon /> Pro</span>}
-              </button>
-            );
-          })}
-          <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>🔒 As ordenações avançadas fazem parte do Ippon Pro.</div>
+                </button>
+              );
+            })}
+        <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>🔒 As ordenações avançadas fazem parte do Ippon Pro.</div>
         </Sheet>
       )}
-      {sheet === "fil" && (
-        <Sheet title="Filtros" onClose={() => setSheet(null)}>
-          <div style={sectionTitle}>Preço</div>
-          <div style={{ textAlign: "center", fontSize: 13, color: "#cfd8d2", marginBottom: 10 }}>
-            JC {priceMin} — JC {priceMax >= PRICE_MAX ? "20+" : priceMax}
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 2 }}>Mínimo</div>
-            <input type="range" min={PRICE_MIN} max={PRICE_MAX} value={priceMin} onChange={(e) => { const v = Number(e.target.value); setPriceMin(Math.min(v, priceMax)); }} style={{ width: "100%", accentColor: GOLD }} />
-          </div>
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 2 }}>Máximo</div>
-            <input type="range" min={PRICE_MIN} max={PRICE_MAX} value={priceMax} onChange={(e) => { const v = Number(e.target.value); setPriceMax(Math.max(v, priceMin)); }} style={{ width: "100%", accentColor: GOLD }} />
-          </div>
-          <div style={sectionTitle}>País</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
-            {ALL_COUNTRIES.map((iso) => {
+    {sheet === "fil" && (
+        <Sheet title={t("mk.filtros")} onClose={() => setSheet(null)}>
+        <div style={sectionTitle}>{t("mt.preco")}</div>
+        <div style={{ textAlign: "center", fontSize: 13, color: "#cfd8d2", marginBottom: 10 }}>
+        JC {priceMin} — JC {priceMax >= PRICE_MAX ? "20+" : priceMax}
+        </div>
+        <div style={{ marginBottom: 6 }}>
+        <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 2 }}>{t("mk.minimo")}</div>
+        <input type="range" min={PRICE_MIN} max={PRICE_MAX} value={priceMin} onChange={(e) => { const v = Number(e.target.value); setPriceMin(Math.min(v, priceMax)); }} style={{ width: "100%", accentColor: GOLD }} />
+        </div>
+        <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 11, color: "#7c8a82", marginBottom: 2 }}>{t("mk.maximo")}</div>
+        <input type="range" min={PRICE_MIN} max={PRICE_MAX} value={priceMax} onChange={(e) => { const v = Number(e.target.value); setPriceMax(Math.max(v, priceMin)); }} style={{ width: "100%", accentColor: GOLD }} />
+        </div>
+        <div style={sectionTitle}>{t("mk.pais")}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+        {ALL_COUNTRIES.map((iso) => {
               const on = countrySel.includes(iso);
               return (
                 <button key={iso} onClick={() => setCountrySel((prev) => prev.includes(iso) ? prev.filter((x) => x !== iso) : [...prev, iso])} style={chip(on)}>{code3(iso)}</button>
               );
             })}
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => { clearFilters(); }} style={{ flex: 1, background: "transparent", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: 12, borderRadius: 11, cursor: "pointer" }}>Limpar</button>
-            <button onClick={() => setSheet(null)} style={{ flex: 1, ...applyBtn, marginTop: 0 }}>Aplicar</button>
-          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={() => { clearFilters(); }} style={{ flex: 1, background: "transparent", border: "1px solid #243029", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: 12, borderRadius: 11, cursor: "pointer" }}>{t("mk.limpar")}</button>
+        <button onClick={() => setSheet(null)} style={{ flex: 1, ...applyBtn, marginTop: 0 }}>{t("mk.aplicar")}</button>
+        </div>
         </Sheet>
       )}
-      {pedirLogin && (
+    {pedirLogin && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
-          <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Entra para contratar</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Para contratares atletas e montares a tua equipa, entra na tua conta. É rápido — e ficas já a jogar!</p>
-            <button onClick={() => exigirSessao("/mercado")} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Entrar / Criar conta</button>
-            <button onClick={() => setPedirLogin(false)} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Agora não</button>
-          </div>
+        <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
+        <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>{t("mk.entraContratar")}</h2>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Para contratares atletas e montares a tua equipa, entra na tua conta. É rápido — e ficas já a jogar!</p>
+        <button onClick={() => exigirSessao("/mercado")} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>{t("mk.entrarCriar")}</button>
+        <button onClick={() => setPedirLogin(false)} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>{t("mk.agoraNao")}</button>
+        </div>
         </div>
       )}
-      {avisoGenero && (
+    {avisoGenero && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
-          <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>
-              {avisoGenero.feito === "M" ? "4 masculinos prontos!" : "4 femininas prontas!"}
-            </h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
-              Já completaste os <strong style={{ color: "#f1ede2" }}>{avisoGenero.feito === "M" ? "4 atletas masculinos" : "4 atletas femininas"}</strong>. Agora escolhe os <strong style={{ color: GOLD }}>{avisoGenero.falta === "M" ? "4 masculinos" : "4 femininas"}</strong> — já te mudei o filtro. Se faltarem atletas numa categoria, há noutra.
-            </p>
-            <button onClick={() => setAvisoGenero(null)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Vamos lá</button>
-          </div>
+        <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
+        <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>
+        {avisoGenero.feito === "M" ? "4 masculinos prontos!" : "4 femininas prontas!"}
+        </h2>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
+        Já completaste os <strong style={{ color: "#f1ede2" }}>{avisoGenero.feito === "M" ? "4 atletas masculinos" : "4 atletas femininas"}</strong>. Agora escolhe os <strong style={{ color: GOLD }}>{avisoGenero.falta === "M" ? "4 masculinos" : "4 femininas"}</strong> — já te mudei o filtro. Se faltarem atletas numa categoria, há noutra.
+        </p>
+        <button onClick={() => setAvisoGenero(null)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>{t("mk.vamosLa")}</button>
+        </div>
         </div>
       )}
-      {avisoCategoria && (
+    {avisoCategoria && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 110 }}>
-          <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="sabio" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Um por categoria</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Só podes ter <strong style={{ color: GOLD }}>1 atleta por categoria de peso</strong>. Monta 4 masculinos e 4 femininos, cada um de uma categoria diferente.</p>
-            <button onClick={() => setAvisoCategoria(false)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>Entendi</button>
-            <button onClick={() => { try { localStorage.setItem("ippon_aviso_categoria", "skip"); } catch {} setAvisoCategoria(false); }} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Não mostrar mais</button>
-          </div>
+        <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
+        <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="sabio" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>{t("mk.umPorCategoria")}</h2>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>{t("mk.soPodesTer")} <strong style={{ color: GOLD }}>{t("mk.umAtletaPorCat")}</strong>{t("mk.montaQuatro")}</p>
+        <button onClick={() => setAvisoCategoria(false)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>{t("mk.entendi")}</button>
+        <button onClick={() => { try { localStorage.setItem("ippon_aviso_categoria", "skip"); } catch {} setAvisoCategoria(false); }} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>{t("comum.naoMostrarMais")}</button>
+        </div>
         </div>
       )}
-      {guide !== null && <Tutorial step={guide} setStep={setGuide} onClose={finishTutorial} cor={corFaixa} />}
+    {guide !== null && <Tutorial step={guide} setStep={setGuide} onClose={finishTutorial} cor={corFaixa} />}
     </main>
   );
 }
@@ -586,14 +602,14 @@ function MercadoInner() {
 export default function Mercado() {
   return (
     <Suspense fallback={<main style={{ minHeight: "100vh", background: "#0c0e0d" }} />}>
-      <MercadoInner />
+    <MercadoInner />
     </Suspense>
   );
 }
 // "Mínimo para valorizar" (Pro): quantos pontos o atleta precisa de fazer na
 // competição para superar a sua expectativa — acima disso, o preço sobe e o
 // jogador ganha JC. A expectativa é a média típica do atleta (campo avg, que vem
-// da forma: média 12m). Fazer MAIS do que isto valoriza; logo, quem tem este
+  // da forma: média 12m). Fazer MAIS do que isto valoriza; logo, quem tem este
 // número mais baixo é mais fácil de valorizar.
 function expEsperada(a: Athlete): number {
   return Math.max(0, Math.round((a.avg || 0) * 10) / 10);
@@ -613,21 +629,21 @@ function chip(on: boolean): React.CSSProperties {
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 80 }}>
-      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(6,8,7,0.6)" }} />
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, margin: "0 auto", maxWidth: 460, background: "#10160f", borderTop: "1px solid #243029", borderRadius: "18px 18px 0 0", padding: "16px 16px 22px", maxHeight: "82%", overflowY: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <span style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase" }}>{title}</span>
-          <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 18, cursor: "pointer" }}>✕</button>
-        </div>
-        {children}
-      </div>
+    <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(6,8,7,0.6)" }} />
+    <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, margin: "0 auto", maxWidth: 460, background: "#10160f", borderTop: "1px solid #243029", borderRadius: "18px 18px 0 0", padding: "16px 16px 22px", maxHeight: "82%", overflowY: "auto" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+    <span style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase" }}>{title}</span>
+    <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 18, cursor: "pointer" }}>✕</button>
+    </div>
+    {children}
+    </div>
     </div>
   );
 }
 function Avatar({ code }: { code: string }) {
   return (
     <div style={{ width: 40, height: 44, borderRadius: 8, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-      <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 10, padding: "1px 4px", borderRadius: 3 }}>{code}</div>
+    <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 10, padding: "1px 4px", borderRadius: 3 }}>{code}</div>
     </div>
   );
 }
@@ -644,65 +660,66 @@ function LockIcon() {
 function SetaTutorial({ dir }: { dir: "up" | "down" }) {
   return (
     <div className="ilseta" style={{ display: "flex", justifyContent: "center", color: GOLD, margin: dir === "up" ? "0 0 6px" : "6px 0 0" }}>
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        {dir === "up" ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M5 12l7 7 7-7" />}
-      </svg>
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {dir === "up" ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M5 12l7 7 7-7" />}
+    </svg>
     </div>
   );
 }
 // `cor` = cor da faixa do jogador, para o Dôdo aparecer com a faixa certa (era
-// fixo em #141110, o que dava o mesmo mascote a toda a gente).
+  // fixo em #141110, o que dava o mesmo mascote a toda a gente).
 function Tutorial({ step, setStep, onClose, cor }: { step: number; setStep: (s: number | null) => void; onClose: () => void; cor: string }) {
+  const t = useT();
   const s = STEPS[step];
   const total = STEPS.length;
   const isLegend = s.target === "legend";
   const controls = (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-      <button onClick={() => step > 0 && setStep(step - 1)} style={{ background: "transparent", border: "none", color: step === 0 ? "#3c463f" : "#93a39a", fontSize: 13, fontWeight: 700, cursor: step === 0 ? "default" : "pointer", fontFamily: FB }}>Anterior</button>
-      <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
-      <button onClick={() => (step === total - 1 ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{step === total - 1 ? "Começar" : "Seguinte"}</button>
+    <button onClick={() => step > 0 && setStep(step - 1)} style={{ background: "transparent", border: "none", color: step === 0 ? "#3c463f" : "#93a39a", fontSize: 13, fontWeight: 700, cursor: step === 0 ? "default" : "pointer", fontFamily: FB }}>{t("comum.anterior")}</button>
+    <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
+    <button onClick={() => (step === total - 1 ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{step === total - 1 ? t("mk.comecar") : "Seguinte"}</button>
     </div>
   );
   const skip = (
     <div style={{ textAlign: "right", marginBottom: 8 }}>
-      <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>Pular ✕</button>
+    <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>{t("comum.pular")} ✕</button>
     </div>
   );
   if (isLegend) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 100 }}>
-        <div style={{ width: "100%", maxWidth: 300 }}>
-          {skip}
-          <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
-            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
-              <div style={{ width: 54, height: 54, flexShrink: 0 }}><Mascot belt={cor} expression="sabio" /></div>
-              <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase" }}>{s.t}</div>
+      <div style={{ width: "100%", maxWidth: 300 }}>
+      {skip}
+      <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+      <div style={{ width: 54, height: 54, flexShrink: 0 }}><Mascot belt={cor} expression="sabio" /></div>
+      <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase" }}>{s.t}</div>
+      </div>
+      {STATUS_LEGEND.map((l) => (
+            <div key={l.label} style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 7 }}>
+            <span style={{ background: "rgba(255,255,255,0.05)", color: l.color, fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{l.label}</span>
+            <span style={{ fontSize: 12, color: "#c7d0c9" }}>{l.desc}</span>
             </div>
-            {STATUS_LEGEND.map((l) => (
-              <div key={l.label} style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 7 }}>
-                <span style={{ background: "rgba(255,255,255,0.05)", color: l.color, fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{l.label}</span>
-                <span style={{ fontSize: 12, color: "#c7d0c9" }}>{l.desc}</span>
-              </div>
-            ))}
-            {controls}
-          </div>
-        </div>
+          ))}
+      {controls}
+      </div>
+      </div>
       </div>
     );
   }
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
-      <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
-        <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt={cor} expression="indicando" /></div>
-        <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
-          {/* No mercado, tudo o que se destaca está acima do balão: seta sempre para cima. */}
-          <SetaTutorial dir="up" />
-          {skip}
-          <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{s.t}</div>
-          <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{s.x}</p>
-          {controls}
-        </div>
-      </div>
+    <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
+    <div style={{ width: 58, height: 58, flexShrink: 0 }}><Mascot belt={cor} expression="indicando" /></div>
+    <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
+    {/* No mercado, tudo o que se destaca está acima do balão: seta sempre para cima. */}
+    <SetaTutorial dir="up" />
+    {skip}
+    <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{s.t}</div>
+    <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{s.x}</p>
+    {controls}
+    </div>
+    </div>
     </div>
   );
 }
