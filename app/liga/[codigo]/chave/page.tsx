@@ -5,6 +5,7 @@ import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { focoMercado, numeroDaRodada, rotuloRodada } from "@/lib/calendario";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
 import {
+  import { useT } from "@/lib/i18n";
   BlocoChave,
   CaixaConfronto,
   CaixaBye,
@@ -48,16 +49,18 @@ function ordemComp(id: string): number {
 }
 // Nome da ronda pelo nº de jogadores nela (a última ronda "normal" é a semi).
 // Recebemos as rondas em nº (1,2,3...) e o total; convertemos para nomes.
-function nomeRonda(ronda: number, totalRondas: number): string {
+// Recebe o tradutor por argumento: é uma função pura, não um componente — e
+// um hook só pode ser chamado de dentro de um componente.
+function nomeRonda(ronda: number, totalRondas: number, t: (k: string) => string): string {
   // A última ronda (== totalRondas) é a final; a anterior, a semifinal; etc.
   const apartirDoFim = totalRondas - ronda; // 0 = final, 1 = semi, 2 = quartas...
   switch (apartirDoFim) {
-    case 0: return "Final";
-    case 1: return "Semifinais";
-    case 2: return "Quartas de final";
-    case 3: return "Oitavas de final";
-    case 4: return "Ronda de 32";
-    default: return `Ronda ${ronda}`;
+    case 0: return t("ck.finalRonda");
+    case 1: return t("ck.semifinais");
+    case 2: return t("ck.quartas");
+    case 3: return t("ck.oitavas");
+    case 4: return t("ck.ronda32");
+    default: return t("ck.rondaN").replace("{n}", String(ronda));
   }
 }
 // Abre o DOJO de um jogador NAQUELA ronda (competição). Reutiliza a mesma página
@@ -79,6 +82,7 @@ function podeVerEquipa(c: ConfrontoAPI, idADecorrer: string | null): boolean {
   return false; // mercado aberto / ronda futura -> trancado
 }
 export default function PaginaChave() {
+  const t = useT();
   const params = useParams();
   const codigo = String(params?.codigo || "").toUpperCase();
   const [dados, setDados] = useState<RespostaChave | null>(null);
@@ -104,7 +108,7 @@ export default function PaginaChave() {
             setEstado("ok");
           } catch {
             if (!vivo) return;
-            setErro("Não foi possível carregar a chave.");
+            setErro(t("ck.erroCarregar"));
             setEstado("erro");
           }
         })();
@@ -122,20 +126,20 @@ export default function PaginaChave() {
     <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
     {/* Voltar vai para /ligas (as competições). NÃO para /liga/[codigo],
       porque essa página redireciona de volta para a chave (loop). */}
-    <a href="/ligas" aria-label="Voltar às competições" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+    <a href="/ligas" aria-label={t("ck.voltarCompeticoes")} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
     </a>
-    <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>Chave da Copa</h1>
+    <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>{t("ck.titulo")}</h1>
     <button onClick={() => setTutorial(true)} aria-label="Como funciona a chave" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
     </header>
     {estado === "carregando" && (
-        <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82", fontFamily: FD, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar a chave…</div>
+        <div style={{ textAlign: "center", padding: "50px 16px", color: "#7c8a82", fontFamily: FD, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("ck.aCarregar")}</div>
       )}
     {estado === "erro" && (
         <div style={{ textAlign: "center", padding: "40px 16px", background: "#1a1110", border: "1px solid #3a2420", borderRadius: 16 }}>
-        <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#ef8d83", marginBottom: 8 }}>Ups</div>
+        <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: "#ef8d83", marginBottom: 8 }}>{t("mt.ups")}</div>
         <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{erro}</p>
-        <a href="/ligas" style={{ display: "inline-block", marginTop: 12, color: GOLD, fontSize: 13, textDecoration: "none", fontFamily: FD, fontWeight: 700 }}>Voltar às competições</a>
+        <a href="/ligas" style={{ display: "inline-block", marginTop: 12, color: GOLD, fontSize: 13, textDecoration: "none", fontFamily: FD, fontWeight: 700 }}>{t("ck.voltarCompeticoes")}</a>
         </div>
       )}
     {estado === "ok" && dados && (
@@ -147,6 +151,7 @@ export default function PaginaChave() {
   );
 }
 function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEquipa }: {
+    const t = useT();
     dados: RespostaChave;
     nome: (uid: string | null) => string;
     escudoDe: (uid: string | null) => Identity;
@@ -166,7 +171,6 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
   // Competição a decorrer agora (mercado fechado). Confrontos desta competição
   // podem ser espreitados; os de uma ronda com mercado ainda aberto, não.
   const idADecorrer = focoMercado().aDecorrer?.idCompeticao ?? null;
-
   // O confronto aberto em detalhe. A caixa na árvore é estreita por
   // necessidade; tudo o resto (estado, "ver equipa", nota da janela da final)
   // vive aqui, ao toque.
@@ -195,9 +199,9 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
     <div style={{ flexShrink: 0 }}><Escudo config={liga.escudo || DEFAULT_IDENTITY} size={38} /></div>
     <div style={{ flex: 1, minWidth: 0 }}>
     <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{liga.name}</div>
-    <div style={{ fontSize: 11, color: "#93a39a" }}>{naChave} {naChave === 1 ? "equipa" : "equipas"} · {chaveGrande ? "com repescagem" : "mata-mata simples"}</div>
+    <div style={{ fontSize: 11, color: "#93a39a" }}>{naChave} {naChave === 1 ? "equipa" : "equipas"} · {chaveGrande ? t("ck.comRepescagem") : "mata-mata simples"}</div>
     </div>
-    <button onClick={onAbrirTutorial} style={{ flexShrink: 0, background: "transparent", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", padding: "7px 11px", borderRadius: 9, cursor: "pointer" }}>Como funciona</button>
+    <button onClick={onAbrirTutorial} style={{ flexShrink: 0, background: "transparent", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", padding: "7px 11px", borderRadius: 9, cursor: "pointer" }}>{t("ck.comoFunciona")}</button>
     </div>
     {/* Aviso: entraram na liga depois do sorteio e não disputam esta copa. */}
     {nInscritos > naChave && (
@@ -209,13 +213,11 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
       Era uma lista vertical, uma secção por ronda, com cartões largos. Lia-se
       como um relatório, não como uma chave: não se via quem vinha de onde, nem
       o caminho de alguém até à final.
-
       Agora usa o components/Chave.tsx, o mesmo do /chave-atletas e do /dodo.
       As caixas são estreitas de propósito — é o que permite pôr as rondas lado
       a lado com as linhas a ligá-las.
-
       O que não cabe numa caixa de 184px (o estado, o "ver equipa", a nota da
-      janela da final) não se perde: TOCAR numa caixa abre o cartão completo,
+        janela da final) não se perde: TOCAR numa caixa abre o cartão completo,
       que é o mesmo CartaoConfronto de antes. Nada foi deitado fora. */}
     {(() => {
           // A árvore constrói-se DE CIMA PARA BAIXO: o confronto (r, o) é
@@ -227,7 +229,6 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
             for (const c of lista) porRO.set(`${c.ronda}:${c.ordem}`, c);
             const arestas: Aresta[] = [];
             const topo = Math.max(rondas, 0, ...lista.map((c) => c.ronda));
-
             const no = (r: number, o: number): NoChave => {
               const e = porRO.get(`${r}:${o}`);
               const key = e ? e.id : `vazio:${r}:${o}`;
@@ -244,16 +245,12 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
               }
               return { tipo: "luta", key, dados: e ?? null, filhos };
             };
-
             return topo >= 1 ? { arvores: [no(topo, 0)], arestas } : { arvores: [], arestas };
           };
-
           const principais = confrontos.filter((c) => c.fase === "normal" || c.fase === "final");
           const laterais = confrontos.filter((c) => c.fase === "repescagem" || c.fase === "bronze");
-
           const b1 = montar(principais, totalRondas);
           const b2 = laterais.length > 0 ? montar(laterais, 0) : null;
-
           // A caixa: escudo, nome e pontos. O resto vive no cartão que abre ao toque.
           const ladoDe = (uid: string | null, pts: number | null, venceu: boolean): LadoCaixa => {
             if (!uid) return { titulo: "—", vazio: true };
@@ -264,15 +261,14 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
               marca: <Escudo config={escudoDe(uid)} size={18} />,
             };
           };
-
           const Caixa = ({ no }: { no: NoChave }) => {
             const c = no.dados as ConfrontoAPI | null;
             if (!c) return <CaixaConfronto a={{ titulo: "—", vazio: true }} b={{ titulo: "—", vazio: true }} />;
             if (no.tipo === "bye") return <CaixaBye lado={ladoDe(c.jogador_a, null, false)} />;
             return (
               <div onClick={() => setAberto(c)} style={{ cursor: "pointer" }} role="button" tabIndex={0}
-                onKeyDown={(e) => { if (e.key === "Enter") setAberto(c); }}
-                title="Ver o confronto">
+              onKeyDown={(e) => { if (e.key === "Enter") setAberto(c); }}
+              title="Ver o confronto">
               <CaixaConfronto
               a={ladoDe(c.jogador_a, c.pontos_a, c.vencedor === c.jogador_a)}
               b={ladoDe(c.jogador_b, c.pontos_b, c.vencedor === c.jogador_b)}
@@ -281,9 +277,7 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
               </div>
             );
           };
-
           const proximo = confrontos.find((c) => c.estado === "pendente")?.id ?? null;
-
           return (
             <>
             <BlocoChave
@@ -293,8 +287,9 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
               // o da final.
               nomeRonda(
                 confrontos.find((c) => c.estado === "pendente" && c.fase !== "repescagem" && c.fase !== "bronze")?.ronda
-                  ?? totalRondas,
-                totalRondas
+                ?? totalRondas,
+                totalRondas,
+                t
               )
             }
             arvores={b1.arvores}
@@ -345,27 +340,26 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
         </div>
         </div>
       )}
-
     {/* Nota explicativa da repescagem — só ENQUANTO ela ainda não foi gerada
       (início da copa, antes das semis). Quando os confrontos reais existem,
       aparecem nas rondas acima e esta nota desaparece. */}
     {chaveGrande && !temRepescagemReal && (
         <div style={{ marginBottom: 18 }}>
-        <SecaoTitulo>Repescagem e bronze</SecaoTitulo>
+        <SecaoTitulo>{t("ck.repescagemBronze")}</SecaoTitulo>
         <div style={{ background: "#101511", border: "1px dashed #2f4a3c", borderRadius: 14, padding: "14px 15px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 17 }}>🥋</span>
-        <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", color: "#aee9c9" }}>Há sempre uma segunda chance</span>
+        <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", color: "#aee9c9" }}>{t("ck.segundaChance")}</span>
         </div>
         <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 8px" }}>
-        No judô, quem perde para um semifinalista entra na <strong style={{ color: "#f1ede2" }}>repescagem</strong>. Os derrotados de cada semifinalista lutam em cadeia até sair um campeão de repescagem, que depois disputa o <strong style={{ color: GOLD }}>bronze</strong>. São <strong style={{ color: "#f1ede2" }}>dois bronzes</strong> — tal como numa competição real.
+        No judô, quem perde para um semifinalista entra na <strong style={{ color: "#f1ede2" }}>{t("ck.repescagem")}</strong>. Os derrotados de cada semifinalista lutam em cadeia até sair um campeão de repescagem, que depois disputa o <strong style={{ color: GOLD }}>{t("ck.bronze")}</strong>. São <strong style={{ color: "#f1ede2" }}>{t("ck.doisBronzes")}</strong> — tal como numa competição real.
         </p>
-        <button onClick={onAbrirTutorial} style={{ background: "transparent", border: "none", color: GOLD, fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", cursor: "pointer", padding: 0 }}>Ver como funciona →</button>
+        <button onClick={onAbrirTutorial} style={{ background: "transparent", border: "none", color: GOLD, fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", cursor: "pointer", padding: 0 }}>{t("ck.verComoFunciona")}</button>
         </div>
         </div>
       )}
     <div style={{ marginTop: 8, fontSize: 11, color: "#5f6f67", textAlign: "center", lineHeight: 1.5 }}>
-    Cada ronda é uma competição real. Os pontos do confronto são os pontos da tua equipa nessa competição (capitão a dobrar). Na <strong style={{ color: "#8b9a92" }}>final</strong> somam-se as rodadas desde que chegaste a ela até ao dia do bronze.
+    Cada ronda é uma competição real. Os pontos do confronto são os pontos da tua equipa nessa competição (capitão a dobrar). Na <strong style={{ color: "#8b9a92" }}>{t("ck.final")}</strong> somam-se as rodadas desde que chegaste a ela até ao dia do bronze.
     </div>
     </>
   );
@@ -375,6 +369,7 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
 // `janelaFinal` (só na final) diz que rodadas entraram na soma — sem isto, um
 // "+70" ao lado de uma equipa que fez -59 naquela competição parece um erro.
 function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa, janelaFinal }: {
+    const t = useT();
     c: ConfrontoAPI;
     nome: (uid: string | null) => string;
     escudoDe: (uid: string | null) => Identity;
@@ -390,7 +385,7 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa
   // Trancado enquanto o mercado desta ronda não fechar (anti-cópia).
   const trancado = !podeVerEquipa(c, idADecorrer);
   const cor = destaque === "final" ? GOLD : destaque === "bronze" ? "#c87f43" : destaque === "repescagem" ? "#5b8f73" : "#243029";
-  const etiqueta = destaque === "final" ? "Final" : destaque === "bronze" ? "Disputa de bronze" : null;
+  const etiqueta = destaque === "final" ? "Final" : destaque === "bronze" ? t("ck.disputaBronze") : null;
   // Texto da janela do acumulado (só na final e só quando há pontos a explicar).
   let notaJanela: string | null = null;
   if (destaque === "final" && janelaFinal && janelaFinal.length > 0 && !bye) {
@@ -409,12 +404,12 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa
       )}
     <LinhaJogador uid={c.jogador_a} pontos={c.pontos_a} venceu={venceuA} perdeu={decidido && !venceuA} trancado={trancado} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_a && onVerEquipa(c.jogador_a, c.id_competicao)} />
     {bye ? (
-        <div style={{ fontSize: 11, color: "#7c8a82", textAlign: "center", padding: "4px 0", fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.05em" }}>passou (sem adversário)</div>
+        <div style={{ fontSize: 11, color: "#7c8a82", textAlign: "center", padding: "4px 0", fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("ck.passouSemAdversario")}</div>
       ) : (
         <>
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "2px 0" }}>
         <div style={{ flex: 1, height: 1, background: "#1a221d" }} />
-        <span style={{ fontSize: 9.5, color: "#5f6f67", fontFamily: FD, fontWeight: 700 }}>{estadoLabel(c)}</span>
+        <span style={{ fontSize: 9.5, color: "#5f6f67", fontFamily: FD, fontWeight: 700 }}>{estadoLabel(c, t)}</span>
         <div style={{ flex: 1, height: 1, background: "#1a221d" }} />
         </div>
         <LinhaJogador uid={c.jogador_b} pontos={c.pontos_b} venceu={venceuB} perdeu={decidido && !venceuB} trancado={trancado} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_b && onVerEquipa(c.jogador_b, c.id_competicao)} />
@@ -428,13 +423,14 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa
     </div>
   );
 }
-function estadoLabel(c: ConfrontoAPI): string {
+// Idem: recebe o tradutor, não o vai buscar.
+function estadoLabel(c: ConfrontoAPI, t: (k: string) => string): string {
   if (c.estado === "decidido") {
-    if (c.decidido_por === "sorteio") return "decidido por sorteio";
-    if (c.decidido_por === "capitao") return "decidido pelo capitão";
-    return "decidido";
+    if (c.decidido_por === "sorteio") return t("ck.porSorteio");
+    if (c.decidido_por === "capitao") return t("ck.decididoCapitao");
+    return t("ck.decidido");
   }
-  return "a aguardar";
+  return t("ck.aAguardar");
 }
 function LinhaJogador({ uid, pontos, venceu, perdeu, trancado, nome, escudoDe, onVerEquipa }: {
     uid: string | null;
@@ -475,6 +471,7 @@ function LinhaJogador({ uid, pontos, venceu, perdeu, trancado, nome, escudoDe, o
   );
 }
 function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
+    const t = useT();
     podio: { campeao?: string; vice?: string; terceiro?: string };
     nome: (uid: string | null) => string;
     escudoDe: (uid: string | null) => Identity;
@@ -517,8 +514,8 @@ function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
   return (
     <div style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "16px 15px", marginBottom: 16 }}>
     <div style={{ textAlign: "center", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: GOLD, marginBottom: 12 }}>🏆 Pódio da Copa</div>
-    {linha(podio.campeao, "🥇", "Campeão", GOLD, "campeao")}
-    {linha(podio.vice, "🥈", "Vice-campeão", "#c0c0c0", "vice")}
+    {linha(podio.campeao, "🥇", t("ck.campeao"), GOLD, "campeao")}
+    {linha(podio.vice, "🥈", t("ck.vice"), "#c0c0c0", "vice")}
     {linha(podio.terceiro, "🥉", "3º lugar", "#c87f43", "terceiro")}
     {certificado && (
         <CartaoCertificado
@@ -542,18 +539,19 @@ function SecaoTitulo({ children }: { children: React.ReactNode }) {
 }
 // Tutorial DIDÁTICO da chave — explica o formato do mata-mata de judô.
 function TutorialChave({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const [passo, setPasso] = useState(0);
   const passos = [
     {
-      t: "Mata-mata por competições",
+      t: t("ck.mataMataCompeticoes"),
       x: "Cada ronda da Copa é uma competição real. Os pontos do teu confronto são os pontos da tua equipa nessa competição (com o capitão a dobrar), tal como no ranking. Quem pontuar mais, avança.",
     },
     {
-      t: "Eliminação até às meias",
+      t: t("ck.eliminacaoMeias"),
       x: "Vais avançando enquanto venceres. Em caso de empate, decide quem teve o capitão com mais pontos; se ainda empatar, sorteio. Chega às semifinais quem vencer todos os confrontos do seu lado da chave.",
     },
     {
-      t: "Esqueceste-te de escalar?",
+      t: t("ck.esqueceuEscalar"),
       x: "Não ficas a zeros: mantens a última equipa que guardaste, e continuas com ela até salvares uma nova. Só pontuam os atletas dessa equipa que lutaram na competição da ronda.",
     },
     {
@@ -565,7 +563,7 @@ function TutorialChave({ onClose }: { onClose: () => void }) {
       x: "Os campeões de repescagem de cada metade disputam o bronze cruzando com o semifinalista perdedor do outro lado. Por isso há DOIS bronzes — e quem perdeu a semifinal ainda tem de os disputar (não recebe a medalha de borla).",
     },
     {
-      t: "A final é por pontos",
+      t: t("ck.finalPorPontos"),
       x: "Os dois finalistas não decidem o título numa só competição: acumulam pontos a partir do momento em que chegam à final, até ao dia do bronze. O que fizeram nas rondas anteriores não conta — a contagem começa do zero na final. Quem somar mais é o campeão.",
     },
   ];
