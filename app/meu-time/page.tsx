@@ -965,7 +965,7 @@ function MeuTimeInner() {
                   </div>
                   </div>
                   {editavel && (
-                      <button onClick={() => removerAusente(id)} aria-label=t("mt.removerIndisponivel") style={{ flexShrink: 0, border: "1px solid #5a2f2c", background: "transparent", color: "#ef8d83", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "7px 12px", borderRadius: 9, cursor: "pointer" }}>{t("mt.remover")}</button>
+                      <button onClick={() => removerAusente(id)} aria-label={t("mt.removerIndisponivel")} style={{ flexShrink: 0, border: "1px solid #5a2f2c", background: "transparent", color: "#ef8d83", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "7px 12px", borderRadius: 9, cursor: "pointer" }}>{t("mt.remover")}</button>
                     )}
                   </div>
                 ))}
