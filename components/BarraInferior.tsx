@@ -33,6 +33,7 @@
 
 import { useEffect, useState } from "react";
 import { useNivel } from "@/lib/useNivel";
+import { useT } from "@/lib/i18n";
 
 const GOLD = "#d9a441";
 const CHAVE_VISTA = "ippon_viu_area_pro";
@@ -59,6 +60,7 @@ function jaViuAreaPro(): boolean {
 type Ativo = "inicio" | "ligas" | "atletas" | "pro" | undefined;
 
 export function BarraInferior({ ativo }: { ativo?: Ativo }) {
+  const t = useT();
   const { ehPro, ehProMax } = useNivel();
   const [pulsar, setPulsar] = useState(false);
 
@@ -104,16 +106,16 @@ export function BarraInferior({ ativo }: { ativo?: Ativo }) {
           zIndex: 50,
         }}
       >
-        <Tab label="Início" icon={<HomeIcon />} href="/inicio" active={ativo === "inicio"} />
-        <Tab label="Competições" icon={<TrophyIcon />} href="/ligas" active={ativo === "ligas"} />
-        <Tab label="Atletas" icon={<AthletesIcon />} href="/atletas" active={ativo === "atletas"} />
+        <Tab label={t("nav.inicio")} icon={<HomeIcon />} href="/inicio" active={ativo === "inicio"} />
+        <Tab label={t("nav.competicoes")} icon={<TrophyIcon />} href="/ligas" active={ativo === "ligas"} />
+        <Tab label={t("nav.atletas")} icon={<AthletesIcon />} href="/atletas" active={ativo === "atletas"} />
 
         {/* Destino ÚNICO: /pro-central decide para onde ir (ver app/pro-central).
             Assim todas as barras da app apontam para o mesmo sítio e nenhuma
             precisa de saber o nível — era essa divergência que levava um Pro Max
             à página de vendas a partir de qualquer ecrã. */}
         <Tab
-          label="Pro"
+          label={t("nav.pro")}
           icon={<BoltIcon />}
           href="/pro-central"
           active={ativo === "pro"}
@@ -137,6 +139,7 @@ function Tab({
   href?: string;
   pulsar?: boolean;
 }) {
+  const t = useT();
   const baseStyle: React.CSSProperties = {
     display: "flex",
     flexDirection: "column",
@@ -178,7 +181,7 @@ function Tab({
   );
 
   return href ? (
-    <a href={href} style={baseStyle} aria-label={pulsar ? `${label} — novidade` : label}>
+    <a href={href} style={baseStyle} aria-label={pulsar ? t("nav.proNovidade", { label }) : label}>
       {content}
     </a>
   ) : (
