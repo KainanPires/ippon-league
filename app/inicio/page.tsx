@@ -14,7 +14,7 @@ import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { PRECO } from "@/lib/precos";
 import { SinoNotificacoes } from "@/components/SinoNotificacoes";
 import { criarNotificacao } from "@/lib/notificacoes";
-import { normalizarFaixa, corDaFaixa, nomeDaFaixa, type Faixa } from "@/lib/faixas";
+import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
 // NÍVEL DE SUBSCRIÇÃO: vem do useNivel(), que lê da tabela `users` — a MESMA
 // fonte que o servidor usa para bloquear. Antes lia-se do user_metadata da
 // sessão, e desde que o trigger deixou de sincronizar o nível, essa cópia podia
@@ -32,7 +32,7 @@ import { HubCarrossel } from "@/components/HubCarrossel";
 // components/BarraInferior.tsx, e é lá que o separador Pro pulsa a dourado
 // para quem tem Pro e ainda não visitou a área.
 import { BarraInferior } from "@/components/BarraInferior";
-import { useT } from "@/lib/i18n";
+import { useT, useRotuloFaixa } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -100,6 +100,8 @@ function marcarModalVisto(chave: string, userId: string | null | undefined) {
 }
 export default function Inicio() {
   const t = useT();
+  const rotuloFaixa = useRotuloFaixa();
+  const nomeFaixaTraduzida = (f: string) => rotuloFaixa(f);
   const [ready, setReady] = useState(false);
   const [visitante, setVisitante] = useState(false);
   const [phase, setPhase] = useState<"tutorial" | null>(null);
@@ -449,7 +451,7 @@ export default function Inicio() {
         </div>
         <div>
         <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{nomeMostrado || "\u00A0"}</div>
-        <div style={{ fontSize: 11, color: GOLD }}>Faixa {nomeDaFaixa(faixaJogo)}</div>
+        <div style={{ fontSize: 11, color: GOLD }}>{rotuloFaixa(faixaJogo)}</div>
         </div>
         </a>
       )}
@@ -645,7 +647,7 @@ export default function Inicio() {
         identity={identityResumo}
         team={desempenho.team}
         nome={nomeMostrado || t("inicio.campeao")}
-        faixa={nomeDaFaixa(faixaJogo)}
+        faixa={nomeFaixaTraduzida(faixaJogo)}
         pro={isPro}
         extra={extra}
         daGaleria={desempenhoDaGaleria}
@@ -780,6 +782,7 @@ function TeamCreate({ corDodo = "#efeadd" }: { corDodo?: string }) {
 // Saldo = quanto sobra para comprar. É o 100 - valor da equipa.
 function TeamBuilt({ info, fechoTexto, faixa, patrimonio }: { info: { name: string; value: string; last: number }; fechoTexto: string; faixa: Faixa; patrimonio: number | null }) {
   const t = useT();
+  const rotuloFaixa = useRotuloFaixa();
   return (
     <div style={{ border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
     <div style={{ background: "#1c3a2e", padding: 9, textAlign: "center", fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aee9c9" }}>{t("inicio.minhaEquipa")}</div>
@@ -790,7 +793,7 @@ function TeamBuilt({ info, fechoTexto, faixa, patrimonio }: { info: { name: stri
     </div>
     <div>
     <div style={{ fontSize: 16, fontWeight: 700 }}>{info.name}</div>
-    <div style={{ fontSize: 12, color: GOLD }}>Faixa {nomeDaFaixa(faixa)}</div>
+    <div style={{ fontSize: 12, color: GOLD }}>{rotuloFaixa(faixa)}</div>
     </div>
     </div>
     <div style={{ display: "flex", justifyContent: "space-between", textAlign: "center", marginBottom: 12 }}>
