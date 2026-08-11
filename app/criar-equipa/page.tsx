@@ -16,6 +16,7 @@ import { useFaixa } from "@/lib/useFaixa";
 import { useNivel } from "@/lib/useNivel";
 import { supabase } from "@/lib/supabase";
 import { PRECO } from "@/lib/precos";
+import { useT } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -26,7 +27,6 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
-
 // Competição vinda do Calendário Oficial. A "atual" é a da semana; se o mercado dela
 // já fechou (início - 1h), escala-se para a "próxima". Ver focoMercado em lib/calendario.
 //
@@ -34,7 +34,6 @@ const fmt = (n: number) => String(Math.round(n * 10) / 10);
 // clássico, o nome cru revela a cidade ("Grand Prix The Hague 2018") — e quem a
 // vê antes de escalar vai ao JudoBase buscar os resultados de 2018 e monta a
 // equipa perfeita. A função esconde a cidade enquanto o mercado está aberto.
-
 // Junta a identidade da CONTA (nuvem) por cima da que temos em memória.
 // A nuvem é a fonte de verdade do nome/escudo: o localStorage perde-se ao mudar
 // de aparelho ou limpar o browser.
@@ -46,7 +45,6 @@ function juntarIdentidade(prev: Identity, idc: { name?: string; escudo?: Record<
     ...(idc.name ? { name: idc.name } : {}),
   };
 }
-
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
 type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" | "leave" | "precisaNome" } | { kind: "athlete"; a: Athlete } | null;
 // Resultado do carry-over para mostrar no banner "Reescala o teu time".
@@ -57,6 +55,7 @@ function sameTeam(a: TeamState, b: TeamState): boolean {
   return [...a.ids].sort().join(",") === [...b.ids].sort().join(",");
 }
 export default function CriarEquipa() {
+  const t = useT();
   const [guide, setGuide] = useState<Guide>(null);
   const [draft, setDraft] = useState<TeamState>({ ids: [], captain: null });
   const [saved, setSaved] = useState<TeamState>({ ids: [], captain: null });
@@ -74,7 +73,6 @@ export default function CriarEquipa() {
   const router = useRouter();
   // Faixa REAL do jogador (cor para o Dôdo, nome para o cartão de partilha).
   const { cor: corFaixa, nome: nomeFaixa } = useFaixa();
-
   // Foco do mercado (regra única no calendário): competição-alvo (mercado aberto),
   // a que está a decorrer (mercado fechado) e o estado para a contagem.
   const foco = focoMercado();
@@ -85,111 +83,109 @@ export default function CriarEquipa() {
   // Nomes a MOSTRAR (cidade escondida nos clássicos com mercado aberto).
   const nomeAlvo = nomeCompeticao(alvo);
   const nomeAtual = nomeCompeticao(atual);
-
   useEffect(() => {
-    let active = true;
-    const idAlvo = alvo.idCompeticao;
-    try {
-      // Guia do Dojo: só aparece se ainda não foi visto neste aparelho NEM na conta.
-      if (!tutorialVistoLocal("ippon_team_tutorial")) {
-        tutoriaisVistosConta().then((vistos) => {
-          if (!active) return;
-          if (vistos["ippon_team_tutorial"]) {
-            try { localStorage.setItem("ippon_team_tutorial", "done"); } catch {}
-          } else {
-            setGuide("welcome");
-          }
-        });
-      }
-    } catch {}
-    // Carrega a lista de atletas desta competição (mesma fonte do Mercado). Sem isto,
-    // o resolve() não traduz os ids da equipa e o Dojo aparece "0/8" mesmo com equipa.
-    // Esta lista é também a de INSCRITOS usada pelo carry-over (quem não está aqui,
-    // não está inscrito nesta competição).
-    fetch(`/api/atletas?id=${idAlvo}`)
+      let active = true;
+      const idAlvo = alvo.idCompeticao;
+      try {
+        // Guia do Dojo: só aparece se ainda não foi visto neste aparelho NEM na conta.
+        if (!tutorialVistoLocal("ippon_team_tutorial")) {
+          tutoriaisVistosConta().then((vistos) => {
+              if (!active) return;
+              if (vistos["ippon_team_tutorial"]) {
+                try { localStorage.setItem("ippon_team_tutorial", "done"); } catch {}
+              } else {
+                setGuide("welcome");
+              }
+            });
+        }
+      } catch {}
+      // Carrega a lista de atletas desta competição (mesma fonte do Mercado). Sem isto,
+      // o resolve() não traduz os ids da equipa e o Dojo aparece "0/8" mesmo com equipa.
+      // Esta lista é também a de INSCRITOS usada pelo carry-over (quem não está aqui,
+        // não está inscrito nesta competição).
+      fetch(`/api/atletas?id=${idAlvo}`)
       .then((r) => r.json())
       .then((j) => {
-        if (!active) return;
-        const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
-        if (list.length > 0) {
-          setAthletePool(list);
-          bumpPool((t) => t + 1);
-          // CARRY-OVER: só quando esta competição ainda está MESMO vazia (sem
-          // rascunho, sem guardado local e sem nuvem) E só depois de termos a
-          // lista de inscritos. Traz a última equipa guardada e larga os não
-          // inscritos. Só semeia o rascunho — não há commit automático.
-          tryCarryOver(idAlvo, list);
-        }
-      })
+          if (!active) return;
+          const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
+          if (list.length > 0) {
+            setAthletePool(list);
+            bumpPool((t) => t + 1);
+            // CARRY-OVER: só quando esta competição ainda está MESMO vazia (sem
+              // rascunho, sem guardado local e sem nuvem) E só depois de termos a
+            // lista de inscritos. Traz a última equipa guardada e larga os não
+            // inscritos. Só semeia o rascunho — não há commit automático.
+            tryCarryOver(idAlvo, list);
+          }
+        })
       .catch(() => {});
-
-    // Corre o carry-over quando a competição-alvo está vazia. `inscritos` é a
-    // lista de atletas desta competição (a pool acabada de carregar). A guarda
-    // de segurança contra inscritos vazios vive dentro de carryOver().
-    async function tryCarryOver(idComp: string, inscritos: Athlete[]) {
-      // Não mexer se já há rascunho ou equipa guardada local nesta competição.
-      const draftLocal = loadDraftFor(idComp);
-      const savedLocal = loadSavedFor(idComp);
-      if (draftLocal.ids.length > 0 || savedLocal.ids.length > 0) return;
-      if (!(await temSessao())) return;
-      // Não mexer se já existe equipa na nuvem para esta competição.
-      const cloudAlvo = await loadSavedCloudFor(idComp);
-      if (!active) return;
-      if (cloudAlvo && cloudAlvo.ids.length > 0) return;
-      // Base = última equipa guardada noutra competição.
-      const anterior = await loadLatestSavedCloudExcept(idComp);
-      if (!active || !anterior) return;
-      const inscritosIds = inscritos.map((a) => a.id);
-      const res = carryOver(anterior.team, inscritosIds);
-      // Se, entretanto, o utilizador já começou a montar, não sobrescrever.
-      const draftAgora = loadDraftFor(idComp);
-      if (draftAgora.ids.length > 0) return;
-      setDraft(res.team);
-      saveDraftFor(idComp, res.team);
-      if (res.dropped.length > 0 || res.captainDropped) {
-        setCarry({ dropped: res.dropped, captainDropped: res.captainDropped });
+      // Corre o carry-over quando a competição-alvo está vazia. `inscritos` é a
+      // lista de atletas desta competição (a pool acabada de carregar). A guarda
+      // de segurança contra inscritos vazios vive dentro de carryOver().
+      async function tryCarryOver(idComp: string, inscritos: Athlete[]) {
+        // Não mexer se já há rascunho ou equipa guardada local nesta competição.
+        const draftLocal = loadDraftFor(idComp);
+        const savedLocal = loadSavedFor(idComp);
+        if (draftLocal.ids.length > 0 || savedLocal.ids.length > 0) return;
+        if (!(await temSessao())) return;
+        // Não mexer se já existe equipa na nuvem para esta competição.
+        const cloudAlvo = await loadSavedCloudFor(idComp);
+        if (!active) return;
+        if (cloudAlvo && cloudAlvo.ids.length > 0) return;
+        // Base = última equipa guardada noutra competição.
+        const anterior = await loadLatestSavedCloudExcept(idComp);
+        if (!active || !anterior) return;
+        const inscritosIds = inscritos.map((a) => a.id);
+        const res = carryOver(anterior.team, inscritosIds);
+        // Se, entretanto, o utilizador já começou a montar, não sobrescrever.
+        const draftAgora = loadDraftFor(idComp);
+        if (draftAgora.ids.length > 0) return;
+        setDraft(res.team);
+        saveDraftFor(idComp, res.team);
+        if (res.dropped.length > 0 || res.captainDropped) {
+          setCarry({ dropped: res.dropped, captainDropped: res.captainDropped });
+        }
       }
-    }
-    temSessao().then((logado) => {
-      if (!active || !logado) return;
-      try {
-        setIdentity(loadIdentity());
-        const localSaved = loadSavedFor(idAlvo);
-        let localDraft = loadDraftFor(idAlvo);
-        setSaved(localSaved);
-        // BUG 2: se o rascunho desta competição está vazio mas há equipa guardada
-        // localmente, parte dessa equipa — em vez de abrir o Dojo em branco.
-        if (localDraft.ids.length === 0 && localSaved.ids.length > 0) {
-          localDraft = localSaved;
-          saveDraftFor(idAlvo, localDraft);
-        }
-        setDraft(localDraft);
-      } catch {}
-      // IDENTIDADE DA CONTA (nuvem) por cima da local. Sem isto, abrir a app num
-      // browser/telemóvel novo mostrava "A minha equipa" — e ao guardar pedia o
-      // nome outra vez a quem já o tinha (e gravava o nome por omissão na conta).
-      loadIdentityCloudFor(idAlvo).then((idc) => {
-        if (!active || !idc) return;
-        setIdentity((prev) => juntarIdentidade(prev, idc));
-      }).catch(() => {});
-      loadSavedCloudFor(idAlvo).then((cloud) => {
-        if (!active || !cloud || cloud.ids.length === 0) return;
-        setSaved(cloud);
-        const curDraft = loadDraftFor(idAlvo);
-        const curSaved = loadSavedFor(idAlvo);
-        // Adota a equipa da nuvem como ponto de partida da edição SÓ se o utilizador
-        // ainda não começou a editar: rascunho vazio, OU rascunho igual ao guardado
-        // local (sem alterações por guardar). Assim nunca apagamos edições em curso.
-        if (curDraft.ids.length === 0 || sameTeam(curDraft, curSaved)) {
-          setDraft(cloud);
-          saveDraftFor(idAlvo, cloud);
-          commitSavedFor(idAlvo, cloud);
-        }
-      });
-    });
-    return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      temSessao().then((logado) => {
+          if (!active || !logado) return;
+          try {
+            setIdentity(loadIdentity());
+            const localSaved = loadSavedFor(idAlvo);
+            let localDraft = loadDraftFor(idAlvo);
+            setSaved(localSaved);
+            // BUG 2: se o rascunho desta competição está vazio mas há equipa guardada
+            // localmente, parte dessa equipa — em vez de abrir o Dojo em branco.
+            if (localDraft.ids.length === 0 && localSaved.ids.length > 0) {
+              localDraft = localSaved;
+              saveDraftFor(idAlvo, localDraft);
+            }
+            setDraft(localDraft);
+          } catch {}
+          // IDENTIDADE DA CONTA (nuvem) por cima da local. Sem isto, abrir a app num
+          // browser/telemóvel novo mostrava "A minha equipa" — e ao guardar pedia o
+          // nome outra vez a quem já o tinha (e gravava o nome por omissão na conta).
+          loadIdentityCloudFor(idAlvo).then((idc) => {
+              if (!active || !idc) return;
+              setIdentity((prev) => juntarIdentidade(prev, idc));
+            }).catch(() => {});
+          loadSavedCloudFor(idAlvo).then((cloud) => {
+              if (!active || !cloud || cloud.ids.length === 0) return;
+              setSaved(cloud);
+              const curDraft = loadDraftFor(idAlvo);
+              const curSaved = loadSavedFor(idAlvo);
+              // Adota a equipa da nuvem como ponto de partida da edição SÓ se o utilizador
+              // ainda não começou a editar: rascunho vazio, OU rascunho igual ao guardado
+              // local (sem alterações por guardar). Assim nunca apagamos edições em curso.
+              if (curDraft.ids.length === 0 || sameTeam(curDraft, curSaved)) {
+                setDraft(cloud);
+                saveDraftFor(idAlvo, cloud);
+                commitSavedFor(idAlvo, cloud);
+              }
+            });
+        });
+      return () => { active = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
   const dirty = !sameTeam(draft, saved) && draft.ids.length > 0;
   // O rascunho fica gravado localmente a cada alteração. Ao sair com alterações
   // por guardar, avisamos (sem bloquear): a pessoa decide sair ou ficar.
@@ -256,7 +252,6 @@ export default function CriarEquipa() {
     // preso na vista de montagem.
     router.push("/meu-time");
   }
-
   // Depois de fechar o aviso "e agora?": segue o mesmo caminho que seguiria se
   // ele não existisse (avaliação, se for altura; senão, a vista de gestão).
   function fecharAvisoGuardada() {
@@ -272,277 +267,273 @@ export default function CriarEquipa() {
   const firstEmpty = males.length < 4 ? { row: "M", i: males.length } : females.length < 4 ? { row: "F", i: females.length } : null;
   function renderRow(list: Athlete[], row: "M" | "F") {
     return Array.from({ length: 4 }).map((_, i) => {
-      const a = list[i];
-      const highlight = guide === "slot" && firstEmpty != null && firstEmpty.row === row && firstEmpty.i === i;
-      return a
+        const a = list[i];
+        const highlight = guide === "slot" && firstEmpty != null && firstEmpty.row === row && firstEmpty.i === i;
+        return a
         ? <FilledSlot key={row + i} a={a} isCaptain={draft.captain === a.id} onClick={() => setModal({ kind: "athlete", a })} />
         : <EmptySlot key={row + i} highlight={highlight} />;
-    });
+      });
   }
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-      <style>{`@keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.55)}50%{box-shadow:0 0 0 8px rgba(74,144,217,0.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:10px} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilsavebig{0%{transform:scale(1)}30%{transform:scale(1.06)}60%{transform:scale(0.98)}100%{transform:scale(1)}} .ilsavebig{animation:ilsave 1.2s ease-in-out infinite, ilsavebig 0.5s ease-in-out 2} @keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
-      <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 150px" }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
-            <a href="/inicio" onClick={(e) => { e.preventDefault(); tryLeave("/inicio"); }} aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
-              <BackIcon />
-            </a>
-            <div style={{ display: "flex", alignItems: "center", gap: 11, color: "#f1ede2", minWidth: 0 }}>
-              <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={identity} size={40} /></div>
-              <div style={{ minWidth: 0 }}>
-                <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name}</h1>
-                <div style={{ fontSize: 11, color: "#93a39a" }}>1 por categoria · 4 masc + 4 fem</div>
-              </div>
-            </div>
-          </div>
-          <button onClick={openGuide} aria-label="Como montar a equipa" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
-        </header>
-
-        {/* Banner do carry-over: atletas da equipa anterior que não estão inscritos
-            nesta competição sairam; o JC deles já voltou pelo preço atual. */}
-        {carry && (
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a2410,#10160f)", border: "1px solid #5a4a18", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", marginBottom: 10 }}>
-            <div style={{ width: 34, height: 34, flexShrink: 0 }}><Mascot belt={corFaixa} expression="indicando" /></div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Reescala o teu time</div>
-              <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "5px 0 0" }}>
-                {carry.dropped.length === 1
-                  ? "1 atleta da tua equipa não está inscrito nesta competição e saiu."
-                  : `${carry.dropped.length} atletas da tua equipa não estão inscritos nesta competição e sairam.`}
-                {carry.captainDropped ? " O teu capitão era um deles — escolhe um novo." : ""}
-                {" "}Os JC voltaram pelo preço atual. Escala quem falta (ou refaz tudo) e guarda.
-              </p>
-              <button onClick={() => setCarry(null)} style={{ marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB, padding: 0 }}>Percebi, dispensar</button>
-            </div>
-          </div>
-        )}
-
-        {/* Quando há competição a decorrer, mostra-a com aviso de que se escala para a próxima. */}
-        {emAndamento && (
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a1f1c,#10160f)", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "10px 13px", marginBottom: 10 }}>
-            <span className="ilpulse" style={{ width: 9, height: 9, borderRadius: "50%", background: "#e2655a", marginTop: 4, flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#e2655a" }}>A decorrer agora{atual.classico ? " · Clássico" : ""}</div>
-              <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, lineHeight: 1.1, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeAtual}</div>
-              <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "6px 0 0" }}>
-                O mercado desta competição já fechou — os preços podem oscilar enquanto os atletas competem. <strong style={{ color: "#f1ede2" }}>Já podes escalar para a próxima:</strong> {nomeAlvo} — {textoFecho(alvo)}.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Cabeçalho: a competição para a qual se está a escalar (alvo).
-            NOTA: nomeAlvo esconde a cidade se for um clássico de mercado aberto. */}
-        <div style={{ display: "flex", alignItems: "center", gap: 11, background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "10px 13px", marginBottom: 14 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 8, background: GOLD, color: "#1b211e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <TrophyIcon />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>A escalar para{rodadaAlvo ? ` · Rodada ${rodadaAlvo}` : ""}{alvo.classico ? " · Clássico" : ""}</div>
-            <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeAlvo}</div>
-            <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{textoFecho(alvo)}</div>
-          </div>
-          <span style={{ background: "#1b211e", color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{alvo.nivel}</span>
-        </div>
-
-        <div style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
-          <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
-            <SectionLabel>Masculino</SectionLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>{renderRow(males, "M")}</div>
-            <SectionLabel>Feminino</SectionLabel>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>{renderRow(females, "F")}</div>
-          </div>
-        </div>
-        <p style={{ fontSize: 12, color: "#93a39a", textAlign: "center", marginTop: 14 }}>
-          Toca num lugar livre para abrir o Mercado. Toca num atleta para o tornar capitão.
+    <style>{`@keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.55)}50%{box-shadow:0 0 0 8px rgba(74,144,217,0.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:10px} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilsavebig{0%{transform:scale(1)}30%{transform:scale(1.06)}60%{transform:scale(0.98)}100%{transform:scale(1)}} .ilsavebig{animation:ilsave 1.2s ease-in-out infinite, ilsavebig 0.5s ease-in-out 2} @keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
+    <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 150px" }}>
+    <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
+    <a href="/inicio" onClick={(e) => { e.preventDefault(); tryLeave("/inicio"); }} aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+    <BackIcon />
+    </a>
+    <div style={{ display: "flex", alignItems: "center", gap: 11, color: "#f1ede2", minWidth: 0 }}>
+    <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={identity} size={40} /></div>
+    <div style={{ minWidth: 0 }}>
+    <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name}</h1>
+    <div style={{ fontSize: 11, color: "#93a39a" }}>1 por categoria · 4 masc + 4 fem</div>
+    </div>
+    </div>
+    </div>
+    <button onClick={openGuide} aria-label="Como montar a equipa" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
+    </header>
+    {/* Banner do carry-over: atletas da equipa anterior que não estão inscritos
+      nesta competição sairam; o JC deles já voltou pelo preço atual. */}
+    {carry && (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a2410,#10160f)", border: "1px solid #5a4a18", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", marginBottom: 10 }}>
+        <div style={{ width: 34, height: 34, flexShrink: 0 }}><Mascot belt={corFaixa} expression="indicando" /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{t("ce.reescala")}</div>
+        <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "5px 0 0" }}>
+        {carry.dropped.length === 1
+          ? "1 atleta da tua equipa não está inscrito nesta competição e saiu."
+          : `${carry.dropped.length} atletas da tua equipa não estão inscritos nesta competição e sairam.`}
+        {carry.captainDropped ? " O teu capitão era um deles — escolhe um novo." : ""}
+        {" "}Os JC voltaram pelo preço atual. Escala quem falta (ou refaz tudo) e guarda.
         </p>
-        {!isPro && (
-          <a href="/ippon-pro" onClick={(e) => { e.preventDefault(); tryLeave("/ippon-pro"); }} style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16, textDecoration: "none" }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Sê Pro e avalia a tua equipa</div>
-              <div style={{ fontSize: 11.5, color: "#5c4410", marginTop: 2 }}>Scout, valorização esperada e dicas da rodada.</div>
-              <div style={{ fontSize: 11.5, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
-              <span style={{ display: "inline-block", marginTop: 8, background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8 }}>Ver Ippon Pro</span>
-            </div>
-            <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt={corFaixa} expression="sabio" /></div>
-          </a>
-        )}
-      </div>
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50 }}>
-        <div style={{ background: "#0f1411", borderTop: "1px solid #243029", padding: "9px 14px" }}>
-          <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <div className={guide === "counter" ? "ilglow" : undefined} style={{ padding: "2px 6px" }}>
-              <div><span style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: GOLD }}>{total}</span><span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#93a39a" }}>/8</span></div>
-              <div style={{ fontSize: 11, color: "#cfd8d2" }}>JC {fmt(left)}</div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button onClick={() => setModal({ kind: "trash" })} aria-label="Limpar equipa" style={roundBtn("#3a2422", "#ef8d83")}>
-                <TrashIcon />
-              </button>
-              <button onClick={() => setModal({ kind: "share" })} aria-label="Partilhar equipa" style={roundBtn("#243029", "#cfd8d2")}>
-                <ShareIcon />
-              </button>
-              <button onClick={save} disabled={savingCloud} className={dirty && !savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar equipa"}</button>
-            </div>
-          </div>
+        <button onClick={() => setCarry(null)} style={{ marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB, padding: 0 }}>{t("ce.percebiDispensar")}</button>
         </div>
-      </div>
-      {guide === "welcome" && (
-        <div style={overlayBg}>
-          <div style={cardBox}>
-            <div style={{ width: 90, height: 90, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Vamos montar a tua equipa</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 20px" }}>Eu guio-te! Toca onde eu indicar e, em segundos, tens a tua equipa de 8 atletas pronta para competir.</p>
-            <button onClick={() => setGuide("counter")} style={primaryBtn}>Vamos!</button>
-            <button onClick={naoMostrarMais} style={ghostBtn}>Não mostrar mais</button>
-          </div>
         </div>
       )}
-      {guide === "counter" && (
+    {/* Quando há competição a decorrer, mostra-a com aviso de que se escala para a próxima. */}
+    {emAndamento && (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a1f1c,#10160f)", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "10px 13px", marginBottom: 10 }}>
+        <span className="ilpulse" style={{ width: 9, height: 9, borderRadius: "50%", background: "#e2655a", marginTop: 4, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#e2655a" }}>A decorrer agora{atual.classico ? " · Clássico" : ""}</div>
+        <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, lineHeight: 1.1, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeAtual}</div>
+        <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "6px 0 0" }}>
+        O mercado desta competição já fechou — os preços podem oscilar enquanto os atletas competem. <strong style={{ color: "#f1ede2" }}>{t("ce.jaPodesEscalar")}</strong> {nomeAlvo} — {textoFecho(alvo)}.
+        </p>
+        </div>
+        </div>
+      )}
+    {/* Cabeçalho: a competição para a qual se está a escalar (alvo).
+      NOTA: nomeAlvo esconde a cidade se for um clássico de mercado aberto. */}
+    <div style={{ display: "flex", alignItems: "center", gap: 11, background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "10px 13px", marginBottom: 14 }}>
+    <div style={{ width: 34, height: 34, borderRadius: 8, background: GOLD, color: "#1b211e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+    <TrophyIcon />
+    </div>
+    <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>A escalar para{rodadaAlvo ? ` · Rodada ${rodadaAlvo}` : ""}{alvo.classico ? " · Clássico" : ""}</div>
+    <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeAlvo}</div>
+    <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{textoFecho(alvo)}</div>
+    </div>
+    <span style={{ background: "#1b211e", color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{alvo.nivel}</span>
+    </div>
+    <div style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
+    <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
+    <SectionLabel>{t("mt.masculino")}</SectionLabel>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>{renderRow(males, "M")}</div>
+    <SectionLabel>{t("mt.feminino")}</SectionLabel>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>{renderRow(females, "F")}</div>
+    </div>
+    </div>
+    <p style={{ fontSize: 12, color: "#93a39a", textAlign: "center", marginTop: 14 }}>
+    Toca num lugar livre para abrir o Mercado. Toca num atleta para o tornar capitão.
+    </p>
+    {!isPro && (
+        <a href="/ippon-pro" onClick={(e) => { e.preventDefault(); tryLeave("/ippon-pro"); }} style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16, textDecoration: "none" }}>
+        <div style={{ flex: 1 }}>
+        <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>{t("ce.seProAvalia")}</div>
+        <div style={{ fontSize: 11.5, color: "#5c4410", marginTop: 2 }}>{t("ce.seProSub")}</div>
+        <div style={{ fontSize: 11.5, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
+        <span style={{ display: "inline-block", marginTop: 8, background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8 }}>{t("ce.verIpponPro")}</span>
+        </div>
+        <div style={{ width: 66, height: 66, flexShrink: 0 }}><Mascot belt={corFaixa} expression="sabio" /></div>
+        </a>
+      )}
+    </div>
+    <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50 }}>
+    <div style={{ background: "#0f1411", borderTop: "1px solid #243029", padding: "9px 14px" }}>
+    <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+    <div className={guide === "counter" ? "ilglow" : undefined} style={{ padding: "2px 6px" }}>
+    <div><span style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: GOLD }}>{total}</span><span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#93a39a" }}>/8</span></div>
+    <div style={{ fontSize: 11, color: "#cfd8d2" }}>JC {fmt(left)}</div>
+    </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <button onClick={() => setModal({ kind: "trash" })} aria-label="Limpar equipa" style={roundBtn("#3a2422", "#ef8d83")}>
+    <TrashIcon />
+    </button>
+    <button onClick={() => setModal({ kind: "share" })} aria-label="Partilhar equipa" style={roundBtn("#243029", "#cfd8d2")}>
+    <ShareIcon />
+    </button>
+    <button onClick={save} disabled={savingCloud} className={dirty && !savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar equipa"}</button>
+    </div>
+    </div>
+    </div>
+    </div>
+    {guide === "welcome" && (
+        <div style={overlayBg}>
+        <div style={cardBox}>
+        <div style={{ width: 90, height: 90, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>{t("ce.vamosMontar")}</h2>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 20px" }}>Eu guio-te! Toca onde eu indicar e, em segundos, tens a tua equipa de 8 atletas pronta para competir.</p>
+        <button onClick={() => setGuide("counter")} style={primaryBtn}>{t("inicio.vamos")}</button>
+        <button onClick={naoMostrarMais} style={ghostBtn}>{t("comum.naoMostrarMais")}</button>
+        </div>
+        </div>
+      )}
+    {guide === "counter" && (
         <CoachBubble dir="down" cor={corFaixa}>
-          <p style={coachP}>Aqui em baixo, o <strong style={{ color: GOLD }}>{total}/8</strong> mostra quantos atletas já tens. Vais preenchendo até teres 8.</p>
-          <button onClick={() => setGuide("slot")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
-          <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
+        <p style={coachP}>{t("ce.contador", { total: `${total}/8` })}</p>
+        <button onClick={() => setGuide("slot")} style={{ ...nextBtn, marginTop: 10 }}>{t("comum.seguinte")}</button>
+        <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>{t("comum.naoMostrarMais")}</button>
         </CoachBubble>
       )}
-      {guide === "slot" && (
+    {guide === "slot" && (
         <CoachBubble dir="up" cor={corFaixa}>
-          <p style={coachP}>Toca no <strong style={{ color: "#7fb8f5" }}>lugar destacado</strong> para abrir o Mercado e contratar um atleta.</p>
-          <button onClick={() => setGuide("captain")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
-          <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
+        <p style={coachP}>{t("ce.tocaLugar", { lugar: t("ce.lugarDestacado") })}</p>
+        <button onClick={() => setGuide("captain")} style={{ ...nextBtn, marginTop: 10 }}>{t("comum.seguinte")}</button>
+        <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>{t("comum.naoMostrarMais")}</button>
         </CoachBubble>
       )}
-      {guide === "captain" && (
+    {guide === "captain" && (
         <CoachBubble dir="up" cor={corFaixa}>
-          <p style={coachP}>Toca num atleta já escalado para o <strong style={{ color: "#FF8F00" }}>tornares capitão</strong> (pontua a dobrar) ou para o <strong style={{ color: "#ef8d83" }}>venderes</strong>.</p>
-          <button onClick={() => setGuide("actions")} style={{ ...nextBtn, marginTop: 10 }}>Seguinte</button>
-          <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>Não mostrar mais</button>
+        <p style={coachP}>{t("ce.tocaAtleta", { capitao: t("ce.tornaresCapitao"), vender: t("ce.venderes") })}</p>
+        <button onClick={() => setGuide("actions")} style={{ ...nextBtn, marginTop: 10 }}>{t("comum.seguinte")}</button>
+        <button onClick={naoMostrarMais} style={{ ...skipLink, marginTop: 8 }}>{t("comum.naoMostrarMais")}</button>
         </CoachBubble>
       )}
-      {guide === "actions" && (
+    {guide === "actions" && (
         <CoachBubble dir="down" cor={corFaixa}>
-          <p style={coachP}>Em baixo: <strong style={{ color: "#ef8d83" }}>🗑 limpa</strong> a equipa, <strong style={{ color: GOLD }}>partilha</strong> o teu time e <strong style={{ color: GOLD }}>Salvar equipa</strong> guarda a escalação. Boa sorte!</p>
-          <button onClick={naoMostrarMais} style={{ ...nextBtn, marginTop: 10 }}>Concluir</button>
+        <p style={coachP}>{t("ce.rodape", { limpa: t("ce.limpa"), partilha: t("ce.partilha"), salvar: t("ce.salvarEquipa") })}</p>
+        <button onClick={naoMostrarMais} style={{ ...nextBtn, marginTop: 10 }}>{t("ce.concluir")}</button>
         </CoachBubble>
       )}
-      {modal?.kind === "missing" && (
+    {modal?.kind === "missing" && (
         <div style={overlayBg}>
-          <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Falta pouco!</h2>
-            <p style={{ fontSize: 13, color: "#c7d0c9", margin: "0 0 12px" }}>Para guardares a equipa ainda precisas de:</p>
-            <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
-              {missing(draft).map((m) => (
-                <div key={m} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
-                  <span style={{ color: "#ef8d83", fontWeight: 700 }}>•</span>
-                  <span style={{ fontSize: 13, color: "#f1ede2" }}>{m}</span>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => setModal(null)} style={primaryBtn}>Continuar a montar</button>
-          </div>
+        <div style={cardBox}>
+        <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>{t("mt.faltaPouco")}</h2>
+        <p style={{ fontSize: 13, color: "#c7d0c9", margin: "0 0 12px" }}>{t("mt.paraGuardar")}</p>
+        <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
+        {missing(draft).map((m) => (
+              <div key={m} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+              <span style={{ color: "#ef8d83", fontWeight: 700 }}>•</span>
+              <span style={{ fontSize: 13, color: "#f1ede2" }}>{m}</span>
+              </div>
+            ))}
+        </div>
+        <button onClick={() => setModal(null)} style={primaryBtn}>{t("mt.continuarMontar")}</button>
+        </div>
         </div>
       )}
-      {modal?.kind === "login" && (
+    {modal?.kind === "login" && (
         <div style={overlayBg}>
-          <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Entra para guardar</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Para guardares a tua equipa e competires, entra na tua conta. É rápido — e ficas já a jogar!</p>
-            <button onClick={() => exigirSessao("/criar-equipa")} style={primaryBtn}>Entrar / Criar conta</button>
-            <button onClick={() => setModal(null)} style={ghostBtn}>Agora não</button>
-          </div>
+        <div style={cardBox}>
+        <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>{t("ce.entraGuardar")}</h2>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>{t("ce.entraGuardarSub")}</p>
+        <button onClick={() => exigirSessao("/criar-equipa")} style={primaryBtn}>{t("mk.entrarCriar")}</button>
+        <button onClick={() => setModal(null)} style={ghostBtn}>{t("mk.agoraNao")}</button>
+        </div>
         </div>
       )}
-      {mostrarAvaliacao && (
+    {mostrarAvaliacao && (
         <Avaliacao nomeTime={identity.name} onClose={() => { setMostrarAvaliacao(false); router.push("/meu-time"); }} />
       )}
-      {/* AVISO "e agora?" — logo depois de guardar a equipa, uma vez. */}
-      {avisoGuardada && (
+    {/* AVISO "e agora?" — logo depois de guardar a equipa, uma vez. */}
+    {avisoGuardada && (
         <AvisoEquipaGuardada
-          nomeCompeticao={nomeAlvo}
-          rodada={rodadaAlvo}
-          onFechar={fecharAvisoGuardada}
+        nomeCompeticao={nomeAlvo}
+        rodada={rodadaAlvo}
+        onFechar={fecharAvisoGuardada}
         />
       )}
-      {modal?.kind === "saved" && (
+    {modal?.kind === "saved" && (
         <div style={overlayBg}>
-          <div style={cardBox}>
-            <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Equipa salva!</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
-              {cloudWarn
-                ? "Guardámos a tua equipa neste dispositivo, mas não conseguimos sincronizar com a tua conta agora. Tenta guardar de novo quando tiveres ligação."
-                : "A tua equipa está guardada na tua conta e pronta para competir. Boa sorte na próxima rodada!"}
-            </p>
-            <button onClick={() => setModal(null)} style={primaryBtn}>Fechar</button>
-          </div>
+        <div style={cardBox}>
+        <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>{t("mt.equipaSalva")}</h2>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
+        {cloudWarn
+          ? t("mt.guardadoSoAqui")
+          : t("mt.guardadaNaConta")}
+        </p>
+        <button onClick={() => setModal(null)} style={primaryBtn}>{t("comum.fechar")}</button>
+        </div>
         </div>
       )}
-      {modal?.kind === "precisaNome" && (
+    {modal?.kind === "precisaNome" && (
         <div style={overlayBg}>
-          <div style={cardBox}>
-            <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>Equipa salva!</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 8px" }}>
-              Falta só um passo: <strong style={{ color: "#f1ede2" }}>dá um nome ao teu time</strong>. É a tua identidade na liga — sem ele, apareces como “A minha equipa” e ninguém te distingue.
-            </p>
-            <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5, margin: "0 0 20px" }}>Escolhe o nome e, se quiseres, o escudo. Demora 10 segundos.</p>
-            <button onClick={() => { window.location.href = "/escudo?voltar=/inicio&obrigatorio=1"; }} style={primaryBtn}>Dar nome ao meu time</button>
-          </div>
+        <div style={cardBox}>
+        <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>{t("mt.equipaSalva")}</h2>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 8px" }}>
+        Falta só um passo: <strong style={{ color: "#f1ede2" }}>{t("ce.daNome")}</strong>. É a tua identidade na liga — sem ele, apareces como “A minha equipa” e ninguém te distingue.
+        </p>
+        <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5, margin: "0 0 20px" }}>{t("ce.daNomeSub")}</p>
+        <button onClick={() => { window.location.href = "/escudo?voltar=/inicio&obrigatorio=1"; }} style={primaryBtn}>{t("ce.darNomeBtn")}</button>
+        </div>
         </div>
       )}
-      {modal?.kind === "trash" && (
+    {modal?.kind === "trash" && (
         <div style={overlayBg}>
-          <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="determinado" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Limpar a equipa?</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Isto remove todos os atletas e vais ter de escalar de novo.</p>
-            <button onClick={clearAll} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>Sim, limpar tudo</button>
-            <button onClick={() => setModal(null)} style={ghostBtn}>Cancelar</button>
-          </div>
+        <div style={cardBox}>
+        <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="determinado" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>{t("mt.limparEquipa")}</h2>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>{t("mt.limparEquipaSub")}</p>
+        <button onClick={clearAll} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>{t("mt.simLimpar")}</button>
+        <button onClick={() => setModal(null)} style={ghostBtn}>{t("comum.cancelar")}</button>
+        </div>
         </div>
       )}
-      {modal?.kind === "share" && (
+    {modal?.kind === "share" && (
         <CartaoEquipa
-          identity={identity}
-          faixa={nomeFaixa}
-          atletas={resolve(draft.ids)}
-          capitao={draft.captain}
-          pro={isPro}
-          onClose={() => setModal(null)}
+        identity={identity}
+        faixa={nomeFaixa}
+        atletas={resolve(draft.ids)}
+        capitao={draft.captain}
+        pro={isPro}
+        onClose={() => setModal(null)}
         />
       )}
-      {modal?.kind === "leave" && (
+    {modal?.kind === "leave" && (
         <div style={overlayBg}>
-          <div style={cardBox}>
-            <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
-            <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>Sair sem guardar?</h2>
-            <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>Tens alterações por guardar. Se saíres agora, não ficam guardadas na tua conta.</p>
-            <button onClick={() => { const to = leaveTo; setModal(null); setLeaveTo(null); if (to) router.push(to); }} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>Sair sem guardar</button>
-            <button onClick={() => { setModal(null); setLeaveTo(null); }} style={ghostBtn}>Continuar a montar</button>
-          </div>
+        <div style={cardBox}>
+        <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>{t("ce.sairSemGuardar")}</h2>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>{t("ce.sairSemGuardarSub")}</p>
+        <button onClick={() => { const to = leaveTo; setModal(null); setLeaveTo(null); if (to) router.push(to); }} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>{t("ce.sairBtn")}</button>
+        <button onClick={() => { setModal(null); setLeaveTo(null); }} style={ghostBtn}>{t("mt.continuarMontar")}</button>
+        </div>
         </div>
       )}
-      {modal?.kind === "athlete" && (
+    {modal?.kind === "athlete" && (
         <div style={overlayBg}>
-          <div style={cardBox}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-              <div style={{ width: 44, height: 48, borderRadius: 8, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 9, padding: "1px 4px", borderRadius: 3 }}>{code3(modal.a.countryIso)}</div>
-              </div>
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>{modal.a.name}</div>
-                <div style={{ fontSize: 12, color: "#93a39a" }}>{code3(modal.a.countryIso)} · {modal.a.category}kg · <span style={{ color: GOLD }}>JC {modal.a.priceJc.toFixed(1)}</span></div>
-              </div>
-            </div>
-            <button onClick={() => setCaptain(modal.a.id)} style={{ ...primaryBtn, background: draft.captain === modal.a.id ? "#1c3a2e" : GOLD, color: draft.captain === modal.a.id ? "#aee9c9" : "#1b211e" }}>
-              {draft.captain === modal.a.id ? "Remover capitão" : "Tornar capitão (pontua x2)"}
-            </button>
-            <button onClick={() => sell(modal.a.id)} style={{ display: "block", width: "100%", marginTop: 10, textAlign: "center", border: "1px solid #5a2f2c", background: "transparent", color: "#ef8d83", padding: "11px", borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer" }}>Vender</button>
-            <button onClick={() => setModal(null)} style={ghostBtn}>Fechar</button>
-          </div>
+        <div style={cardBox}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div style={{ width: 44, height: 48, borderRadius: 8, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 9, padding: "1px 4px", borderRadius: 3 }}>{code3(modal.a.countryIso)}</div>
+        </div>
+        <div style={{ textAlign: "left" }}>
+        <div style={{ fontSize: 15, fontWeight: 700 }}>{modal.a.name}</div>
+        <div style={{ fontSize: 12, color: "#93a39a" }}>{code3(modal.a.countryIso)} · {modal.a.category}kg · <span style={{ color: GOLD }}>JC {modal.a.priceJc.toFixed(1)}</span></div>
+        </div>
+        </div>
+        <button onClick={() => setCaptain(modal.a.id)} style={{ ...primaryBtn, background: draft.captain === modal.a.id ? "#1c3a2e" : GOLD, color: draft.captain === modal.a.id ? "#aee9c9" : "#1b211e" }}>
+        {draft.captain === modal.a.id ? t("mt.removerCapitao") : t("mt.tornarCapitao")}
+        </button>
+        <button onClick={() => sell(modal.a.id)} style={{ display: "block", width: "100%", marginTop: 10, textAlign: "center", border: "1px solid #5a2f2c", background: "transparent", color: "#ef8d83", padding: "11px", borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer" }}>{t("mt.vender")}</button>
+        <button onClick={() => setModal(null)} style={ghostBtn}>{t("comum.fechar")}</button>
+        </div>
         </div>
       )}
     </main>
@@ -558,9 +549,9 @@ const coachP: React.CSSProperties = { fontSize: 13, color: "#f1ede2", margin: 0,
 function SetaCoach({ dir }: { dir: "up" | "down" }) {
   return (
     <div className="ilseta" style={{ display: "flex", justifyContent: "center", color: GOLD, margin: dir === "up" ? "0 0 6px" : "6px 0 0" }}>
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        {dir === "up" ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M5 12l7 7 7-7" />}
-      </svg>
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {dir === "up" ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M5 12l7 7 7-7" />}
+    </svg>
     </div>
   );
 }
@@ -569,52 +560,52 @@ function SetaCoach({ dir }: { dir: "up" | "down" }) {
 function CoachBubble({ children, dir = "down", cor }: { children: React.ReactNode; dir?: "up" | "down"; cor: string }) {
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 134, display: "flex", justifyContent: "center", padding: "0 14px", zIndex: 90 }}>
-      <div style={{ width: "100%", maxWidth: 432, display: "flex", alignItems: "flex-end", gap: 10 }}>
-        <div style={{ width: 64, height: 64, flexShrink: 0 }}><Mascot belt={cor} expression="feliz" /></div>
-        <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", display: "flex", flexDirection: "column", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
-          {dir === "up" && <SetaCoach dir="up" />}
-          {children}
-          {dir === "down" && <SetaCoach dir="down" />}
-        </div>
-      </div>
+    <div style={{ width: "100%", maxWidth: 432, display: "flex", alignItems: "flex-end", gap: 10 }}>
+    <div style={{ width: 64, height: 64, flexShrink: 0 }}><Mascot belt={cor} expression="feliz" /></div>
+    <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px", display: "flex", flexDirection: "column", boxShadow: `0 0 0 3px rgba(217,164,65,0.18)` }}>
+    {dir === "up" && <SetaCoach dir="up" />}
+    {children}
+    {dir === "down" && <SetaCoach dir="down" />}
+    </div>
+    </div>
     </div>
   );
 }
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-      <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#5a4a12" }}>{children}</span>
-      <span style={{ flex: 1, height: 1, background: "rgba(90,74,18,0.35)" }} />
+    <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#5a4a12" }}>{children}</span>
+    <span style={{ flex: 1, height: 1, background: "rgba(90,74,18,0.35)" }} />
     </div>
   );
 }
 function FilledSlot({ a, isCaptain, onClick }: { a: Athlete; isCaptain: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "8px 3px", borderRadius: 12, border: `1.5px solid ${isCaptain ? "#FF8F00" : "#2f4a3c"}`, background: "rgba(12,14,13,0.78)", color: "#f1ede2", minWidth: 0, cursor: "pointer", fontFamily: FB }}>
-      {isCaptain && <div style={{ position: "absolute", top: -8, right: -5, background: "#FF8F00", border: "1px solid #c2410c", color: "#1b1208", fontFamily: FD, fontWeight: 700, fontSize: 11, padding: "1px 6px", borderRadius: 5, lineHeight: 1.3, boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>C</div>}
-      <div style={{ width: 30, height: 34, borderRadius: 6, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 8, padding: "1px 3px", borderRadius: 2 }}>{code3(a.countryIso)}</div>
-      </div>
-      <div style={{ fontSize: 10, fontWeight: 700, width: "100%", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name.split(" ").slice(-1)[0]}</div>
-      <div style={{ fontSize: 9, color: "#93a39a" }}>{a.category}kg</div>
-      <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, color: "#7fd1a3" }}>JC {a.priceJc.toFixed(1)}</div>
+    {isCaptain && <div style={{ position: "absolute", top: -8, right: -5, background: "#FF8F00", border: "1px solid #c2410c", color: "#1b1208", fontFamily: FD, fontWeight: 700, fontSize: 11, padding: "1px 6px", borderRadius: 5, lineHeight: 1.3, boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>C</div>}
+    <div style={{ width: 30, height: 34, borderRadius: 6, background: "linear-gradient(160deg,#2a4d3e,#1c3a2e)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ background: "#f1ede2", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 8, padding: "1px 3px", borderRadius: 2 }}>{code3(a.countryIso)}</div>
+    </div>
+    <div style={{ fontSize: 10, fontWeight: 700, width: "100%", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name.split(" ").slice(-1)[0]}</div>
+    <div style={{ fontSize: 9, color: "#93a39a" }}>{a.category}kg</div>
+    <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, color: "#7fd1a3" }}>JC {a.priceJc.toFixed(1)}</div>
     </button>
   );
 }
 function EmptySlot({ highlight }: { highlight: boolean }) {
   return (
     <a href="/mercado" className={highlight ? "ilglow" : undefined} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: "9px 3px 7px", borderRadius: 12, border: highlight ? "2px solid #5aa9ff" : "1.5px dashed rgba(217,164,65,0.7)", background: "rgba(12,14,13,0.62)", textDecoration: "none", color: "#f1ede2" }}>
-      <div style={{ width: 26, height: 26, borderRadius: "50%", border: `2px solid ${highlight ? "#5aa9ff" : GOLD}`, color: highlight ? "#7fb8f5" : GOLD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, lineHeight: 1 }}>+</div>
-      <div style={{ width: 38, height: 42 }}><GiGhost /></div>
+    <div style={{ width: 26, height: 26, borderRadius: "50%", border: `2px solid ${highlight ? "#5aa9ff" : GOLD}`, color: highlight ? "#7fb8f5" : GOLD, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, lineHeight: 1 }}>+</div>
+    <div style={{ width: 38, height: 42 }}><GiGhost /></div>
     </a>
   );
 }
 function GiGhost() {
   return (
     <svg viewBox="0 0 60 70" width="100%" height="100%" aria-hidden="true">
-      <path d="M16 16 L7 25 L13 34 L20 29 L20 60 Q30 64 40 60 L40 29 L47 34 L53 25 L44 16 Q37 12 30 12 Q23 12 16 16 Z" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.40)" strokeWidth="1.6" strokeLinejoin="round" />
-      <path d="M26 16 L30 26 L34 16" fill="none" stroke="rgba(255,255,255,0.40)" strokeWidth="1.4" />
-      <rect x="18" y="44" width="24" height="5" rx="1" fill="rgba(255,255,255,0.28)" />
+    <path d="M16 16 L7 25 L13 34 L20 29 L20 60 Q30 64 40 60 L40 29 L47 34 L53 25 L44 16 Q37 12 30 12 Q23 12 16 16 Z" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.40)" strokeWidth="1.6" strokeLinejoin="round" />
+    <path d="M26 16 L30 26 L34 16" fill="none" stroke="rgba(255,255,255,0.40)" strokeWidth="1.4" />
+    <rect x="18" y="44" width="24" height="5" rx="1" fill="rgba(255,255,255,0.28)" />
     </svg>
   );
 }
