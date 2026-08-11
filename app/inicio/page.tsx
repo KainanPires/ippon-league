@@ -32,17 +32,21 @@ import { HubCarrossel } from "@/components/HubCarrossel";
 // components/BarraInferior.tsx, e é lá que o separador Pro pulsa a dourado
 // para quem tem Pro e ainda não visitou a área.
 import { BarraInferior } from "@/components/BarraInferior";
+import { useT } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
+// CHAVES, não texto. Um array fora do componente é avaliado uma vez, no
+// arranque do módulo — não tem acesso ao `t`, que vive no contexto do React.
+// Guardando as chaves, o texto é resolvido no render, na língua da altura.
 const STEPS = [
-  { title: "Como funciona", text: "Vou mostrar-te o essencial em 1 minuto. Avança quando quiseres — ou pula." },
-  { title: "Monta a tua equipa", text: "100 Judocoins, 8 atletas e 1 capitão (pontua a dobrar). É por aqui que começas." },
-  { title: "Pontua pelas ações", text: "Ippon +10, waza-ari +4, shido a favor +1. Acompanhas tudo ao vivo no início." },
-  { title: "Competições e ligas", text: "Cada Grand Slam ou Mundial é uma rodada. Dispute ligas mundial, nacional e de amigos." },
-  { title: "Sobe de faixa", text: "O teu desempenho mensal muda a tua faixa — e o visual do jogo. Boa sorte!" },
+  { title: "tut.comoFunciona", text: "tut.intro" },
+  { title: "tut.montaEquipa", text: "tut.montaEquipaSub" },
+  { title: "tut.pontuaAcoes", text: "tut.pontuaAcoesSub" },
+  { title: "tut.competicoes", text: "tut.competicoesSub" },
+  { title: "tut.sobeFaixa", text: "tut.sobeFaixaSub" },
 ];
-const PRO_BENEFITS = ["Scout avançado: histórico de cada atleta", "Análise do teu time e dica de capitão", "Maior possibilidade de valorização, pela análise", "Acompanhamento ao vivo no dia da competição"];
+const PRO_BENEFITS = ["vant.scout", "vant.analise", "vant.valorizacao", "vant.aoVivo"];
 type TutTarget = "team" | "ligas" | "belt" | "pro" | null;
 function targetForStep(step: number): TutTarget {
   const idx = step - 1;
@@ -95,6 +99,7 @@ function marcarModalVisto(chave: string, userId: string | null | undefined) {
   try { localStorage.setItem(modalKey(chave, userId), "1"); } catch {}
 }
 export default function Inicio() {
+  const t = useT();
   const [ready, setReady] = useState(false);
   const [visitante, setVisitante] = useState(false);
   const [phase, setPhase] = useState<"tutorial" | null>(null);
@@ -145,7 +150,7 @@ export default function Inicio() {
   const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
   const temEquipaCompleta = !!savedTeam && savedTeam.ids.length === 8 && !!savedTeam.captain;
   const destinoEscalar = temEquipaCompleta ? "/meu-time" : "/criar-equipa";
-  const nomeMostrado = visitante ? "Campeão" : name;
+  const nomeMostrado = visitante ? t("inicio.campeao") : name;
   useEffect(() => {
       let active = true;
       supabase.auth.getSession().then(({ data }: { data: { session: { user?: { id?: string; user_metadata?: { nome?: string } } } | null } }) => {
@@ -192,7 +197,7 @@ export default function Inicio() {
             const nomeParaMsg = metaName ? String(metaName).split(" ")[0] : (savedName || "");
             if (metaName) setName(String(metaName).split(" ")[0]);
             else if (savedName) setName(savedName);
-            else setName("Campeão");
+            else setName(t("inicio.campeao"));
             // O nível já vem do useNivel() (tabela `users`) — não se lê do metadata.
             if (userId) {
               supabase.from("users").select("belt, data_nascimento, country_code, patrimony_jc, email_verificado_em").eq("id", userId).maybeSingle()
@@ -414,7 +419,7 @@ export default function Inicio() {
   if (!ready) {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#7c8a82", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ fontFamily: FD, fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase" }}>A carregar…</div>
+      <div style={{ fontFamily: FD, fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase" }}>{t("comum.carregando")}</div>
       </main>
     );
   }
@@ -434,7 +439,7 @@ export default function Inicio() {
         </div>
         <div>
         <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>Campeão</div>
-        <div style={{ fontSize: 11, color: GOLD }}>Entrar para jogar</div>
+        <div style={{ fontSize: 11, color: GOLD }}>{t("inicio.entrarParaJogar")}</div>
         </div>
         </a>
       ) : (
@@ -478,8 +483,8 @@ export default function Inicio() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aee9c9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>
         </span>
         <span>
-        <span style={{ display: "block", fontSize: 13.5, fontWeight: 700 }}>Os meus resumos</span>
-        <span style={{ display: "block", fontSize: 11, color: "#93a39a" }}>Revê e partilha cada rodada</span>
+        <span style={{ display: "block", fontSize: 13.5, fontWeight: 700 }}>{t("inicio.meusResumos")}</span>
+        <span style={{ display: "block", fontSize: 11, color: "#93a39a" }}>{t("inicio.meusResumosSub")}</span>
         </span>
         </span>
         <span style={{ color: GOLD, fontSize: 18 }}>›</span>
@@ -489,23 +494,23 @@ export default function Inicio() {
         <a href="/pro-max-central" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "linear-gradient(135deg,#3f86d6,#7fb8f5)", borderRadius: 14, padding: "13px 14px", marginBottom: 14, textDecoration: "none" }}>
         <div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#0a1622", textTransform: "uppercase" }}>A tua central Pro Max</span>
+        <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#0a1622", textTransform: "uppercase" }}>{t("inicio.centralMax")}</span>
         <span style={{ background: "#0a1622", color: "#7fb8f5", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>★ Pro Max</span>
         </div>
-        <div style={{ fontSize: 11, color: "#0e2236", marginTop: 3 }}>Scout, personalização e as tuas vantagens no máximo</div>
+        <div style={{ fontSize: 11, color: "#0e2236", marginTop: 3 }}>{t("inicio.centralMaxSub")}</div>
         </div>
-        <span style={{ background: "#0a1622", color: "#7fb8f5", fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Abrir</span>
+        <span style={{ background: "#0a1622", color: "#7fb8f5", fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>{t("inicio.abrir")}</span>
         </a>
       ) : isPro ? (
         <a href="/pro" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "13px 14px", marginBottom: 14, textDecoration: "none" }}>
         <div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>A tua central Pro</span>
+        <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>{t("inicio.centralPro")}</span>
         <span style={{ background: "#1b211e", color: GOLD, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>★ Pro</span>
         </div>
-        <div style={{ fontSize: 11, color: "#5c4410", marginTop: 3 }}>Análise do teu time e as tuas vantagens</div>
+        <div style={{ fontSize: 11, color: "#5c4410", marginTop: 3 }}>{t("inicio.centralProSub")}</div>
         </div>
-        <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Abrir</span>
+        <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>{t("inicio.abrir")}</span>
         </a>
       ) : (
         <a href="/ippon-pro" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "11px 14px", marginBottom: 14, textDecoration: "none" }}>
@@ -519,10 +524,10 @@ export default function Inicio() {
         <span style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: "#3a2a08" }}>{PRECO.atual}</span>
         <span style={{ fontSize: 11, color: "#5c4410" }}>{PRECO.periodo}</span>
         </div>
-        <div style={{ fontSize: 11, color: "#5c4410", marginTop: 2 }}>Joga com vantagem competitiva</div>
+        <div style={{ fontSize: 11, color: "#5c4410", marginTop: 2 }}>{t("inicio.proSub")}</div>
         <div style={{ fontSize: 11, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
         </div>
-        <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>Assinar</span>
+        <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>{t("inicio.assinar")}</span>
         </a>
       )}
     <div ref={teamRef} className={glow("team")}>
@@ -532,7 +537,7 @@ export default function Inicio() {
     {!visitante && teamInfo && userIdState && <LembreteNotificacoes userId={userIdState} />}
     <Card>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-    <CardTitle>{ehClassico ? (emAndamento ? "Clássico atual" : "Próximo clássico") : (emAndamento ? "Competição atual" : "Próxima competição")}</CardTitle>
+    <CardTitle>{ehClassico ? (emAndamento ? t("inicio.classicoAtual") : t("inicio.proximoClassico")) : (emAndamento ? t("inicio.competicaoAtual") : t("inicio.proximaCompeticao"))}</CardTitle>
     {ehClassico && (
         <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#3a2f12", color: GOLD, fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.03em" }}>↻ Clássico</span>
       )}
@@ -552,12 +557,12 @@ export default function Inicio() {
       )}
     {emAndamento ? (
         visitante ? (
-          <a href="/entrar?voltar=/inicio" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>Entrar para jogar</a>
+          <a href="/entrar?voltar=/inicio" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>{t("inicio.entrarParaJogar")}</a>
         ) : (
-          <a href="/meu-time" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>Ver a minha equipa</a>
+          <a href="/meu-time" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>{t("inicio.verEquipa")}</a>
         )
       ) : (
-        <a href={destinoEscalar} style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>Escalar</a>
+        <a href={destinoEscalar} style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>{t("inicio.escalar")}</a>
       )}
     </div>
     </Card>
@@ -565,7 +570,7 @@ export default function Inicio() {
         <Card>
         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}>
         <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
-        <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#e2655a" }}>Ao vivo agora</span>
+        <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#e2655a" }}>{t("inicio.aoVivo")}</span>
         </div>
         <div style={{ fontSize: 13, fontWeight: 700 }}>{nomeADecorrer ?? nomeComp}</div>
         <div style={{ fontSize: 12, color: "#93a39a", marginTop: 3, lineHeight: 1.4 }}>
@@ -590,7 +595,7 @@ export default function Inicio() {
                 <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 8, background: "#1c3a2e", flexShrink: 0 }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#aee9c9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>Acompanha o chaveamento ao vivo</span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{t("inicio.aoVivoSub")}</span>
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
                 {!temAcesso && <span style={{ fontSize: 9.5, color: "#3a2a08", background: GOLD, borderRadius: 999, padding: "2px 8px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro</span>}
@@ -604,11 +609,11 @@ export default function Inicio() {
     <a ref={ligasRef} className={glow("ligas")} href="/ligas" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
     <Card>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: minhasLigas && minhasLigas.length > 0 ? 6 : 0 }}>
-    <CardTitle>As tuas ligas</CardTitle>
-    <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: GOLD }}>Ver todas ›</span>
+    <CardTitle>{t("inicio.tuasLigas")}</CardTitle>
+    <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: GOLD }}>{t("inicio.verTodas")}</span>
     </div>
     {minhasLigas === null ? (
-        <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6 }}>A carregar as tuas ligas…</div>
+        <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6 }}>{t("inicio.aCarregarLigas")}</div>
       ) : minhasLigas.length === 0 ? (
         <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6, lineHeight: 1.4 }}>
         Não tens nenhuma liga a decorrer. Entra numa liga oficial, cria uma com os teus amigos — ou vê os teus títulos em Resultados.
@@ -627,8 +632,8 @@ export default function Inicio() {
       e as ligas. É conteúdo para ficar, não para decidir. */}
     <HubCarrossel />
     </div>
-        <BarraInferior ativo="inicio" />
-    {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || "Campeão"} target={tutTarget} cor={corDaFaixa(faixaJogo)} />}
+    <BarraInferior ativo="inicio" />
+    {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || t("inicio.campeao")} target={tutTarget} cor={corDaFaixa(faixaJogo)} />}
     {/* Modais de evento (aniversário, grande competição, etc.). Aparecem 1x por
       evento; em sequência quando coincidem; ao fechar vão para o sino. */}
     {podeMostrarModalEvento && modalEvento && (
@@ -639,7 +644,7 @@ export default function Inicio() {
         dados={desempenho.dados}
         identity={identityResumo}
         team={desempenho.team}
-        nome={nomeMostrado || "Campeão"}
+        nome={nomeMostrado || t("inicio.campeao")}
         faixa={nomeDaFaixa(faixaJogo)}
         pro={isPro}
         extra={extra}
@@ -698,6 +703,7 @@ const iconBtn: React.CSSProperties = {
 // Faixa de "confirma o teu email". Mostra o estado vindo do redirecionamento
 // (?email=ok, ?email=expirado...) e deixa reenviar a ligação.
 function FaixaVerificarEmail() {
+  const t = useT();
   const [estado, setEstado] = useState<"normal" | "enviando" | "enviado" | "erro">("normal");
   const [msg, setMsg] = useState("");
   async function reenviar() {
@@ -705,17 +711,17 @@ function FaixaVerificarEmail() {
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
-      if (!token) { setEstado("erro"); setMsg("Entra na tua conta primeiro."); return; }
+      if (!token) { setEstado("erro"); setMsg(t("inicio.entraPrimeiro")); return; }
       const j = await fetch("/api/verificar-email", {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
         }).then((r) => r.json());
-      if (j?.jaVerificado) { setEstado("enviado"); setMsg("Já está confirmado!"); return; }
-      if (j?.jaEnviado) { setEstado("enviado"); setMsg(String(j.nota || "Acabámos de enviar.")); return; }
-      if (!j?.ok) { setEstado("erro"); setMsg("Não conseguimos enviar agora. Tenta daqui a pouco."); return; }
-      setEstado("enviado"); setMsg("Enviado! Vê a tua caixa de entrada (e o spam).");
+      if (j?.jaVerificado) { setEstado("enviado"); setMsg(t("inicio.jaConfirmado")); return; }
+      if (j?.jaEnviado) { setEstado("enviado"); setMsg(String(j.nota || t("inicio.acabamosEnviar"))); return; }
+      if (!j?.ok) { setEstado("erro"); setMsg(t("inicio.naoEnviouAgora")); return; }
+      setEstado("enviado"); setMsg(t("inicio.enviado"));
     } catch {
-      setEstado("erro"); setMsg("Não conseguimos enviar agora.");
+      setEstado("erro"); setMsg(t("inicio.naoEnviou"));
     }
   }
   return (
@@ -724,7 +730,7 @@ function FaixaVerificarEmail() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
     </span>
     <div style={{ flex: 1, minWidth: 0 }}>
-    <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>Confirma o teu email</div>
+    <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{t("inicio.confirmaEmail")}</div>
     <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "4px 0 0" }}>
     Enviámos-te uma ligação. Confirmar garante que recebes os avisos das rodadas e que não perdes a conta.
     </p>
@@ -746,14 +752,15 @@ function CardTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>{children}</div>;
 }
 function TeamCreate({ corDodo = "#efeadd" }: { corDodo?: string }) {
+  const t = useT();
   return (
     <div style={{ border: "1px solid #2a4d3e", borderRadius: 16, overflow: "hidden", marginBottom: 14, background: "repeating-linear-gradient(45deg,#1c3a2e 0 16px,#1a352a 16px 32px)" }}>
     <div style={{ padding: "20px 16px", textAlign: "center" }}>
     <div style={{ width: 64, height: 64, margin: "0 auto 6px" }}>
     <Mascot belt={corDodo} expression="feliz" />
     </div>
-    <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase" }}>Cria a tua equipa</div>
-    <div style={{ fontSize: 12, color: "#cfe4d8", margin: "4px 0 14px" }}>Monta 8 atletas com 100 Judocoins e escolhe o teu capitão.</div>
+    <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase" }}>{t("inicio.criarEquipa")}</div>
+    <div style={{ fontSize: 12, color: "#cfe4d8", margin: "4px 0 14px" }}>{t("inicio.criarEquipaSub")}</div>
     <a href="/criar-equipa" style={{ display: "block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 13, borderRadius: 11, fontSize: 15, textDecoration: "none" }}>
     Criar a minha equipa
     </a>
@@ -772,9 +779,10 @@ function TeamCreate({ corDodo = "#efeadd" }: { corDodo?: string }) {
 // Património = quanto vale ao todo (equipa + saldo). Evolui a cada rodada.
 // Saldo = quanto sobra para comprar. É o 100 - valor da equipa.
 function TeamBuilt({ info, fechoTexto, faixa, patrimonio }: { info: { name: string; value: string; last: number }; fechoTexto: string; faixa: Faixa; patrimonio: number | null }) {
+  const t = useT();
   return (
     <div style={{ border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
-    <div style={{ background: "#1c3a2e", padding: 9, textAlign: "center", fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aee9c9" }}>A minha equipa</div>
+    <div style={{ background: "#1c3a2e", padding: 9, textAlign: "center", fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aee9c9" }}>{t("inicio.minhaEquipa")}</div>
     <div style={{ background: "#0f1411", padding: 14 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
     <div style={{ width: 48, height: 48 }}>
@@ -790,9 +798,9 @@ function TeamBuilt({ info, fechoTexto, faixa, patrimonio }: { info: { name: stri
           // Enquanto o património não chega da base, mostra "—" em vez de um
           // número inventado: um valor errado é pior do que um traço.
           const pat = patrimonio !== null ? `JC ${Math.round(patrimonio * 10) / 10}` : "—";
-          return [[pat, "Património"], [String(info.last), "Última"], [`JC ${info.value}`, "Valor"]].map(([v, l]) => (
+          return [[pat, t("equipa.patrimonio")], [String(info.last), t("inicio.ultima")], [`JC ${info.value}`, t("inicio.valor")]].map(([v, l]) => (
               <div key={l}>
-              <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: l === "Património" ? GOLD : "#f1ede2" }}>{v}</div>
+              <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: l === t("equipa.patrimonio") ? GOLD : "#f1ede2" }}>{v}</div>
               <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{l}</div>
               </div>
             ));
@@ -842,27 +850,28 @@ function ModalEvento({ msg, onClose, cor }: { msg: MensagemEspecial; onClose: ()
 // CUIDADO: a variável `isPro` aqui dentro é LOCAL e significa "este é o passo do
 // Ippon Pro" — não tem nada a ver com a subscrição do utilizador.
 function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string; target: TutTarget; cor: string }) {
+  const t = useT();
   const total = STEPS.length + 2;
   const isWelcome = step === 0;
   const isPro = step === STEPS.length + 1;
   const teach = STEPS[step - 1];
   if (target) {
-    const title = isPro ? "Ippon Pro" : teach.title;
+    const title = isPro ? "Ippon Pro" : t(teach.title);
     const text = isPro
-    ? `Toca aqui para teres o Ippon Pro: scout avançado, análise do teu time e dica de capitão. ${PRECO.atualComPeriodo}.`
-    : teach.text;
+    ? t("inicio.tocaProSub", { preco: PRECO.atualComPeriodo })
+    : t(teach.text);
     return (
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
       <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
       <div style={{ width: 56, height: 56, flexShrink: 0 }}><Mascot belt={cor} expression="indicando" /></div>
       <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px" }}>
       <div style={{ textAlign: "right", marginBottom: 4 }}>
-      <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB }}>Pular ✕</button>
+      <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB }}>{t("comum.pular")} ✕</button>
       </div>
       <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{title}</div>
       <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{text}</p>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-      <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>Anterior</button>
+      <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>{t("comum.anterior")}</button>
       <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
       <button onClick={() => (isPro ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{isPro ? "Concluir" : "Seguinte"}</button>
       </div>
@@ -874,7 +883,7 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
   return (
     <Overlay>
     <div style={{ textAlign: "right", marginBottom: 8 }}>
-    <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>Pular tutorial ✕</button>
+    <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>{t("inicio.pularTutorial")}</button>
     </div>
     <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
     {Array.from({ length: total }).map((_, i) => (
@@ -893,7 +902,7 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
         </div>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-        <button onClick={() => setStep(1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 20px", borderRadius: 9, fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Vamos!</button>
+        <button onClick={() => setStep(1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 20px", borderRadius: 9, fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{t("inicio.vamos")}</button>
         </div>
         </div>
       ) : isPro ? (
@@ -901,24 +910,24 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
         <div style={{ width: 80, height: 80, margin: "0 auto 2px" }}>
         <Mascot belt={cor} expression="sabio" />
         </div>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>Oferta de lançamento</div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>{t("inicio.ofertaLancamento")}</div>
         <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0" }}>Ippon Pro</div>
         <div style={{ margin: "6px 0 14px" }}>
         {PRECO.emPromocao && <><span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through" }}>{PRECO.normal}</span>{" "}</>}
         <span style={{ fontFamily: FD, fontSize: 30, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
-        <span style={{ fontSize: 12, color: "#93a39a" }}>/mês</span>
+        <span style={{ fontSize: 12, color: "#93a39a" }}>{t("precos.porMes")}</span>
         </div>
         <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
         {PRO_BENEFITS.map((b) => (
               <div key={b} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
               <span style={{ color: GOLD, fontWeight: 700 }}>✓</span>
-              <span style={{ fontSize: 13, color: "#c7d0c9" }}>{b}</span>
+              <span style={{ fontSize: 13, color: "#c7d0c9" }}>{t(b)}</span>
               </div>
             ))}
         </div>
-        <a href="/ippon-pro" style={{ display: "block", width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 15, borderRadius: 12, fontSize: 16, textDecoration: "none", boxSizing: "border-box" }}>Seja Ippon Pro agora</a>
-        <a href="/ippon-pro" style={{ display: "block", marginTop: 9, textAlign: "center", color: GOLD, fontSize: 13, fontWeight: 700, textDecoration: "none", fontFamily: FB }}>Saber mais</a>
-        <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB }}>Continuar sem pagar</button>
+        <a href="/ippon-pro" style={{ display: "block", width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 15, borderRadius: 12, fontSize: 16, textDecoration: "none", boxSizing: "border-box" }}>{t("inicio.sejaProAgora")}</a>
+        <a href="/ippon-pro" style={{ display: "block", marginTop: 9, textAlign: "center", color: GOLD, fontSize: 13, fontWeight: 700, textDecoration: "none", fontFamily: FB }}>{t("inicio.saberMais")}</a>
+        <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB }}>{t("inicio.continuarSemPagar")}</button>
         </div>
       ) : (
         <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
@@ -927,14 +936,14 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
         <Mascot belt={cor} expression="indicando" />
         </div>
         <div>
-        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>{teach.title}</div>
-        <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{teach.text}</p>
+        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>{t(teach.title)}</div>
+        <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{t(teach.text)}</p>
         </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
-        <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>Anterior</button>
+        <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>{t("comum.anterior")}</button>
         <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
-        <button onClick={() => setStep(step + 1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>Seguinte</button>
+        <button onClick={() => setStep(step + 1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{t("comum.seguinte")}</button>
         </div>
         </div>
       )}
