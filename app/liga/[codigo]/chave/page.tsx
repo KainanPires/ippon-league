@@ -5,7 +5,6 @@ import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { focoMercado, numeroDaRodada, rotuloRodada } from "@/lib/calendario";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
 import {
-  import { useT } from "@/lib/i18n";
   BlocoChave,
   CaixaConfronto,
   CaixaBye,
@@ -13,6 +12,7 @@ import {
   type Aresta,
   type LadoCaixa,
 } from "@/components/Chave";
+import { useT } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
