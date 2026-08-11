@@ -10,7 +10,8 @@ import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import { PRECO } from "@/lib/precos";
 import { limparCacheNivel } from "@/lib/useNivel";
 import { SeletorLingua } from "@/components/SeletorLingua";
-import { normalizarFaixa, corDaFaixa, nomeDaFaixa, type Faixa } from "@/lib/faixas";
+import { useRotuloFaixa } from "@/lib/i18n";
+import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -233,7 +234,10 @@ if (!emailMudou) setEditando(false);
 }
 const nomeMostrado = conta?.nome || "Campeão";
 const corFaixaJogo = corDaFaixa(faixaJogo);
-const nomeFaixaJogo = nomeDaFaixa(faixaJogo);
+// A FAIXA traduzida. O valor gravado em users.belt continua "azul"; só o
+  // rótulo muda de língua — mesmo padrão dos países.
+  const rotuloFaixa = useRotuloFaixa();
+  const nomeFaixaJogo = rotuloFaixa(faixaJogo);
 return (
   <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
   <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 16px 40px" }}>
@@ -251,7 +255,7 @@ return (
   <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeMostrado}</div>
   <div style={{ fontSize: 13, color: GOLD, fontWeight: 700, marginTop: 2, display: "flex", alignItems: "center", gap: 7 }}>
   <span style={{ width: 11, height: 11, borderRadius: 3, background: corFaixaJogo, border: "1px solid rgba(255,255,255,0.25)", flexShrink: 0 }} />
-  Faixa {nomeFaixaJogo}
+  {nomeFaixaJogo}
   </div>
   <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>{abertoDados ? "Toca para fechar" : "Toca para ver os teus dados"}</div>
   </div>
@@ -277,7 +281,7 @@ return (
           <DataRow label="Faixa no judô" value={conta.faixaJudo || "—"} />
           </div>
           <p style={{ fontSize: 11, color: "#5f6f67", lineHeight: 1.5, margin: "8px 2px 0" }}>
-          A tua faixa no judô é informativa. A faixa que conta na Ippon League é a <strong style={{ color: "#93a39a" }}>Faixa {nomeFaixaJogo}</strong>, conquistada pelo teu desempenho.
+          A tua faixa no judô é informativa. A faixa que conta na Ippon League é a <strong style={{ color: "#93a39a" }}>{nomeFaixaJogo}</strong>, conquistada pelo teu desempenho.
           </p>
           <button onClick={abrirEdicao} style={{ display: "block", width: "100%", textAlign: "center", marginTop: 10, background: "transparent", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px", borderRadius: 12, cursor: "pointer" }}>Editar dados</button>
           </>
