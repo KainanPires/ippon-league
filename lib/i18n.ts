@@ -240,6 +240,11 @@ const PT: Dicionario = {
   "precos.contratar": "Contratar {plano}",
   "precos.aAbrir": "A abrir…",
 
+  // --- montra / precos.ts (acrescentado) ---
+  "precos.etiqueta": "Promoção de lançamento",
+  "precos.duracaoDesconto": "{meses} meses com desconto",
+  "precos.premios": "Joga com mais informação e compete pelo topo do ranking",
+
   // --- paginas de venda: ippon-pro / pro (acrescentado) ---
   "pro.heroTitulo": "Joga com vantagem",
   "pro.estrategiaTua": "A estratégia é sempre tua.",
@@ -934,6 +939,11 @@ const EN: Dicionario = {
   "precos.contratar": "Get {plano}",
   "precos.aAbrir": "Opening…",
 
+  // --- montra / precos.ts (acrescentado) ---
+  "precos.etiqueta": "Launch offer",
+  "precos.duracaoDesconto": "{meses} months at a discount",
+  "precos.premios": "Play with more information and compete for the top of the ranking",
+
   // --- paginas de venda: ippon-pro / pro (acrescentado) ---
   "pro.heroTitulo": "Play with an edge",
   "pro.estrategiaTua": "The strategy is always yours.",
@@ -1609,6 +1619,11 @@ const ES: Dicionario = {
   "precos.contratar": "Contratar {plano}",
   "precos.aAbrir": "Abriendo…",
 
+  // --- montra / precos.ts (acrescentado) ---
+  "precos.etiqueta": "Promoción de lanzamiento",
+  "precos.duracaoDesconto": "{meses} meses con descuento",
+  "precos.premios": "Juega con más información y compite por lo más alto del ranking",
+
   // --- paginas de venda: ippon-pro / pro (acrescentado) ---
   "pro.heroTitulo": "Juega con ventaja",
   "pro.estrategiaTua": "La estrategia siempre es tuya.",
@@ -2283,6 +2298,11 @@ const FR: Dicionario = {
   "precos.notaMoeda": "Facturé dans ta monnaie locale, au taux du jour.",
   "precos.contratar": "Souscrire {plano}",
   "precos.aAbrir": "Ouverture…",
+
+  // --- montra / precos.ts (acrescentado) ---
+  "precos.etiqueta": "Offre de lancement",
+  "precos.duracaoDesconto": "{meses} mois à prix réduit",
+  "precos.premios": "Joue avec plus d'informations et vise le sommet du classement",
 
   // --- paginas de venda: ippon-pro / pro (acrescentado) ---
   "pro.heroTitulo": "Joue avec un avantage",
@@ -2966,6 +2986,11 @@ const DE: Dicionario = {
   "precos.notaMoeda": "Abrechnung in deiner Landeswährung, zum Tageskurs.",
   "precos.contratar": "{plano} holen",
   "precos.aAbrir": "Wird geöffnet…",
+
+  // --- montra / precos.ts (acrescentado) ---
+  "precos.etiqueta": "Launch-Aktion",
+  "precos.duracaoDesconto": "{meses} Monate mit Rabatt",
+  "precos.premios": "Spiele mit mehr Informationen und kämpfe um die Spitze der Rangliste",
 
   // --- paginas de venda: ippon-pro / pro (acrescentado) ---
   "pro.heroTitulo": "Spiele mit Vorteil",
