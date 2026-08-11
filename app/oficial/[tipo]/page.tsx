@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { focoMercado, competicoesReais } from "@/lib/calendario";
 import { useNivel } from "@/lib/useNivel";
+import { useT } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -42,6 +43,7 @@ interface MembroGeral {
   is_pro: boolean;
 }
 export default function PaginaOficial() {
+  const t = useT();
   const params = useParams();
   const tipo = String(params?.tipo || "").toLowerCase(); // "mundial" | "continental"
   const ehMundial = tipo === "mundial";
@@ -83,7 +85,7 @@ export default function PaginaOficial() {
     return lista.filter((m) => {
         if (ehNumero) return m.posicao === Number(termo);
         return (m.nome_time || "").toLowerCase().includes(termo);
-      });
+    });
   }
   const membrosVisiveis = filtrar(membros);
   const geralVisivel = filtrar(geral);
@@ -125,7 +127,7 @@ useEffect(() => {
         } catch {
           if (vivo) { setMembros([]); setEstado("pronto"); }
         }
-      })();
+    })();
     return () => { vivo = false; };
   }, [tipo, ehMundial, idComp]);
 // 2) Ranking GERAL (acumulado ao vivo, via /api/liga/geral). Atualiza sozinho
@@ -178,8 +180,8 @@ return (
   </div>
   <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.85)", lineHeight: 1.5 }}>
   {ehMundial
-    ? "Os melhores do mundo. Concorre aos prémios mundiais da rodada."
-    : `Os melhores de ${nomeContinente || "o teu continente"}. Concorre aos prémios continentais.`}
+    ? t("of.melhoresMundo")
+    : `Os melhores de ${nomeContinente || t("of.teuContinente")}. Concorre aos prémios continentais.`}
   </div>
   <div style={{ marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
   Só membros Pro entram no ranking · {compAtual.nome}
@@ -193,24 +195,24 @@ return (
       <span aria-hidden="true" style={{ fontSize: 15, flexShrink: 0 }}>{atualEhUltimaDoAno ? "🏁" : "📅"}</span>
       <span style={{ fontSize: 12.5, color: atualEhUltimaDoAno ? "#f0d79a" : "#aee9c9", lineHeight: 1.45 }}>
       {atualEhUltimaDoAno
-        ? <>Esta é a <strong>última competição de {anoCorrente}</strong>! O ranking fecha aqui e os campeões do ano serão definidos. Em {anoCorrente + 1} recomeça uma época nova, do zero.</>
-        : <>Esta liga é <strong>anual</strong>. A época de {anoCorrente} vai até à última competição do ano, em dezembro. No ano seguinte começa uma época nova — o ranking recomeça do zero.</>}
+        ? t("of.ultimaDoAno", { ano: anoCorrente, proximo: anoCorrente + 1 })
+        : t("of.ligaAnual", { ano: anoCorrente })}
       </span>
       </div>
-    )}
+  )}
   {/* Banner Pro para quem não é Pro */}
   {!souPro && estado === "pronto" && (
       <a href="/ippon-pro" style={{ display: "block", textAlign: "center", marginBottom: 14, background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "11px 14px", borderRadius: 10, textDecoration: "none", fontSize: 12.5, lineHeight: 1.4 }}>
       🔒 Estás a ver o ranking dos Pro · passa a Pro para entrares
       </a>
-    )}
+  )}
   {/* Seletor Geral / Rodada (Geral é a vista principal) */}
   <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: "1px solid #1a221d" }}>
   {(["geral", "rodada"] as Vista[]).map((v) => (
         <button key={v} onClick={() => setVista(v)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${vista === v ? GOLD : "transparent"}`, color: vista === v ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", padding: "9px 0", cursor: "pointer" }}>
-        {v === "geral" ? "Ranking Geral" : "Líderes da Rodada"}
+        {v === "geral" ? "Ranking Geral" : t("of.lideresRodada")}
         </button>
-      ))}
+  ))}
   </div>
   {/* Destaque FIXO da minha posição (na vista ativa). Sempre visível, para
     saber onde estou sem ter de procurar na lista. Só Pro e se estou no
@@ -222,31 +224,31 @@ return (
           <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: GOLD, lineHeight: 1 }}>{`${minhaPos}º`}</div>
         ) : (
           <div style={{ fontFamily: FD, fontSize: 20, color: "#7c8a82", lineHeight: 1 }}>—</div>
-        )}
+      )}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#aee9c9" }}>A tua posição</div>
+      <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#aee9c9" }}>{t("of.tuaPosicao")}</div>
       <div style={{ fontSize: 12, color: "#c7d0c9", marginTop: 2 }}>
       {minhaPos !== null
-        ? <>{vista === "geral" ? "Ranking do ano" : "Nesta rodada"} · entre {totalVista} {totalVista === 1 ? "jogador" : "jogadores"}</>
-        : (vista === "geral" ? "Ainda sem pontos no ano. Escala e começa a pontuar!" : "Não escalaste nesta rodada.")}
+        ? <>{vista === "geral" ? t("of.rankingAno") : "Nesta rodada"} · entre {totalVista} {totalVista === 1 ? "jogador" : "jogadores"}</>
+        : (vista === "geral" ? t("of.semPontosAno") : t("of.naoEscalasteRodada"))}
       </div>
       </div>
       </div>
-    )}
-  {estado === "a_carregar" && <Aviso>A carregar o ranking…</Aviso>}
+  )}
+  {estado === "a_carregar" && <Aviso>{t("of.aCarregarRanking")}</Aviso>}
   {estado === "sem_sessao" && (
       <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
-      <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 16 }}>Entra na tua conta para veres a liga do teu continente.</p>
-      <a href="/entrar?voltar=/ligas" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: "12px 22px", borderRadius: 11, textDecoration: "none", fontSize: 14 }}>Entrar</a>
+      <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 16 }}>{t("of.entraParaVer")}</p>
+      <a href="/entrar?voltar=/ligas" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: "12px 22px", borderRadius: 11, textDecoration: "none", fontSize: 14 }}>{t("of.entrar")}</a>
       </div>
-    )}
+  )}
   {estado === "sem_continente" && (
       <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
       <div style={{ fontSize: 30, marginBottom: 6 }}>🗺️</div>
       <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Ainda não sabemos o teu continente. Define o teu país no perfil para entrares na liga continental.</p>
       </div>
-    )}
+  )}
   {/* Barra de pesquisa partilhada pelas duas vistas */}
   {estado === "pronto" && (membros.length > 0 || geral.length > 0) && (
       <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "9px 12px", marginBottom: 11 }}>
@@ -254,30 +256,30 @@ return (
       <input
       value={pesquisa}
       onChange={(e) => setPesquisa(e.target.value)}
-      placeholder="Procurar por time ou posição"
+      placeholder={t("of.procurarTime")}
       inputMode="text"
       style={{ flex: 1, background: "transparent", border: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB, outline: "none" }}
       />
       {pesquisa && (
           <button onClick={() => setPesquisa("")} aria-label="Limpar" style={{ background: "transparent", border: "none", color: "#7c8a82", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
-        )}
+      )}
       </div>
-    )}
+  )}
   {/* Vista GERAL: acumulado ao vivo */}
   {estado === "pronto" && vista === "geral" && (
       <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-      <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>Ranking geral · época</span>
+      <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>{t("pl.rankingGeral")}</span>
       {emAndamento && (
           <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo
           </span>
-        )}
+      )}
       </div>
       {!geralCarregado ? (
-          <Aviso>A somar a época…</Aviso>
+          <Aviso>{t("pl.aSomarEpoca")}</Aviso>
         ) : geral.length === 0 ? (
-          <Aviso>Ainda sem pontos acumulados.</Aviso>
+          <Aviso>{t("pl.semPontosAcumulados")}</Aviso>
         ) : geralVisivel.length === 0 ? (
           <Aviso>Sem resultados para &quot;{pesquisa}&quot;.</Aviso>
         ) : (
@@ -295,19 +297,19 @@ return (
                   <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>
                   {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
                   </div>
-                  <div style={{ fontSize: 11, color: "#93a39a" }}>{m.escalou ? <span style={{ color: "#7fd1a3" }}>+{m.pontos_rodada} nesta rodada</span> : "Sem escalação nesta rodada"}</div>
+                  <div style={{ fontSize: 11, color: "#93a39a" }}>{m.escalou ? <span style={{ color: "#7fd1a3" }}>+{m.pontos_rodada} nesta rodada</span> : t("pl.semEscalacao")}</div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: GOLD }}>{m.pontos_geral}</div>
-                  <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>total</div>
+                  <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>{t("pl.total")}</div>
                   </div>
                   </div>
                 );
-              })}
+          })}
           </div>
-        )}
+      )}
       </>
-    )}
+  )}
   {/* Vista RODADA: o ranking só da rodada atual */}
   {estado === "pronto" && vista === "rodada" && (
       <>
@@ -318,11 +320,11 @@ return (
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo
           </span>
         ) : (
-          <span style={{ fontSize: 11, color: "#7fd1a3" }}>Pré-competição</span>
-        )}
+          <span style={{ fontSize: 11, color: "#7fd1a3" }}>{t("pl.preCompeticao")}</span>
+      )}
       </div>
       {membros.length === 0 ? (
-          <Aviso>Ainda sem membros Pro nesta rodada.</Aviso>
+          <Aviso>{t("of.semMembrosPro")}</Aviso>
         ) : membrosVisiveis.length === 0 ? (
           <Aviso>Sem resultados para &quot;{pesquisa}&quot;.</Aviso>
         ) : (
@@ -340,19 +342,19 @@ return (
                   <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>
                   {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
                   </div>
-                  <div style={{ fontSize: 11, color: m.escalou ? "#7fd1a3" : "#e0894f" }}>{m.escalou ? "Escalou" : "Não escalou"}</div>
+                  <div style={{ fontSize: 11, color: m.escalou ? "#7fd1a3" : "#e0894f" }}>{m.escalou ? "Escalou" : t("pl.naoEscalou")}</div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: "#f1ede2" }}>{m.escalou ? (m.pontos >= 0 ? "+" : "") + m.pontos : "—"}</div>
-                  <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>pts</div>
+                  <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>{t("comum.pts")}</div>
                   </div>
                   </div>
                 );
-              })}
+          })}
           </div>
-        )}
+      )}
       </>
-    )}
+  )}
   </div>
   </main>
 );
