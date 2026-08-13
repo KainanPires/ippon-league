@@ -28,10 +28,16 @@
 //
 // E o apagar é irreversível: por isso há um LIMITE por corrida, e um modo de
 // simulação (?simular=1) que mostra quem seria apagado sem tocar em nada.
+//
+// IDIOMA: o email e a notificação do sino saem NA LÍNGUA da pessoa (users.lingua).
+// Os textos vivem no dicionário do servidor (lib/dicionarioNotif); o email
+// renderiza-se com renderNotif, e o sino passa as chaves a criarNotificacaoServidor
+// (que já escolhe a língua de quem recebe). Sem língua definida, cai no português.
 // ---------------------------------------------------------------------------
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
+import { renderNotif, type LinguaNotif } from "@/lib/dicionarioNotif";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -46,6 +52,12 @@ const AVISO_7 = 358;  // faltam ~7 dias
 const MAX_APAGAR = 20;
 
 const MAIL_FROM = process.env.MAIL_FROM || "Ippon League <support@ipponleague.com>";
+
+/** Normaliza o valor de users.lingua para uma das 5 línguas (fallback pt). */
+function normLingua(v: unknown): LinguaNotif {
+  const s = String(v || "").toLowerCase();
+  return (["pt", "en", "es", "fr", "de"].includes(s) ? s : "pt") as LinguaNotif;
+}
 
 const E_AMP = String.fromCharCode(38) + "amp;";
 const E_LT = String.fromCharCode(38) + "lt;";
@@ -66,27 +78,32 @@ async function enviarEmail(para: string, assunto: string, html: string): Promise
   } catch { /* o aviso é extra; a contagem continua */ }
 }
 
-function corpoAviso(nome: string, dias: number, nomeTime: string | null): string {
-  const primeiro = (nome || "").trim().split(" ")[0] || "Campeão";
+// Corpo do email de aviso, na língua da pessoa. O nome do time (se houver) entra
+// como HTML de confiança em {time}; o nome próprio da pessoa vai escapado.
+function corpoAviso(nome: string, dias: number, nomeTime: string | null, lingua: LinguaNotif): string {
+  const primeiro = (nome || "").trim().split(" ")[0] || renderNotif(lingua, "email.confirmarFallbackNome");
   const time = nomeTime ? ` <strong>${esc(nomeTime)}</strong>` : "";
+  const saudacao = renderNotif(lingua, "email.confirmarSaudacao", { nome: esc(primeiro) });
+  const frase1 = renderNotif(lingua, "inativa.emailFrase1", { time, dias });
+  const frase2 = renderNotif(lingua, "inativa.emailFrase2");
+  const botao = renderNotif(lingua, "inativa.emailBotao");
+  const rodape = renderNotif(lingua, "inativa.emailRodape");
   return `
     <div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.6;color:#111;max-width:520px">
-      <p style="margin:0 0 14px">Olá, ${esc(primeiro)}!</p>
+      <p style="margin:0 0 14px">${saudacao}</p>
       <p style="margin:0 0 14px">
-        Há quase um ano que não entras na <strong>Ippon League</strong>, e a tua conta${time}
-        será apagada dentro de <strong>${dias} dias</strong>.
+        ${frase1}
       </p>
       <p style="margin:0 0 14px">
-        Se voltares, fica tudo como estava — e a contagem recomeça. Basta abrir a app uma vez.
+        ${frase2}
       </p>
       <p style="margin:0 0 20px">
         <a href="https://www.ipponleague.com/inicio" style="display:inline-block;background:#d9a441;color:#1b211e;text-decoration:none;font-weight:700;padding:13px 26px;border-radius:10px">
-          Voltar ao dojo
+          ${botao}
         </a>
       </p>
       <p style="margin:0;color:#666;font-size:13px">
-        Se preferires não continuar, não precisas de fazer nada. O nome do teu time volta a ficar
-        disponível para outra pessoa.
+        ${rodape}
       </p>
     </div>`;
 }
@@ -117,7 +134,7 @@ export async function GET(req: Request) {
   for (const [diasInativo, faltam] of [[AVISO_30, 30], [AVISO_7, 7]] as const) {
     const { data } = await supabaseAdmin
       .from("users")
-      .select("id, email, name, ultima_atividade, avisos_inatividade")
+      .select("id, email, name, lingua, ultima_atividade, avisos_inatividade")
       .eq("is_pro", false).eq("is_pro_max", false)
       .lt("ultima_atividade", corte(diasInativo))
       .or(`aviso_inatividade_em.is.null,aviso_inatividade_em.lt.${limiteAviso}`)
@@ -131,6 +148,7 @@ export async function GET(req: Request) {
         if (inativoHa >= AVISO_7) continue;
       }
       if (!simular) {
+        const lingua = normLingua(u.lingua);
         // Nome do time, para o email ser concreto: "a tua conta Relâmpago
         // Marquinhos". Um aviso vago é fácil de ignorar.
         let nomeTime: string | null = null;
@@ -141,13 +159,16 @@ export async function GET(req: Request) {
           nomeTime = eq?.nome ? String(eq.nome) : null;
         } catch { /* sem nome: o email fica genérico */ }
 
-        await enviarEmail(String(u.email || ""), `A tua conta será apagada em ${faltam} dias`, corpoAviso(String(u.name || ""), faltam, nomeTime));
-        // Notificação no sino também: quem não lê email pode abrir a app.
+        const assunto = renderNotif(lingua, "inativa.emailAssunto", { dias: faltam });
+        await enviarEmail(String(u.email || ""), assunto, corpoAviso(String(u.name || ""), faltam, nomeTime, lingua));
+        // Notificação no sino também: quem não lê email pode abrir a app. Sai na
+        // língua de quem recebe (chaves + vars; o serviço trata da tradução).
         await criarNotificacaoServidor({
           paraUserId: String(u.id),
           tipo: "conta_inativa",
-          titulo: `A tua conta será apagada em ${faltam} dias`,
-          corpo: "Há quase um ano que não entras. Abre a app uma vez para manteres tudo como está.",
+          chaveTitulo: "inativa.emailAssunto",
+          chaveCorpo: "inativa.sinoCorpo",
+          vars: { dias: faltam },
           link: "/inicio",
         }).catch(() => {});
         await supabaseAdmin
