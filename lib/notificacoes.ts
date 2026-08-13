@@ -12,11 +12,19 @@
 //     fecha em 5h" (vem do calendário) ou "estás perto do Top 10" (vem do
 //     ranking). São recalculadas sempre que o sino abre — nunca ficam "velhas".
 //
-// O componente do sino chama `listarTudo()` que devolve as duas, já unidas e
-// ordenadas, prontas para mostrar.
+// O componente do sino chama `listarTudo(opts, t)` que devolve as duas, já
+// unidas e ordenadas, prontas para mostrar.
+//
+// IDIOMA: as calculadas são construídas AQUI, no cliente, por isso recebem o
+// tradutor `t` (de useT) e saem já na língua da pessoa. As GUARDADAS vêm da BD
+// como texto (a tradução delas é de uma fase posterior).
 
 import { supabase } from "@/lib/supabase";
-import { focoMercado, textoFecho, estadoMercado } from "@/lib/calendario";
+import { focoMercado, estadoMercado, formatarContagem } from "@/lib/calendario";
+
+// O tradutor tal como useT() o devolve. As calculadas recebem-no por parâmetro
+// porque estas funções não são componentes React (não podem chamar hooks).
+type Tradutor = (chave: string, vars?: Record<string, string | number>) => string;
 
 // Tipos de evento conhecidos (texto livre na BD, mas usamos estes no código).
 export type TipoNotificacao =
@@ -163,30 +171,45 @@ function marcarCalculadaVista(chave: string) {
   } catch {}
 }
 
+// Rótulo da faixa na língua da pessoa. As chaves da BD/estado guardam o VALOR
+// canónico ("Roxa"); aqui traduz-se só para mostrar.
+const FAIXA_KEY: Record<string, string> = {
+  Branca: "faixa.branca", Azul: "faixa.azul", Amarela: "faixa.amarela",
+  Verde: "faixa.verde", Roxa: "faixa.roxa", Marrom: "faixa.marrom", Preta: "faixa.preta",
+};
+function rotuloFaixa(f: string, t: Tradutor): string {
+  const k = FAIXA_KEY[f];
+  return k ? t(k) : f;
+}
+
 /**
- * Gera as notificações calculadas do momento (mercado + faixa/ranking).
+ * Gera as notificações calculadas do momento (mercado + faixa/ranking), já na
+ * língua da pessoa (via `t`).
  *
  * ── PRINCÍPIO DE OURO (vale para TODA notificação, calculada ou guardada) ──
  * Uma notificação NUNCA é genérica. Antes de gerar o texto, verifica-se o estado
  * REAL do utilizador e a mensagem é ajustada a ele. Exemplos:
  *   • mercado a fechar → COM equipa: "confere a tua equipa"; SEM equipa: "escala já!"
  *   • o destino (link) também muda conforme o estado (/meu-time vs /criar-equipa).
- * Ao adicionar QUALQUER notificação nova (aqui ou na Leva 2), passa pelos dados
- * do utilizador (tem equipa? que faixa? que posição?) e personaliza título, corpo
- * e link. Nada de mensagens iguais para toda a gente.
  *
  * `opts` traz o que se sabe do utilizador neste momento. Quanto mais completo,
  * mais personalizadas as notificações. Tudo é opcional: o que faltar, não gera
  * a notificação correspondente (em vez de gerar uma genérica).
+ *
+ * As CHAVES de deduplicação ("vistas") continuam a usar valores/ids — não texto —
+ * por isso não dependem da língua: mudar de idioma não "desmarca" notificações.
  */
-export function gerarCalculadas(opts?: {
-  temEquipa?: boolean;        // já tem equipa COMPLETA escalada para a competição-alvo?
-  faixaAtual?: string;
-  faixaAnterior?: string;
-  posicaoAtual?: number;
-  posicaoAnterior?: number;
-  distanciaTop10?: number; // pontos até ao Top 10, se conhecido
-}): Notificacao[] {
+export function gerarCalculadas(
+  t: Tradutor,
+  opts?: {
+    temEquipa?: boolean;        // já tem equipa COMPLETA escalada para a competição-alvo?
+    faixaAtual?: string;
+    faixaAnterior?: string;
+    posicaoAtual?: number;
+    posicaoAnterior?: number;
+    distanciaTop10?: number; // pontos até ao Top 10, se conhecido
+  }
+): Notificacao[] {
   const out: Notificacao[] = [];
   const vistas = vistasCalculadas();
   const push = (chave: string, n: Omit<Notificacao, "id" | "lida" | "criadaEm" | "calculada">) => {
@@ -198,44 +221,43 @@ export function gerarCalculadas(opts?: {
     const foco = focoMercado();
     const temEquipa = !!opts?.temEquipa;
     if (foco.aDecorrer) {
-      // A decorrer: a mensagem muda conforme escalou ou não.
-      // IMPORTANTE: enquanto HÁ competição a decorrer, NÃO se anuncia o mercado da
-      // próxima competição (ele ainda não abriu de verdade — só abre quando esta
-      // terminar). Por isso este ramo gera apenas a notificação "em jogo" e mais
-      // nada de mercado.
+      const comp = foco.aDecorrer.nome;
       push("mercado_a_decorrer:" + foco.aDecorrer.idCompeticao, {
         tipo: "mercado",
-        titulo: temEquipa ? "A tua equipa está em jogo" : "Competição a decorrer",
-        corpo: temEquipa
-          ? `${foco.aDecorrer.nome} está a decorrer. Acompanha os pontos da tua equipa ao vivo.`
-          : `${foco.aDecorrer.nome} está a decorrer. Não escalaste a tempo — prepara-te para a próxima.`,
+        titulo: temEquipa ? t("notif.emJogoTitulo") : t("notif.aDecorrerTitulo"),
+        corpo: temEquipa ? t("notif.emJogoCorpo", { comp }) : t("notif.aDecorrerCorpo", { comp }),
         link: temEquipa ? "/meu-time" : "/inicio",
       });
     } else {
       const est = estadoMercado(foco.alvo);
       if (est.estado === "aberto") {
         const urgente = est.msAteFecho !== null && est.msAteFecho <= 24 * 60 * 60 * 1000;
-        const fecho = textoFecho(foco.alvo); // ex: "Mercado fecha em 4h 12min"
+        const comp = foco.alvo.nome;
+        // Tempo até fechar, traduzível: ao minuto se há hora oficial; senão, em dias.
+        let tempo: string;
+        if (est.temHora && est.msAteFecho !== null) {
+          tempo = formatarContagem(est.msAteFecho); // ex.: "4h 12min"
+        } else {
+          const inicioDia = new Date(foco.alvo.de.replace(/\//g, "-") + "T00:00:00");
+          const dias = Math.max(0, Math.ceil((inicioDia.getTime() - Date.now()) / 86400000));
+          tempo = dias <= 1 ? t("notif.umDia") : t("notif.nDias", { n: dias });
+        }
         // Chave distinta por estado+urgência+equipa, para o "visto" não se confundir.
         const chave = `mercado_${temEquipa ? "tem" : "sem"}_${urgente ? "urg" : "calmo"}:${foco.alvo.idCompeticao}`;
         if (temEquipa) {
           // JÁ TEM equipa: lembra de conferir, sem pressão de montar.
           push(chave, {
             tipo: "mercado",
-            titulo: urgente ? `Última hora para ajustar a equipa` : `A tua equipa está pronta`,
-            corpo: urgente
-              ? `${fecho} para ${foco.alvo.nome}. Confere o teu capitão e os teus atletas antes de fechar.`
-              : `${foco.alvo.nome} — ${fecho}. Podes ainda trocar atletas ou o capitão.`,
+            titulo: urgente ? t("notif.ajustarTitulo") : t("notif.prontaTitulo"),
+            corpo: urgente ? t("notif.ajustarCorpo", { tempo, comp }) : t("notif.prontaCorpo", { comp, tempo }),
             link: "/meu-time",
           });
         } else {
           // NÃO TEM equipa: incentiva a escalar; urgência se falta pouco.
           push(chave, {
             tipo: "mercado",
-            titulo: urgente ? `Escala já! O mercado está a fechar` : `Monta a tua equipa`,
-            corpo: urgente
-              ? `${fecho} para ${foco.alvo.nome}. Escala a tua equipa rápido para entrares nesta rodada!`
-              : `${foco.alvo.nome} — ${fecho}. Monta os teus 8 atletas e escolhe o capitão.`,
+            titulo: urgente ? t("notif.escalaJaTitulo") : t("notif.montaEquipaTitulo"),
+            corpo: urgente ? t("notif.escalaJaCorpo", { tempo, comp }) : t("notif.montaEquipaCorpo", { comp, tempo }),
             link: "/criar-equipa",
           });
         }
@@ -246,10 +268,11 @@ export function gerarCalculadas(opts?: {
   // --- FAIXA (subiu/desceu) ---
   if (opts?.faixaAtual && opts?.faixaAnterior && opts.faixaAtual !== opts.faixaAnterior) {
     const subiu = ordemFaixa(opts.faixaAtual) > ordemFaixa(opts.faixaAnterior);
+    const faixa = rotuloFaixa(opts.faixaAtual, t);
     push(`faixa_${opts.faixaAtual}`, {
       tipo: subiu ? "faixa_subiu" : "faixa_desceu",
-      titulo: subiu ? `Subiste para a Faixa ${opts.faixaAtual}!` : `Desceste para a Faixa ${opts.faixaAtual}`,
-      corpo: subiu ? "Parabéns pela evolução. Continua assim!" : "Recupera a tua posição na próxima rodada.",
+      titulo: subiu ? t("notif.faixaSubiuTitulo", { faixa }) : t("notif.faixaDesceuTitulo", { faixa }),
+      corpo: subiu ? t("notif.faixaSubiuCorpo") : t("notif.faixaDesceuCorpo"),
       link: "/perfil",
     });
   }
@@ -258,8 +281,8 @@ export function gerarCalculadas(opts?: {
   if (typeof opts?.distanciaTop10 === "number" && opts.distanciaTop10 > 0) {
     push(`ranking_top10:${opts.distanciaTop10}`, {
       tipo: "ranking",
-      titulo: `Estás perto do Top 10`,
-      corpo: `Faltam ${opts.distanciaTop10} pontos para entrares no Top 10.`,
+      titulo: t("notif.top10Titulo"),
+      corpo: t("notif.top10Corpo", { n: opts.distanciaTop10 }),
       link: "/ligas",
     });
   }
@@ -267,8 +290,8 @@ export function gerarCalculadas(opts?: {
     const subiu = opts.posicaoAnterior - opts.posicaoAtual;
     push(`ranking_subiu:${opts.posicaoAtual}`, {
       tipo: "ranking",
-      titulo: `Subiste ${subiu} ${subiu === 1 ? "posição" : "posições"} no ranking`,
-      corpo: `Estás agora em #${opts.posicaoAtual}.`,
+      titulo: subiu === 1 ? t("notif.subiuRankSing", { n: subiu }) : t("notif.subiuRankPlur", { n: subiu }),
+      corpo: t("notif.subiuRankCorpo", { pos: opts.posicaoAtual }),
       link: "/ligas",
     });
   }
@@ -288,6 +311,9 @@ export function marcarCalculadaLida(n: Notificacao) {
   if (n.calculada) marcarCalculadaVista(n.id.replace(/^calc:/, ""));
 }
 
+// Opções das calculadas (para o sino tipar o `calcOpts` sem repetir a forma).
+export type OpcoesCalculadas = Parameters<typeof gerarCalculadas>[1];
+
 // ---------------------------------------------------------------------------
 // UNIÃO — o que o sino consome
 // ---------------------------------------------------------------------------
@@ -296,8 +322,8 @@ export function marcarCalculadaLida(n: Notificacao) {
  * Devolve TODAS as notificações (guardadas + calculadas), ordenadas das mais
  * recentes para as mais antigas, prontas para o sino mostrar.
  */
-export async function listarTudo(opts?: Parameters<typeof gerarCalculadas>[0]): Promise<Notificacao[]> {
-  const [guardadas, calculadas] = [await listarGuardadas(), gerarCalculadas(opts)];
+export async function listarTudo(t: Tradutor, opts?: OpcoesCalculadas): Promise<Notificacao[]> {
+  const [guardadas, calculadas] = [await listarGuardadas(), gerarCalculadas(t, opts)];
   // Calculadas aparecem no topo (são "do momento"), seguidas das guardadas por data.
   return [...calculadas, ...guardadas].sort((a, b) => {
     // não lidas primeiro; dentro disso, mais recentes primeiro
@@ -307,7 +333,7 @@ export async function listarTudo(opts?: Parameters<typeof gerarCalculadas>[0]): 
 }
 
 /** Quantas não lidas há (para o ponto vermelho do sino). */
-export async function contarNaoLidas(opts?: Parameters<typeof gerarCalculadas>[0]): Promise<number> {
-  const todas = await listarTudo(opts);
+export async function contarNaoLidas(t: Tradutor, opts?: OpcoesCalculadas): Promise<number> {
+  const todas = await listarTudo(t, opts);
   return todas.filter((n) => !n.lida).length;
 }
