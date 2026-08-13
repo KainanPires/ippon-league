@@ -295,6 +295,62 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Le {comp} est terminé. Tu as fait {pontos} pts — vois ta position dans la ligue.",
     de: "Der {comp} ist vorbei. Du hast {pontos} Pkt gemacht — sieh dir deine Position in der Liga an.",
   },
+  "mercado.abertoTitulo": {
+    pt: "🥋 Mercado aberto: {comp}",
+    en: "🥋 Market open: {comp}",
+    es: "🥋 Mercado abierto: {comp}",
+    fr: "🥋 Marché ouvert : {comp}",
+    de: "🥋 Markt offen: {comp}",
+  },
+  "mercado.abertoCorpo": {
+    pt: "Já podes montar a tua equipa para o {comp}. O mercado fecha em {tempo} — escala os teus 8 atletas e o capitão antes de fechar!",
+    en: "You can now build your team for {comp}. The market closes in {tempo} — line up your 8 athletes and captain before it closes!",
+    es: "Ya puedes montar tu equipo para el {comp}. El mercado cierra en {tempo} — ¡alinea a tus 8 atletas y al capitán antes del cierre!",
+    fr: "Tu peux maintenant constituer ton équipe pour le {comp}. Le marché ferme dans {tempo} — aligne tes 8 athlètes et ton capitaine avant la fermeture !",
+    de: "Du kannst jetzt dein Team für {comp} aufstellen. Der Markt schließt in {tempo} — stell deine 8 Athleten und den Kapitän auf, bevor er schließt!",
+  },
+  "mercado.ajustarTitulo": {
+    pt: "⏰ Última chance para ajustar: {comp}",
+    en: "⏰ Last chance to adjust: {comp}",
+    es: "⏰ Última oportunidad para ajustar: {comp}",
+    fr: "⏰ Dernière chance pour ajuster : {comp}",
+    de: "⏰ Letzte Chance zum Anpassen: {comp}",
+  },
+  "mercado.ajustarCorpo": {
+    pt: "O mercado do {comp} fecha em {tempo}. Ainda dá para trocar atletas ou mudar o capitão — confere a tua equipa antes de fechar!",
+    en: "The market for {comp} closes in {tempo}. You can still swap athletes or change the captain — check your team before it closes!",
+    es: "El mercado del {comp} cierra en {tempo}. Aún puedes cambiar atletas o al capitán — ¡revisa tu equipo antes del cierre!",
+    fr: "Le marché du {comp} ferme dans {tempo}. Tu peux encore changer d'athlètes ou de capitaine — vérifie ton équipe avant la fermeture !",
+    de: "Der Markt für {comp} schließt in {tempo}. Du kannst noch Athleten oder den Kapitän tauschen — prüfe dein Team, bevor er schließt!",
+  },
+  "mercado.fechadoJogoTitulo": {
+    pt: "Mercado fechado: {comp} vai começar",
+    en: "Market closed: {comp} is about to start",
+    es: "Mercado cerrado: {comp} va a empezar",
+    fr: "Marché fermé : {comp} va commencer",
+    de: "Markt geschlossen: {comp} beginnt gleich",
+  },
+  "mercado.fechadoJogoCorpo": {
+    pt: "A tua equipa está escalada e em jogo no {comp}. Boa sorte! Acompanha a pontuação ao vivo.",
+    en: "Your team is lined up and in play at {comp}. Good luck! Follow the scoring live.",
+    es: "Tu equipo está alineado y en juego en el {comp}. ¡Buena suerte! Sigue la puntuación en directo.",
+    fr: "Ton équipe est alignée et en jeu au {comp}. Bonne chance ! Suis les points en direct.",
+    de: "Dein Team ist aufgestellt und im Spiel beim {comp}. Viel Glück! Verfolge die Punkte live.",
+  },
+  "mercado.fechadoForaTitulo": {
+    pt: "Mercado fechado: {comp}",
+    en: "Market closed: {comp}",
+    es: "Mercado cerrado: {comp}",
+    fr: "Marché fermé : {comp}",
+    de: "Markt geschlossen: {comp}",
+  },
+  "mercado.fechadoForaCorpo": {
+    pt: "O mercado fechou e não montaste equipa para o {comp}. Ficaste de fora desta rodada — prepara-te para a próxima!",
+    en: "The market closed and you didn't build a team for {comp}. You're out this round — get ready for the next one!",
+    es: "El mercado cerró y no montaste equipo para el {comp}. Te quedaste fuera de esta ronda — ¡prepárate para la próxima!",
+    fr: "Le marché a fermé et tu n'as pas constitué d'équipe pour le {comp}. Tu es hors-jeu cette journée — prépare-toi pour la prochaine !",
+    de: "Der Markt hat geschlossen und du hast kein Team für {comp} aufgestellt. Du bist diese Runde raus — mach dich bereit für die nächste!",
+  },
 };
 
 /** Substitui {var} pelos valores dados. */
