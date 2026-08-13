@@ -9,13 +9,13 @@
 //   1) Escolhe a competição (não-clássica).
 //   2) A app carrega os inscritos (/api/atletas) — já vêm com categoria e género.
 //   3) Escolhe uma categoria; vê só os inscritos dela.
-//   4) Distribui-os pelos 4 pools (A/B/C/D), na ordem da chave da IJF
-//      (cabeças-de-série primeiro). Os BYES são calculados AUTOMATICAMENTE pelo
-//      tamanho de cada pool — o responsável não os marca à mão (evita chaves
-//      inválidas que partiam o desenho).
-//   5) Guarda a categoria -> grava em `chave_atletas`. O cron "Chave Maestro"
+//   4) Distribui-os pelos 4 pools (A/B/C/D), na ordem da chave da IJF.
+//   5) Os BYES são SUGERIDOS automaticamente pelo tamanho do pool, mas cada um é
+//      EDITÁVEL: toca no "Bye" de um atleta para ligar/desligar. Ao tocar, esse
+//      pool passa a manual (a sugestão automática deixa de mexer nele).
+//   6) Guarda a categoria -> grava em `chave_atletas`. O cron "Chave Maestro"
 //      preenche o movimento e a chave ao vivo do Pro/Pro Max aparece sozinha.
-//   6) "Avisar jogadores" dispara a notificação a todos (uma vez por competição).
+//   7) "Avisar jogadores" dispara a notificação a todos (uma vez por competição).
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -44,8 +44,8 @@ function compPorOmissao(): string {
   return COMPS[0]?.idCompeticao || "";
 }
 
-// Quantos byes precisa um pool de n atletas para formar uma chave "redonda":
-// os primeiros (2^ceil(log2 n) − n) da lista (os cabeças-de-série) recebem bye.
+// Sugestão de byes para um pool de n atletas: os primeiros (2^ceil(log2 n) − n)
+// da lista recebem bye. É só uma SUGESTÃO — o responsável ajusta à mão.
 function calcByes(ids: string[]): string[] {
   const n = ids.length;
   if (n <= 1) return [];
@@ -61,6 +61,7 @@ type Pools = Record<PoolId, string[]>;
 interface MolduraGuardada { pools: Record<string, unknown>; genero: string | null }
 
 const POOLS_VAZIOS: Pools = { A: [], B: [], C: [], D: [] };
+const AUTO_TODOS: Record<PoolId, boolean> = { A: true, B: true, C: true, D: true };
 
 export default function EditorChave() {
   const t = useT();
@@ -70,6 +71,9 @@ export default function EditorChave() {
   const [carregando, setCarregando] = useState(false);
   const [cat, setCat] = useState<string>("-73");
   const [pools, setPools] = useState<Pools>(POOLS_VAZIOS);
+  // Byes: em "auto" seguem calcByes(pools); em "manual" seguem o que o utilizador escolheu.
+  const [manualByes, setManualByes] = useState<Pools>(POOLS_VAZIOS);
+  const [autoBye, setAutoBye] = useState<Record<PoolId, boolean>>(AUTO_TODOS);
   const [feitas, setFeitas] = useState<Record<string, boolean>>({});
   const [cache, setCache] = useState<Record<string, MolduraGuardada>>({});
   const [aGravar, setAGravar] = useState(false);
@@ -96,14 +100,24 @@ export default function EditorChave() {
     return data.session?.access_token || "";
   }
 
-  // Carrega os ids guardados de uma categoria para os pools editáveis.
+  // Byes efetivos de um pool: automáticos (sugestão) ou manuais (escolha do utilizador).
+  const byesDe = (p: PoolId): string[] => (autoBye[p] ? calcByes(pools[p]) : manualByes[p]);
+
   const carregarCat = useCallback((categoria: string, c: Record<string, MolduraGuardada>) => {
     const m = c[categoria];
-    if (!m || !m.pools || typeof m.pools !== "object") { setPools(POOLS_VAZIOS); setMsg(""); setErro(""); return; }
+    if (!m || !m.pools || typeof m.pools !== "object") {
+      setPools(POOLS_VAZIOS); setManualByes(POOLS_VAZIOS); setAutoBye(AUTO_TODOS); setMsg(""); setErro(""); return;
+    }
     const raw = m.pools as Record<string, unknown>;
     const np: Pools = { A: [], B: [], C: [], D: [] };
+    const nb: Pools = { A: [], B: [], C: [], D: [] };
     for (const p of POOLS) np[p] = Array.isArray(raw[p]) ? (raw[p] as unknown[]).map(String) : [];
+    const byesRaw = (raw["byes"] ?? null) as Record<string, unknown> | null;
+    if (byesRaw) for (const p of POOLS) nb[p] = Array.isArray(byesRaw[p]) ? (byesRaw[p] as unknown[]).map(String) : [];
     setPools(np);
+    setManualByes(nb);
+    // Moldura já guardada -> respeita os byes guardados (manual).
+    setAutoBye({ A: false, B: false, C: false, D: false });
     setMsg(""); setErro("");
   }, []);
 
@@ -148,14 +162,24 @@ export default function EditorChave() {
       np[pool] = [...np[pool], id];
       return np;
     });
+    // Ao (re)colocar, tira-o de qualquer lista manual de byes; os pools em auto
+    // recalculam a sugestão sozinhos.
+    setManualByes((prev) => {
+      const nb: Pools = { A: prev.A.filter((x) => x !== id), B: prev.B.filter((x) => x !== id), C: prev.C.filter((x) => x !== id), D: prev.D.filter((x) => x !== id) };
+      return nb;
+    });
     setMsg("");
   }
   function tirar(id: string) {
-    setPools((prev) => {
-      const np: Pools = { A: [...prev.A], B: [...prev.B], C: [...prev.C], D: [...prev.D] };
-      for (const p of POOLS) np[p] = np[p].filter((x) => x !== id);
-      return np;
-    });
+    setPools((prev) => ({ A: prev.A.filter((x) => x !== id), B: prev.B.filter((x) => x !== id), C: prev.C.filter((x) => x !== id), D: prev.D.filter((x) => x !== id) }));
+    setManualByes((prev) => ({ A: prev.A.filter((x) => x !== id), B: prev.B.filter((x) => x !== id), C: prev.C.filter((x) => x !== id), D: prev.D.filter((x) => x !== id) }));
+  }
+  // Liga/desliga o bye de um atleta. Ao mexer, o pool passa a manual.
+  function alternarBye(id: string, pool: PoolId) {
+    const atual = byesDe(pool);
+    const novo = atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id];
+    setManualByes((prev) => ({ ...prev, [pool]: novo }));
+    setAutoBye((prev) => ({ ...prev, [pool]: false }));
   }
 
   async function guardar() {
@@ -165,10 +189,9 @@ export default function EditorChave() {
     setAGravar(true);
     try {
       const tk = await token();
-      // Byes calculados automaticamente por pool.
       const payload = {
         A: pools.A, B: pools.B, C: pools.C, D: pools.D,
-        byes: { A: calcByes(pools.A), B: calcByes(pools.B), C: calcByes(pools.C), D: calcByes(pools.D) },
+        byes: { A: byesDe("A"), B: byesDe("B"), C: byesDe("C"), D: byesDe("D") },
       };
       const r = await fetch("/api/chaveamento-moldura", {
         method: "POST",
@@ -197,7 +220,7 @@ export default function EditorChave() {
     });
     setFeitas((f) => { const n = { ...f }; delete n[cat]; return n; });
     setCache((c) => { const n = { ...c }; delete n[cat]; return n; });
-    setPools(POOLS_VAZIOS);
+    setPools(POOLS_VAZIOS); setManualByes(POOLS_VAZIOS); setAutoBye(AUTO_TODOS);
     setMsg("");
   }
 
@@ -294,7 +317,7 @@ export default function EditorChave() {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {POOLS.map((p) => {
-                    const byeSet = new Set(calcByes(pools[p]));
+                    const byeSet = new Set(byesDe(p));
                     return (
                       <div key={p} style={{ background: "#121815", border: "1px solid #243029", borderRadius: 11, padding: "10px 12px" }}>
                         <div style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", color: GOLD, marginBottom: 7 }}>
@@ -304,16 +327,20 @@ export default function EditorChave() {
                           <div style={{ fontSize: 12, color: "#5f6f67" }}>—</div>
                         ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                            {pools[p].map((id, i) => (
-                              <div key={id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ flexShrink: 0, width: 18, fontSize: 11, color: "#7c8a82", fontFamily: FD }}>{i + 1}</span>
-                                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "#d6ddd6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeCurto(idA[id])}</span>
-                                {byeSet.has(id) && (
-                                  <span style={{ flexShrink: 0, background: "#2a2410", border: `1px solid ${GOLD}`, color: GOLD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", padding: "3px 7px", borderRadius: 6, fontFamily: FD }}>{t("chvm.bye")}</span>
-                                )}
-                                <button onClick={() => tirar(id)} aria-label={t("chv.removerPrint")} style={{ flexShrink: 0, background: "transparent", border: "none", color: "#ef8d83", fontSize: 15, cursor: "pointer", lineHeight: 1, padding: "0 2px" }}>✕</button>
-                              </div>
-                            ))}
+                            {pools[p].map((id, i) => {
+                              const ehBye = byeSet.has(id);
+                              return (
+                                <div key={id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ flexShrink: 0, width: 18, fontSize: 11, color: "#7c8a82", fontFamily: FD }}>{i + 1}</span>
+                                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "#d6ddd6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeCurto(idA[id])}</span>
+                                  <button onClick={() => alternarBye(id, p)} title={t("chvm.bye")}
+                                    style={{ flexShrink: 0, background: ehBye ? "#2a2410" : "transparent", border: `1px solid ${ehBye ? GOLD : "#2a3a33"}`, color: ehBye ? GOLD : "#5f6f67", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", padding: "3px 7px", borderRadius: 6, cursor: "pointer", fontFamily: FD }}>
+                                    {t("chvm.bye")}
+                                  </button>
+                                  <button onClick={() => tirar(id)} aria-label={t("chv.removerPrint")} style={{ flexShrink: 0, background: "transparent", border: "none", color: "#ef8d83", fontSize: 15, cursor: "pointer", lineHeight: 1, padding: "0 2px" }}>✕</button>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
