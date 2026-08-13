@@ -478,6 +478,7 @@ export default function Inicio() {
       equilíbrio que se quis — não perder ninguém no registo, e ainda assim
       acabar com endereços que não existem (havia um "@gamil.com" na base). */}
     {!visitante && emailPorVerificar && <FaixaVerificarEmail />}
+    {!visitante && <ChaveamentoAlerta idADecorrer={aDecorrer ? aDecorrer.idCompeticao : null} idAlvo={alvo.idCompeticao} />}
     {/* Botão da galeria de resumos (todas as rodadas jogadas). Só para quem tem conta. */}
     {!visitante && (
         <button onClick={() => setGaleriaAberta(true)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 10, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "11px 14px", marginBottom: 14, cursor: "pointer", fontFamily: FB, color: "#f1ede2", textAlign: "left" }}>
@@ -705,6 +706,45 @@ const iconBtn: React.CSSProperties = {
 };
 // Faixa de "confirma o teu email". Mostra o estado vindo do redirecionamento
 // (?email=ok, ?email=expirado...) e deixa reenviar a ligação.
+// Alerta "Chave oficial" no dashboard. Só aparece quando há um chaveamento
+// PUBLICADO para a competição a decorrer (ou a de mercado aberto). Leva à
+// página dedicada da chave. Sem chave publicada, não mostra nada.
+function ChaveamentoAlerta({ idADecorrer, idAlvo }: { idADecorrer: string | null; idAlvo: string }) {
+  const t = useT();
+  const [chave, setChave] = useState<{ id: string; nome: string } | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const ids = [idADecorrer, idAlvo].filter(Boolean) as string[];
+      for (const id of ids) {
+        const { data } = await supabase
+          .from("hub_chaveamentos")
+          .select("id_competicao, nome_competicao")
+          .eq("id_competicao", id)
+          .eq("estado", "publicado")
+          .maybeSingle();
+        if (!vivo) return;
+        if (data) {
+          setChave({ id: String(data.id_competicao), nome: String(data.nome_competicao || "") });
+          return;
+        }
+      }
+    })();
+    return () => { vivo = false; };
+  }, [idADecorrer, idAlvo]);
+  if (!chave) return null;
+  return (
+    <a href={`/chaveamento/${encodeURIComponent(chave.id)}`} style={{ display: "flex", alignItems: "center", gap: 11, background: "linear-gradient(160deg,#141a17,#10160f)", border: "1px solid #243029", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", marginBottom: 14, textDecoration: "none" }}>
+      <span aria-hidden="true" style={{ fontSize: 18, flexShrink: 0 }}>🥋</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{t("chv.oficial")}</span>
+        {chave.nome && <span style={{ display: "block", fontSize: 12, color: "#c7d0c9", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chave.nome}</span>}
+      </span>
+      <span style={{ flexShrink: 0, color: GOLD, fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>{t("chv.verChave")} →</span>
+    </a>
+  );
+}
+
 function FaixaVerificarEmail() {
   const t = useT();
   const [estado, setEstado] = useState<"normal" | "enviando" | "enviado" | "erro">("normal");
