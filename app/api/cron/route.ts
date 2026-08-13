@@ -1203,6 +1203,19 @@ export async function GET(req: Request) {
       await supabaseAdmin.rpc("ippon_limpar_destaques");
     }
   } catch { /* não bloqueia o resto do cron */ }
+  // (E-quinquies-bis) TRADUÇÃO DAS NOTÍCIAS — traduz para EN/ES/FR/DE as notícias
+  // já publicadas que ainda não têm tradução: as geradas pelo motor e as agendadas
+  // que acabaram de sair. As escritas pelo editor já se traduzem no ato de publicar
+  // (o editor chama a rota); esta varredura é a rede de segurança para as restantes.
+  // Idempotente e barata: só toca nas que ainda estão por traduzir, em lotes.
+  let noticiasTraduzidas: { candidatas: number; traduzidas: number } | null = null;
+  try {
+    if (haTempo(t0, MS_MARGEM_ETAPA)) {
+      const r = await fetch(`${base}/api/hub/traduzir?key=${encodeURIComponent(process.env.CRON_SECRET || "")}`);
+      const j = await r.json().catch(() => null);
+      if (j && j.ok) noticiasTraduzidas = { candidatas: Number(j.candidatas || 0), traduzidas: Number(j.traduzidas || 0) };
+    }
+  } catch { /* não bloqueia o resto do cron */ }
   // (E-sexies) MATA-MATA DO DÔDO: sorteia quando as inscrições fecham, e retira
   // quem deixou de ter Pro (o adversário avança). Ambas as rotas não fazem nada
   // quando não há edição a decorrer, por isso é barato chamá-las sempre.
@@ -1308,6 +1321,7 @@ export async function GET(req: Request) {
       hub_noticias: hubNoticias,
       dodo,
       noticias_agendadas_publicadas: agendadasPublicadas,
+      noticias_traduzidas: noticiasTraduzidas,
       // Estado dos preços nesta corrida (cursor): de onde partiu, onde ficou.
       precos: {
         dia: diaHoje,
