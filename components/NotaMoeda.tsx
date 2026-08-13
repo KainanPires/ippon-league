@@ -1,3 +1,5 @@
+"use client";
+
 // components/NotaMoeda.tsx
 //
 // Uma linha discreta a avisar que o preço sai na moeda local de quem compra.
@@ -17,10 +19,11 @@
 // /sobre-pro, o cartão da subscrição no perfil.
 //
 // Aceita `align` e `style` para encaixar em cartões alinhados de formas
-// diferentes, mas o TEXTO vem sempre do PRECO.notaMoeda — não se escreve a
-// frase à mão em lado nenhum, pela mesma razão que não se escrevem os preços.
+// diferentes, mas o TEXTO vem sempre da tradução (precos.notaMoeda) — não se
+// escreve a frase à mão em lado nenhum, pela mesma razão que não se escrevem os
+// preços.
 
-import { PRECO } from "@/lib/precos";
+import { useT } from "@/lib/i18n";
 
 export function NotaMoeda({
   align = "center",
@@ -29,6 +32,7 @@ export function NotaMoeda({
   align?: "left" | "center" | "right";
   style?: React.CSSProperties;
 }) {
+  const t = useT();
   return (
     <p
       style={{
@@ -40,7 +44,7 @@ export function NotaMoeda({
         ...style,
       }}
     >
-      {PRECO.notaMoeda}
+      {t("precos.notaMoeda")}
     </p>
   );
 }
