@@ -216,6 +216,7 @@ export default function Inicio() {
                   try {
                     const compSemana = competicaoDaSemana();
                     const lista = mensagensModaisDeHoje(
+                      t,
                       new Date(),
                       {
                         nome: nomeParaMsg || undefined,
@@ -734,8 +735,8 @@ function FaixaVerificarEmail() {
     <div style={{ flex: 1, minWidth: 0 }}>
     <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{t("inicio.confirmaEmail")}</div>
     <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "4px 0 0" }}>
-    Enviámos-te uma ligação. Confirmar garante que recebes os avisos das rodadas e que não perdes a conta.
-    </p>
+    {t("inicio.confirmaEmailCorpo")}
+</p>
     {msg && <p style={{ fontSize: 11.5, color: estado === "erro" ? "#ef8d83" : "#7fd1a3", margin: "6px 0 0" }}>{msg}</p>}
     {estado !== "enviado" && (
         <button onClick={reenviar} disabled={estado === "enviando"}
