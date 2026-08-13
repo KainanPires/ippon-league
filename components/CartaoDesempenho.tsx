@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { Escudo, type Identity } from "@/components/Escudo";
 import { Mascot } from "@/components/Mascot";
 import type { DesempenhoRodada } from "@/lib/desempenho";
+import { useT } from "@/lib/i18n";
 
 const GOLD = "#d9a441";
 
@@ -14,7 +15,6 @@ const IOC: Record<string, string> = {
   SI: "SLO", HR: "CRO", NL: "NED",
 };
 const code3 = (iso: string) => IOC[iso] || iso;
-const sobrenome = (nome: string) => (nome.split(" ").slice(-1)[0] || nome).toUpperCase();
 // Nome para o cartão: primeiro nome + último apelido (no máximo 2 palavras), para
 // quebrar de forma limpa entre linhas sem nunca partir uma palavra a meio. Ex:
 // "Lea Metrot" -> "LEA METROT"; "Movli Borchashvilli" -> "MOVLI BORCHASHVILLI".
@@ -28,16 +28,16 @@ const sinal = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
 
 type Belt = "branca" | "azul" | "amarela" | "verde" | "roxa" | "castanha" | "preta";
 interface BeltTheme {
-  name: string; accent: string; chipText: string; frame: number; frameColor: string; double: boolean; glow: number; glowColor: string;
+  nameK: string; accent: string; chipText: string; frame: number; frameColor: string; double: boolean; glow: number; glowColor: string;
 }
 const BELTS: Record<Belt, BeltTheme> = {
-  branca:   { name: "FAIXA BRANCA",   accent: "#d7dcd6", chipText: "#14181a", frame: 3, frameColor: "#5a635e", double: false, glow: 0,  glowColor: "transparent" },
-  azul:     { name: "FAIXA AZUL",     accent: "#3f86d6", chipText: "#0a1622", frame: 4, frameColor: "#3f86d6", double: false, glow: 34, glowColor: "rgba(63,134,214,0.30)" },
-  amarela:  { name: "FAIXA AMARELA",  accent: "#e6b422", chipText: "#1f1804", frame: 4, frameColor: "#e6b422", double: false, glow: 44, glowColor: "rgba(230,180,34,0.32)" },
-  verde:    { name: "FAIXA VERDE",    accent: "#3f9f5a", chipText: "#08160d", frame: 5, frameColor: "#3f9f5a", double: false, glow: 48, glowColor: "rgba(63,159,90,0.34)" },
-  roxa:     { name: "FAIXA ROXA",     accent: "#9b6cc9", chipText: "#f1ede2", frame: 5, frameColor: "#9b6cc9", double: false, glow: 64, glowColor: "rgba(155,108,201,0.46)" },
-  castanha: { name: "FAIXA CASTANHA", accent: "#a06a3a", chipText: "#f1ede2", frame: 6, frameColor: "#a06a3a", double: true,  glow: 64, glowColor: "rgba(160,106,58,0.46)" },
-  preta:    { name: "FAIXA PRETA",    accent: GOLD,      chipText: "#1f1804", frame: 9, frameColor: GOLD,      double: true,  glow: 96, glowColor: "rgba(217,164,65,0.62)" },
+  branca:   { nameK: "card.faixaBranca",   accent: "#d7dcd6", chipText: "#14181a", frame: 3, frameColor: "#5a635e", double: false, glow: 0,  glowColor: "transparent" },
+  azul:     { nameK: "card.faixaAzul",     accent: "#3f86d6", chipText: "#0a1622", frame: 4, frameColor: "#3f86d6", double: false, glow: 34, glowColor: "rgba(63,134,214,0.30)" },
+  amarela:  { nameK: "card.faixaAmarela",  accent: "#e6b422", chipText: "#1f1804", frame: 4, frameColor: "#e6b422", double: false, glow: 44, glowColor: "rgba(230,180,34,0.32)" },
+  verde:    { nameK: "card.faixaVerde",    accent: "#3f9f5a", chipText: "#08160d", frame: 5, frameColor: "#3f9f5a", double: false, glow: 48, glowColor: "rgba(63,159,90,0.34)" },
+  roxa:     { nameK: "card.faixaRoxa",     accent: "#9b6cc9", chipText: "#f1ede2", frame: 5, frameColor: "#9b6cc9", double: false, glow: 64, glowColor: "rgba(155,108,201,0.46)" },
+  castanha: { nameK: "card.faixaCastanha", accent: "#a06a3a", chipText: "#f1ede2", frame: 6, frameColor: "#a06a3a", double: true,  glow: 64, glowColor: "rgba(160,106,58,0.46)" },
+  preta:    { nameK: "card.faixaPreta",    accent: GOLD,      chipText: "#1f1804", frame: 9, frameColor: GOLD,      double: true,  glow: 96, glowColor: "rgba(217,164,65,0.62)" },
 };
 function beltKey(faixa: string): Belt {
   const k = (faixa || "").trim().toLowerCase();
@@ -137,6 +137,7 @@ export function CartaoDesempenho({
   pro?: boolean;
   onClose: () => void;
 }) {
+  const t = useT();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0.3);
@@ -192,11 +193,11 @@ export function CartaoDesempenho({
     // Link para a app: aponta para /inicio para que quem ainda não tem conta veja
     // primeiro a página inicial (e não bata de frente no criar conta).
     const link = "https://www.ipponleague.com/inicio";
-    const texto = `Fiz ${sinal(dados.pontuacaoTotal)} pts em ${dados.nomeCompeticao} na Ippon League! Joga também: ${link}`;
+    const texto = t("cd.partilhaTexto", { pts: sinal(dados.pontuacaoTotal), comp: dados.nomeCompeticao, link });
     const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean; share?: (d: unknown) => Promise<void> };
     try {
       if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
-        await nav.share({ files: [file], title: "O meu desempenho na Ippon League", text: texto });
+        await nav.share({ files: [file], title: t("cd.shareTitle"), text: texto });
         return;
       }
     } catch { /* cancelado */ }
@@ -221,20 +222,20 @@ export function CartaoDesempenho({
     <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 130, overflowY: "auto" }}>
       <style>{CARD_CSS}</style>
       <div style={{ width: "100%", maxWidth: 360, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18, textAlign: "center" }}>
-        <h2 style={{ fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 12px", color: GOLD }}>Partilhar desempenho</h2>
+        <h2 style={{ fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 12px", color: GOLD }}>{t("cd.partilharDesempenho")}</h2>
 
         {/* Pré-visualização: o cartão real (1080px) escalado para a largura do modal. */}
         <div ref={previewRef} style={{ width: "100%", aspectRatio: "1080 / 1350", borderRadius: 12, overflow: "hidden", marginBottom: 14, position: "relative", background: "#0c0e0d" }}>
           <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1350, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <DesempenhoNode innerRef={cardRef} vars={cardVars} pro={pro} belt={bk} beltName={b.name} accent={b.accent} identity={identity} dados={dados} />
+            <DesempenhoNode innerRef={cardRef} vars={cardVars} pro={pro} belt={bk} beltName={t(b.nameK)} accent={b.accent} identity={identity} dados={dados} />
           </div>
         </div>
 
         {podePartilhar && (
-          <button onClick={partilhar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1, marginBottom: 10 }}>{busy ? "A gerar…" : "Partilhar"}</button>
+          <button onClick={partilhar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1, marginBottom: 10 }}>{busy ? t("cc.aGerar") : t("comum.partilhar")}</button>
         )}
-        <button onClick={guardar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "A gerar…" : "Guardar imagem"}</button>
-        <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer" }}>Fechar</button>
+        <button onClick={guardar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? t("cc.aGerar") : t("cc.guardarImagem")}</button>
+        <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer" }}>{t("comum.fechar")}</button>
       </div>
     </div>
   );
@@ -251,6 +252,7 @@ function DesempenhoNode({ innerRef, vars, pro, belt, beltName, accent, identity,
   identity: Identity;
   dados: DesempenhoRodada;
 }) {
+  const t = useT();
   const total = dados.pontuacaoTotal;
   const positivo = total >= 0;
   const scoreColor = positivo ? GOLD : "#ef8d83";
@@ -279,15 +281,15 @@ function DesempenhoNode({ innerRef, vars, pro, belt, beltName, accent, identity,
         </header>
 
         <div className="dhero">
-          <div className="dhero-label">{dados.numeroRodada ? `Rodada ${dados.numeroRodada}` : "O meu desempenho"}</div>
+          <div className="dhero-label">{dados.numeroRodada ? t("pl.rodadaN", { n: dados.numeroRodada }) : t("cd.meuDesempenho")}</div>
           <div className="dhero-pts">{sinal(total)}</div>
-          <div className="dhero-unit">pontos na rodada</div>
+          <div className="dhero-unit">{t("cd.pontosNaRodada")}</div>
           <div className="dhero-comp">{dados.nomeCompeticao}</div>
 
           <div className="dcards">
             {dados.capitao && (
               <div className="dchip-card" style={{ ["--card-border" as string]: GOLD, ["--role-color" as string]: GOLD, ["--pts-color" as string]: dados.capitao.pontos >= 0 ? "#7fd1a3" : "#ef8d83" } as CSSProperties}>
-                <span className="dchip-role">★ Capitão</span>
+                <span className="dchip-role">★ {t("cd.capitao")}</span>
                 <span className="dchip-flag">{code3(dados.capitao.atleta.countryIso)}</span>
                 <span className="dchip-name">{nomeCartao(dados.capitao.atleta.name)}</span>
                 <span className="dchip-pts">{sinal(dados.capitao.pontos)}</span>
@@ -295,7 +297,7 @@ function DesempenhoNode({ innerRef, vars, pro, belt, beltName, accent, identity,
             )}
             {dados.melhor && (
               <div className="dchip-card" style={{ ["--card-border" as string]: "rgba(241,237,226,0.16)", ["--role-color" as string]: "#93a39a", ["--pts-color" as string]: dados.melhor.pontos >= 0 ? "#7fd1a3" : "#ef8d83" } as CSSProperties}>
-                <span className="dchip-role">Melhor atleta</span>
+                <span className="dchip-role">{t("cd.melhorAtleta")}</span>
                 <span className="dchip-flag">{code3(dados.melhor.atleta.countryIso)}</span>
                 <span className="dchip-name">{nomeCartao(dados.melhor.atleta.name)}</span>
                 <span className="dchip-pts">{sinal(dados.melhor.pontos)}</span>
@@ -307,13 +309,13 @@ function DesempenhoNode({ innerRef, vars, pro, belt, beltName, accent, identity,
         <footer className="dcard-foot">
           {pro ? (
             <>
-              <div className="dfoot-main pro">JOGA COM VANTAGEM.<br />SÊ IPPON PRO.</div>
+              <div className="dfoot-main pro">{t("card.rodapePro")}</div>
               <div className="dfoot-link">www.ipponleague.com</div>
             </>
           ) : (
             <>
               <div className="dfoot-main">IPPON&nbsp;LEAGUE</div>
-              <div className="dfoot-sub">O jogo oficial dos fãs de judô</div>
+              <div className="dfoot-sub">{t("sobre.rodape")}</div>
             </>
           )}
         </footer>
