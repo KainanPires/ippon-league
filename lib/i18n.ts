@@ -7842,6 +7842,13 @@ export async function gravarLingua(l: Lingua): Promise<void> {
     const { data } = await supabase.auth.getSession();
     if (!data.session) return; // visitante: fica só a cache local
     await supabase.auth.updateUser({ data: { lingua: l } });
+    // Espelha a língua na tabela `users` (coluna `lingua`): é de onde o SERVIDOR
+    // a lê depressa, em lote, para mandar notificações/push na língua certa —
+    // sem ter de ir ao metadata da conta um a um. Falha em silêncio: se a coluna
+    // ainda não existir ou o RLS não deixar, a preferência fica no metadata na
+    // mesma, e o backfill/leitura de recurso do servidor cobre o resto.
+    const uid = data.session.user?.id;
+    if (uid) { try { await supabase.from("users").update({ lingua: l }).eq("id", uid); } catch {} }
   } catch {}
 }
 
