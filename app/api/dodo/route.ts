@@ -612,8 +612,9 @@ async function sortear(simular: boolean) {
       await criarNotificacaoServidor({
           paraUserId: e.user_id,
           tipo: "dodo_sorteado",
-          titulo: `🏆 Entraste na ${edicao.numero}ª Copa do Dôdo!`,
-          corpo: `Parabéns — a tua vaga saiu no sorteio. És um dos ${nEntraram} em prova e, a partir de agora, cada rodada elimina metade. Fica atento às competições seguintes: os pontos da tua equipa contam a sério e não há segunda hipótese. Vais representar o teu país e o teu continente. Boa sorte, campeão!`,
+          chaveTitulo: "dodo.sorteadoTitulo",
+          chaveCorpo: "dodo.sorteadoCorpo",
+          vars: { numero: edicao.numero, n: nEntraram },
           link: linkChave,
         });
     } catch { /* um push falhado não bloqueia os outros */ }
@@ -625,8 +626,9 @@ async function sortear(simular: boolean) {
       await criarNotificacaoServidor({
           paraUserId: u,
           tipo: "dodo_nao_sorteado",
-          titulo: "A tua vaga não saiu no sorteio",
-          corpo: `Houve mais inscritos do que lugares na ${edicao.numero}ª Copa do Dôdo e o sorteio decidiu. Não teve nada a ver com o teu desempenho — foi mesmo sorte. A próxima edição volta a abrir com todas as vagas em jogo, e podes acompanhar esta Copa na mesma. Até lá, há as ligas Mundial e Continental a correr.`,
+          chaveTitulo: "dodo.naoSorteadoTitulo",
+          chaveCorpo: "dodo.naoSorteadoCorpo",
+          vars: { numero: edicao.numero },
           link: "/dodo",
         });
     } catch { /* idem */ }
@@ -721,13 +723,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, jaEstava: true });
   }
   const nomeCont = NOME_CONTINENTE[continente as Continente] || continente;
+  // Data do sorteio em formato NEUTRO (DD/MM), para o texto sair traduzido sem
+  // "vazar" uma data escrita à portuguesa no meio da frase.
+  const dSort = new Date(String(edicao.inscricoes_ate || ""));
+  const dataSorteio = isNaN(dSort.getTime())
+    ? ""
+    : `${String(dSort.getDate()).padStart(2, "0")}/${String(dSort.getMonth() + 1).padStart(2, "0")}`;
   // Confirmação no sininho. Diz o que interessa: está feito, e QUANDO se sabe.
   try {
     await criarNotificacaoServidor({
         paraUserId: uid,
         tipo: "dodo_inscricao",
-        titulo: `Inscrição feita na ${edicao.numero}ª Copa do Dôdo`,
-        corpo: `Estás no sorteio, a concorrer pelas vagas d${nomeCont === "Ásia" || nomeCont === "África" || nomeCont === "América" ? "a" : "o"} ${nomeCont}. O sorteio sai a ${dataPT(edicao.inscricoes_ate)}, na véspera da competição que abre a Copa, e avisamos-te aqui no momento. Não é por ordem de chegada: teres-te inscrito hoje ou no último dia dá exatamente a mesma hipótese.`,
+        chaveTitulo: "dodo.inscricaoTitulo",
+        chaveCorpo: "dodo.inscricaoCorpo",
+        vars: { numero: edicao.numero, cont: nomeCont, data: dataSorteio },
         link: "/dodo",
       });
   } catch { /* a inscrição está feita; o aviso é um extra */ }
