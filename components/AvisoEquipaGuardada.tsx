@@ -34,6 +34,7 @@ import { Mascot } from "@/components/Mascot";
 import { useFaixa } from "@/lib/useFaixa";
 import { marcarTutorialVisto } from "@/lib/tutorials";
 import { focoMercado, nomeCompeticao, numeroDaRodada, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -51,14 +52,6 @@ function diasAteInicio(s: SemanaCalendario): number {
   return Math.ceil(ms / 86400000);
 }
 
-// "é já hoje" / "é já amanhã" / "é daqui a 4 dias" — em linguagem natural, que
-// é o que a pessoa quer saber ("quando é que vejo os meus pontos?").
-function textoQuando(dias: number): string {
-  if (dias <= 0) return "é já hoje";
-  if (dias === 1) return "é já amanhã";
-  return `é daqui a ${dias} dias`;
-}
-
 export function AvisoEquipaGuardada({
   nomeCompeticao: nomeProp,
   rodada: rodadaProp,
@@ -74,6 +67,7 @@ export function AvisoEquipaGuardada({
   /** Fechar o aviso. O chamador decide para onde vai a seguir. */
   onFechar: () => void;
 }) {
+  const t = useT();
   const { cor } = useFaixa();
   const [copiado, setCopiado] = useState(false);
 
@@ -86,9 +80,13 @@ export function AvisoEquipaGuardada({
   const rodada = rodadaProp ?? numeroDaRodada(alvo.idCompeticao);
   const dias = diasAteInicio(alvo);
 
+  // "é já hoje" / "é já amanhã" / "é daqui a 4 dias" — linguagem natural, que
+  // é o que a pessoa quer saber ("quando é que vejo os meus pontos?").
+  const quando = dias <= 0 ? t("aeg.hoje") : dias === 1 ? t("aeg.amanha") : t("aeg.emDias", { dias });
+
   const rotuloAlvo = rodada
-    ? `a Rodada ${rodada}${nome ? ` · ${nome}` : ""}`
-    : (nome || "a próxima rodada");
+    ? t("aeg.rodadaN", { n: rodada }) + (nome ? ` · ${nome}` : "")
+    : (nome || t("aeg.proximaRodada"));
 
   async function naoMostrarMais() {
     await marcarTutorialVisto("ippon_aviso_pos_guardar");
@@ -100,7 +98,8 @@ export function AvisoEquipaGuardada({
   // transferência e diz que copiou. Nunca deixa o utilizador sem saída.
   async function convidar() {
     const url = typeof window !== "undefined" ? window.location.origin : "https://ipponleague.com";
-    const texto = `Acabei de montar a minha equipa na Ippon League 🥋 Monta a tua e vamos ver quem pontua mais${nome ? ` em ${nome}` : ""}!`;
+    const onde = nome ? t("aeg.emComp", { nome }) : "";
+    const texto = t("aeg.partilhaTexto", { onde });
     try {
       const nav = navigator as Navigator & { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
       if (nav.share) {
@@ -125,18 +124,27 @@ export function AvisoEquipaGuardada({
         </div>
 
         <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", textAlign: "center", margin: "4px 0 12px", color: GOLD }}>
-          Equipa guardada! E agora?
+          {t("aeg.titulo")}
         </h2>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 11, marginBottom: 16 }}>
-          <Passo n="1" titulo={dias <= 1 ? "É já a seguir" : `Faltam ${dias} dias`}>
-            A tua equipa está escalada para <strong style={{ color: "#f1ede2" }}>{rotuloAlvo}</strong>. A competição <strong style={{ color: GOLD }}>{textoQuando(dias)}</strong> — até lá não tens de fazer nada.
+          <Passo n="1" titulo={dias <= 1 ? t("aeg.jaASeguir") : t("aeg.faltamDias", { dias })}>
+            {t("aeg.passo1").split(/(%[AB]%)/).map((s, i) =>
+              s === "%A%" ? <strong key={i} style={{ color: "#f1ede2" }}>{rotuloAlvo}</strong>
+              : s === "%B%" ? <strong key={i} style={{ color: GOLD }}>{quando}</strong>
+              : s
+            )}
           </Passo>
-          <Passo n="2" titulo="Os teus atletas pontuam">
-            Cada <strong style={{ color: "#f1ede2" }}>ippon</strong>, <strong style={{ color: "#f1ede2" }}>waza-ari</strong> e <strong style={{ color: "#f1ede2" }}>shido provocado</strong> conta para ti. O teu capitão pontua a dobrar.
+          <Passo n="2" titulo={t("aeg.passo2Tit")}>
+            {t("aeg.passo2").split(/(%[ABC]%)/).map((s, i) =>
+              s === "%A%" ? <strong key={i} style={{ color: "#f1ede2" }}>ippon</strong>
+              : s === "%B%" ? <strong key={i} style={{ color: "#f1ede2" }}>waza-ari</strong>
+              : s === "%C%" ? <strong key={i} style={{ color: "#f1ede2" }}>{t("aeg.shidoProvocado")}</strong>
+              : s
+            )}
           </Passo>
-          <Passo n="3" titulo="Depois, a contagem">
-            Quando a competição acabar vês quantos pontos fizeste, se o teu património subiu, e como ficaste face aos teus amigos e ao ranking mundial.
+          <Passo n="3" titulo={t("aeg.passo3Tit")}>
+            {t("aeg.passo3")}
           </Passo>
         </div>
 
@@ -144,10 +152,10 @@ export function AvisoEquipaGuardada({
             montar a equipa e ainda não tem com quem competir. */}
         <div style={{ background: "#101511", border: "1px dashed #2f4a3c", borderRadius: 12, padding: "12px 13px", marginBottom: 16 }}>
           <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "#aee9c9", marginBottom: 4 }}>
-            Mais divertido a dois
+            {t("aeg.maisDivertido")}
           </div>
           <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 10px" }}>
-            Convida um amigo para montar a equipa dele. Ao fim de semana, comparam pontuações — e podem criar uma liga só vossa.
+            {t("aeg.conviteCorpo")}
           </p>
           <button
             onClick={convidar}
@@ -156,32 +164,32 @@ export function AvisoEquipaGuardada({
             {copiado ? (
               <>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
-                Convite copiado!
+                {t("aeg.conviteCopiado")}
               </>
             ) : (
               <>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
-                Convidar um amigo
+                {t("aeg.convidarAmigo")}
               </>
             )}
           </button>
         </div>
 
         <p style={{ fontSize: 12, color: "#93a39a", lineHeight: 1.5, textAlign: "center", margin: "0 0 14px" }}>
-          Podes voltar e mudar a equipa até o mercado fechar.
+          {t("aeg.podesVoltar")}
         </p>
 
         <button
           onClick={onFechar}
           style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}
         >
-          Entendi
+          {t("aeg.entendi")}
         </button>
         <button
           onClick={naoMostrarMais}
           style={{ display: "block", width: "100%", marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB }}
         >
-          Não mostrar mais
+          {t("aeg.naoMostrarMais")}
         </button>
       </div>
     </div>
