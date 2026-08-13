@@ -37,7 +37,8 @@ import { Escudo, type Identity } from "@/components/Escudo";
 // As notícias da região do leitor aparecem primeiro. Nenhuma é escondida — ver
 // a nota em lib/ordenarNoticias.
 import { ordenarPorRegiao } from "@/lib/ordenarNoticias";
-import { useT } from "@/lib/i18n";
+import { noticiaNaLingua, type CamposTraduzidos } from "@/lib/noticiaLingua";
+import { useT, useLingua } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -72,6 +73,7 @@ interface Noticia {
   imagem_url: string | null;   // só as escritas por pessoas têm
   dados: { escudo?: Identity | null } | null;
   estado: string;   // um EDITOR vê também as que ainda não estão no ar  // as geradas trazem o escudo da equipa
+  traducoes: Record<string, CamposTraduzidos> | null;
 }
 
 /** De quanto em quanto tempo passa. 6s: dá para ler um título sem pressa. */
@@ -89,6 +91,7 @@ const PAUSA_APOS_GESTO = 12000;
 
 export function HubCarrossel() {
   const t = useT();
+  const { lingua } = useLingua();
   const [noticias, setNoticias] = useState<Noticia[]>([]);
   const [i, setI] = useState(0);
   const [parado, setParado] = useState(false);
@@ -119,7 +122,7 @@ export function HubCarrossel() {
       }
       await supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, resumo, corpo, nome_competicao, imagem_url, dados, pais, continente, estado")
+      .select("id, tipo, titulo, resumo, corpo, nome_competicao, imagem_url, dados, pais, continente, estado, traducoes")
       .order("destaque", { ascending: false })
       .order("criada_em", { ascending: false })
       .limit(8)
@@ -201,6 +204,7 @@ export function HubCarrossel() {
 
   const n = noticias[Math.min(i, noticias.length - 1)];
   const est = ESTILO[n.tipo] || ESTILO.curiosidade;
+  const loc = noticiaNaLingua(n, lingua);
 
   return (
     <div style={{ marginBottom: 12 }}>
@@ -251,11 +255,11 @@ export function HubCarrossel() {
                   {n.estado === "revisao" ? t("hub.aRever") : n.estado === "agendada" ? t("hub.agendada") : t("hub.rascunho")}
                 </span>
               )}
-              {n.titulo}
+              {loc.titulo}
             </div>
             {/* Duas linhas e corta: o carrossel é uma montra, não o artigo. */}
             <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.45, margin: "5px 0 0", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-              {n.resumo || n.corpo}
+              {loc.resumo || loc.corpo}
             </p>
           </div>
         </div>
