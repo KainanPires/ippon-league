@@ -134,9 +134,13 @@ function refToNo(
   const node = flat[i];
   const key = luta?.chaveId || `n-${poolKey}-${i}`;
   const filhos: No[] = [];
-  const ehPre = node.left.leaf !== undefined || node.right.leaf !== undefined;
-  if (!ehPre) {
+  // Blindagem: uma moldura irregular (ex.: byes a mais numa categoria) pode
+  // gerar um nó sem um dos lados. Antes isto rebentava a ler node.right.leaf e
+  // partia a página (que é paga). Agora ignora-se o lado em falta.
+  const ehPre = node?.left?.leaf !== undefined || node?.right?.leaf !== undefined;
+  if (!ehPre && node) {
     for (const c of [node.left, node.right]) {
+      if (!c) continue;
       const child = refToNo(c, flat, lutas, poolKey, arestas, nomes);
       filhos.push(child);
       arestas.push({ de: child.key, para: key });
