@@ -64,8 +64,10 @@ export async function notificarFimDeCompeticao(idComp: string): Promise<void> {
     const posicao = i + 1; // posição nesta competição
     const pontos = Number(r.pontos_rodada) || 0;
 
-    let titulo: string;
-    let corpo: string;
+    // Escolhe as CHAVES (traduzidas na língua de quem recebe); as variáveis
+    // (nome da competição, nível, pontos, rótulo da rodada) vão à parte.
+    let chaveTitulo: string;
+    let chaveCorpo: string;
     let tipo = "resumo_rodada";
     let link = "/ligas";
 
@@ -75,35 +77,36 @@ export async function notificarFimDeCompeticao(idComp: string): Promise<void> {
       tipo = "campeao_mundial";
       link = linkResultados;
       if (posicao === 1) {
-        titulo = `👑 És o nº1 do ${nomeComp}!`;
-        corpo = `Ficaste em 1º lugar numa competição de nível ${nivel}, com ${pontos} pts. Estás entre os melhores do mundo na Ippon League. Que feito histórico!`;
+        chaveTitulo = "comp.mundial1Titulo";
+        chaveCorpo = "comp.mundial1Corpo";
       } else if (posicao === 2) {
-        titulo = `🥈 Vice-campeão do ${nomeComp}!`;
-        corpo = `Que feito! Ficaste em 2º lugar numa competição de nível ${nivel}, com ${pontos} pts. Estás no pódio dos melhores do mundo — falta tão pouco para o topo!`;
+        chaveTitulo = "comp.mundial2Titulo";
+        chaveCorpo = "comp.mundial2Corpo";
       } else {
-        titulo = `🥉 No pódio do ${nomeComp}!`;
-        corpo = `Brilhante! 3º lugar numa competição de nível ${nivel}, com ${pontos} pts. Subiste ao pódio mundial da Ippon League — orgulha-te disso!`;
+        chaveTitulo = "comp.mundial3Titulo";
+        chaveCorpo = "comp.mundial3Corpo";
       }
     } else if (posicao === 1) {
-      titulo = `🥇 Venceste a ${rotulo}!`;
-      corpo = `Ficaste em 1º lugar no ${nomeComp} com ${pontos} pts. Que rodada! Vê como ficou a tua liga.`;
+      chaveTitulo = "comp.venceu1Titulo";
+      chaveCorpo = "comp.venceu1Corpo";
     } else if (posicao === 2) {
-      titulo = `🥈 2º lugar na ${rotulo}!`;
-      corpo = `Grande rodada no ${nomeComp}: ${pontos} pts e o vice-pódio. Vê a tua liga.`;
+      chaveTitulo = "comp.lugar2Titulo";
+      chaveCorpo = "comp.lugar2Corpo";
     } else if (posicao === 3) {
-      titulo = `🥉 3º lugar na ${rotulo}!`;
-      corpo = `Subiste ao pódio no ${nomeComp} com ${pontos} pts. Vê a tua liga.`;
+      chaveTitulo = "comp.lugar3Titulo";
+      chaveCorpo = "comp.lugar3Corpo";
     } else {
       // Fora do pódio: resultado simples, sem alarido. Leva à liga.
-      titulo = `Resultado da ${rotulo}`;
-      corpo = `O ${nomeComp} terminou. Fizeste ${pontos} pts — vê a tua posição na liga.`;
+      chaveTitulo = "comp.resultadoTitulo";
+      chaveCorpo = "comp.resultadoCorpo";
     }
 
     await criarNotificacaoServidor({
       paraUserId: String(r.user_id),
       tipo,
-      titulo,
-      corpo,
+      chaveTitulo,
+      chaveCorpo,
+      vars: { comp: nomeComp, nivel: String(nivel ?? ""), pontos, rotulo },
       link,
     });
   }
