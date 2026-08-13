@@ -449,6 +449,69 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Tu as terminé le mois sur la ceinture {faixa}. Il t'a manqué {falta} points pour la {faixaAcima} — tu peux aller les chercher le mois prochain !",
     de: "Du hast den Monat auf dem {faixa} Gürtel beendet. Dir fehlten {falta} Punkte für den {faixaAcima} — die kannst du dir nächsten Monat holen!",
   },
+  "melhorRodada.mundialTitulo": {
+    pt: "🥇 És o Melhor da Rodada — Mundial!",
+    en: "🥇 You're the Best of the Round — World!",
+    es: "🥇 ¡Eres el Mejor de la Ronda — Mundial!",
+    fr: "🥇 Tu es le Meilleur de la Journée — Mondial !",
+    de: "🥇 Du bist der Beste der Runde — Welt!",
+  },
+  "melhorRodada.mundialMaisTitulo": {
+    pt: "🥇 És o Melhor da Rodada — Mundial + {cont}!",
+    en: "🥇 You're the Best of the Round — World + {cont}!",
+    es: "🥇 ¡Eres el Mejor de la Ronda — Mundial + {cont}!",
+    fr: "🥇 Tu es le Meilleur de la Journée — Mondial + {cont} !",
+    de: "🥇 Du bist der Beste der Runde — Welt + {cont}!",
+  },
+  "melhorRodada.continentalTitulo": {
+    pt: "🥇 És o Melhor da Rodada — {cont}!",
+    en: "🥇 You're the Best of the Round — {cont}!",
+    es: "🥇 ¡Eres el Mejor de la Ronda — {cont}!",
+    fr: "🥇 Tu es le Meilleur de la Journée — {cont} !",
+    de: "🥇 Du bist der Beste der Runde — {cont}!",
+  },
+  "melhorRodada.mundialCorpo": {
+    pt: "Parabéns! Foste o nº1 do mundo em {comp}. Vê e partilha o teu certificado na liga oficial.",
+    en: "Congratulations! You were #1 in the world at {comp}. See and share your certificate in the official league.",
+    es: "¡Enhorabuena! Fuiste el nº1 del mundo en {comp}. Mira y comparte tu certificado en la liga oficial.",
+    fr: "Félicitations ! Tu as été le nº1 du monde au {comp}. Vois et partage ton certificat dans la ligue officielle.",
+    de: "Glückwunsch! Du warst die Nr. 1 der Welt beim {comp}. Sieh dir dein Zertifikat an und teile es in der offiziellen Liga.",
+  },
+  "melhorRodada.continentalCorpo": {
+    pt: "Parabéns! Foste o nº1 de {cont} em {comp}. Vê e partilha o teu certificado na liga oficial.",
+    en: "Congratulations! You were the #1 of {cont} at {comp}. See and share your certificate in the official league.",
+    es: "¡Enhorabuena! Fuiste el nº1 de {cont} en {comp}. Mira y comparte tu certificado en la liga oficial.",
+    fr: "Félicitations ! Tu as été le nº1 de {cont} au {comp}. Vois et partage ton certificat dans la ligue officielle.",
+    de: "Glückwunsch! Du warst die Nr. 1 von {cont} beim {comp}. Sieh dir dein Zertifikat an und teile es in der offiziellen Liga.",
+  },
+  "evento.aniversarioTitulo": {
+    pt: "Parabéns!",
+    en: "Happy birthday!",
+    es: "¡Feliz cumpleaños!",
+    fr: "Joyeux anniversaire !",
+    de: "Alles Gute zum Geburtstag!",
+  },
+  "evento.aniversarioCorpo": {
+    pt: "Hoje é o teu dia, e nós cá da Ippon League queremos celebrá-lo contigo! 🥋 Estamos muito felizes por fazeres parte desta comunidade de apaixonados pelo judô. Que este novo ano te traga muitas alegrias, conquistas no tatame e fora dele — e que continues a crescer e a divertir-te connosco. Um grande abraço, e parabéns! 🎂",
+    en: "Today is your day, and all of us at the Ippon League want to celebrate it with you! 🥋 We're so happy you're part of this community of judo lovers. May this new year bring you plenty of joy, wins on the tatame and beyond — and may you keep growing and having fun with us. A big hug, and happy birthday! 🎂",
+    es: "¡Hoy es tu día, y en la Ippon League queremos celebrarlo contigo! 🥋 Estamos muy felices de que formes parte de esta comunidad de apasionados por el judo. Que este nuevo año te traiga muchas alegrías, logros en el tatame y fuera de él — y que sigas creciendo y divirtiéndote con nosotros. ¡Un fuerte abrazo y feliz cumpleaños! 🎂",
+    fr: "Aujourd'hui, c'est ton jour, et toute l'équipe de l'Ippon League veut le célébrer avec toi ! 🥋 Nous sommes très heureux que tu fasses partie de cette communauté de passionnés de judo. Que cette nouvelle année t'apporte plein de joies, des victoires sur le tatame et en dehors — et que tu continues à grandir et à t'amuser avec nous. Une grosse accolade, et joyeux anniversaire ! 🎂",
+    de: "Heute ist dein Tag, und wir alle bei der Ippon League wollen ihn mit dir feiern! 🥋 Wir freuen uns sehr, dass du Teil dieser Gemeinschaft von Judo-Fans bist. Möge dir dieses neue Jahr viel Freude bringen, Erfolge auf dem Tatame und darüber hinaus — und mögest du weiter mit uns wachsen und Spaß haben. Eine große Umarmung und alles Gute zum Geburtstag! 🎂",
+  },
+  "evento.diaDoJudoTitulo": {
+    pt: "Dia Mundial do Judô",
+    en: "World Judo Day",
+    es: "Día Mundial del Judo",
+    fr: "Journée mondiale du judo",
+    de: "Welt-Judo-Tag",
+  },
+  "evento.diaDoJudoCorpo": {
+    pt: "Hoje é o Dia Mundial do Judô! Parabéns a todos os que amam este desporto. Que tal homenagear a data com uma escalação de respeito?",
+    en: "Today is World Judo Day! Congratulations to everyone who loves this sport. How about honoring the day with a lineup to be proud of?",
+    es: "¡Hoy es el Día Mundial del Judo! Enhorabuena a todos los que aman este deporte. ¿Qué tal homenajear la fecha con una alineación de respeto?",
+    fr: "Aujourd'hui, c'est la Journée mondiale du judo ! Félicitations à tous ceux qui aiment ce sport. Et si tu rendais hommage à cette date avec une composition de respect ?",
+    de: "Heute ist der Welt-Judo-Tag! Glückwunsch an alle, die diesen Sport lieben. Wie wäre es, den Tag mit einer Aufstellung zu ehren, die sich sehen lassen kann?",
+  },
 };
 
 // Nomes das FAIXAS por língua — iguais aos que a app mostra no resto do ecrã
@@ -468,6 +531,22 @@ const FAIXAS_NOME: Record<string, Entrada> = {
 export function nomeFaixaEm(lingua: LinguaNotif, canonica: string): string {
   const e = FAIXAS_NOME[String(canonica || "").toLowerCase()];
   return e ? e[lingua] || e.pt : String(canonica || "");
+}
+
+// Nomes dos CONTINENTES por código (EUR/PAN/ASI/AFR/OCE), nas 5 línguas. Mesmo
+// modelo das faixas: a notificação diz "de {cont}" e {cont} sai traduzido.
+const CONTINENTES_NOME: Record<string, Entrada> = {
+  EUR: { pt: "Europa", en: "Europe", es: "Europa", fr: "Europe", de: "Europa" },
+  PAN: { pt: "América", en: "the Americas", es: "América", fr: "Amériques", de: "Amerika" },
+  ASI: { pt: "Ásia", en: "Asia", es: "Asia", fr: "Asie", de: "Asien" },
+  AFR: { pt: "África", en: "Africa", es: "África", fr: "Afrique", de: "Afrika" },
+  OCE: { pt: "Oceânia", en: "Oceania", es: "Oceanía", fr: "Océanie", de: "Ozeanien" },
+};
+
+/** Nome de um continente (código "EUR") na língua pedida. */
+export function nomeContinenteEm(lingua: LinguaNotif, codigo: string): string {
+  const e = CONTINENTES_NOME[String(codigo || "").toUpperCase()];
+  return e ? e[lingua] || e.pt : String(codigo || "");
 }
 
 /** Substitui {var} pelos valores dados. */
@@ -494,10 +573,16 @@ export function renderNotif(
   const e = NOTIF[chave];
   const texto = (e && (e[lingua] || e.pt)) || chave;
   let v = vars;
-  if (vars && (vars.faixaCanonica !== undefined || vars.faixaAcimaCanonica !== undefined)) {
+  const temEspeciais = vars && (
+    vars.faixaCanonica !== undefined ||
+    vars.faixaAcimaCanonica !== undefined ||
+    vars.contCanonica !== undefined
+  );
+  if (vars && temEspeciais) {
     v = { ...vars };
     if (vars.faixaCanonica !== undefined) v.faixa = nomeFaixaEm(lingua, String(vars.faixaCanonica));
     if (vars.faixaAcimaCanonica !== undefined) v.faixaAcima = nomeFaixaEm(lingua, String(vars.faixaAcimaCanonica));
+    if (vars.contCanonica !== undefined) v.cont = nomeContinenteEm(lingua, String(vars.contCanonica));
   }
   return preencher(texto, v);
 }
