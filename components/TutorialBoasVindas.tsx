@@ -40,6 +40,7 @@
 import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { marcarTutorialVisto, type TutKey } from "@/lib/tutorials";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -49,11 +50,11 @@ const MAX = "#7fb8f5";
 export type PercursoTutorial = "pro" | "promax" | "promax_direto";
 
 interface Passo {
-  titulo: string;
-  texto: string;
+  tituloK: string;
+  textoK: string;
   /** Para onde este passo leva, se a pessoa quiser ver. */
   href?: string;
-  rotulo?: string;
+  rotuloK?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,92 +65,26 @@ interface Passo {
 // ---------------------------------------------------------------------------
 
 const PASSOS_PRO: Passo[] = [
-  {
-    titulo: "Bem-vindo ao Ippon Pro",
-    texto:
-      "Deixaste de jogar às escuras. A partir de agora tens a análise da tua equipa, o histórico de cada atleta e a dica de capitão antes de cada rodada.",
-  },
-  {
-    titulo: "O scout da tua equipa",
-    texto:
-      "Vê a média de cada um dos teus 8 atletas ao nível desta competição, e o dossiê completo de qualquer um deles. É o que separa uma escalação por instinto de uma escalação por dados.",
-    href: "/pro",
-    rotulo: "Ver o meu scout",
-  },
-  {
-    titulo: "A chave das competições",
-    texto:
-      "O quadro de lutas de cada categoria, com o caminho de cada atleta até à final. Dá para perceber quem apanha um percurso fácil e quem vai ter de passar pelos favoritos.",
-    href: "/chave-atletas",
-    rotulo: "Ver a chave",
-  },
-  {
-    titulo: "As ligas oficiais",
-    texto:
-      "Entraste automaticamente na Liga Mundial e na liga do teu continente. Não precisas de fazer nada: os pontos das tuas rodadas já lá contam.",
-    href: "/oficial/mundial",
-    rotulo: "Ver a Liga Mundial",
-  },
-  {
-    titulo: "Até 5 ligas",
-    texto:
-      "Podes criar e disputar até cinco ligas de amigos ao mesmo tempo, e outras tantas copas de mata-mata. Cada uma com o seu ranking.",
-    href: "/ligas",
-    rotulo: "Ver as minhas ligas",
-  },
+  { tituloK: "tbv.pro1Tit", textoK: "tbv.pro1Txt" },
+  { tituloK: "tbv.pro2Tit", textoK: "tbv.pro2Txt", href: "/pro", rotuloK: "tbv.pro2Rot" },
+  { tituloK: "tbv.pro3Tit", textoK: "tbv.pro3Txt", href: "/chave-atletas", rotuloK: "tbv.pro3Rot" },
+  { tituloK: "tbv.pro4Tit", textoK: "tbv.pro4Txt", href: "/oficial/mundial", rotuloK: "tbv.pro4Rot" },
+  { tituloK: "tbv.pro5Tit", textoK: "tbv.pro5Txt", href: "/ligas", rotuloK: "tbv.pro5Rot" },
 ];
 
 const PASSOS_PROMAX: Passo[] = [
-  {
-    titulo: "Bem-vindo ao Pro Max",
-    texto:
-      "Tens tudo o que o Pro dá — e mais quatro coisas que só existem aqui. Vamos a elas.",
-  },
-  {
-    titulo: "A chave AO VIVO",
-    texto:
-      "No Pro a chave está congelada: vês como começou e como acabou. Aqui vês o que está a acontecer agora, luta a luta, enquanto a competição decorre.",
-    href: "/chave-atletas",
-    rotulo: "Ver a chave ao vivo",
-  },
-  {
-    titulo: "Aviso quando o teu atleta vai lutar",
-    texto:
-      "Marcas os teus favoritos e recebes um aviso no telemóvel pouco antes de cada um entrar no tatame. Deixas de perder as lutas que te interessam.",
-    href: "/atletas",
-    rotulo: "Escolher favoritos",
-  },
-  {
-    titulo: "A Copa do Dôdo",
-    texto:
-      "O mata-mata mundial entre continentes. Seis vagas por continente, entrada por sorteio, e só quem é Pro ou Pro Max pode disputar. Representas o teu país.",
-    href: "/dodo",
-    rotulo: "Ver a Copa",
-  },
-  {
-    titulo: "A comunidade",
-    texto:
-      "Um grupo de WhatsApp só para membros Pro Max: notícias, conversa sobre as rodadas e o sítio onde as tuas ideias chegam primeiro. A entrada é aprovada por um administrador.",
-    href: "/pro-max-central",
-    rotulo: "Entrar no grupo",
-  },
-  {
-    titulo: "E o dobro de tudo",
-    texto:
-      "Até 10 ligas e 10 copas, o dobro do Pro. Mais a cor do tatame e a cor do judogui do teu Dôdo — só tu tens.",
-    href: "/pro-max-central",
-    rotulo: "Personalizar",
-  },
+  { tituloK: "tbv.max1Tit", textoK: "tbv.max1Txt" },
+  { tituloK: "tbv.max2Tit", textoK: "tbv.max2Txt", href: "/chave-atletas", rotuloK: "tbv.max2Rot" },
+  { tituloK: "tbv.max3Tit", textoK: "tbv.max3Txt", href: "/atletas", rotuloK: "tbv.max3Rot" },
+  { tituloK: "tbv.max4Tit", textoK: "tbv.max4Txt", href: "/dodo", rotuloK: "tbv.max4Rot" },
+  { tituloK: "tbv.max5Tit", textoK: "tbv.max5Txt", href: "/pro-max-central", rotuloK: "tbv.max5Rot" },
+  { tituloK: "tbv.max6Tit", textoK: "tbv.max6Txt", href: "/pro-max-central", rotuloK: "tbv.max6Rot" },
 ];
 
 // Quem vai direto de grátis para Pro Max leva os dois, sem a introdução do Pro
 // Max (que fala em "tudo o que o Pro dá" a quem nunca foi Pro).
 const PASSOS_PROMAX_DIRETO: Passo[] = [
-  {
-    titulo: "Bem-vindo ao Ippon Pro Max",
-    texto:
-      "Foste direto ao pacote completo. Tens tudo: os dados que o Pro dá e as vantagens exclusivas do Max. Vamos ver o que mudou.",
-  },
+  { tituloK: "tbv.dir1Tit", textoK: "tbv.dir1Txt" },
   ...PASSOS_PRO.slice(1),
   ...PASSOS_PROMAX.slice(1),
 ];
@@ -179,6 +114,7 @@ export function TutorialBoasVindas({
   nome?: string;
   onFechar: () => void;
 }) {
+  const t = useT();
   const passos = passosDe(percurso);
   const [passo, setPasso] = useState(0);
   const total = passos.length;
@@ -223,7 +159,7 @@ export function TutorialBoasVindas({
             onClick={fechar}
             style={{ background: "transparent", border: "none", color: "#7c8a82", fontSize: 11.5, cursor: "pointer", fontFamily: FB }}
           >
-            Não mostrar mais ✕
+            {t("tbv.naoMostrar")}
           </button>
         </div>
 
@@ -234,9 +170,9 @@ export function TutorialBoasVindas({
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: cimo, lineHeight: 1.25, marginBottom: 6 }}>
-              {passo === 0 && nome ? `${s.titulo}, ${nome}!` : s.titulo}
+              {passo === 0 && nome ? `${t(s.tituloK)}, ${nome}!` : t(s.tituloK)}
             </div>
-            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>{s.texto}</p>
+            <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>{t(s.textoK)}</p>
           </div>
         </div>
 
@@ -248,7 +184,7 @@ export function TutorialBoasVindas({
             onClick={() => marcarTutorialVisto(chaveDe(percurso))}
             style={{ display: "block", textAlign: "center", marginTop: 14, background: "transparent", border: `1px solid ${cimo}`, color: cimo, fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "10px", borderRadius: 10, textDecoration: "none" }}
           >
-            {s.rotulo || "Ver"} →
+            {s.rotuloK ? t(s.rotuloK) : t("tbv.verDefault")} →
           </a>
         )}
 
@@ -258,16 +194,16 @@ export function TutorialBoasVindas({
             disabled={passo === 0}
             style={{ background: "transparent", border: "none", color: passo === 0 ? "#3c463f" : "#93a39a", fontSize: 13, fontWeight: 700, cursor: passo === 0 ? "default" : "pointer", fontFamily: FB }}
           >
-            Anterior
+            {t("comum.anterior")}
           </button>
 
-          <span style={{ fontSize: 11, color: "#5f6f67" }}>{passo + 1} de {total}</span>
+          <span style={{ fontSize: 11, color: "#5f6f67" }}>{t("tbv.passoDeTotal", { n: passo + 1, total })}</span>
 
           <button
             onClick={() => (ultimo ? fechar() : setPasso(passo + 1))}
             style={{ background: cimo, border: "none", color: "#0b1220", padding: "9px 20px", borderRadius: 10, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}
           >
-            {ultimo ? "Começar" : "Seguinte"}
+            {ultimo ? t("tbv.comecar") : t("comum.seguinte")}
           </button>
         </div>
       </div>
