@@ -10,7 +10,7 @@
 // AUTOSSUFICIENTE: trata da sessão, do pedido e de todos os estados (a carregar,
 // sem acesso, sem dados, ok). A página só precisa de lhe passar a categoria.
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, nomeCompeticao } from "@/lib/calendario";
 import { useT } from "@/lib/i18n";
@@ -70,28 +70,30 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
   const [aCarregar, setACarregar] = useState(true);
   const [aberto, setAberto] = useState<string | null>(null);
 
-  const carregar = useCallback(async () => {
+  useEffect(() => {
     if (!comp || !cat) return;
+    let cancelado = false;
     setACarregar(true);
-    try {
-      // O paywall está no SERVIDOR: sem este token não sai um único dado.
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-      const r = await fetch(
-        `/api/confrontos?comp=${encodeURIComponent(comp)}&cat=${encodeURIComponent(cat)}`,
-        { cache: "no-store", headers }
-      );
-      const j = (await r.json()) as Resposta;
-      setDados(j);
-    } catch {
-      setDados({ ok: false });
-    } finally {
-      setACarregar(false);
-    }
+    (async () => {
+      try {
+        // O paywall está no SERVIDOR: sem este token não sai um único dado.
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+        const r = await fetch(
+          `/api/confrontos?comp=${encodeURIComponent(comp)}&cat=${encodeURIComponent(cat)}`,
+          { cache: "no-store", headers }
+        );
+        const j = (await r.json()) as Resposta;
+        if (!cancelado) setDados(j);
+      } catch {
+        if (!cancelado) setDados({ ok: false });
+      } finally {
+        if (!cancelado) setACarregar(false);
+      }
+    })();
+    return () => { cancelado = true; };
   }, [comp, cat]);
-
-  useEffect(() => { void carregar(); }, [carregar]);
 
   if (aCarregar) return <Aviso texto={t("ac.aAnalisar")} />;
   if (!dados || !dados.ok) return <Aviso texto={t("ac.erroCarregar")} />;
