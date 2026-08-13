@@ -37,6 +37,7 @@ import { Escudo, type Identity } from "@/components/Escudo";
 // As notícias da região do leitor aparecem primeiro. Nenhuma é escondida — ver
 // a nota em lib/ordenarNoticias.
 import { ordenarPorRegiao } from "@/lib/ordenarNoticias";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -87,6 +88,7 @@ const INTERVALO_MS = 6000;
 const PAUSA_APOS_GESTO = 12000;
 
 export function HubCarrossel() {
+  const t = useT();
   const [noticias, setNoticias] = useState<Noticia[]>([]);
   const [i, setI] = useState(0);
   const [parado, setParado] = useState(false);
@@ -150,9 +152,9 @@ export function HubCarrossel() {
   const MIN_ARRASTO = 45;
 
   function inicioToque(e: React.TouchEvent) {
-    const t = e.touches[0];
-    toqueX.current = t.clientX;
-    toqueY.current = t.clientY;
+    const tp = e.touches[0];
+    toqueX.current = tp.clientX;
+    toqueY.current = tp.clientY;
     arrastou.current = false;
     // Para ENQUANTO o dedo está em cima — não para sempre. As duas coisas
     // convivem: passa sozinho de 6 em 6 segundos, e quem quiser escolher
@@ -204,10 +206,10 @@ export function HubCarrossel() {
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#cdb86a" }}>
-          Blog do Dôdo
+          {t("hub.blogTitulo")}
         </span>
         <a href="/blog" style={{ fontFamily: FD, fontSize: 11.5, fontWeight: 700, color: GOLD, textDecoration: "none" }}>
-          Ver tudo ›
+          {t("hub.verTudo")}
         </a>
       </div>
 
@@ -246,7 +248,7 @@ export function HubCarrossel() {
                   pense que já está no ar o que ainda está à espera. */}
               {n.estado && n.estado !== "publicada" && (
                 <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "2px 5px", borderRadius: 4, background: "#2a1f1c", color: "#ef8d83", marginRight: 6, verticalAlign: "middle" }}>
-                  {n.estado === "revisao" ? "a rever" : n.estado === "agendada" ? "agendada" : "rascunho"}
+                  {n.estado === "revisao" ? t("hub.aRever") : n.estado === "agendada" ? t("hub.agendada") : t("hub.rascunho")}
                 </span>
               )}
               {n.titulo}
@@ -270,7 +272,7 @@ export function HubCarrossel() {
             <button
               key={x.id}
               onClick={() => { setI(idx); setParado(true); retomar(); }}
-              aria-label={`Notícia ${idx + 1} de ${noticias.length}`}
+              aria-label={t("hub.noticiaDe", { n: idx + 1, total: noticias.length })}
               style={{
                 width: idx === i ? 18 : 6, height: 6, borderRadius: 999, border: "none", padding: 0,
                 background: idx === i ? GOLD : "#2a3a33",
