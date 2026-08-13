@@ -565,6 +565,52 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Si ce n'est pas toi qui t'es inscrit, ignore cet e-mail — sans confirmation, rien ne se passe.",
     de: "Wenn du dich nicht registriert hast, ignoriere diese E-Mail einfach — ohne Bestätigung passiert nichts.",
   },
+
+  // --- CONTAS INATIVAS (app/api/contas-inativas) — email + sino ---
+  // {dias} = quantos dias faltam; {time} = " <strong>NomeTime</strong>" ou "".
+  // A saudação e o nome-de-recurso reaproveitam as chaves do email de confirmação.
+  "inativa.emailAssunto": {
+    pt: "A tua conta será apagada em {dias} dias",
+    en: "Your account will be deleted in {dias} days",
+    es: "Tu cuenta será eliminada en {dias} días",
+    fr: "Ton compte sera supprimé dans {dias} jours",
+    de: "Dein Konto wird in {dias} Tagen gelöscht",
+  },
+  "inativa.emailFrase1": {
+    pt: "Há quase um ano que não entras na <strong>Ippon League</strong>, e a tua conta{time} será apagada dentro de <strong>{dias} dias</strong>.",
+    en: "You haven't been to the <strong>Ippon League</strong> in almost a year, and your account{time} will be deleted in <strong>{dias} days</strong>.",
+    es: "Hace casi un año que no entras en la <strong>Ippon League</strong>, y tu cuenta{time} será eliminada dentro de <strong>{dias} días</strong>.",
+    fr: "Cela fait presque un an que tu n'es pas venu sur l'<strong>Ippon League</strong>, et ton compte{time} sera supprimé dans <strong>{dias} jours</strong>.",
+    de: "Du warst seit fast einem Jahr nicht mehr bei der <strong>Ippon League</strong>, und dein Konto{time} wird in <strong>{dias} Tagen</strong> gelöscht.",
+  },
+  "inativa.emailFrase2": {
+    pt: "Se voltares, fica tudo como estava — e a contagem recomeça. Basta abrir a app uma vez.",
+    en: "If you come back, everything stays as it was — and the countdown resets. Just open the app once.",
+    es: "Si vuelves, todo queda como estaba — y la cuenta atrás se reinicia. Solo tienes que abrir la app una vez.",
+    fr: "Si tu reviens, tout reste comme avant — et le compte à rebours repart. Il suffit d'ouvrir l'appli une fois.",
+    de: "Wenn du zurückkommst, bleibt alles, wie es war — und der Countdown beginnt von vorn. Öffne die App einfach einmal.",
+  },
+  "inativa.emailBotao": {
+    pt: "Voltar ao dojo",
+    en: "Back to the dojo",
+    es: "Volver al dojo",
+    fr: "Retour au dojo",
+    de: "Zurück ins Dojo",
+  },
+  "inativa.emailRodape": {
+    pt: "Se preferires não continuar, não precisas de fazer nada. O nome do teu time volta a ficar disponível para outra pessoa.",
+    en: "If you'd rather not continue, you don't need to do anything. Your team's name becomes available for someone else.",
+    es: "Si prefieres no continuar, no necesitas hacer nada. El nombre de tu time vuelve a quedar disponible para otra persona.",
+    fr: "Si tu préfères ne pas continuer, tu n'as rien à faire. Le nom de ton équipe redevient disponible pour quelqu'un d'autre.",
+    de: "Wenn du lieber nicht weitermachst, musst du nichts tun. Der Name deines Teams wird wieder für jemand anderen frei.",
+  },
+  "inativa.sinoCorpo": {
+    pt: "Há quase um ano que não entras. Abre a app uma vez para manteres tudo como está.",
+    en: "You haven't been here in almost a year. Open the app once to keep everything as it is.",
+    es: "Hace casi un año que no entras. Abre la app una vez para mantener todo como está.",
+    fr: "Cela fait presque un an que tu n'es pas venu. Ouvre l'appli une fois pour tout garder comme c'est.",
+    de: "Du warst seit fast einem Jahr nicht mehr hier. Öffne die App einmal, um alles so zu behalten, wie es ist.",
+  },
 };
 
 // Nomes das FAIXAS por língua — iguais aos que a app mostra no resto do ecrã
