@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Mascot } from "@/components/Mascot";
 import { supabase } from "@/lib/supabase";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -42,6 +43,7 @@ function marcarApareceu() {
 type Fase = "estrelas" | "comentario" | "fim";
 
 export function Avaliacao({ nomeTime, onClose }: { nomeTime?: string; onClose: () => void }) {
+  const t = useT();
   const [fase, setFase] = useState<Fase>("estrelas");
   const [estrelas, setEstrelas] = useState(0);
   const [hover, setHover] = useState(0);
@@ -99,8 +101,8 @@ export function Avaliacao({ nomeTime, onClose }: { nomeTime?: string; onClose: (
 
         {fase === "estrelas" && (
           <>
-            <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px" }}>Estás a gostar?</h2>
-            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 16px" }}>Dá a tua avaliação à Ippon League. Ajuda-nos a melhorar o jogo para ti.</p>
+            <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px" }}>{t("aval.estasGostar")}</h2>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 16px" }}>{t("aval.corpo")}</p>
             <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 20 }}>
               {[1, 2, 3, 4, 5].map((n) => {
                 const ativa = (hover || estrelas) >= n;
@@ -110,7 +112,7 @@ export function Avaliacao({ nomeTime, onClose }: { nomeTime?: string; onClose: (
                     onClick={() => setEstrelas(n)}
                     onMouseEnter={() => setHover(n)}
                     onMouseLeave={() => setHover(0)}
-                    aria-label={`${n} estrela${n > 1 ? "s" : ""}`}
+                    aria-label={n > 1 ? t("aval.estrelas", { n }) : t("aval.estrela", { n })}
                     style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 34, lineHeight: 1, color: ativa ? GOLD : "#3c463f", padding: 0, transition: "color 0.1s" }}
                   >
                     ★
@@ -129,20 +131,20 @@ export function Avaliacao({ nomeTime, onClose }: { nomeTime?: string; onClose: (
                 cursor: estrelas < 1 ? "default" : "pointer",
               }}
             >
-              {enviando ? "A enviar…" : "Enviar"}
+              {enviando ? t("atletas.aEnviar") : t("aval.enviar")}
             </button>
-            <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Agora não</button>
+            <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>{t("pro.mxAgoraNao")}</button>
           </>
         )}
 
         {fase === "comentario" && (
           <>
-            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px", color: GOLD }}>Obrigado pela tua avaliação!</h2>
-            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 14px" }}>Queres contar-nos o que mais gostaste ou o que podemos melhorar? (opcional)</p>
+            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px", color: GOLD }}>{t("aval.obrigado")}</h2>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 14px" }}>{t("aval.comentarioPergunta")}</p>
             <textarea
               value={comentario}
               onChange={(e) => setComentario(e.target.value)}
-              placeholder="A tua experiência ou sugestão…"
+              placeholder={t("aval.phComentario")}
               rows={4}
               style={{ width: "100%", boxSizing: "border-box", background: "#0f1411", border: "1px solid #243029", borderRadius: 12, padding: 12, color: "#f1ede2", fontSize: 14, fontFamily: FB, resize: "none", outline: "none", marginBottom: 16 }}
             />
@@ -151,20 +153,20 @@ export function Avaliacao({ nomeTime, onClose }: { nomeTime?: string; onClose: (
               disabled={enviando}
               style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}
             >
-              {enviando ? "A enviar…" : comentario.trim() ? "Enviar" : "Saltar"}
+              {enviando ? t("atletas.aEnviar") : comentario.trim() ? t("aval.enviar") : t("aval.saltar")}
             </button>
           </>
         )}
 
         {fase === "fim" && (
           <>
-            <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px", color: GOLD }}>Recebido!</h2>
-            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 18px" }}>A tua opinião conta muito para nós. Bom jogo na próxima rodada!</p>
+            <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 6px", color: GOLD }}>{t("aval.recebido")}</h2>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 18px" }}>{t("aval.recebidoCorpo")}</p>
             <button
               onClick={onClose}
               style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}
             >
-              Fechar
+              {t("comum.fechar")}
             </button>
           </>
         )}
