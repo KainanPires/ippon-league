@@ -611,6 +611,23 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Cela fait presque un an que tu n'es pas venu. Ouvre l'appli une fois pour tout garder comme c'est.",
     de: "Du warst seit fast einem Jahr nicht mehr hier. Öffne die App einmal, um alles so zu behalten, wie es ist.",
   },
+
+  // --- CHAVEAMENTO (app/api/chaveamento) — notificação "Chave oficial" ---
+  // {comp} = nome da competição (nome próprio, não se traduz).
+  "chave.notifTitulo": {
+    pt: "🥋 Chave oficial disponível: {comp}",
+    en: "🥋 Official bracket available: {comp}",
+    es: "🥋 Cuadro oficial disponible: {comp}",
+    fr: "🥋 Tableau officiel disponible : {comp}",
+    de: "🥋 Offizieller Baum verfügbar: {comp}",
+  },
+  "chave.notifCorpo": {
+    pt: "Já podes ver o chaveamento do {comp}. Descobre contra quem os teus atletas vão lutar e prepara a tua estratégia.",
+    en: "You can now see the bracket for {comp}. Find out who your athletes will face and plan your strategy.",
+    es: "Ya puedes ver el cuadro del {comp}. Descubre contra quién van a luchar tus atletas y prepara tu estrategia.",
+    fr: "Tu peux maintenant voir le tableau du {comp}. Découvre contre qui tes athlètes vont combattre et prépare ta stratégie.",
+    de: "Du kannst jetzt den Baum für {comp} sehen. Finde heraus, gegen wen deine Athleten kämpfen, und plane deine Strategie.",
+  },
 };
 
 // Nomes das FAIXAS por língua — iguais aos que a app mostra no resto do ecrã
