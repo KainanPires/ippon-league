@@ -66,8 +66,9 @@ export async function POST(req: Request) {
     await criarNotificacaoServidor({
       paraUserId: pedido.user_id,
       tipo: "liga_aprovado", // mesmo tipo "liga_*"; o texto distingue
-      titulo: "Pedido de liga não aceite",
-      corpo: `O teu pedido para a liga "${liga.name}" não foi aceite desta vez. Há muitas outras ligas para entrares!`,
+      chaveTitulo: "liga.recusadoTitulo",
+      chaveCorpo: "liga.recusadoCorpo",
+      vars: { liga: liga.name },
       link: "/ligas",
     });
     return NextResponse.json({ ok: true, acao: "recusar" });
@@ -112,8 +113,9 @@ export async function POST(req: Request) {
   await criarNotificacaoServidor({
     paraUserId: pedido.user_id,
     tipo: "liga_aprovado",
-    titulo: "Entraste na liga!",
-    corpo: `O teu pedido para a liga "${liga.name}" foi aceite. Boa sorte na competição!`,
+    chaveTitulo: "liga.aprovadoTitulo",
+    chaveCorpo: "liga.aprovadoCorpo",
+    vars: { liga: liga.name },
     link: "/ligas",
   });
   return NextResponse.json({ ok: true, acao: "aprovar" });
