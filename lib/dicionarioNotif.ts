@@ -351,6 +351,48 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Le marché a fermé et tu n'as pas constitué d'équipe pour le {comp}. Tu es hors-jeu cette journée — prépare-toi pour la prochaine !",
     de: "Der Markt hat geschlossen und du hast kein Team für {comp} aufgestellt. Du bist diese Runde raus — mach dich bereit für die nächste!",
   },
+  "dodo.sorteadoTitulo": {
+    pt: "🏆 Entraste na {numero}ª Copa do Dôdo!",
+    en: "🏆 You're in the Copa do Dôdo #{numero}!",
+    es: "🏆 ¡Entraste en la {numero}.ª Copa do Dôdo!",
+    fr: "🏆 Tu es dans la {numero}e Copa do Dôdo !",
+    de: "🏆 Du bist in der {numero}. Copa do Dôdo!",
+  },
+  "dodo.sorteadoCorpo": {
+    pt: "Parabéns — a tua vaga saiu no sorteio. És um dos {n} em prova e, a partir de agora, cada rodada elimina metade. Fica atento às competições seguintes: os pontos da tua equipa contam a sério e não há segunda hipótese. Vais representar o teu país e o teu continente. Boa sorte, campeão!",
+    en: "Congratulations — your spot came up in the draw. You're one of {n} in the running and, from now on, each round eliminates half. Keep an eye on the coming competitions: your team's points count for real and there's no second chance. You'll represent your country and your continent. Good luck, champion!",
+    es: "¡Enhorabuena! — tu plaza salió en el sorteo. Eres uno de {n} en competición y, a partir de ahora, cada ronda elimina a la mitad. Atento a las próximas competiciones: los puntos de tu equipo cuentan de verdad y no hay segunda oportunidad. Representarás a tu país y a tu continente. ¡Buena suerte, campeón!",
+    fr: "Félicitations — ta place est sortie au tirage. Tu es l'un des {n} en lice et, à partir de maintenant, chaque tour élimine la moitié. Reste attentif aux prochaines compétitions : les points de ton équipe comptent pour de vrai et il n'y a pas de seconde chance. Tu représenteras ton pays et ton continent. Bonne chance, champion !",
+    de: "Glückwunsch — dein Platz kam bei der Auslosung. Du bist einer von {n} im Rennen und ab jetzt scheidet in jeder Runde die Hälfte aus. Behalte die kommenden Wettkämpfe im Auge: Die Punkte deines Teams zählen wirklich und es gibt keine zweite Chance. Du vertrittst dein Land und deinen Kontinent. Viel Glück, Champion!",
+  },
+  "dodo.naoSorteadoTitulo": {
+    pt: "A tua vaga não saiu no sorteio",
+    en: "Your spot didn't come up in the draw",
+    es: "Tu plaza no salió en el sorteo",
+    fr: "Ta place n'est pas sortie au tirage",
+    de: "Dein Platz kam nicht bei der Auslosung",
+  },
+  "dodo.naoSorteadoCorpo": {
+    pt: "Houve mais inscritos do que lugares na {numero}ª Copa do Dôdo e o sorteio decidiu. Não teve nada a ver com o teu desempenho — foi mesmo sorte. A próxima edição volta a abrir com todas as vagas em jogo, e podes acompanhar esta Copa na mesma. Até lá, há as ligas Mundial e Continental a correr.",
+    en: "There were more entrants than spots in the Copa do Dôdo #{numero}, and the draw decided. It had nothing to do with your performance — it was pure luck. The next edition opens again with every spot up for grabs, and you can still follow this Copa. Until then, the World and Continental leagues are running.",
+    es: "Hubo más inscritos que plazas en la {numero}.ª Copa do Dôdo y el sorteo decidió. No tuvo nada que ver con tu rendimiento — fue pura suerte. La próxima edición vuelve a abrir con todas las plazas en juego, y puedes seguir esta Copa igualmente. Hasta entonces, están las ligas Mundial y Continental en marcha.",
+    fr: "Il y a eu plus d'inscrits que de places dans la {numero}e Copa do Dôdo, et le tirage a décidé. Cela n'a rien à voir avec ta performance — c'était de la pure chance. La prochaine édition rouvre avec toutes les places en jeu, et tu peux suivre cette Copa quand même. D'ici là, les ligues Mondiale et Continentale sont en cours.",
+    de: "Es gab mehr Anmeldungen als Plätze in der {numero}. Copa do Dôdo, und die Auslosung hat entschieden. Es hatte nichts mit deiner Leistung zu tun — es war reines Glück. Die nächste Ausgabe öffnet wieder mit allen Plätzen, und du kannst diese Copa trotzdem verfolgen. Bis dahin laufen die Welt- und Kontinentalligen.",
+  },
+  "dodo.inscricaoTitulo": {
+    pt: "Inscrição feita na {numero}ª Copa do Dôdo",
+    en: "You're entered in the Copa do Dôdo #{numero}",
+    es: "Inscripción hecha en la {numero}.ª Copa do Dôdo",
+    fr: "Inscription faite à la {numero}e Copa do Dôdo",
+    de: "Anmeldung für die {numero}. Copa do Dôdo erledigt",
+  },
+  "dodo.inscricaoCorpo": {
+    pt: "Estás no sorteio, a concorrer pelas vagas do teu continente ({cont}). O sorteio sai a {data}, na véspera da competição que abre a Copa, e avisamos-te aqui no momento. Não é por ordem de chegada: teres-te inscrito hoje ou no último dia dá exatamente a mesma hipótese.",
+    en: "You're in the draw, competing for your continent's spots ({cont}). The draw takes place on {data}, the eve of the competition that opens the Copa, and we'll let you know right here when it does. It's not first-come, first-served: entering today or on the last day gives you exactly the same chance.",
+    es: "Estás en el sorteo, compitiendo por las plazas de tu continente ({cont}). El sorteo se hace el {data}, la víspera de la competición que abre la Copa, y te avisamos aquí en el momento. No es por orden de llegada: inscribirte hoy o el último día te da exactamente la misma oportunidad.",
+    fr: "Tu es dans le tirage, en lice pour les places de ton continent ({cont}). Le tirage a lieu le {data}, la veille de la compétition qui ouvre la Copa, et on te prévient ici à ce moment-là. Ce n'est pas premier arrivé, premier servi : t'inscrire aujourd'hui ou le dernier jour te donne exactement la même chance.",
+    de: "Du bist in der Auslosung und kämpfst um die Plätze deines Kontinents ({cont}). Die Auslosung findet am {data} statt, am Vorabend des Wettkampfs, der die Copa eröffnet, und wir sagen dir hier sofort Bescheid. Es gilt nicht: wer zuerst kommt — ob du dich heute oder am letzten Tag anmeldest, gibt dir genau dieselbe Chance.",
+  },
 };
 
 /** Substitui {var} pelos valores dados. */
