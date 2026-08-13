@@ -22,10 +22,16 @@
 //   GET  /api/verificar-email?token=...      -> confirma e redireciona
 //   POST /api/verificar-email  { acao }       -> "enviar" (pedido do próprio)
 //        ?cron=1&key=CRON_SECRET              -> lote diário (chamado pelo cron)
+//
+// IDIOMA: o corpo e o assunto do email saem NA LÍNGUA da pessoa (users.lingua).
+// Os textos vivem no dicionário do servidor (lib/dicionarioNotif) e renderizam-se
+// com renderNotif — o mesmo caminho das notificações. Se a pessoa não tem língua
+// definida, cai no português.
 // ---------------------------------------------------------------------------
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { renderNotif, type LinguaNotif } from "@/lib/dicionarioNotif";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,6 +40,12 @@ export const runtime = "nodejs";
 const VALIDADE_HORAS = 72;
 
 const MAIL_FROM = process.env.MAIL_FROM || "Ippon League <support@ipponleague.com>";
+
+/** Normaliza o valor de users.lingua para uma das 5 línguas (fallback pt). */
+function normLingua(v: unknown): LinguaNotif {
+  const s = String(v || "").toLowerCase();
+  return (["pt", "en", "es", "fr", "de"].includes(s) ? s : "pt") as LinguaNotif;
+}
 
 function novoToken(): string {
   // 32 caracteres hexadecimais: impossível de adivinhar, e passa bem num URL.
@@ -77,7 +89,7 @@ function baseUrl(req: Request): string {
  * Gera sempre um token novo: o anterior deixa de servir, e assim uma ligação
  * antiga esquecida numa caixa de correio não fica válida para sempre.
  */
-async function enviarLigacao(uid: string, email: string, nome: string, base: string): Promise<boolean> {
+async function enviarLigacao(uid: string, email: string, nome: string, base: string, lingua: LinguaNotif): Promise<boolean> {
   if (!supabaseAdmin) return false;
   const apiKey = process.env.RESEND_API_KEY;
   const token = novoToken();
@@ -91,24 +103,33 @@ async function enviarLigacao(uid: string, email: string, nome: string, base: str
   if (!apiKey || !email) return false;
 
   const link = `${base}/api/verificar-email?token=${token}`;
-  const primeiroNome = (nome || "").trim().split(" ")[0] || "Campeão";
+  const primeiroNome = (nome || "").trim().split(" ")[0] || renderNotif(lingua, "email.confirmarFallbackNome");
+
+  // Textos na língua da pessoa. {marca} = "Ippon League" a negrito (HTML de
+  // confiança, não escapado); {nome} = primeiro nome já escapado.
+  const saudacao = renderNotif(lingua, "email.confirmarSaudacao", { nome: esc(primeiroNome) });
+  const frase = renderNotif(lingua, "email.confirmarFrase", { marca: "<strong>Ippon League</strong>" });
+  const rotuloBotao = renderNotif(lingua, "email.confirmarBotao");
+  const validade = renderNotif(lingua, "email.confirmarValidade", { horas: VALIDADE_HORAS });
+  const ignora = renderNotif(lingua, "email.confirmarIgnora");
+  const assunto = renderNotif(lingua, "email.confirmarAssunto");
+
   const html = `
     <div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.6;color:#111;max-width:520px">
-      <p style="margin:0 0 14px">Olá, ${esc(primeiroNome)}!</p>
+      <p style="margin:0 0 14px">${saudacao}</p>
       <p style="margin:0 0 14px">
-        Falta um passo para a tua conta na <strong>Ippon League</strong> ficar completa:
-        confirmar que este email é mesmo teu.
+        ${frase}
       </p>
       <p style="margin:0 0 20px">
         <a href="${link}" style="display:inline-block;background:#d9a441;color:#1b211e;text-decoration:none;font-weight:700;padding:13px 26px;border-radius:10px">
-          Confirmar o meu email
+          ${rotuloBotao}
         </a>
       </p>
       <p style="margin:0 0 14px;color:#666;font-size:13px">
-        Serve durante ${VALIDADE_HORAS} horas. Se expirar, pedes outro dentro da app.
+        ${validade}
       </p>
       <p style="margin:0;color:#666;font-size:13px">
-        Se não foste tu que te registaste, ignora este email — sem confirmação, nada acontece.
+        ${ignora}
       </p>
     </div>`;
 
@@ -116,7 +137,7 @@ async function enviarLigacao(uid: string, email: string, nome: string, base: str
     await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: MAIL_FROM, to: [email], subject: "Confirma o teu email — Ippon League", html }),
+      body: JSON.stringify({ from: MAIL_FROM, to: [email], subject: assunto, html }),
     });
     return true;
   } catch {
@@ -204,14 +225,14 @@ export async function POST(req: Request) {
     const limite = new Date(Date.now() - 20 * 3600 * 1000).toISOString();
     const { data: porVerificar } = await supabaseAdmin
       .from("users")
-      .select("id, email, name, ultimo_lembrete_email")
+      .select("id, email, name, lingua, ultimo_lembrete_email")
       .is("email_verificado_em", null)
       .or(`ultimo_lembrete_email.is.null,ultimo_lembrete_email.lt.${limite}`)
       .limit(100);
 
     let enviados = 0;
     for (const u of porVerificar || []) {
-      const ok = await enviarLigacao(String(u.id), String(u.email || ""), String(u.name || ""), base);
+      const ok = await enviarLigacao(String(u.id), String(u.email || ""), String(u.name || ""), base, normLingua(u.lingua));
       if (ok) enviados++;
     }
     return NextResponse.json({ ok: true, candidatos: (porVerificar || []).length, enviados });
@@ -223,7 +244,7 @@ export async function POST(req: Request) {
 
   const { data: u } = await supabaseAdmin
     .from("users")
-    .select("email, name, email_verificado_em, ultimo_lembrete_email")
+    .select("email, name, lingua, email_verificado_em, ultimo_lembrete_email")
     .eq("id", uid).maybeSingle();
   if (!u) return NextResponse.json({ ok: false, erro: "Conta não encontrada." }, { status: 404 });
   if (u.email_verificado_em) return NextResponse.json({ ok: true, jaVerificado: true });
@@ -234,6 +255,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, jaEnviado: true, nota: "Acabámos de enviar. Vê a tua caixa de entrada (e o spam)." });
   }
 
-  const ok = await enviarLigacao(uid, String(u.email || ""), String(u.name || ""), base);
+  const ok = await enviarLigacao(uid, String(u.email || ""), String(u.name || ""), base, normLingua(u.lingua));
   return NextResponse.json({ ok, enviado: ok });
 }
