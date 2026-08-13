@@ -111,6 +111,8 @@ const PT: Dicionario = {
   "entrar.recEscreveEmail": "Escreve o teu email primeiro, para te enviarmos o link de recuperação.",
   "entrar.recFalhou": "Não foi possível enviar o link. Tenta novamente.",
   "entrar.recEnviado": "Enviámos um link para {email}. Abre-o para definires uma nova senha.",
+  "email.avisoDescartavel": "Esse parece ser um email temporário. Usa um email teu — vais precisar dele para recuperar a conta e receber avisos das rodadas.",
+  "email.avisoSugestao": "Quis dizer @{dominio}?",
 
   "comecar.titulo": "Criar a tua conta",
   "comecar.nome": "Nome",
@@ -1713,6 +1715,8 @@ const EN: Dicionario = {
   "entrar.recEscreveEmail": "Type your email first, so we can send you the reset link.",
   "entrar.recFalhou": "We couldn't send the link. Please try again.",
   "entrar.recEnviado": "We sent a link to {email}. Open it to set a new password.",
+  "email.avisoDescartavel": "This looks like a temporary email. Use one of your own — you'll need it to recover your account and get round alerts.",
+  "email.avisoSugestao": "Did you mean @{dominio}?",
 
   "comecar.titulo": "Create your account",
   "comecar.nome": "Name",
@@ -3288,6 +3292,8 @@ const ES: Dicionario = {
   "entrar.recEscreveEmail": "Escribe tu correo primero para enviarte el enlace de recuperación.",
   "entrar.recFalhou": "No pudimos enviar el enlace. Inténtalo de nuevo.",
   "entrar.recEnviado": "Enviamos un enlace a {email}. Ábrelo para crear una contraseña nueva.",
+  "email.avisoDescartavel": "Ese parece un correo temporal. Usa uno tuyo — lo necesitarás para recuperar la cuenta y recibir avisos de las rondas.",
+  "email.avisoSugestao": "¿Quisiste decir @{dominio}?",
 
   "comecar.titulo": "Crea tu cuenta",
   "comecar.nome": "Nombre",
@@ -4863,6 +4869,8 @@ const FR: Dicionario = {
   "entrar.recEscreveEmail": "Écris d'abord ton e-mail, pour qu'on t'envoie le lien de récupération.",
   "entrar.recFalhou": "Impossible d'envoyer le lien. Réessaie.",
   "entrar.recEnviado": "Nous avons envoyé un lien à {email}. Ouvre-le pour définir un nouveau mot de passe.",
+  "email.avisoDescartavel": "Cet e-mail semble temporaire. Utilise le tien — tu en auras besoin pour récupérer ton compte et recevoir les alertes des journées.",
+  "email.avisoSugestao": "Voulais-tu dire @{dominio} ?",
 
   "comecar.titulo": "Crée ton compte",
   "comecar.nome": "Nom",
@@ -6440,6 +6448,8 @@ const DE: Dicionario = {
   "entrar.recEscreveEmail": "Gib zuerst deine E-Mail ein, damit wir dir den Link schicken können.",
   "entrar.recFalhou": "Der Link konnte nicht gesendet werden. Bitte versuche es erneut.",
   "entrar.recEnviado": "Wir haben einen Link an {email} geschickt. Öffne ihn, um ein neues Passwort zu setzen.",
+  "email.avisoDescartavel": "Das sieht nach einer Wegwerf-E-Mail aus. Nimm deine eigene — du brauchst sie, um dein Konto wiederherzustellen und Runden-Hinweise zu erhalten.",
+  "email.avisoSugestao": "Meintest du @{dominio}?",
 
   "comecar.titulo": "Erstelle dein Konto",
   "comecar.nome": "Name",
