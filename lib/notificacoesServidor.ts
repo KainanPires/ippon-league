@@ -17,13 +17,20 @@
 // em silêncio — nunca parte a ação principal.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { enviarPushPara } from "@/lib/pushServer";
+import { renderNotif, linguaDeUtilizador } from "@/lib/i18nServidor";
 
 export interface NotificacaoServidor {
   paraUserId: string;                 // destinatário
   tipo: string;                        // ex: "liga_pedido", "liga_aprovado"
-  titulo: string;
+  // A notificação pode vir de duas formas:
+  //  • texto PRONTO (titulo/corpo) — o modo antigo, ainda usado;
+  //  • CHAVE (chaveTitulo/chaveCorpo + vars) — traduzida na língua de quem recebe.
+  titulo?: string;
   corpo?: string;
   link?: string;
+  chaveTitulo?: string;               // chave do dicionarioNotif (traduzível)
+  chaveCorpo?: string;
+  vars?: Record<string, string | number>;
 }
 
 /**
@@ -34,13 +41,22 @@ export interface NotificacaoServidor {
 export async function criarNotificacaoServidor(n: NotificacaoServidor): Promise<boolean> {
   if (!supabaseAdmin) return false;
   if (!n.paraUserId) return false;
+  // Se vier por CHAVE, descobre a língua de quem recebe e renderiza nela; senão
+  // usa o texto pronto tal como veio (retrocompatível com os avisos antigos).
+  let titulo = n.titulo ?? "";
+  let corpo = n.corpo;
+  if (n.chaveTitulo) {
+    const lingua = await linguaDeUtilizador(n.paraUserId);
+    titulo = renderNotif(lingua, n.chaveTitulo, n.vars);
+    if (n.chaveCorpo) corpo = renderNotif(lingua, n.chaveCorpo, n.vars);
+  }
   let gravou = false;
   try {
     const { error } = await supabaseAdmin.from("notificacoes").insert({
       user_id: n.paraUserId,
       tipo: n.tipo,
-      titulo: n.titulo,
-      corpo: n.corpo ?? null,
+      titulo,
+      corpo: corpo ?? null,
       link: n.link ?? null,
     });
     gravou = !error;
@@ -49,7 +65,7 @@ export async function criarNotificacaoServidor(n: NotificacaoServidor): Promise<
   }
   // Dispara o push (não bloqueia nem parte se falhar).
   try {
-    await enviarPushPara([n.paraUserId], { titulo: n.titulo, corpo: n.corpo, link: n.link });
+    await enviarPushPara([n.paraUserId], { titulo, corpo, link: n.link });
   } catch {}
   return gravou;
 }
