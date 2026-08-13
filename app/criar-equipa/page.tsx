@@ -477,7 +477,9 @@ export default function CriarEquipa() {
         <div style={{ width: 88, height: 88, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
         <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>{t("mt.equipaSalva")}</h2>
         <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 8px" }}>
-        Falta só um passo: <strong style={{ color: "#f1ede2" }}>{t("ce.daNome")}</strong>. É a tua identidade na liga — sem ele, apareces como “A minha equipa” e ninguém te distingue.
+        {t("ce.faltaPasso").split(/(%A%)/).map((seg, i) =>
+          seg === "%A%" ? <strong key={i} style={{ color: "#f1ede2" }}>{t("ce.daNome")}</strong> : seg
+        )}
         </p>
         <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5, margin: "0 0 20px" }}>{t("ce.daNomeSub")}</p>
         <button onClick={() => { window.location.href = "/escudo?voltar=/inicio&obrigatorio=1"; }} style={primaryBtn}>{t("ce.darNomeBtn")}</button>
