@@ -12,7 +12,8 @@ import { Escudo, type Identity } from "@/components/Escudo";
 // As notícias da região do leitor aparecem primeiro. Nenhuma é escondida — ver
 // a nota em lib/ordenarNoticias.
 import { ordenarPorRegiao } from "@/lib/ordenarNoticias";
-import { useT } from "@/lib/i18n";
+import { noticiaNaLingua, type CamposTraduzidos } from "@/lib/noticiaLingua";
+import { useT, useLingua } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -48,6 +49,7 @@ interface Noticia {
   continente: string | null;
   dados: { escudo?: Identity | null } | null;
   estado: string;
+  traducoes: Record<string, CamposTraduzidos> | null;
 }
 
 const FAMILIA: Record<string, "rodada" | "mercado" | "comunidade" | "artigos"> = {
@@ -86,6 +88,7 @@ function quando(iso: string, t: ReturnType<typeof useT>): string {
 
 export default function Blog() {
   const t = useT();
+  const { lingua } = useLingua();
   const [noticias, setNoticias] = useState<Noticia[] | null>(null);
   const { cor: corFaixa } = useFaixa();
   const [aba, setAba] = useState<"tudo" | "rodada" | "mercado" | "comunidade" | "artigos">("tudo");
@@ -105,7 +108,7 @@ export default function Blog() {
       }
       await supabase
       .from("hub_noticias")
-      .select("id, tipo, titulo, corpo, nome_competicao, criada_em, imagem_url, autor_nome, dados, pais, continente, estado")
+      .select("id, tipo, titulo, corpo, nome_competicao, criada_em, imagem_url, autor_nome, dados, pais, continente, estado, traducoes")
       .order("criada_em", { ascending: false })
       .limit(60)
       .then(({ data }) => {
@@ -120,7 +123,9 @@ export default function Blog() {
     if (aba !== "tudo" && FAMILIA[n.tipo] !== aba) return false;
     if (procura.trim()) {
       const q = procura.trim().toLowerCase();
-      if (!n.titulo.toLowerCase().includes(q) && !n.corpo.toLowerCase().includes(q)) return false;
+      // Procura no texto que a pessoa vê (já na língua dela), não no original.
+      const loc = noticiaNaLingua(n, lingua);
+      if (!loc.titulo.toLowerCase().includes(q) && !loc.corpo.toLowerCase().includes(q)) return false;
     }
     return true;
   });
@@ -179,6 +184,7 @@ export default function Blog() {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {visiveis.map((n) => {
               const e = ESTILO[n.tipo] || ESTILO.curiosidade;
+              const loc = noticiaNaLingua(n, lingua);
               return (
                 <a key={n.id} href={`/blog/${n.id}`} style={{ display: "block", background: "#121815", border: "1px solid #243029", borderLeft: `3px solid ${e.cor}`, borderRadius: 13, padding: "13px 14px", textDecoration: "none", color: "inherit" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
@@ -192,7 +198,7 @@ export default function Blog() {
                     <span style={{ flex: 1 }} />
                     <span style={{ fontSize: 10.5, color: "#5f6f67" }}>{quando(n.criada_em, t)}</span>
                   </div>
-                  <h2 style={{ fontSize: 15, fontWeight: 700, color: "#f1ede2", lineHeight: 1.3, margin: "0 0 6px" }}>{n.titulo}</h2>
+                  <h2 style={{ fontSize: 15, fontWeight: 700, color: "#f1ede2", lineHeight: 1.3, margin: "0 0 6px" }}>{loc.titulo}</h2>
                   <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                     {n.imagem_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -200,7 +206,7 @@ export default function Blog() {
                     ) : n.dados?.escudo ? (
                       <span style={{ flexShrink: 0, display: "flex" }}><Escudo config={n.dados.escudo} size={56} /></span>
                     ) : null}
-                    <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0, flex: 1, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{n.corpo}</p>
+                    <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: 0, flex: 1, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{loc.corpo}</p>
                   </div>
                   {(n.nome_competicao || n.autor_nome) && (
                     <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 8 }}>
