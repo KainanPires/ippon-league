@@ -14,6 +14,7 @@ import {
   marcarCalculadaLida,
   type Notificacao,
 } from "@/lib/notificacoes";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -32,22 +33,23 @@ function iconePorTipo(tipo: string): string {
   return "🔔";
 }
 
-function tempoRelativo(ms: number): string {
-  const diff = Date.now() - ms;
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "agora";
-  if (min < 60) return `há ${min}min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `há ${h}h`;
-  const d = Math.floor(h / 24);
-  return `há ${d}d`;
-}
-
 export function SinoNotificacoes({ calcOpts }: { calcOpts?: CalcOpts }) {
+  const t = useT();
   const [aberto, setAberto] = useState(false);
   const [lista, setLista] = useState<Notificacao[]>([]);
   const [naoLidas, setNaoLidas] = useState(0);
   const [carregando, setCarregando] = useState(false);
+
+  function tempoRelativo(ms: number): string {
+    const diff = Date.now() - ms;
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return t("sino.agora");
+    if (min < 60) return t("sino.hMin", { min });
+    const h = Math.floor(min / 60);
+    if (h < 24) return t("sino.hH", { h });
+    const d = Math.floor(h / 24);
+    return t("sino.hD", { d });
+  }
 
   // Conta as não lidas ao montar (para o ponto vermelho), sem abrir o painel.
   const atualizarContagem = useCallback(async () => {
@@ -104,7 +106,7 @@ export function SinoNotificacoes({ calcOpts }: { calcOpts?: CalcOpts }) {
     <>
       <button
         onClick={abrir}
-        aria-label="Notificações"
+        aria-label={t("perfil.notificacoes")}
         style={{ position: "relative", width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -128,23 +130,23 @@ export function SinoNotificacoes({ calcOpts }: { calcOpts?: CalcOpts }) {
             style={{ width: "100%", maxWidth: 460, background: "#0f1411", borderBottomLeftRadius: 18, borderBottomRightRadius: 18, maxHeight: "82vh", display: "flex", flexDirection: "column", borderBottom: "1px solid #243029", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 12px", borderBottom: "1px solid #1a221d" }}>
-              <span style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, textTransform: "uppercase", color: "#f1ede2" }}>Notificações</span>
+              <span style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, textTransform: "uppercase", color: "#f1ede2" }}>{t("perfil.notificacoes")}</span>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 {lista.some((n) => !n.lida) && (
-                  <button onClick={lerTodas} style={{ background: "transparent", border: "none", color: GOLD, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>Marcar lidas</button>
+                  <button onClick={lerTodas} style={{ background: "transparent", border: "none", color: GOLD, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>{t("sino.marcarLidas")}</button>
                 )}
-                <button onClick={fechar} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
+                <button onClick={fechar} aria-label={t("comum.fechar")} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
               </div>
             </div>
 
             <div className="noscroll" style={{ overflowY: "auto", padding: "8px 12px 16px" }}>
               {carregando ? (
-                <div style={{ padding: "30px 12px", textAlign: "center", color: "#7c8a82", fontSize: 13, fontFamily: FD, letterSpacing: "0.08em", textTransform: "uppercase" }}>A carregar…</div>
+                <div style={{ padding: "30px 12px", textAlign: "center", color: "#7c8a82", fontSize: 13, fontFamily: FD, letterSpacing: "0.08em", textTransform: "uppercase" }}>{t("comum.carregando")}</div>
               ) : lista.length === 0 ? (
                 <div style={{ padding: "34px 16px", textAlign: "center" }}>
                   <div style={{ fontSize: 34, marginBottom: 8 }}>🔔</div>
-                  <div style={{ fontSize: 14, color: "#c7d0c9", fontWeight: 700 }}>Sem notificações</div>
-                  <div style={{ fontSize: 12.5, color: "#7c8a82", marginTop: 4, lineHeight: 1.4 }}>Quando houver novidades sobre o mercado, a tua liga ou a tua faixa, aparecem aqui.</div>
+                  <div style={{ fontSize: 14, color: "#c7d0c9", fontWeight: 700 }}>{t("sino.semNotif")}</div>
+                  <div style={{ fontSize: 12.5, color: "#7c8a82", marginTop: 4, lineHeight: 1.4 }}>{t("sino.semNotifCorpo")}</div>
                 </div>
               ) : (
                 lista.map((n) => (
