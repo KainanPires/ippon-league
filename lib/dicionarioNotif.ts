@@ -393,7 +393,82 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Tu es dans le tirage, en lice pour les places de ton continent ({cont}). Le tirage a lieu le {data}, la veille de la compétition qui ouvre la Copa, et on te prévient ici à ce moment-là. Ce n'est pas premier arrivé, premier servi : t'inscrire aujourd'hui ou le dernier jour te donne exactement la même chance.",
     de: "Du bist in der Auslosung und kämpfst um die Plätze deines Kontinents ({cont}). Die Auslosung findet am {data} statt, am Vorabend des Wettkampfs, der die Copa eröffnet, und wir sagen dir hier sofort Bescheid. Es gilt nicht: wer zuerst kommt — ob du dich heute oder am letzten Tag anmeldest, gibt dir genau dieselbe Chance.",
   },
+  "faixa.subiuTitulo": {
+    pt: "🥋 Subiste para a faixa {faixa}!",
+    en: "🥋 You moved up to the {faixa} belt!",
+    es: "🥋 ¡Subiste al cinturón {faixa}!",
+    fr: "🥋 Tu es passé à la ceinture {faixa} !",
+    de: "🥋 Du bist auf den {faixa} Gürtel aufgestiegen!",
+  },
+  "faixa.subiuCorpo": {
+    pt: "Parabéns! O teu desempenho levou-te à faixa {faixa}. Estás entre os melhores — continua assim e vai mais longe!",
+    en: "Congratulations! Your performance took you to the {faixa} belt. You're among the best — keep it up and go even further!",
+    es: "¡Enhorabuena! Tu rendimiento te llevó al cinturón {faixa}. Estás entre los mejores — ¡sigue así y llega más lejos!",
+    fr: "Félicitations ! Ta performance t'a mené à la ceinture {faixa}. Tu es parmi les meilleurs — continue comme ça et va encore plus loin !",
+    de: "Glückwunsch! Deine Leistung hat dich auf den {faixa} Gürtel gebracht. Du gehörst zu den Besten — weiter so und komm noch weiter!",
+  },
+  "faixa.desceuTitulo": {
+    pt: "Faixa {faixa} — a próxima é tua",
+    en: "{faixa} belt — the next one is yours",
+    es: "Cinturón {faixa} — el próximo es tuyo",
+    fr: "Ceinture {faixa} — la prochaine est à toi",
+    de: "{faixa} Gürtel — der nächste gehört dir",
+  },
+  "faixa.desceuCorpo": {
+    pt: "Desta vez desceste para a faixa {faixa}, mas isto faz parte do jogo. Monta uma boa equipa na próxima rodada e recupera o teu lugar — acreditamos em ti!",
+    en: "This time you dropped to the {faixa} belt, but that's part of the game. Build a good team next round and win your spot back — we believe in you!",
+    es: "Esta vez bajaste al cinturón {faixa}, pero eso es parte del juego. Monta un buen equipo en la próxima ronda y recupera tu lugar — ¡creemos en ti!",
+    fr: "Cette fois tu es redescendu à la ceinture {faixa}, mais ça fait partie du jeu. Constitue une bonne équipe à la prochaine journée et reprends ta place — on croit en toi !",
+    de: "Diesmal bist du auf den {faixa} Gürtel abgestiegen, aber das gehört zum Spiel. Stell in der nächsten Runde ein gutes Team auf und hol dir deinen Platz zurück — wir glauben an dich!",
+  },
+  "faixa.mantidaTitulo": {
+    pt: "🥋 Mantiveste a faixa {faixa}",
+    en: "🥋 You kept the {faixa} belt",
+    es: "🥋 Mantuviste el cinturón {faixa}",
+    fr: "🥋 Tu as gardé la ceinture {faixa}",
+    de: "🥋 Du hast den {faixa} Gürtel gehalten",
+  },
+  "faixa.mantidaTopoCorpo": {
+    pt: "Fechaste o mês na faixa {faixa} — o topo da Ippon League. Agora é aguentar lá em cima: no próximo mês há quem venha atrás do teu lugar.",
+    en: "You ended the month on the {faixa} belt — the top of the Ippon League. Now it's about holding on up there: next month, others will be coming for your spot.",
+    es: "Cerraste el mes en el cinturón {faixa} — la cima de la Ippon League. Ahora toca aguantar ahí arriba: el próximo mes habrá quien venga a por tu lugar.",
+    fr: "Tu as terminé le mois sur la ceinture {faixa} — le sommet de l'Ippon League. Maintenant il faut tenir là-haut : le mois prochain, d'autres viendront pour ta place.",
+    de: "Du hast den Monat auf dem {faixa} Gürtel beendet — der Spitze der Ippon League. Jetzt heißt es, oben zu bleiben: Nächsten Monat kommen andere für deinen Platz.",
+  },
+  "faixa.mantidaPortaCorpo": {
+    pt: "Fechaste o mês na faixa {faixa}, mesmo à porta da seguinte. No próximo mês é tua.",
+    en: "You ended the month on the {faixa} belt, right on the doorstep of the next one. Next month it's yours.",
+    es: "Cerraste el mes en el cinturón {faixa}, justo a las puertas del siguiente. El próximo mes es tuyo.",
+    fr: "Tu as terminé le mois sur la ceinture {faixa}, juste aux portes de la suivante. Le mois prochain, elle est à toi.",
+    de: "Du hast den Monat auf dem {faixa} Gürtel beendet, direkt vor dem nächsten. Nächsten Monat gehört er dir.",
+  },
+  "faixa.mantidaFaltaCorpo": {
+    pt: "Fechaste o mês na faixa {faixa}. Faltaram {falta} pontos para a {faixaAcima} — dá para ir buscá-los no próximo mês!",
+    en: "You ended the month on the {faixa} belt. You were {falta} points short of the {faixaAcima} — you can go get them next month!",
+    es: "Cerraste el mes en el cinturón {faixa}. Te faltaron {falta} puntos para el {faixaAcima} — ¡puedes ir a por ellos el próximo mes!",
+    fr: "Tu as terminé le mois sur la ceinture {faixa}. Il t'a manqué {falta} points pour la {faixaAcima} — tu peux aller les chercher le mois prochain !",
+    de: "Du hast den Monat auf dem {faixa} Gürtel beendet. Dir fehlten {falta} Punkte für den {faixaAcima} — die kannst du dir nächsten Monat holen!",
+  },
 };
+
+// Nomes das FAIXAS por língua — iguais aos que a app mostra no resto do ecrã
+// (ver faixa.* no lib/i18n). Uma notificação diz "faixa {faixa}", e {faixa} tem
+// de sair no nome traduzido, não no valor canónico ("roxa").
+const FAIXAS_NOME: Record<string, Entrada> = {
+  branca: { pt: "Branca", en: "White", es: "Blanco", fr: "Blanche", de: "Weiß" },
+  azul: { pt: "Azul", en: "Blue", es: "Azul", fr: "Bleue", de: "Blau" },
+  amarela: { pt: "Amarela", en: "Yellow", es: "Amarillo", fr: "Jaune", de: "Gelb" },
+  verde: { pt: "Verde", en: "Green", es: "Verde", fr: "Verte", de: "Grün" },
+  roxa: { pt: "Roxa", en: "Purple", es: "Morado", fr: "Violette", de: "Lila" },
+  marrom: { pt: "Marrom", en: "Brown", es: "Marrón", fr: "Marron", de: "Braun" },
+  preta: { pt: "Preta", en: "Black", es: "Negro", fr: "Noire", de: "Schwarz" },
+};
+
+/** Nome de uma faixa (valor canónico "roxa") na língua pedida. */
+export function nomeFaixaEm(lingua: LinguaNotif, canonica: string): string {
+  const e = FAIXAS_NOME[String(canonica || "").toLowerCase()];
+  return e ? e[lingua] || e.pt : String(canonica || "");
+}
 
 /** Substitui {var} pelos valores dados. */
 function preencher(texto: string, vars?: Record<string, string | number>): string {
@@ -406,6 +481,10 @@ function preencher(texto: string, vars?: Record<string, string | number>): strin
 /**
  * Devolve o texto de uma chave na língua pedida, com recurso ao português e, em
  * último caso, à própria chave (nunca devolve vazio). `vars` preenche os {campos}.
+ *
+ * FAIXAS: passa-se o valor canónico em `faixaCanonica` / `faixaAcimaCanonica`, e
+ * aqui expõe-se o nome JÁ traduzido como {faixa} / {faixaAcima}. Assim o nome da
+ * faixa sai na língua de quem recebe, sem que quem chama saiba a língua.
  */
 export function renderNotif(
   lingua: LinguaNotif,
@@ -414,5 +493,11 @@ export function renderNotif(
 ): string {
   const e = NOTIF[chave];
   const texto = (e && (e[lingua] || e.pt)) || chave;
-  return preencher(texto, vars);
+  let v = vars;
+  if (vars && (vars.faixaCanonica !== undefined || vars.faixaAcimaCanonica !== undefined)) {
+    v = { ...vars };
+    if (vars.faixaCanonica !== undefined) v.faixa = nomeFaixaEm(lingua, String(vars.faixaCanonica));
+    if (vars.faixaAcimaCanonica !== undefined) v.faixaAcima = nomeFaixaEm(lingua, String(vars.faixaAcimaCanonica));
+  }
+  return preencher(texto, v);
 }
