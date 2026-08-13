@@ -12,6 +12,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { enviarPushPara } from "@/lib/pushServer";
 import { focoMercado, estadoMercado, textoFecho, formatarContagem } from "@/lib/calendario";
+import { renderNotif, agruparPorLingua, type LinguaNotif } from "@/lib/i18nServidor";
 
 // Janela do lembrete de véspera: dispara quando falta ISTO ou menos para o
 // fecho (e ainda há tempo > 0). 28h (e não 24h) dá folga: como o cron corre
@@ -45,25 +46,60 @@ async function quemMontou(idComp: string): Promise<string[]> {
 }
 
 // Notifica muitos utilizadores de uma vez (sino em massa + push em massa).
+//
+// Pode receber texto PRONTO (titulo/corpo) — o modo antigo — ou uma CHAVE
+// (chaveTitulo/chaveCorpo + vars). Por chave, agrupa os destinatários por língua
+// e renderiza cada texto UMA vez por grupo: assim uma notificação para todos sai
+// na língua de cada um sem uma chamada por pessoa.
 async function notificarMuitos(
   userIds: string[],
-  n: { tipo: string; titulo: string; corpo?: string; link?: string }
+  n: {
+    tipo: string;
+    titulo?: string;
+    corpo?: string;
+    link?: string;
+    chaveTitulo?: string;
+    chaveCorpo?: string;
+    vars?: Record<string, string | number>;
+  }
 ): Promise<void> {
   if (!supabaseAdmin) return;
   const ids = [...new Set(userIds.filter(Boolean))];
   if (ids.length === 0) return;
+
+  // --- Por CHAVE: um texto por língua, cada grupo recebe o seu. ---
+  if (n.chaveTitulo) {
+    const grupos = await agruparPorLingua(ids);
+    for (const [lg, gids] of Object.entries(grupos)) {
+      if (!gids.length) continue;
+      const titulo = renderNotif(lg as LinguaNotif, n.chaveTitulo, n.vars);
+      const corpo = n.chaveCorpo ? renderNotif(lg as LinguaNotif, n.chaveCorpo, n.vars) : undefined;
+      try {
+        await supabaseAdmin.from("notificacoes").insert(
+          gids.map((user_id) => ({ user_id, tipo: n.tipo, titulo, corpo: corpo ?? null, link: n.link ?? null }))
+        );
+      } catch {}
+      try {
+        await enviarPushPara(gids, { titulo, corpo, link: n.link });
+      } catch {}
+    }
+    return;
+  }
+
+  // --- Legado: texto pronto, igual para todos. ---
+  const titulo = n.titulo ?? "";
   try {
     const linhas = ids.map((user_id) => ({
       user_id,
       tipo: n.tipo,
-      titulo: n.titulo,
+      titulo,
       corpo: n.corpo ?? null,
       link: n.link ?? null,
     }));
     await supabaseAdmin.from("notificacoes").insert(linhas);
   } catch {}
   try {
-    await enviarPushPara(ids, { titulo: n.titulo, corpo: n.corpo, link: n.link });
+    await enviarPushPara(ids, { titulo, corpo: n.corpo, link: n.link });
   } catch {}
 }
 
