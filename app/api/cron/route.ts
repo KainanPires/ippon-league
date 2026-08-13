@@ -7,7 +7,6 @@ import { competicaoPorId } from "@/lib/copa";
 import { notificarMercado } from "@/lib/notificarMercado";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { mensagensModaisDeHoje } from "@/lib/mensagensEspeciais";
-import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 // CRON — o motor automático da Ippon League.
 //
 // DESENHO (mudou: ler antes de mexer)
@@ -612,15 +611,25 @@ async function notificarDatasEspeciais(hoje: Date): Promise<{ dia_do_judo: numbe
       for (const r of data || []) jaFeito.add(`${r.tipo}::${r.user_id}`);
     } catch { /* sem idempotência prévia: segue */ }
   }
+  // Chaves traduzíveis para os eventos de push (o texto do motor mensagensEspeciais
+  // fica para os modais; aqui o push sai na língua de quem recebe). Se um tipo não
+  // estiver no mapa, recorre-se ao texto pronto do motor.
+  const CHAVES_EVENTO: Record<string, { t: string; c: string }> = {
+    dia_do_judo: { t: "evento.diaDoJudoTitulo", c: "evento.diaDoJudoCorpo" },
+    aniversario: { t: "evento.aniversarioTitulo", c: "evento.aniversarioCorpo" },
+  };
   // 1) GLOBAIS → todos os utilizadores.
 if (globais.length > 0) {
   const ids = await todosOsUserIds();
   for (const m of globais) {
     const tipo = `evento_${m.tipo}`;
+    const ce = CHAVES_EVENTO[m.tipo];
     for (const uid of ids) {
       if (jaFeito.has(`${tipo}::${uid}`)) continue;
       try {
-        await criarNotificacaoServidor({ paraUserId: uid, tipo, titulo: m.titulo, corpo: m.texto, link: "/inicio" });
+        await criarNotificacaoServidor(ce
+          ? { paraUserId: uid, tipo, chaveTitulo: ce.t, chaveCorpo: ce.c, link: "/inicio" }
+          : { paraUserId: uid, tipo, titulo: m.titulo, corpo: m.texto, link: "/inicio" });
         jaFeito.add(`${tipo}::${uid}`);
         if (m.tipo === "dia_do_judo") out.dia_do_judo++; else out.outras_globais++;
       } catch { /* falha de um utilizador não bloqueia os outros */ }
@@ -636,7 +645,7 @@ for (const u of aniversariantes) {
   .find((x) => x.tipo === "aniversario");
   if (!msg) continue;
   try {
-    await criarNotificacaoServidor({ paraUserId: u.id, tipo, titulo: msg.titulo, corpo: msg.texto, link: "/inicio" });
+    await criarNotificacaoServidor({ paraUserId: u.id, tipo, chaveTitulo: "evento.aniversarioTitulo", chaveCorpo: "evento.aniversarioCorpo", link: "/inicio" });
     jaFeito.add(`${tipo}::${u.id}`);
     out.aniversarios++;
   } catch { /* não bloqueia os outros */ }
@@ -679,10 +688,8 @@ async function userIdsComAniversario(hoje: Date): Promise<{ id: string; dataNasc
   }
   return out;
 }
-// Nome PT do continente para rótulos/mensagens. Defensivo (aceita string solta).
-function nomeContinentePT(cont: string): string {
-  return NOME_CONTINENTE[cont as Continente] ?? cont;
-}
+// (O nome do continente nas notificações passou a ser traduzido no renderizador
+// do servidor — ver nomeContinenteEm em lib/dicionarioNotif.)
 // ---------------------------------------------------------------------------
 // MELHORES DA RODADA. Para uma competição JÁ CONGELADA e COMPLETA, calcula o
 // vencedor da rodada (só Pro, como na liga oficial) e grava em melhores_rodada:
@@ -771,17 +778,22 @@ for (const l of linhas) {
     }, { onConflict: "id_competicao,escopo,continente,user_id" });
   if (error) continue;
   out.gravados++;
-  const rotulo = l.escopo === "mundial"
-  ? `Mundial${l.continente ? ` + ${nomeContinentePT(l.continente)}` : ""}`
-  : nomeContinentePT(l.continente);
-  const ondeFoi = l.escopo === "mundial" ? "do mundo" : `de ${nomeContinentePT(l.continente)}`;
+  // Traduzido na língua de quem recebe: escolhe a chave por âmbito (mundial /
+  // mundial+continente / continental); o continente ({cont}) é traduzido pelo
+  // renderizador a partir do código (contCanonica).
+  const ehMundial = l.escopo === "mundial";
+  const temCont = !!l.continente;
+  const chaveTituloMR = ehMundial
+    ? (temCont ? "melhorRodada.mundialMaisTitulo" : "melhorRodada.mundialTitulo")
+    : "melhorRodada.continentalTitulo";
   try {
     await criarNotificacaoServidor({
         paraUserId: l.user_id,
         tipo: "melhor_rodada",
-        titulo: `🥇 És o Melhor da Rodada — ${rotulo}!`,
-        corpo: `Parabéns! Foste o nº1 ${ondeFoi} em ${nomeComp}. Vê e partilha o teu certificado na liga oficial.`,
-        link: l.escopo === "mundial" ? "/oficial/mundial" : "/oficial/continental",
+        chaveTitulo: chaveTituloMR,
+        chaveCorpo: ehMundial ? "melhorRodada.mundialCorpo" : "melhorRodada.continentalCorpo",
+        vars: { comp: nomeComp, contCanonica: l.continente || "" },
+        link: ehMundial ? "/oficial/mundial" : "/oficial/continental",
       });
     out.push++;
   } catch { /* push de um vencedor não bloqueia os outros */ }
