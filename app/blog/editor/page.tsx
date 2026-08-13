@@ -177,14 +177,15 @@ export default function EditorBlog() {
       };
       // Guarda e recupera o id — no insert é preciso pedir a coluna de volta,
       // para depois poder mandar traduzir esta notícia em concreto.
+      type ErroBd = { message?: string; details?: string; hint?: string; code?: string };
       let idGravado = f.id || "";
-      let erroBd: { message?: string; details?: string; hint?: string; code?: string } | null = null;
+      let erroBd: ErroBd | null = null;
       if (f.id) {
         const r = await supabase.from("hub_noticias").update(linha).eq("id", f.id);
-        erroBd = (r.error as typeof erroBd) || null;
+        erroBd = (r.error as ErroBd | null) ?? null;
       } else {
         const r = await supabase.from("hub_noticias").insert(linha).select("id").single();
-        erroBd = (r.error as typeof erroBd) || null;
+        erroBd = (r.error as ErroBd | null) ?? null;
         idGravado = r.data?.id ? String(r.data.id) : "";
       }
       if (erroBd) {
