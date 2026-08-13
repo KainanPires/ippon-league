@@ -25,7 +25,14 @@
 // O que faz é apanhar erros de ESCRITA: quando o que foi escrito está a um ou
 // dois caracteres de um domínio muito comum, sugere-se a correção. Nunca
 // bloqueia — a pessoa pode ter mesmo um email nesse domínio.
+//
+// IDIOMA: a mensagem sai na língua da pessoa. Como este é um módulo puro (não é
+// componente, não pode chamar hooks), recebe o tradutor `t` — o mesmo de useT —
+// por parâmetro. O ecrã que chama passa o seu `t`.
 // ---------------------------------------------------------------------------
+
+// O tradutor, tal como useT() o devolve.
+export type Tradutor = (chave: string, vars?: Record<string, string | number>) => string;
 
 /** Domínios comuns o suficiente para valer a pena comparar. */
 const DOMINIOS_COMUNS = [
@@ -81,9 +88,10 @@ export interface AvisoEmail {
  * Analisa um email e devolve um aviso, ou null se não houver nada a dizer.
  *
  * Nunca devolve "inválido": a validação de formato é outra coisa, e continua a
- * ser feita onde já era. Isto é só um alerta amigável.
+ * ser feita onde já era. Isto é só um alerta amigável. `t` traduz a mensagem
+ * para a língua da pessoa.
  */
-export function avisoDoEmail(email: string): AvisoEmail | null {
+export function avisoDoEmail(email: string, t: Tradutor): AvisoEmail | null {
   const limpo = (email || "").trim().toLowerCase();
   const arroba = limpo.lastIndexOf("@");
   if (arroba < 1) return null;
@@ -94,7 +102,7 @@ export function avisoDoEmail(email: string): AvisoEmail | null {
   if (DESCARTAVEIS.includes(dominio)) {
     return {
       tipo: "descartavel",
-      mensagem: "Esse parece ser um email temporário. Usa um email teu — vais precisar dele para recuperar a conta e receber avisos das rodadas.",
+      mensagem: t("email.avisoDescartavel"),
     };
   }
 
@@ -113,7 +121,7 @@ export function avisoDoEmail(email: string): AvisoEmail | null {
 
   return {
     tipo: "sugestao",
-    mensagem: `Quis dizer @${melhor.dominio}?`,
+    mensagem: t("email.avisoSugestao", { dominio: melhor.dominio }),
     corrigido: `${utilizador}@${melhor.dominio}`,
   };
 }
