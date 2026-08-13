@@ -9,13 +9,13 @@
 //   1) Escolhe a competição (não-clássica).
 //   2) A app carrega os inscritos (/api/atletas) — já vêm com categoria e género.
 //   3) Escolhe uma categoria; vê só os inscritos dela.
-//   4) Distribui-os pelos 4 pools (A/B/C/D), na ordem da chave da IJF, e marca
-//      os "bye" (quem salta a 1ª luta).
-//   5) Guarda a categoria -> grava em `chave_atletas` (via /api/chaveamento-moldura).
-//      A partir daí, o cron "Chave Maestro" preenche o movimento e a chave ao
-//      vivo do Pro/Pro Max aparece sozinha.
-//   6) Quando a chave estiver montada, "Avisar jogadores" dispara a notificação
-//      "Chave oficial disponível" a todos (uma vez por competição).
+//   4) Distribui-os pelos 4 pools (A/B/C/D), na ordem da chave da IJF
+//      (cabeças-de-série primeiro). Os BYES são calculados AUTOMATICAMENTE pelo
+//      tamanho de cada pool — o responsável não os marca à mão (evita chaves
+//      inválidas que partiam o desenho).
+//   5) Guarda a categoria -> grava em `chave_atletas`. O cron "Chave Maestro"
+//      preenche o movimento e a chave ao vivo do Pro/Pro Max aparece sozinha.
+//   6) "Avisar jogadores" dispara a notificação a todos (uma vez por competição).
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -44,6 +44,16 @@ function compPorOmissao(): string {
   return COMPS[0]?.idCompeticao || "";
 }
 
+// Quantos byes precisa um pool de n atletas para formar uma chave "redonda":
+// os primeiros (2^ceil(log2 n) − n) da lista (os cabeças-de-série) recebem bye.
+function calcByes(ids: string[]): string[] {
+  const n = ids.length;
+  if (n <= 1) return [];
+  let pow = 1;
+  while (pow < n) pow *= 2;
+  return ids.slice(0, pow - n);
+}
+
 const norm = (c?: string) => String(c || "").toLowerCase().replace(/kg/g, "").replace(/\s+/g, "");
 
 interface Atleta { id: string; name: string; countryIso?: string; category?: string; gender?: string }
@@ -60,7 +70,6 @@ export default function EditorChave() {
   const [carregando, setCarregando] = useState(false);
   const [cat, setCat] = useState<string>("-73");
   const [pools, setPools] = useState<Pools>(POOLS_VAZIOS);
-  const [byes, setByes] = useState<Pools>(POOLS_VAZIOS);
   const [feitas, setFeitas] = useState<Record<string, boolean>>({});
   const [cache, setCache] = useState<Record<string, MolduraGuardada>>({});
   const [aGravar, setAGravar] = useState(false);
@@ -87,21 +96,17 @@ export default function EditorChave() {
     return data.session?.access_token || "";
   }
 
-  // Carrega os ids guardados de uma categoria para os pools/byes editáveis.
+  // Carrega os ids guardados de uma categoria para os pools editáveis.
   const carregarCat = useCallback((categoria: string, c: Record<string, MolduraGuardada>) => {
     const m = c[categoria];
-    if (!m || !m.pools || typeof m.pools !== "object") { setPools(POOLS_VAZIOS); setByes(POOLS_VAZIOS); return; }
+    if (!m || !m.pools || typeof m.pools !== "object") { setPools(POOLS_VAZIOS); setMsg(""); setErro(""); return; }
     const raw = m.pools as Record<string, unknown>;
     const np: Pools = { A: [], B: [], C: [], D: [] };
-    const nb: Pools = { A: [], B: [], C: [], D: [] };
     for (const p of POOLS) np[p] = Array.isArray(raw[p]) ? (raw[p] as unknown[]).map(String) : [];
-    const byesRaw = (raw["byes"] ?? null) as Record<string, unknown> | null;
-    if (byesRaw) for (const p of POOLS) nb[p] = Array.isArray(byesRaw[p]) ? (byesRaw[p] as unknown[]).map(String) : [];
-    setPools(np); setByes(nb);
+    setPools(np);
     setMsg(""); setErro("");
   }, []);
 
-  // Ao mudar de competição: carrega inscritos + molduras já guardadas.
   const carregarComp = useCallback(async (idc: string) => {
     setCarregando(true); setMsg(""); setErro("");
     try {
@@ -136,18 +141,12 @@ export default function EditorChave() {
     carregarCat(c, cache);
   }
 
-  // --- movimentos de atletas ---
   function colocar(id: string, pool: PoolId) {
     setPools((prev) => {
       const np: Pools = { A: [...prev.A], B: [...prev.B], C: [...prev.C], D: [...prev.D] };
       for (const p of POOLS) np[p] = np[p].filter((x) => x !== id);
       np[pool] = [...np[pool], id];
       return np;
-    });
-    setByes((prev) => {
-      const nb: Pools = { A: [...prev.A], B: [...prev.B], C: [...prev.C], D: [...prev.D] };
-      for (const p of POOLS) nb[p] = nb[p].filter((x) => x !== id);
-      return nb;
     });
     setMsg("");
   }
@@ -156,18 +155,6 @@ export default function EditorChave() {
       const np: Pools = { A: [...prev.A], B: [...prev.B], C: [...prev.C], D: [...prev.D] };
       for (const p of POOLS) np[p] = np[p].filter((x) => x !== id);
       return np;
-    });
-    setByes((prev) => {
-      const nb: Pools = { A: [...prev.A], B: [...prev.B], C: [...prev.C], D: [...prev.D] };
-      for (const p of POOLS) nb[p] = nb[p].filter((x) => x !== id);
-      return nb;
-    });
-  }
-  function alternarBye(id: string, pool: PoolId) {
-    setByes((prev) => {
-      const nb: Pools = { A: [...prev.A], B: [...prev.B], C: [...prev.C], D: [...prev.D] };
-      nb[pool] = nb[pool].includes(id) ? nb[pool].filter((x) => x !== id) : [...nb[pool], id];
-      return nb;
     });
   }
 
@@ -178,7 +165,11 @@ export default function EditorChave() {
     setAGravar(true);
     try {
       const tk = await token();
-      const payload = { A: pools.A, B: pools.B, C: pools.C, D: pools.D, byes: { A: byes.A, B: byes.B, C: byes.C, D: byes.D } };
+      // Byes calculados automaticamente por pool.
+      const payload = {
+        A: pools.A, B: pools.B, C: pools.C, D: pools.D,
+        byes: { A: calcByes(pools.A), B: calcByes(pools.B), C: calcByes(pools.C), D: calcByes(pools.D) },
+      };
       const r = await fetch("/api/chaveamento-moldura", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${tk}` },
@@ -206,7 +197,7 @@ export default function EditorChave() {
     });
     setFeitas((f) => { const n = { ...f }; delete n[cat]; return n; });
     setCache((c) => { const n = { ...c }; delete n[cat]; return n; });
-    setPools(POOLS_VAZIOS); setByes(POOLS_VAZIOS);
+    setPools(POOLS_VAZIOS);
     setMsg("");
   }
 
@@ -227,7 +218,6 @@ export default function EditorChave() {
   if (acesso === "a-ver") return <Centro texto={t("be.aVerificar")} />;
   if (acesso === "nao") return <SemAcesso />;
 
-  // Índice id -> atleta, para render.
   const idA: Record<string, Atleta> = {};
   for (const a of atletas) idA[a.id] = a;
 
@@ -264,7 +254,6 @@ export default function EditorChave() {
           <div style={{ fontSize: 13.5, color: "#93a39a", lineHeight: 1.6, textAlign: "center", padding: "20px 12px", background: "#121815", border: "1px solid #243029", borderRadius: 12 }}>{t("chvm.semInscritos")}</div>
         ) : (
           <>
-            {/* Categorias: M em cima, F em baixo. ✓ nas que já têm moldura. */}
             {[CATS_M, CATS_F].map((linha, li) => (
               <div key={li} style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: li === 0 ? 6 : 12 }}>
                 {linha.map((c) => {
@@ -285,7 +274,6 @@ export default function EditorChave() {
               <div style={{ fontSize: 13, color: "#5f6f67", textAlign: "center", padding: "16px 0" }}>{t("chvm.semAtletasCat")}</div>
             ) : (
               <>
-                {/* POR COLOCAR */}
                 {porColocar.length > 0 && (
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#93a39a", marginBottom: 6 }}>
@@ -304,35 +292,33 @@ export default function EditorChave() {
                   </div>
                 )}
 
-                {/* POOLS */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {POOLS.map((p) => (
-                    <div key={p} style={{ background: "#121815", border: "1px solid #243029", borderRadius: 11, padding: "10px 12px" }}>
-                      <div style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", color: GOLD, marginBottom: 7 }}>
-                        Pool {p} · {pools[p].length}
-                      </div>
-                      {pools[p].length === 0 ? (
-                        <div style={{ fontSize: 12, color: "#5f6f67" }}>—</div>
-                      ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                          {pools[p].map((id, i) => {
-                            const ehBye = byes[p].includes(id);
-                            return (
+                  {POOLS.map((p) => {
+                    const byeSet = new Set(calcByes(pools[p]));
+                    return (
+                      <div key={p} style={{ background: "#121815", border: "1px solid #243029", borderRadius: 11, padding: "10px 12px" }}>
+                        <div style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", color: GOLD, marginBottom: 7 }}>
+                          Pool {p} · {pools[p].length}
+                        </div>
+                        {pools[p].length === 0 ? (
+                          <div style={{ fontSize: 12, color: "#5f6f67" }}>—</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                            {pools[p].map((id, i) => (
                               <div key={id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                 <span style={{ flexShrink: 0, width: 18, fontSize: 11, color: "#7c8a82", fontFamily: FD }}>{i + 1}</span>
                                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "#d6ddd6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeCurto(idA[id])}</span>
-                                <button onClick={() => alternarBye(id, p)} title={t("chvm.bye")}
-                                  style={{ flexShrink: 0, background: ehBye ? "#2a2410" : "transparent", border: `1px solid ${ehBye ? GOLD : "#2a3a33"}`, color: ehBye ? GOLD : "#7c8a82", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", padding: "3px 7px", borderRadius: 6, cursor: "pointer", fontFamily: FD }}>
-                                  {t("chvm.bye")}
-                                </button>
+                                {byeSet.has(id) && (
+                                  <span style={{ flexShrink: 0, background: "#2a2410", border: `1px solid ${GOLD}`, color: GOLD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", padding: "3px 7px", borderRadius: 6, fontFamily: FD }}>{t("chvm.bye")}</span>
+                                )}
                                 <button onClick={() => tirar(id)} aria-label={t("chv.removerPrint")} style={{ flexShrink: 0, background: "transparent", border: "none", color: "#ef8d83", fontSize: 15, cursor: "pointer", lineHeight: 1, padding: "0 2px" }}>✕</button>
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {erro && <Aviso cor="#ef8d83" texto={erro} />}
@@ -348,7 +334,6 @@ export default function EditorChave() {
               </>
             )}
 
-            {/* AVISAR — separado, no fim. */}
             <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid #1a221d" }}>
               <button onClick={avisar} style={{ ...btnSec, width: "100%" }}>{t("chvm.avisar")}</button>
             </div>
