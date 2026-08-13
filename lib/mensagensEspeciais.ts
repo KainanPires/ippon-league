@@ -19,11 +19,16 @@
 // Ordem da fila: aniversário > Dia do Judô > grande competição > fim de ano >
 // começo de ano. A fila é limitada a 2 modais (decisão "2 em sequência").
 //
-// Textos das grandes competições + aniversário: APROVADOS (rascunho-textos-modais).
-// Textos de Dia do Judô / fim de ano / começo de ano: reaproveitados do cartão
-// que já estava em produção (não havia versão de modal aprovada para estes).
+// IDIOMA: o texto já sai NA LÍNGUA da pessoa. Como este motor não é um componente
+// (não pode chamar hooks), recebe o tradutor `t` (o mesmo de useT) por parâmetro
+// e devolve titulo/texto/botao já traduzidos. O ecrã passa o `t`; no servidor
+// (cron), que só usa o `tipo` de cada mensagem para o push, passa-se um tradutor
+// trivial — ver a chamada lá.
 
 import { type Continente } from "./continentes";
+
+// O tradutor, tal como useT() o devolve.
+export type Tradutor = (chave: string, vars?: Record<string, string | number>) => string;
 
 export type TipoMensagem =
   | "aniversario"
@@ -102,6 +107,7 @@ function continenteDaCompeticao(nome: string): Continente | null {
 // MOTOR — fila de modais de hoje (no máximo 2, na ordem certa).
 // ---------------------------------------------------------------------------
 export function mensagensModaisDeHoje(
+  t: Tradutor,
   hoje: Date,
   user: DadosUtilizador,
   competicaoSemana?: CompeticaoDaSemana | null,
@@ -118,10 +124,9 @@ export function mensagensModaisDeHoje(
       fila.push({
         tipo: "aniversario",
         emoji: "🎉",
-        titulo: nome ? `Parabéns, ${nome}!` : "Parabéns!",
-        texto:
-          "Hoje é o teu dia, e nós cá da Ippon League queremos celebrá-lo contigo! 🥋 Estamos muito felizes por fazeres parte desta comunidade de apaixonados pelo judô. Que este novo ano te traga muitas alegrias, conquistas no tatame e fora dele — e que continues a crescer e a divertir-te connosco. Um grande abraço, e parabéns! 🎂",
-        botao: "Obrigado! 🙏",
+        titulo: nome ? t("modal.aniversarioTituloNome", { nome }) : t("modal.aniversarioTitulo"),
+        texto: t("modal.aniversarioTexto"),
+        botao: t("modal.aniversarioBotao"),
         chave: `aniversario-${ano}`,
         push: true,
         cor: GOLD,
@@ -134,9 +139,9 @@ export function mensagensModaisDeHoje(
     fila.push({
       tipo: "dia_do_judo",
       emoji: "🥋",
-      titulo: "Dia Mundial do Judô",
-      texto: `${nome ? `${nome}, hoje` : "Hoje"} é o Dia Mundial do Judô! Parabéns a todos os que amam este desporto. Que tal homenagear a data com uma escalação de respeito?`,
-      botao: "Bora homenagear! 🥋",
+      titulo: t("modal.diaDoJudoTitulo"),
+      texto: nome ? t("modal.diaDoJudoTextoNome", { nome }) : t("modal.diaDoJudoTexto"),
+      botao: t("modal.diaDoJudoBotao"),
       chave: `dia_do_judo-${ano}`,
       push: true,
       cor: GOLD,
@@ -145,7 +150,7 @@ export function mensagensModaisDeHoje(
 
   // (B) GRANDE COMPETIÇÃO da semana. NUNCA clássicos. Continental filtra continente.
   if (competicaoSemana && !competicaoSemana.classico) {
-    const g = mensagemGrandeCompeticao(competicaoSemana, user.continente ?? null, ano);
+    const g = mensagemGrandeCompeticao(t, competicaoSemana, user.continente ?? null, ano);
     if (g) fila.push(g);
   }
 
@@ -154,9 +159,9 @@ export function mensagensModaisDeHoje(
     fila.push({
       tipo: "fim_de_ano",
       emoji: "🎄",
-      titulo: "Boas festas, atleta!",
-      texto: `Obrigado por fazeres parte da Ippon League em ${ano}. Que ${ano + 1} traga muitos ippons. 🥋`,
-      botao: "Boas festas! 🎄",
+      titulo: t("modal.fimAnoTitulo"),
+      texto: t("modal.fimAnoTexto", { ano, anoSeguinte: ano + 1 }),
+      botao: t("modal.fimAnoBotao"),
       chave: `fim_de_ano-${ano}`,
       push: false,
       cor: VERDE,
@@ -168,9 +173,9 @@ export function mensagensModaisDeHoje(
     fila.push({
       tipo: "comeco_de_ano",
       emoji: "🎍",
-      titulo: "Época nova, tatame limpo!",
-      texto: "O ranking recomeça do zero — todos com as mesmas hipóteses. Monta a tua equipa e começa o ano a pontuar.",
-      botao: "Começar a pontuar! 🥋",
+      titulo: t("modal.comecoAnoTitulo"),
+      texto: t("modal.comecoAnoTexto"),
+      botao: t("modal.comecoAnoBotao"),
       chave: `comeco_de_ano-${ano}`,
       push: false,
       cor: GOLD,
@@ -183,16 +188,18 @@ export function mensagensModaisDeHoje(
 // Compatibilidade: devolve só a mensagem de maior prioridade (ou null). Mantida
 // para qualquer chamador antigo / futuro motor de push. Uma única fonte de texto.
 export function mensagemEspecialDeHoje(
+  t: Tradutor,
   hoje: Date,
   user: DadosUtilizador,
   competicaoSemana?: CompeticaoDaSemana | null,
 ): MensagemEspecial | null {
-  return mensagensModaisDeHoje(hoje, user, competicaoSemana)[0] ?? null;
+  return mensagensModaisDeHoje(t, hoje, user, competicaoSemana)[0] ?? null;
 }
 
 // Mensagem de uma grande competição (já sabemos que não é clássico). Para a
 // Continental, devolve null se o utilizador não for do continente dela.
 function mensagemGrandeCompeticao(
+  t: Tradutor,
   c: CompeticaoDaSemana,
   continenteUser: Continente | null,
   ano: number,
@@ -204,10 +211,9 @@ function mensagemGrandeCompeticao(
     return {
       tipo: "olimpiada",
       emoji: "🏅",
-      titulo: "É tempo de Jogos Olímpicos!",
-      texto:
-        "O maior palco do desporto mundial abriu as portas ao judô! 🏅 Só os melhores entre os melhores chegam aqui — os medalhistas olímpicos entram para a história. É o sonho de todo o judoca, e tu vais viver isto connosco. Prepara a tua equipa dos sonhos e entra nesta rodada histórica!",
-      botao: "Vamos a isto! 🔥",
+      titulo: t("modal.olimpiadaTitulo"),
+      texto: t("modal.olimpiadaTexto"),
+      botao: t("modal.olimpiadaBotao"),
       chave,
       push: false,
       cor: OURO_OLIMP,
@@ -218,9 +224,9 @@ function mensagemGrandeCompeticao(
     return {
       tipo: "mundial",
       emoji: "🌍",
-      titulo: "É a semana do Mundial!",
-      texto: `Atenção, atleta: chegou a competição mais importante do ano! 🌍 O Mundial de Judô reúne os melhores do planeta no mesmo tatame — é aqui que se consagram os campeões do mundo de ${ano}. Uma rodada destas não se repete. Monta a tua melhor equipa, escolhe bem o capitão e não percas esta!`,
-      botao: "Bora escalar! 🥋",
+      titulo: t("modal.mundialTitulo"),
+      texto: t("modal.mundialTexto", { ano }),
+      botao: t("modal.mundialBotao"),
       chave,
       push: false,
       cor: VERDE,
@@ -231,10 +237,9 @@ function mensagemGrandeCompeticao(
     return {
       tipo: "masters",
       emoji: "🏆",
-      titulo: "É a semana do Masters!",
-      texto:
-        "O Masters é só para a elite: entram apenas os melhores do ranking mundial de cada categoria. 🏆 Cada luta é entre feras — pontos não vão faltar para quem escalar com sabedoria. Esta é uma rodada de respeito. Escolhe a dedo o teu time e mostra o que vales!",
-      botao: "Montar o meu time! 🥋",
+      titulo: t("modal.mastersTitulo"),
+      texto: t("modal.mastersTexto"),
+      botao: t("modal.mastersBotao"),
       chave,
       push: false,
       cor: VERDE,
@@ -245,52 +250,28 @@ function mensagemGrandeCompeticao(
   if (nivel.includes("continental")) {
     const contComp = continenteDaCompeticao(c.nome);
     if (!contComp || !continenteUser || contComp !== continenteUser) return null;
-    return continentalModal(contComp, chave);
+    return continentalModal(t, contComp, chave);
   }
 
   return null;
 }
 
-function continentalModal(cont: Continente, chave: string): MensagemEspecial {
-  const M: Record<Continente, { emoji: string; titulo: string; texto: string }> = {
-    EUR: {
-      emoji: "🇪🇺",
-      titulo: "É a semana do Campeonato da Europa!",
-      texto:
-        "O título continental está em jogo, e é no teu continente! 🇪🇺 Os melhores da Europa vão medir forças — uma grande oportunidade para fazeres pontos e subires na tua liga continental. Não deixes passar a tua rodada!",
-    },
-    PAN: {
-      emoji: "🌎",
-      titulo: "É a semana do Campeonato Pan-Americano!",
-      texto:
-        "O título continental está em jogo, e é no teu continente! 🌎 Os melhores da América vão à luta — aproveita para fazer pontos e brilhar na tua liga continental. A tua rodada é agora!",
-    },
-    ASI: {
-      emoji: "🌏",
-      titulo: "É a semana do Campeonato Asiático!",
-      texto:
-        "O título continental está em jogo, e é no teu continente! 🌏 Os melhores da Ásia entram no tatame — uma grande oportunidade para pontuares e subires na tua liga continental. Não percas a tua rodada!",
-    },
-    AFR: {
-      emoji: "🌍",
-      titulo: "É a semana do Campeonato Africano!",
-      texto:
-        "O título continental está em jogo, e é no teu continente! 🌍 Os melhores de África vão medir forças — aproveita para fazer pontos e brilhar na tua liga continental. A tua rodada chegou!",
-    },
-    OCE: {
-      emoji: "🌏",
-      titulo: "É a semana do Campeonato da Oceânia!",
-      texto:
-        "O título continental está em jogo, e é no teu continente! 🌏 Os melhores da Oceânia entram em ação — uma boa altura para pontuares e subires na tua liga continental. Não deixes escapar a tua rodada!",
-    },
+function continentalModal(t: Tradutor, cont: Continente, chave: string): MensagemEspecial {
+  // Emoji e chaves de título/texto por continente. O botão é comum.
+  const M: Record<Continente, { emoji: string; tituloKey: string; textoKey: string }> = {
+    EUR: { emoji: "🇪🇺", tituloKey: "modal.contEURTitulo", textoKey: "modal.contEURTexto" },
+    PAN: { emoji: "🌎", tituloKey: "modal.contPANTitulo", textoKey: "modal.contPANTexto" },
+    ASI: { emoji: "🌏", tituloKey: "modal.contASITitulo", textoKey: "modal.contASITexto" },
+    AFR: { emoji: "🌍", tituloKey: "modal.contAFRTitulo", textoKey: "modal.contAFRTexto" },
+    OCE: { emoji: "🌏", tituloKey: "modal.contOCETitulo", textoKey: "modal.contOCETexto" },
   };
   const x = M[cont];
   return {
     tipo: "continental",
     emoji: x.emoji,
-    titulo: x.titulo,
-    texto: x.texto,
-    botao: "Bora competir! 🥋",
+    titulo: t(x.tituloKey),
+    texto: t(x.textoKey),
+    botao: t("modal.continentalBotao"),
     chave,
     push: false,
     cor: AZUL,
