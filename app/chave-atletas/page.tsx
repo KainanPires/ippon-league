@@ -3,33 +3,7 @@
 //
 // CHAVE DE ATLETAS (Pro Max) — versão ÁRVORE.
 //
-// CÉREBRO: o nosso motor. Lê /api/chave-atletas?comp=&cat= (motor + moldura) e
-// recebe a chave já RESOLVIDA: pools[A..D].lutas (em ordem: pré → quartos →
-  // meias do pool → final) + meias/final/repescagens/bronzes, cada luta com
-// azul/branco/vencedor/estado/chaveId. A API devolve também a `moldura`
-// (pools + byes) para reconstruirmos os ramos.
-//
-// VISUAL: a árvore da página /chave antiga — caixas ligadas por conectores em
-// cotovelo (SVG medido), caixa "Vencedor" destacada, estrela de favoritos e o
-// pontinho verde da "próxima luta de cada bloco".
-//
-// Como ligamos os dois: em vez de adivinhar a árvore pelas rondas (como a /chave
-  // fazia com o JudoBase), RECONSTRUÍMOS o esqueleto do bracket a partir da moldura
-// (a MESMA construção do motor: byes na posição certa) e ligamos cada nó à luta
-// resolvida por índice. Assim os ramos saem exatos e os dados vêm do motor.
-//
-// Pontos Ippon por atleta no cartão: fica para fase seguinte (só país + nome).
-//
 // Acesso: só Pro Max. Pro normal e grátis são redirecionados.
-//
-// SEPARADORES: a página tem duas vistas sobre a mesma categoria —
-// • CHAVE : a árvore (esta página, sempre foi assim)
-// • CONFRONTOS : quem já ganhou a quem entre os inscritos, e a probabilidade
-// de cada um chegar ao topo (components/AnaliseConfrontos)
-// Estão no mesmo sítio de propósito: é aqui que a decisão de escalar acontece,
-// e ver o quadro sem saber quem leva vantagem sobre quem é meia informação.
-// Separadores em vez de tudo empilhado porque a árvore é alta — juntas dariam
-// uma página interminável no telemóvel.
 import {
   useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect,
   createContext, useContext,
@@ -39,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { useNivel } from "@/lib/useNivel";
 import { uid } from "@/lib/team";
 import { AnaliseConfrontos } from "@/components/AnaliseConfrontos";
+import { useT } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -74,14 +49,15 @@ type No =
 | { tipo: "bye"; key: string; lado: Lado };
 type Aresta = { de: string; para: string };
 type Arvore = { no: No; vencedor: { key: string; lado: Lado } | null };
+type TipoVencedor = "pool" | "bronze" | "campeao";
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
 function sobrenome(nome?: string): string {
   // Mostra "Primeiro Último" (nome + sobrenome). Se só houver uma palavra, mostra-a.
-  const t = (nome || "").trim();
-  if (!t || t === "—") return "—";
-  const p = t.split(/\s+/);
+  const s = (nome || "").trim();
+  if (!s || s === "—") return "—";
+  const p = s.split(/\s+/);
   if (p.length === 1) return p[0];
   return p[0] + " " + p[p.length - 1];
 }
@@ -99,9 +75,6 @@ function mapearNomes(chave: Chave): Record<string, { nome: string; pais: string 
   }
   return m;
 }
-// Construção POSICIONAL dos slots da 1ª ronda — ESPELHA o motor (byes na posição
-  // certa; empareia lutadores consecutivos). É isto que garante ramos iguais aos
-// do quadro real.
 function construirSlots(ordem: string[], byes: string[]): Array<{ bye?: string; match?: [string, string] }> {
   const isBye = (id: string) => byes.includes(id);
   const fighters = ordem.filter((id) => !isBye(id));
@@ -123,8 +96,6 @@ function construirSlots(ordem: string[], byes: string[]): Array<{ bye?: string; 
     });
   return slots;
 }
-// Esqueleto do bracket em ordem de EMISSÃO do motor (pré → quartos → meias → final).
-// Cada nó: { left, right } com refs { bye } | { leaf } | { node:idx }.
 type Ref = { bye?: string; leaf?: string; node?: number };
 type NoFlat = { left: Ref; right: Ref };
 function buildSkeleton(ordem: string[], byes: string[]): NoFlat[] {
@@ -150,8 +121,6 @@ function buildSkeleton(ordem: string[], byes: string[]): NoFlat[] {
   if (nivel.length === 2) flat.push({ left: nivel[0], right: nivel[1] });
   return flat;
 }
-// Converte um Ref (e a sua sub-árvore) num No, ligando as lutas resolvidas por
-// índice e acumulando as arestas (ligações) para o SVG.
 function refToNo(
   ref: Ref, flat: NoFlat[], lutas: Luta[], poolKey: string, arestas: Aresta[],
   nomes: Record<string, { nome: string; pais: string }>
@@ -178,7 +147,6 @@ function refToNo(
 function lutaNo(l: Luta, fallbackKey: string, filhos: No[] = []): No {
   return { tipo: "luta", key: l.chaveId || fallbackKey, luta: l, filhos };
 }
-// Árvore de um POOL (raiz = final do pool).
 function arvorePool(
   poolKey: string, pool: { vencedor: string | null; lutas: Luta[] },
   ordem: string[], byes: string[], nomes: Record<string, { nome: string; pais: string }>
@@ -188,7 +156,6 @@ function arvorePool(
   if (!ordem || ordem.length === 0 || lutas.length === 0) return { arvores: [], arestas };
   const flat = buildSkeleton(ordem, byes || []);
   if (flat.length !== lutas.length) {
-    // segurança: se desalinhar, mostra as lutas empilhadas (sem árvore) em vez de partir.
     const arv: Arvore[] = lutas.map((l, i) => ({ no: lutaNo(l, `f-${poolKey}-${i}`), vencedor: null }));
     return { arvores: arv, arestas };
   }
@@ -204,7 +171,6 @@ function arvorePool(
   }
   return { arvores: [{ no, vencedor }], arestas };
 }
-// Árvore Meias + Final (raiz = final; filhos = as 2 meias).
 function arvoreMeiasFinal(chave: Chave): { arvores: Arvore[]; arestas: Aresta[] } {
   const arestas: Aresta[] = [];
   const meias = chave.meias || [];
@@ -222,8 +188,6 @@ function arvoreMeiasFinal(chave: Chave): { arvores: Arvore[]; arestas: Aresta[] 
   }
   return { arvores: [{ no: finalNo, vencedor }], arestas };
 }
-// Árvores Repescagem → Bronze (cada bronze tem a sua repescagem como filho;
-  // o semifinalista perdedor aparece como nome dentro da caixa do bronze).
 function arvoreRepBronze(chave: Chave): { arvores: Arvore[]; arestas: Aresta[] } {
   const arestas: Aresta[] = [];
   const reps = chave.repescagens || [];
@@ -247,8 +211,6 @@ function arvoreRepBronze(chave: Chave): { arvores: Arvore[]; arestas: Aresta[] }
   }
   return { arvores, arestas };
 }
-// A próxima luta de um conjunto: a primeira "agendada" (ambos os lados definidos,
-  // ainda por decidir), em ordem de bracket. Devolve o chaveId, ou null.
 function proximaLutaId(lutas: (Luta | null | undefined)[]): string | null {
   const c = lutas.filter((l): l is Luta => !!l && l.estado === "agendada" && !!l.azul.id && !!l.branco.id);
   if (c.length === 0) return null;
@@ -265,45 +227,29 @@ interface FavCtx {
 }
 const FavoritosContexto = createContext<FavCtx | null>(null);
 const ProximaContexto = createContext<string | null>(null);
-// Pontos Ippon por atleta (id -> { pontos, nLutas }), para o badge no cartão.
 type InfoAtleta = { pontos: number; nLutas: number };
 const PontosContexto = createContext<Record<string, InfoAtleta> | null>(null);
 // ----------------------------------------------------------------------------
 // Página
 // ----------------------------------------------------------------------------
 export default function ChaveAtletasPage() {
+  const t = useT();
   const [nivel, setNivel] = useState<"verificar" | "promax" | "pro" | "gratis">("verificar");
-  // A competição a mostrar é decidida pela API (regra: a decorrer -> próxima em
-    // 24h -> última com chave). A página começa SEM comp e adota o que a API
-  // devolver; assim a chave da última competição fica visível toda a semana, em
-  // vez de dar "indisponível" quando a próxima é um clássico ou não tem molduras.
   const [comp, setComp] = useState<string>("");
   const [compNome, setCompNome] = useState<string | null>(null);
   const [cat, setCat] = useState<string>(CAT_INICIAL);
-  // Vista atual: a árvore da chave, ou a análise de confrontos diretos.
   const [aba, setAba] = useState<"chave" | "confrontos">("chave");
   const [chave, setChave] = useState<Chave | null>(null);
   const [infos, setInfos] = useState<Record<string, InfoAtleta>>({});
   const [moldura, setMoldura] = useState<Moldura | null>(null);
   const [existeMoldura, setExisteMoldura] = useState<boolean | null>(null);
-  const [semChave, setSemChave] = useState(false); // não há nenhuma competição com molduras
+  const [semChave, setSemChave] = useState(false);
   const [aCarregar, setACarregar] = useState(false);
   const [quando, setQuando] = useState("");
-  // O bloqueio do Pro (categoria a decorrer) é decidido pelo SERVIDOR (Paywall).
   const [bloqueadoSrv, setBloqueadoSrv] = useState(false);
-  // Favoritos do utilizador (id_person).
   const [favoritos, setFavoritos] = useState<Set<string>>(new Set());
   const [pendentes, setPendentes] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string>("anon");
-  // Nível do utilizador: Pro Max (vê tudo ao vivo), Pro (só início ou final),
-  // grátis (não vê chave). Não redireciona — mostra na própria página.
-  //
-  // LÊ-SE DO useNivel, NÃO DO user_metadata (corrigido)
-  //
-  // Esta página lia `user_metadata.is_pro`, que deixou de ser sincronizado.
-  // Um subscritor Pro aparecia como GRÁTIS e via o ecrã de vendas a oferecer-lhe
-  // o Pro que já tinha pago. O useNivel lê da tabela `users`, que é onde o
-  // webhook da Stripe escreve e onde o servidor confirma o acesso.
   const { ehPro, ehProMax, pronto: nivelPronto } = useNivel();
   useEffect(() => {
       if (!nivelPronto) return;
@@ -358,19 +304,14 @@ export default function ChaveAtletasPage() {
   const carregar = useCallback(async () => {
       setACarregar(true);
       try {
-        // Paywall: enviamos o token de sessão para a API confirmar quem somos e
-        // decidir o que devolver. Sem token, a API responde "negado".
         const { data: sess } = await supabase.auth.getSession();
         const token = sess?.session?.access_token;
         const headers: Record<string, string> = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
-        // comp só vai no pedido quando já sabemos qual é (a página adotou o que a
-          // API escolheu). Na 1ª chamada vai vazio e a API decide (regra da semana).
         const qComp = comp ? `comp=${encodeURIComponent(comp)}&` : "";
         const r = await fetch(`/api/chave-atletas?${qComp}cat=${encodeURIComponent(cat)}`, { cache: "no-store", headers });
         const j = await r.json();
         if (j?.ok && j.acesso !== "negado") {
-          // Adota a competição escolhida pela API (e o nome, para o rótulo).
           if (j.comp && j.comp !== comp) setComp(String(j.comp));
           setCompNome(j.compNome ?? null);
           setSemChave(false);
@@ -381,11 +322,8 @@ export default function ChaveAtletasPage() {
           setBloqueadoSrv(!!j.bloqueado);
           setQuando(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }));
         } else if (j?.acesso === "negado") {
-          // A API recusou (grátis/sem sessão). A página não devia chegar aqui com
-          // Pro/Pro Max, mas por segurança limpamos a chave.
           setChave(null); setExisteMoldura(null); setBloqueadoSrv(false);
         } else if (j?.semChave) {
-          // Não há NENHUMA competição com molduras montadas.
           setSemChave(true); setChave(null); setExisteMoldura(null);
         }
       } catch { /* silencioso */ }
@@ -395,33 +333,29 @@ export default function ChaveAtletasPage() {
       if (nivel !== "promax" && nivel !== "pro") return;
       setChave(null); setMoldura(null); setExisteMoldura(null);
       carregar();
-      const t = setInterval(carregar, 60000);
-      return () => clearInterval(t);
+      const iv = setInterval(carregar, 60000);
+      return () => clearInterval(iv);
     }, [nivel, carregar]);
   const nomes = useMemo(() => (chave ? mapearNomes(chave) : {}), [chave]);
   const nomeDe = useCallback((id: string | null) => (id && nomes[id] ? sobrenome(nomes[id].nome) : "—"), [nomes]);
-  if (nivel === "verificar") return <Tela texto="A verificar acesso…" />;
+  if (nivel === "verificar") return <Tela texto={t("ck.aVerificarAcesso")} />;
   if (nivel === "gratis") {
     return (
       <main style={{ minHeight: "100vh", background: FUNDO, color: "#f1ede2", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ maxWidth: 440, textAlign: "center" }}>
       <div style={{ fontSize: 34, marginBottom: 10 }}>🔒</div>
-      <h1 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>Chave de Atletas</h1>
+      <h1 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>{t("ck.tituloGratis")}</h1>
       <p style={{ fontSize: 15, lineHeight: 1.55, color: "#bcc7c0", margin: "0 0 22px" }}>
-      Marca os teus atletas favoritos com uma estrela e acompanha o chaveamento ao vivo:
-      recebe uma notificação no telemóvel quando o teu atleta vai lutar, quando vence e quando
-      avança — luta a luta, da primeira ronda ao pódio.
+      {t("ck.gratisCorpo")}
       </p>
       <a href="/ippon-pro" style={{ display: "inline-block", background: GOLD, color: "#10130f", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px 22px", borderRadius: 10, textDecoration: "none" }}>
-      Conhecer os planos
+      {t("ck.conhecerPlanos")}
       </a>
       </div>
       </main>
     );
   }
-  const generoCat = CATS_M.includes(cat) ? "masc." : "fem.";
-  // O bloqueio do Pro a decorrer é decidido pelo SERVIDOR (Paywall). A página
-  // apenas reflete: quando bloqueado, a API nem sequer enviou a chave.
+  const generoCat = CATS_M.includes(cat) ? t("ck.masc") : t("ck.fem");
   const bloquearPro = nivel === "pro" && bloqueadoSrv;
   return (
     <FavoritosContexto.Provider value={favCtx}>
@@ -445,12 +379,12 @@ export default function ChaveAtletasPage() {
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "16px 14px 60px" }}>
     <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-    <a href="/inicio" aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+    <a href="/inicio" aria-label={t("comum.voltar")} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
     </a>
     <div>
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-    <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, lineHeight: 1.05 }}>Chave ao vivo</h1>
+    <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, lineHeight: 1.05 }}>{t("ck.chaveAoVivo")}</h1>
     <span style={{ fontSize: 10, fontWeight: 700, color: "#7fb8f5", border: "1px solid #7fb8f5", borderRadius: 4, padding: "1px 6px", letterSpacing: 0.5 }}>{nivel === "promax" ? "PRO MAX" : "PRO"}</span>
     </div>
     <div style={{ fontSize: 12, color: "#93a39a", marginTop: 1 }}>{compNome ? `${compNome} · ` : ""}{cat} kg {generoCat}</div>
@@ -458,19 +392,19 @@ export default function ChaveAtletasPage() {
     </div>
     <button onClick={carregar} disabled={aCarregar} style={{ background: "#141a17", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "8px 13px", borderRadius: 9, cursor: aCarregar ? "default" : "pointer", whiteSpace: "nowrap", flexShrink: 0, opacity: aCarregar ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}>
     <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", border: `2px solid ${GOLD}`, borderTopColor: "transparent", animation: aCarregar ? "ilspin 0.6s linear infinite" : "none" }} />
-    {aCarregar ? "A atualizar…" : "Atualizar"}
+    {aCarregar ? t("ck.aAtualizar") : t("ck.atualizar")}
     </button>
     </header>
     {/* Seletor: 2 filas (M em cima, F em baixo), 7 colunas. */}
     <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginTop: 14 }}>
-    {CATS_M.map((c) => <BotaoCat key={c} c={c} g="masc." ativo={c === cat} onClick={() => setCat(c)} />)}
+    {CATS_M.map((c) => <BotaoCat key={c} c={c} g={t("ck.masc")} ativo={c === cat} onClick={() => setCat(c)} />)}
     </div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginTop: 6 }}>
-    {CATS_F.map((c) => <BotaoCat key={c} c={c} g="fem." ativo={c === cat} onClick={() => setCat(c)} />)}
+    {CATS_F.map((c) => <BotaoCat key={c} c={c} g={t("ck.fem")} ativo={c === cat} onClick={() => setCat(c)} />)}
     </div>
     {/* Separadores: mesma categoria, duas leituras. */}
     <div style={{ display: "flex", gap: 8, marginTop: 14, borderBottom: "1px solid #1a221d" }}>
-    {([["chave", "Chave"], ["confrontos", "Confrontos diretos"]] as const).map(([k, label]) => (
+    {([["chave", "ck.abaChave"], ["confrontos", "ac.confrontosDiretos"]] as const).map(([k, labelK]) => (
           <button
           key={k}
           onClick={() => setAba(k)}
@@ -482,15 +416,12 @@ export default function ChaveAtletasPage() {
               letterSpacing: "0.04em", padding: "9px 0", cursor: "pointer",
             }}
           >
-          {label}
+          {t(labelK)}
           </button>
         ))}
     </div>
     {aba === "confrontos" && (
         <div style={{ marginTop: 14 }}>
-        {/* Sem `comp`: a análise segue a competição de MERCADO ABERTO (para onde se
-            escala agora), que pode não ser a que a chave mostra. Ver a nota no
-          componente — ele diz sempre qual está a analisar. */}
         <AnaliseConfrontos cat={cat} />
         </div>
       )}
@@ -500,17 +431,17 @@ export default function ChaveAtletasPage() {
         {bloquearPro ? (
             <>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#7fb8f5" }} />
-            <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7fb8f5" }}>Quadro inicial</span>
-            <span style={{ fontSize: 11, color: "#7c8a82" }}>· sem acompanhamento ao vivo</span>
+            <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7fb8f5" }}>{t("ck.quadroInicial")}</span>
+            <span style={{ fontSize: 11, color: "#7c8a82" }}>{t("ck.semAcompanhamento")}</span>
             </>
           ) : (
             <>
             <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
-            <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#e2655a" }}>Ao vivo</span>
-            {quando && <span style={{ fontSize: 11, color: "#7c8a82" }}>· atualizado às {quando}</span>}
+            <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#e2655a" }}>{t("ck.aoVivo")}</span>
+            {quando && <span style={{ fontSize: 11, color: "#7c8a82" }}>{t("ck.atualizadoAs", { hora: quando })}</span>}
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: VERDE, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: "#7c8a82" }}>próxima luta de cada bloco</span>
+            <span style={{ fontSize: 11, color: "#7c8a82" }}>{t("ck.proximaLutaBloco")}</span>
             </span>
             </>
           )}
@@ -519,51 +450,41 @@ export default function ChaveAtletasPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "0 0 10px", padding: "12px 14px", borderRadius: 11, background: "rgba(217,164,65,0.08)", border: `1px solid ${GOLD}` }}>
             <span style={{ fontSize: 20, flexShrink: 0 }}>⭐</span>
             <span style={{ flex: 1, minWidth: 200, fontSize: 13, lineHeight: 1.5, color: "#e7dcc2" }}>
-            Marca o teu atleta favorito e recebe uma notificação a cada luta dele — quando vai lutar,
-            quando vence e quando avança — a acompanhar o chaveamento ao vivo, da primeira luta ao pódio.
+            {t("ck.proCardCorpo")}
             </span>
-            {/* /pro-max, NAO /ippon-pro-max: essa rota nunca existiu. Eram dois 404
-                        mostrados a um Pro no momento exato em que ele queria pagar mais. */}
                     <a href="/pro-max" style={{ flexShrink: 0, background: GOLD, color: "#10130f", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "9px 16px", borderRadius: 9, textDecoration: "none", whiteSpace: "nowrap" }}>
-            Seja Pro Max
+            {t("ck.sejaProMax")}
             </a>
             </div>
           )}
         {semChave ? (
-            <Tela texto="Ainda não há nenhuma chave disponível. Quando a próxima competição tiver o quadro montado, aparece aqui." />
+            <Tela texto={t("ck.semChaveTexto")} />
           ) : existeMoldura === false ? (
-            <Tela texto="Esta categoria ainda não tem quadro nesta competição. Experimenta outra categoria acima." />
+            <Tela texto={t("ck.semQuadroCat")} />
           ) : !chave ? (
-            <Tela texto="A carregar a chave…" />
+            <Tela texto={t("ck.aCarregarChave")} />
           ) : (
             <>
-            {/* Pro, categoria a decorrer: vê o QUADRO INICIAL (confrontos, byes),
-              sem progressão. O resultado completo abre quando a categoria acabar. */}
             {bloquearPro && (
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 8, marginBottom: 4, padding: "12px 14px", borderRadius: 11, background: "rgba(127,184,245,0.06)", border: "1px solid #243a52" }}>
                 <span style={{ fontSize: 20, flexShrink: 0 }}>⏸️</span>
                 <span style={{ flex: 1, minWidth: 200, fontSize: 13, lineHeight: 1.5, color: "#bcc7c0" }}>
-                Estás a ver o <strong style={{ color: "#e7dcc2" }}>quadro inicial</strong> desta categoria — quem enfrenta quem.
-                Ela está a decorrer agora: o acompanhamento ao vivo é do Pro Max. Quando a categoria
-                terminar, vês aqui a chave toda preenchida.
+                {t("ck.bloqueadoBanner").split(/(%A%)/).map((s, i) =>
+                  s === "%A%" ? <strong key={i} style={{ color: "#e7dcc2" }}>{t("ck.quadroInicialMin")}</strong> : s
+                )}
                 </span>
                 <a href="/pro-max" style={{ flexShrink: 0, background: GOLD, color: "#10130f", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "9px 16px", borderRadius: 9, textDecoration: "none", whiteSpace: "nowrap" }}>
-                Seja Pro Max
+                {t("ck.sejaProMax")}
                 </a>
                 </div>
               )}
-            {/* Pódio: usa o `podio` do motor, que já sabe o estado de cada degrau.
-              Bronzes em falta aparecem como "A decidir" (a decorrer) ou
-              "Bronze não disponível" (terminou mas a fonte não deu o combate),
-              em vez de um lugar vazio que parecia um erro. */}
             {chave.podio && chave.podio.some((d) => d.estado !== "aDecidir" || d.id) && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8, marginBottom: 6, padding: "10px 12px", borderRadius: 10, background: "rgba(217,164,65,0.08)", border: `1px solid ${GOLD}` }}>
                 {chave.podio.map((d, i) => {
                       const cor = d.lugar === "1º" ? GOLD : d.lugar === "2º" ? "#c8ccd2" : "#cd7f32";
                       if (d.estado === "preenchido") return <Medalha key={i} cor={cor} txt={d.lugar} nome={nomeDe(d.id)} />;
-                      if (d.estado === "aDecidir") return <Medalha key={i} cor={cor} txt={d.lugar} nome="A decidir" esbatido />;
-                      // indisponivel
-                      const txtFalta = d.lugar === "3º" ? "Bronze não disponível" : "Não disponível";
+                      if (d.estado === "aDecidir") return <Medalha key={i} cor={cor} txt={d.lugar} nome={t("ck.aDecidir")} esbatido />;
+                      const txtFalta = d.lugar === "3º" ? t("ck.bronzeIndisponivel") : t("ck.naoDisponivel");
                       return <Medalha key={i} cor={cor} txt={d.lugar} nome={txtFalta} esbatido />;
                     })}
                 </div>
@@ -574,19 +495,19 @@ export default function ChaveAtletasPage() {
                   const byes = moldura?.byes?.[p] || [];
                   const { arvores, arestas } = arvorePool(p, chave.pools[p] || { vencedor: null, lutas: [] }, ordem, byes, nomes);
                   const proxima = bloquearPro ? null : proximaLutaId(chave.pools[p]?.lutas || []);
-                  return <Bloco key={p} titulo={`Pool ${p}`} arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="Vence o pool" />;
+                  return <Bloco key={p} titulo={`Pool ${p}`} arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor={t("ac.vencePool")} tipoVencedor="pool" />;
                 })}
             {/* Repescagem + Bronze (antes da final) */}
             {(() => {
                   const { arvores, arestas } = arvoreRepBronze(chave);
                   const proxima = bloquearPro ? null : proximaLutaId([...(chave.repescagens || []), ...(chave.bronzes || [])]);
-                  return <Bloco titulo="Repescagem e Bronzes" arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="🥉 Bronze" />;
+                  return <Bloco titulo={t("ck.repescagemBronzes")} arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor={`🥉 ${t("sc.bronze")}`} tipoVencedor="bronze" />;
                 })()}
             {/* Meias + Final (a final é a última luta da categoria) */}
             {(() => {
                   const { arvores, arestas } = arvoreMeiasFinal(chave);
                   const proxima = bloquearPro ? null : proximaLutaId([...(chave.meias || []), chave.final]);
-                  return <Bloco titulo="Meias-finais e Final" arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor="🥇 Campeão" />;
+                  return <Bloco titulo={t("ck.meiasFinal")} arvores={arvores} arestas={arestas} proxima={proxima} rotuloVencedor={`🥇 ${t("cc.campeao")}`} tipoVencedor="campeao" />;
                 })()}
             </>
           )}
@@ -601,9 +522,10 @@ export default function ChaveAtletasPage() {
 // ----------------------------------------------------------------------------
 // Bloco — desenha as árvores com conectores em cotovelo (SVG medido).
 // ----------------------------------------------------------------------------
-function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
-    titulo: string; arvores: Arvore[]; arestas: Aresta[]; proxima: string | null; rotuloVencedor: string;
+function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor, tipoVencedor }: {
+    titulo: string; arvores: Arvore[]; arestas: Aresta[]; proxima: string | null; rotuloVencedor: string; tipoVencedor: TipoVencedor;
   }) {
+  const t = useT();
   const innerRef = useRef<HTMLDivElement | null>(null);
   const outerRef = useRef<HTMLDivElement | null>(null);
   const refs = useRef<Map<string, HTMLElement>>(new Map());
@@ -648,8 +570,8 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
       }
       const onR = () => { calcular(); medirScroll(); };
       window.addEventListener("resize", onR);
-      const t = setTimeout(() => { calcular(); medirScroll(); }, 80);
-      return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", onR); clearTimeout(t); };
+      const to = setTimeout(() => { calcular(); medirScroll(); }, 80);
+      return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", onR); clearTimeout(to); };
     }, [calcular, medirScroll, arvores]);
   const renderNo = (no: No): ReactNode => {
     if (no.tipo === "bye") {
@@ -675,12 +597,12 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
     </span>
     {temScroll && (
         <span style={{ fontFamily: FD, fontSize: 10, color: "#7c8a82", letterSpacing: "0.04em", display: "inline-flex", alignItems: "center", gap: 4 }}>
-        <span className="ildesliza">→</span> deslize para ver toda a chave
+        <span className="ildesliza">→</span> {t("ck.deslize")}
         </span>
       )}
     </div>
     {arvores.length === 0 ? (
-        <Vazio texto="Sem lutas nesta fase ainda." />
+        <Vazio texto={t("ck.semLutasFase")} />
       ) : (
         <div style={{ position: "relative" }}>
         <div ref={outerRef} className="il-scroll" style={{ overflowX: "auto", paddingBottom: 10 }}>
@@ -693,7 +615,7 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
               {renderNo(a.no)}
               {a.vencedor && (
                   <div ref={setRef(a.vencedor.key)}>
-                  <CaixaVencedor lado={a.vencedor.lado} rotulo={rotuloVencedor} />
+                  <CaixaVencedor lado={a.vencedor.lado} rotulo={rotuloVencedor} tipo={tipoVencedor} />
                   </div>
                 )}
               </div>
@@ -713,6 +635,7 @@ function Bloco({ titulo, arvores, arestas, proxima, rotuloVencedor }: {
 // Caixas e linhas
 // ----------------------------------------------------------------------------
 function CaixaLuta({ luta }: { luta: Luta }) {
+  const t = useT();
   const proxima = useContext(ProximaContexto);
   const ehProxima = !!luta.chaveId && proxima === luta.chaveId;
   const decidida = luta.estado === "decidida" && !!luta.vencedor;
@@ -721,7 +644,7 @@ function CaixaLuta({ luta }: { luta: Luta }) {
   return (
     <div style={{ position: "relative", width: CAIXA_W, background: "#121815", border: `1px solid ${ehProxima ? VERDE : "#243029"}`, borderRadius: 10, overflow: "hidden" }}>
     {ehProxima && (
-        <span className="ilponto" aria-label="Próxima luta" title="Próxima luta deste bloco"
+        <span className="ilponto" aria-label={t("ck.proximaLuta")} title={t("ck.proximaLutaBlocoTitulo")}
         style={{ position: "absolute", top: -5, right: -5, width: 11, height: 11, borderRadius: "50%", background: VERDE, border: "2px solid #0c0e0d", zIndex: 2 }} />
       )}
     <LinhaLado lado={azul} decidida={decidida} />
@@ -737,9 +660,9 @@ function CaixaBye({ lado }: { lado: Lado }) {
     </div>
   );
 }
-function CaixaVencedor({ lado, rotulo }: { lado: Lado; rotulo: string }) {
-  const dourado = rotulo.includes("Campeão");
-  const borda = dourado ? GOLD : rotulo.includes("Bronze") ? "#9a6b3a" : "#2f3d35";
+function CaixaVencedor({ lado, rotulo, tipo }: { lado: Lado; rotulo: string; tipo: TipoVencedor }) {
+  const dourado = tipo === "campeao";
+  const borda = dourado ? GOLD : tipo === "bronze" ? "#9a6b3a" : "#2f3d35";
   return (
     <div style={{ width: CAIXA_W, background: "#141a17", border: `1px solid ${borda}`, borderRadius: 10, overflow: "hidden" }}>
     <div style={{ fontSize: 9, color: "#7c8a82", textTransform: "uppercase", letterSpacing: "0.07em", padding: "4px 9px 0" }}>{rotulo}</div>
@@ -748,6 +671,7 @@ function CaixaVencedor({ lado, rotulo }: { lado: Lado; rotulo: string }) {
   );
 }
 function LinhaLado({ lado, esmaecido, decidida, semEstrela }: { lado: Lado; esmaecido?: boolean; decidida?: boolean; semEstrela?: boolean }) {
+  const t = useT();
   const venceu = lado.vencedor;
   const vazio = !lado.id;
   const cor = vazio ? "#5a665e" : esmaecido ? "#6b7a72" : venceu ? "#f1ede2" : decidida ? "#7c8a82" : "#a9b4ac";
@@ -778,11 +702,11 @@ function LinhaLado({ lado, esmaecido, decidida, semEstrela }: { lado: Lado; esma
     <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: venceu ? 700 : 400, color: cor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
     {vazio ? "—" : sobrenome(lado.nome)}
     </span>
-    {venceu && <span aria-label="venceu" style={{ color: GOLD, fontSize: 12, flexShrink: 0 }}>▸</span>}
+    {venceu && <span aria-label={t("ck.venceu")} style={{ color: GOLD, fontSize: 12, flexShrink: 0 }}>▸</span>}
     {mostraEstrela && (
         <button type="button" onClick={() => fav!.alternar(lado)} disabled={aGravar}
-        aria-label={ehFavorito ? "Remover dos favoritos" : "Adicionar aos favoritos"} aria-pressed={ehFavorito}
-        title={ehFavorito ? "Nos teus atletas" : "Seguir este atleta"}
+        aria-label={ehFavorito ? t("ck.removerFav") : t("ck.adicionarFav")} aria-pressed={ehFavorito}
+        title={ehFavorito ? t("ck.nosTeusAtletas") : t("ck.seguirAtleta")}
         style={{ background: "transparent", border: "none", cursor: aGravar ? "default" : "pointer", padding: 0, marginLeft: 2, flexShrink: 0, lineHeight: 1, fontSize: 14, color: ehFavorito ? GOLD : "#5f6f67", opacity: aGravar ? 0.5 : 1, transition: "color .15s" }}>
         {ehFavorito ? "★" : "☆"}
         </button>
