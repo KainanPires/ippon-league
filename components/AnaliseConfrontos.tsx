@@ -9,39 +9,11 @@
 //
 // AUTOSSUFICIENTE: trata da sessão, do pedido e de todos os estados (a carregar,
 // sem acesso, sem dados, ok). A página só precisa de lhe passar a categoria.
-//
-// QUE COMPETIÇÃO ANALISA — e porque NÃO é a mesma da chave ao lado.
-//
-// A chave mostra a competição que tem QUADRO MONTADO (à mão, na tabela
-// chave_atletas) — normalmente a que está a decorrer ou a última com moldura.
-// A análise responde a outra pergunta: "para quem vou escalar AGORA?". Por isso
-// segue a competição de MERCADO ABERTO (focoMercado().alvo).
-//
-// São perguntas diferentes e as respostas podem ser competições diferentes. Como
-// isso confunde se não se disser, o nome da competição analisada aparece sempre
-// no topo do bloco — nunca se deixa o utilizador a supor.
-//
-// ---------------------------------------------------------------------------
-// HONESTIDADE DOS NÚMEROS — as regras que este ecrã não pode quebrar
-//
-// No judô, dois atletas encontram-se uma ou duas vezes. Uma probabilidade tirada
-// de 2 confrontos não é uma probabilidade. Por isso:
-//
-//   • a AMOSTRA aparece sempre ao lado da percentagem. Sem isso, ninguém
-//     distingue uma leitura apoiada em 13 confrontos de um palpite apoiado em 0.
-//   • sem histórico, dizemos "só por forma" em vez de inventar um número com ar
-//     de certeza.
-//   • uma casa decimal, nunca duas. A precisão não existe.
-//   • nunca "aposta" nem "previsão". O projeto evita deliberadamente a linguagem
-//     de apostas — é posicionamento e é risco regulatório.
-//
-// Um número errado com ar de certeza custa mais confiança do que um número
-// ausente.
-// ---------------------------------------------------------------------------
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, nomeCompeticao } from "@/lib/calendario";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -88,6 +60,7 @@ interface Resposta {
 }
 
 export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat: string }) {
+  const t = useT();
   // Por omissão, a competição para a qual se escala agora. `comp` só se passa
   // para forçar outra (útil em testes).
   const alvo = focoMercado().alvo;
@@ -120,8 +93,8 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
 
   useEffect(() => { void carregar(); }, [carregar]);
 
-  if (aCarregar) return <Aviso texto="A analisar os confrontos…" />;
-  if (!dados || !dados.ok) return <Aviso texto="Não foi possível carregar a análise agora." />;
+  if (aCarregar) return <Aviso texto={t("ac.aAnalisar")} />;
+  if (!dados || !dados.ok) return <Aviso texto={t("ac.erroCarregar")} />;
 
   // ---- Sem acesso: convite diferente para quem já é Pro e para quem não paga ----
   if (dados.acesso === "negado") {
@@ -130,15 +103,13 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
       <div style={{ background: "#0f1620", border: `1px solid ${AZUL_PROMAX}`, borderRadius: 14, padding: "18px 16px", textAlign: "center" }}>
         <div style={{ fontSize: 26, marginBottom: 6 }}>🔍</div>
         <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: AZUL_PROMAX, marginBottom: 8 }}>
-          Confrontos diretos
+          {t("ac.confrontosDiretos")}
         </div>
         <p style={{ fontSize: 13, color: "#cdd9e6", lineHeight: 1.55, margin: "0 0 16px" }}>
-          {ehPro
-            ? "Já és Pro — esta é a camada seguinte. Vê quem já ganhou a quem entre os inscritos desta categoria, e a probabilidade de cada um chegar ao topo."
-            : "Descobre quem já ganhou a quem entre os inscritos desta categoria, e a probabilidade de cada um chegar ao topo — antes de escalares."}
+          {ehPro ? t("ac.negadoPro") : t("ac.negadoGratis")}
         </p>
         <a href="/pro-max" style={{ display: "inline-block", background: AZUL_PROMAX, color: "#0a1828", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 22px", borderRadius: 10, textDecoration: "none" }}>
-          {ehPro ? "Subir a Pro Max" : "Conhecer o Pro Max"}
+          {ehPro ? t("ac.subirProMax") : t("ac.conhecerProMax")}
         </a>
       </div>
     );
@@ -146,16 +117,14 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
 
   if (dados.semDados) {
     return (
-      <Aviso texto={`Ainda não há análise para ${cat} kg${nomeAlvo ? ` em ${nomeAlvo}` : ""}. Assim que os preços desta categoria forem recalculados, aparece aqui.`} />
+      <Aviso texto={t("ac.semDados", { cat, onde: nomeAlvo ? t("aeg.emComp", { nome: nomeAlvo }) : "" })} />
     );
   }
 
   const atletas = dados.atletas || [];
-  if (atletas.length === 0) return <Aviso texto="Sem atletas nesta categoria." />;
+  if (atletas.length === 0) return <Aviso texto={t("ac.semAtletas")} />;
 
-  // CAMADA 2: há quadro montado? Se sim, a probabilidade que MANDA é a da chave
-  // — tem em conta quem apanha quem, e é isso que decide quem escalar. A da
-  // camada 1 (só força relativa) passa a ser a leitura de fundo.
+  // CAMADA 2: há quadro montado? Se sim, a probabilidade que MANDA é a da chave.
   const chave = dados.chave;
   const temChave = !!chave?.existe && !!chave.porAtleta;
   const comChave = (id: string): CaminhoAtleta | null => (temChave ? chave!.porAtleta![id] ?? null : null);
@@ -170,29 +139,23 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
 
   return (
     <div>
-      {/* Cabeçalho: de onde vêm os números. Aparece SEMPRE — é o que separa uma
-          análise honesta de um oráculo. */}
+      {/* Cabeçalho: de onde vêm os números. Aparece SEMPRE. */}
       <div style={{ background: "#101511", border: "1px dashed #2f4a3c", borderRadius: 12, padding: "10px 13px", marginBottom: 12 }}>
-        {/* QUAL competição está a ser analisada. Aparece sempre: pode não ser a
-            mesma que a aba da Chave mostra, e supor qual é seria pior do que
-            perguntar. */}
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: GOLD, marginBottom: 4 }}>
-          A escalar para{dados.compNome || nomeAlvo ? ` · ${dados.compNome || nomeAlvo}` : ""}
+          {t("ac.aEscalarPara")}{dados.compNome || nomeAlvo ? ` · ${dados.compNome || nomeAlvo}` : ""}
         </div>
         <div style={{ fontSize: 12, color: "#aee9c9", lineHeight: 1.5 }}>
-          <strong style={{ color: "#f1ede2" }}>{Math.round(totalLutas)} confrontos</strong> conhecidos entre os{" "}
-          {atletas.length} inscritos ({comHistorico} com histórico).
-          {dados.classico && dados.ano_base ? (
-            <> Só contam lutas até ao fim de <strong style={{ color: GOLD }}>{dados.ano_base}</strong> — é um clássico desse ano.</>
-          ) : null}
+          {t("ac.confrontosLinha", { n: atletas.length, m: comHistorico }).split(/(%A%)/).map((s, k) =>
+            s === "%A%" ? <strong key={k} style={{ color: "#f1ede2" }}>{t("ac.nConfrontos", { x: Math.round(totalLutas) })}</strong> : s
+          )}
+          {dados.classico && dados.ano_base
+            ? t("ac.classicoClausula").split(/(%A%)/).map((s, k) =>
+                s === "%A%" ? <strong key={`c${k}`} style={{ color: GOLD }}>{dados.ano_base}</strong> : s
+              )
+            : null}
         </div>
-        {/* A moldura só se monta depois da pesagem (as chaves da IJF saem 10-12h
-            antes). Dizemos em que estado estamos, para a ausência do caminho não
-            parecer uma falha. */}
         <div style={{ fontSize: 11, color: temChave ? VERDE : "#7c8a82", marginTop: 6 }}>
-          {temChave
-            ? "✓ Quadro montado — as probabilidades já contam com quem apanha quem."
-            : "Quadro ainda não montado. As chaves saem depois da pesagem; até lá, a leitura é só por força e histórico."}
+          {temChave ? t("ac.quadroMontado") : t("ac.quadroNaoMontado")}
         </div>
       </div>
 
@@ -212,17 +175,15 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
                   <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.nome}</span>
                   <span style={{ display: "block", fontSize: 11, color: "#93a39a" }}>
                     JC {a.preco.toFixed(1)}
-                    {semHistorico ? " · sem confrontos conhecidos" : ` · ${a.confrontos.vitorias}V–${a.confrontos.derrotas}D com ${a.confrontos.adversarios} inscritos`}
+                    {semHistorico ? ` · ${t("ac.semConfrontos")}` : ` · ${t("ac.vdComInscritos", { v: a.confrontos.vitorias, d: a.confrontos.derrotas, adv: a.confrontos.adversarios })}`}
                   </span>
                 </span>
                 <span style={{ flexShrink: 0, textAlign: "right" }}>
                   <span style={{ display: "block", fontFamily: FD, fontSize: 16, fontWeight: 700, color: i === 0 ? GOLD : "#cfd8d2" }}>
                     {comChave(a.id) ? comChave(a.id)!.venceCategoria : a.probabilidade}%
                   </span>
-                  {/* A AMOSTRA nunca é escondida. É o que distingue uma leitura
-                      sólida de um palpite — e é ela que torna o número honesto. */}
                   <span style={{ display: "block", fontSize: 9.5, color: semHistorico ? "#7c8a82" : "#5f6f67" }}>
-                    {semHistorico ? "só por forma" : `${a.amostra} lutas`}
+                    {semHistorico ? t("ac.soPorForma") : t("ac.nLutas", { n: a.amostra })}
                   </span>
                 </span>
                 <span style={{ flexShrink: 0, color: "#5f6f67", transform: expandido ? "rotate(90deg)" : "none", transition: "transform .18s" }}>
@@ -234,12 +195,12 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
                 <div style={{ padding: "0 13px 12px", borderTop: "1px solid #1a221d" }}>
                   {semHistorico ? (
                     <p style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.5, margin: "10px 0 0" }}>
-                      Nunca enfrentou nenhum dos outros inscritos. A percentagem acima vem apenas da forma recente — trata-a como uma estimativa larga.
+                      {t("ac.nuncaEnfrentou")}
                     </p>
                   ) : (
                     <>
-                      <Bloco titulo="Leva vantagem" cor={VERDE} linhas={a.favoraveis} />
-                      <Bloco titulo="Costuma sofrer" cor={VERMELHO} linhas={a.desfavoraveis} />
+                      <Bloco titulo={t("ac.levaVantagem")} cor={VERDE} linhas={a.favoraveis} />
+                      <Bloco titulo={t("ac.costumaSofrer")} cor={VERMELHO} linhas={a.desfavoraveis} />
                       <Caminho dados={comChave(a.id)} />
                     </>
                   )}
@@ -250,18 +211,14 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
         })}
       </div>
 
-      {/* Rodapé: explicar o modelo em duas linhas. Quem percebe de onde vem o
-          número confia nele; quem não percebe, desconfia — e tem razão. */}
       <p style={{ fontSize: 10.5, color: "#5f6f67", lineHeight: 1.5, textAlign: "center", marginTop: 14 }}>
-        A percentagem combina a forma recente com o histórico direto entre os inscritos.
-        Quantos mais confrontos existirem, mais peso tem o histórico. É uma estimativa, não uma previsão.
+        {t("ac.rodapeNota")}
       </p>
     </div>
   );
 }
 
-// Lista de relações (leva vantagem / costuma sofrer). Mostra sempre o V–D, para
-// a percentagem nunca aparecer sozinha e sem contexto.
+// Lista de relações (leva vantagem / costuma sofrer). Mostra sempre o V–D.
 function Bloco({ titulo, cor, linhas }: { titulo: string; cor: string; linhas: Relacao[] }) {
   if (!linhas || linhas.length === 0) return null;
   return (
@@ -282,27 +239,25 @@ function Bloco({ titulo, cor, linhas }: { titulo: string; cor: string; linhas: R
 }
 
 // CAMINHO NA CHAVE — só aparece quando há moldura montada.
-// Mostra, fase a fase, quem pode aparecer do outro lado e com que hipótese de lá
-// chegar. Ao lado de cada nome vai o histórico direto, quando existe: é o que
-// transforma "podes apanhar o Kukolj" em "podes apanhar o Kukolj, e estás 0-2".
 function Caminho({ dados }: { dados: CaminhoAtleta | null }) {
+  const t = useT();
   if (!dados) return null;
   return (
     <div style={{ marginTop: 13, paddingTop: 11, borderTop: "1px solid #1a221d" }}>
       <div style={{ fontFamily: FD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: AZUL_PROMAX, marginBottom: 8 }}>
-        Caminho na chave · Pool {dados.pool}
+        {t("ac.caminhoNaChave")} · Pool {dados.pool}
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        <Marco rotulo="Vence o pool" valor={dados.vencePool} />
-        <Marco rotulo="Chega à final" valor={dados.chegaFinal} />
-        <Marco rotulo="Campeão" valor={dados.venceCategoria} destaque />
+        <Marco rotulo={t("ac.vencePool")} valor={dados.vencePool} />
+        <Marco rotulo={t("ac.chegaFinal")} valor={dados.chegaFinal} />
+        <Marco rotulo={t("cc.campeao")} valor={dados.venceCategoria} destaque />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {dados.caminho.map((f, i) => (
           <div key={i}>
             <div style={{ fontSize: 10.5, fontWeight: 700, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{f.fase}</div>
             {f.possiveis.length === 0 ? (
-              <div style={{ fontSize: 11.5, color: "#5f6f67", fontStyle: "italic" }}>Passa sem adversário.</div>
+              <div style={{ fontSize: 11.5, color: "#5f6f67", fontStyle: "italic" }}>{t("ac.passaSemAdversario")}</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 {f.possiveis.map((o) => (
@@ -323,7 +278,7 @@ function Caminho({ dados }: { dados: CaminhoAtleta | null }) {
         ))}
       </div>
       <p style={{ fontSize: 10, color: "#5f6f67", lineHeight: 1.45, marginTop: 9, marginBottom: 0 }}>
-        A percentagem ao lado de cada nome é a hipótese de ELE chegar a essa fase. O V–D é o histórico direto entre os dois.
+        {t("ac.caminhoNota")}
       </p>
     </div>
   );
