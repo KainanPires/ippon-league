@@ -223,8 +223,9 @@ async function processarConfronto(
       await criarNotificacaoServidor({
           paraUserId: c.jogador_a,
           tipo: "copa_avancou",
-          titulo: "3º lugar na Copa Ippon 🥉",
-          corpo: `Subiste ao pódio da Copa "${nomeLiga}". Não houve ninguém para disputar o bronze do teu lado da chave, por isso o 3º lugar é teu. Grande campanha!`,
+          chaveTitulo: "copa.bronze3Titulo",
+          chaveCorpo: "copa.bronzeAutoCorpo",
+          vars: { liga: nomeLiga },
           link: linkResultados,
         });
     }
@@ -246,16 +247,18 @@ async function processarConfronto(
     await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_campeao",
-        titulo: "És o CAMPEÃO da Copa Ippon! 🏆",
-        corpo: `Venceste a final e és o campeão da Copa "${nomeLiga}". Que conquista!`,
+        chaveTitulo: "copa.campeaoTitulo",
+        chaveCorpo: "copa.campeaoCorpo",
+        vars: { liga: nomeLiga },
         link: linkResultados,
       });
     if (perdedor) {
       await criarNotificacaoServidor({
           paraUserId: perdedor,
           tipo: "copa_eliminado",
-          titulo: "Vice-campeão da Copa Ippon 🥈",
-          corpo: `Chegaste à final da Copa "${nomeLiga}" e ficaste em 2º. Grande campanha!`,
+          chaveTitulo: "copa.viceTitulo",
+          chaveCorpo: "copa.viceCorpo",
+          vars: { liga: nomeLiga },
           link: linkResultados,
         });
     }
@@ -264,16 +267,18 @@ async function processarConfronto(
     await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_avancou",
-        titulo: "3º lugar na Copa Ippon 🥉",
-        corpo: `Venceste a disputa do bronze na Copa "${nomeLiga}". Subiste ao pódio!`,
+        chaveTitulo: "copa.bronze3Titulo",
+        chaveCorpo: "copa.bronzeVencidoCorpo",
+        vars: { liga: nomeLiga },
         link: linkResultados,
       });
     if (perdedor) {
       await criarNotificacaoServidor({
           paraUserId: perdedor,
           tipo: "copa_eliminado",
-          titulo: "Às portas do pódio",
-          corpo: `Perdeste a disputa do bronze na Copa "${nomeLiga}", mas chegaste muito longe. Que campanha!`,
+          chaveTitulo: "copa.portasPodioTitulo",
+          chaveCorpo: "copa.portasPodioCorpo",
+          vars: { liga: nomeLiga },
           link: linkCopa,
         });
     }
@@ -283,16 +288,18 @@ async function processarConfronto(
     await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_avancou",
-        titulo: "Venceste na repescagem! 🔁",
-        corpo: `Ganhaste o teu confronto de repescagem na Copa "${nomeLiga}" e segues para a disputa do bronze. A segunda chance é tua!`,
+        chaveTitulo: "copa.repescagemVenceuTitulo",
+        chaveCorpo: "copa.repescagemVenceuCorpo",
+        vars: { liga: nomeLiga },
         link: linkCopa,
       });
     if (perdedor) {
       await criarNotificacaoServidor({
           paraUserId: perdedor,
           tipo: "copa_eliminado",
-          titulo: "Eliminado na repescagem",
-          corpo: `Perdeste o confronto de repescagem na Copa "${nomeLiga}". Foi uma boa campanha — para a próxima, a revanche é tua!`,
+          chaveTitulo: "copa.repescagemPerdeuTitulo",
+          chaveCorpo: "copa.repescagemPerdeuCorpo",
+          vars: { liga: nomeLiga },
           link: linkCopa,
         });
     }
@@ -305,8 +312,9 @@ async function processarConfronto(
     await criarNotificacaoServidor({
         paraUserId: vencedor,
         tipo: "copa_avancou",
-        titulo: "Avançaste na Copa! ⚔️",
-        corpo: `Venceste o teu confronto na Copa "${nomeLiga}". Segues em frente — prepara a próxima ronda!`,
+        chaveTitulo: "copa.avancouTitulo",
+        chaveCorpo: "copa.avancouCorpo",
+        vars: { liga: nomeLiga },
         link: linkCopa,
       });
   }
@@ -448,8 +456,9 @@ if (todaDecidida) {
           await criarNotificacaoServidor({
               paraUserId: perdedorN,
               tipo: "copa_eliminado",
-              titulo: "Perdeste este confronto — mas não acabou! 🔁",
-              corpo: `Foste eliminado deste confronto na Copa "${nomeLiga}", mas a tua campanha continua: ainda podes lutar pelo 3º lugar. Não desanimes — vamos a essa repescagem!`,
+              chaveTitulo: "copa.paraRepescagemTitulo",
+              chaveCorpo: "copa.paraRepescagemCorpo",
+              vars: { liga: nomeLiga },
               link: linkCopa,
             });
         } else {
@@ -457,8 +466,9 @@ if (todaDecidida) {
           await criarNotificacaoServidor({
               paraUserId: perdedorN,
               tipo: "copa_eliminado",
-              titulo: "Eliminado da Copa",
-              corpo: `Foste eliminado da Copa "${nomeLiga}". Foi uma boa campanha — para a próxima, a revanche é tua!`,
+              chaveTitulo: "copa.eliminadoTitulo",
+              chaveCorpo: "copa.eliminadoCorpo",
+              vars: { liga: nomeLiga },
               link: linkCopa,
             });
         }
