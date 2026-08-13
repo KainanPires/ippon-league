@@ -10,7 +10,8 @@ import { supabase } from "@/lib/supabase";
 import { Mascot } from "@/components/Mascot";
 import { useFaixa } from "@/lib/useFaixa";
 import { Escudo, type Identity } from "@/components/Escudo";
-import { useT } from "@/lib/i18n";
+import { noticiaNaLingua, type CamposTraduzidos } from "@/lib/noticiaLingua";
+import { useT, useLingua } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -47,6 +48,8 @@ interface Noticia {
   link_tiktok: string | null;
   link_youtube: string | null;
   dados: { escudo?: Identity | null } | null;
+  resumo?: string | null;
+  traducoes: Record<string, CamposTraduzidos> | null;
 }
 
 /** Botão para o vídeo desta notícia numa rede social. */
@@ -76,20 +79,24 @@ function quando(iso: string, t: ReturnType<typeof useT>): string {
 
 export default function NoticiaPagina() {
   const t = useT();
+  const { lingua } = useLingua();
   const params = useParams();
   const id = String(params?.id || "");
   const [n, setN] = useState<Noticia | null | "nao-existe">(null);
   const [relacionadas, setRelacionadas] = useState<Noticia[]>([]);
   const [copiado, setCopiado] = useState(false);
+  // O leitor pode alternar entre a tradução (por omissão) e o original em PT.
+  const [verOriginal, setVerOriginal] = useState(false);
   const { cor: corFaixa } = useFaixa();
 
   useEffect(() => {
     let vivo = true;
     (async () => {
       if (!id) return;
+      setVerOriginal(false); // ao mudar de notícia, recomeça na tradução
       const { data } = await supabase
         .from("hub_noticias")
-        .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em, autor_nome, imagem_url, imagem_credito, link_instagram, link_tiktok, link_youtube, dados")
+        .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em, autor_nome, imagem_url, imagem_credito, link_instagram, link_tiktok, link_youtube, dados, traducoes")
         .eq("id", id).maybeSingle();
       if (!vivo) return;
       if (!data) { setN("nao-existe"); return; }
@@ -99,7 +106,7 @@ export default function NoticiaPagina() {
       if (noticia.id_competicao) {
         const { data: outras } = await supabase
           .from("hub_noticias")
-          .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em, autor_nome, imagem_url, imagem_credito, link_instagram, link_tiktok, link_youtube, dados")
+          .select("id, tipo, titulo, corpo, id_competicao, nome_competicao, criada_em, autor_nome, imagem_url, imagem_credito, link_instagram, link_tiktok, link_youtube, dados, traducoes")
           .eq("id_competicao", noticia.id_competicao)
           .neq("id", noticia.id)
           .limit(5);
@@ -111,7 +118,7 @@ export default function NoticiaPagina() {
 
   async function partilhar() {
     const url = typeof window !== "undefined" ? window.location.href : "";
-    const texto = n && n !== "nao-existe" ? n.titulo : "Ippon League";
+    const texto = n && n !== "nao-existe" ? noticiaNaLingua(n, lingua, verOriginal).titulo : "Ippon League";
     try {
       const nav = navigator as Navigator & { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
       if (nav.share) { await nav.share({ title: "Ippon League", text: texto, url }); return; }
@@ -124,6 +131,9 @@ export default function NoticiaPagina() {
   }
 
   const e = n && n !== "nao-existe" ? (ESTILO[n.tipo] || ESTILO.curiosidade) : ESTILO.curiosidade;
+  // Campos na língua do leitor (ou o original, se `verOriginal`). Só existe
+  // quando a notícia já carregou — nos ramos de "a carregar"/"não existe" é null.
+  const loc = n && n !== "nao-existe" ? noticiaNaLingua(n, lingua, verOriginal) : null;
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -167,8 +177,21 @@ export default function NoticiaPagina() {
                 <span style={{ fontSize: 11, color: "#5f6f67" }}>{quando(n.criada_em, t)}</span>
               </div>
 
-              <h1 style={{ fontSize: 25, fontWeight: 700, color: "#f1ede2", lineHeight: 1.22, margin: "0 0 14px", letterSpacing: "-0.01em" }}>{n.titulo}</h1>
-              <p style={{ fontSize: 16, color: "#cfd8d2", lineHeight: 1.75, margin: 0, whiteSpace: "pre-wrap" }}>{n.corpo}</p>
+              <h1 style={{ fontSize: 25, fontWeight: 700, color: "#f1ede2", lineHeight: 1.22, margin: "0 0 14px", letterSpacing: "-0.01em" }}>{loc!.titulo}</h1>
+
+              {/* Aviso de tradução automática + alternar para o original. Só
+                  aparece quando existe tradução para a língua do leitor. */}
+              {loc!.temTraducao && (
+                <button
+                  onClick={() => setVerOriginal((v) => !v)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid #243029", color: "#93a39a", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "5px 10px", borderRadius: 999, cursor: "pointer", marginBottom: 14 }}
+                >
+                  <span aria-hidden="true">🌐</span>
+                  {loc!.traduzida ? `${t("hub.traduzido")} · ${t("hub.verOriginal")}` : t("hub.verTraducao")}
+                </button>
+              )}
+
+              <p style={{ fontSize: 16, color: "#cfd8d2", lineHeight: 1.75, margin: 0, whiteSpace: "pre-wrap" }}>{loc!.corpo}</p>
 
               {(n.nome_competicao || n.autor_nome) && (
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #1a221d", fontSize: 12, color: "#93a39a", display: "flex", justifyContent: "space-between", gap: 10 }}>
@@ -218,7 +241,7 @@ export default function NoticiaPagina() {
                     return (
                       <a key={r.id} href={`/blog/${r.id}`} style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "#121815", border: "1px solid #243029", borderRadius: 11, padding: "11px 12px", textDecoration: "none", color: "inherit" }}>
                         <span style={{ fontSize: 15, flexShrink: 0 }} aria-hidden="true">{er.icone}</span>
-                        <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: "#d6ddd6", lineHeight: 1.35 }}>{r.titulo}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: "#d6ddd6", lineHeight: 1.35 }}>{noticiaNaLingua(r, lingua).titulo}</span>
                         <span style={{ color: "#5f6f67", flexShrink: 0 }}>›</span>
                       </a>
                     );
