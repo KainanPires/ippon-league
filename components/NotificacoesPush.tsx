@@ -8,13 +8,14 @@
 
 import { useState, useEffect } from "react";
 import { suportaPush, estadoPush, ativarPush, desativarPush, type EstadoPush } from "@/lib/push";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
 // Reúne o que o aparelho reporta, para diagnosticar quando "não suporta".
-function diagnostico(): { texto: string; standalone: boolean; ios: string; sw: boolean; pm: boolean; nt: boolean } {
+function diagnostico(t: ReturnType<typeof useT>): { texto: string; standalone: boolean; ios: string; sw: boolean; pm: boolean; nt: boolean } {
   if (typeof window === "undefined") return { texto: "", standalone: false, ios: "", sw: false, pm: false, nt: false };
   const ua = navigator.userAgent || "";
   const m = ua.match(/OS (\d+)[._](\d+)/);
@@ -25,14 +26,14 @@ function diagnostico(): { texto: string; standalone: boolean; ios: string; sw: b
   const nt = "Notification" in window;
   let texto = "";
   if (!standalone) {
-    texto = "Estás a abrir pelo navegador. No iPhone, as notificações só funcionam dentro da app: abre pelo ícone no ecrã principal.";
+    texto = t("push.diagNavegador");
   } else if (ios && parseFloat(ios) < 16.4) {
-    texto = `O iOS deste iPhone (${ios}) é anterior ao 16.4. A Apple só permite notificações a partir do 16.4 — atualiza em Definições → Geral → Atualização de Software.`;
+    texto = t("push.diagIosVelho", { ios });
   } else if (!sw || !pm || !nt) {
     const faltam = [!sw ? "Service Worker" : null, !pm ? "PushManager" : null, !nt ? "Notification" : null].filter(Boolean).join(", ");
-    texto = `A app está aberta, mas falta(m): ${faltam}. Tira um print desta caixa para resolvermos.`;
+    texto = t("push.diagFaltam", { faltam });
   } else {
-    texto = "A app está aberta corretamente. Tira um print desta caixa para resolvermos.";
+    texto = t("push.diagOk");
   }
   return { texto, standalone, ios, sw, pm, nt };
 }
@@ -46,6 +47,7 @@ function IconeSino({ cor = GOLD }: { cor?: string }) {
 }
 
 export function BotaoNotificacoes({ userId }: { userId: string }) {
+  const t = useT();
   const [estado, setEstado] = useState<EstadoPush>("pendente");
   const [aFazer, setAFazer] = useState(false);
   const [msg, setMsg] = useState("");
@@ -68,10 +70,10 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
       setErro(false);
       // Diagnóstico útil: mostra a conta para onde foi registado, para se confirmar
       // que é a conta certa (resolve casos de conta trocada no mesmo aparelho).
-      setMsg(`Notificações ativadas! 🥋 (conta ${userId.slice(0, 8)}…)`);
+      setMsg(t("push.ativadas", { conta: userId.slice(0, 8) }));
     } else {
       setErro(true);
-      setMsg(r.erro || "Não foi possível ativar.");
+      setMsg(r.erro || t("push.naoAtivar"));
     }
   }
   async function desativar() {
@@ -80,22 +82,22 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
     setAFazer(false);
     setEstado(estadoPush());
     setSubscritoAgora(false); // <- chave: o botão volta a "Ativar", não fica preso
-    setMsg("Notificações desativadas neste aparelho.");
+    setMsg(t("push.desativadas"));
   }
 
   if (estado === "indisponivel") {
-    const d = diagnostico();
+    const d = diagnostico(t);
     return (
       <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 14 }}>
         <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 10 }}>
           {d.texto}
         </div>
         <div style={{ fontSize: 11, color: "#5f6f67", lineHeight: 1.6, borderTop: "1px solid #1a221d", paddingTop: 8 }}>
-          Diagnóstico: app: <strong style={{ color: d.standalone ? "#7fd1a3" : "#ef8d83" }}>{d.standalone ? "sim" : "não"}</strong>
+          {t("push.diagnostico")} {t("push.appLabel")} <strong style={{ color: d.standalone ? "#7fd1a3" : "#ef8d83" }}>{d.standalone ? t("push.sim") : t("push.nao")}</strong>
           {d.ios ? <> · iOS: <strong style={{ color: parseFloat(d.ios) >= 16.4 ? "#7fd1a3" : "#ef8d83" }}>{d.ios}</strong></> : null}
-          {" · "}SW: <strong style={{ color: d.sw ? "#7fd1a3" : "#ef8d83" }}>{d.sw ? "sim" : "não"}</strong>
-          {" · "}Push: <strong style={{ color: d.pm ? "#7fd1a3" : "#ef8d83" }}>{d.pm ? "sim" : "não"}</strong>
-          {" · "}Notif: <strong style={{ color: d.nt ? "#7fd1a3" : "#ef8d83" }}>{d.nt ? "sim" : "não"}</strong>
+          {" · "}SW: <strong style={{ color: d.sw ? "#7fd1a3" : "#ef8d83" }}>{d.sw ? t("push.sim") : t("push.nao")}</strong>
+          {" · "}Push: <strong style={{ color: d.pm ? "#7fd1a3" : "#ef8d83" }}>{d.pm ? t("push.sim") : t("push.nao")}</strong>
+          {" · "}Notif: <strong style={{ color: d.nt ? "#7fd1a3" : "#ef8d83" }}>{d.nt ? t("push.sim") : t("push.nao")}</strong>
         </div>
       </div>
     );
@@ -113,21 +115,21 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <span style={{ width: 38, height: 38, borderRadius: 10, background: "#1c2a20", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><IconeSino /></span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>Notificações</div>
+          <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>{t("perfil.notificacoes")}</div>
           <div style={{ fontSize: 11.5, color: "#93a39a" }}>
-            {mostrarComoAtivo ? "Ativas neste aparelho" : negadoNoSO ? "Bloqueadas no navegador" : "Recebe avisos das tuas competições"}
+            {mostrarComoAtivo ? t("push.ativas") : negadoNoSO ? t("push.bloqueadas") : t("push.recebeAvisos")}
           </div>
         </div>
       </div>
 
       {negadoNoSO ? (
         <div style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.5 }}>
-          As notificações estão bloqueadas nas definições do iPhone. Para ativar, vai a Definições → Notificações → Ippon League e permite as notificações.
+          {t("push.bloqueadasCorpo")}
         </div>
       ) : mostrarComoAtivo ? (
-        <button onClick={desativar} disabled={aFazer} style={{ ...btnGhost, width: "100%" }}>{aFazer ? "A desativar..." : "Desativar notificações"}</button>
+        <button onClick={desativar} disabled={aFazer} style={{ ...btnGhost, width: "100%" }}>{aFazer ? t("push.aDesativar") : t("push.desativar")}</button>
       ) : (
-        <button onClick={ativar} disabled={aFazer} style={btnPri}>{aFazer ? "A ativar..." : "Ativar notificações"}</button>
+        <button onClick={ativar} disabled={aFazer} style={btnPri}>{aFazer ? t("push.aAtivar") : t("push.ativar")}</button>
       )}
 
       {msg && <div style={{ fontSize: 11.5, color: erro ? "#ef8d83" : "#7fd1a3", marginTop: 9, lineHeight: 1.5 }}>{msg}</div>}
@@ -136,6 +138,7 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
 }
 
 export function LembreteNotificacoes({ userId }: { userId: string }) {
+  const t = useT();
   const [mostrar, setMostrar] = useState(false);
   const [aFazer, setAFazer] = useState(false);
 
@@ -164,15 +167,15 @@ export function LembreteNotificacoes({ userId }: { userId: string }) {
       <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
         <span style={{ width: 40, height: 40, borderRadius: 11, background: "#1c2a20", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><IconeSino /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>Quer ser avisado?</div>
+          <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>{t("push.querAvisado")}</div>
           <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5, margin: "4px 0 0" }}>
-            Ativa as notificações e avisamos-te quando uma competição começar, quando faltar montar a equipa e quando houver novidades importantes.
+            {t("push.lembreteCorpo")}
           </p>
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button onClick={ativar} disabled={aFazer} style={{ ...btnPri, flex: 1 }}>{aFazer ? "A ativar..." : "Ativar"}</button>
-        <button onClick={agoraNao} disabled={aFazer} style={btnGhost}>Agora não</button>
+        <button onClick={ativar} disabled={aFazer} style={{ ...btnPri, flex: 1 }}>{aFazer ? t("push.aAtivar") : t("push.ativarCurto")}</button>
+        <button onClick={agoraNao} disabled={aFazer} style={btnGhost}>{t("pro.mxAgoraNao")}</button>
       </div>
     </div>
   );
