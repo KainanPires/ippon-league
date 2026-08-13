@@ -512,6 +512,59 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Aujourd'hui, c'est la Journée mondiale du judo ! Félicitations à tous ceux qui aiment ce sport. Et si tu rendais hommage à cette date avec une composition de respect ?",
     de: "Heute ist der Welt-Judo-Tag! Glückwunsch an alle, die diesen Sport lieben. Wie wäre es, den Tag mit einer Aufstellung zu ehren, die sich sehen lassen kann?",
   },
+
+  // --- EMAIL de confirmação de conta (app/api/verificar-email) ---
+  // Sai na língua de quem recebe (users.lingua). {marca} recebe o "Ippon League"
+  // em <strong>; {nome} recebe o primeiro nome já escapado; {horas} a validade.
+  "email.confirmarAssunto": {
+    pt: "Confirma o teu email — Ippon League",
+    en: "Confirm your email — Ippon League",
+    es: "Confirma tu correo — Ippon League",
+    fr: "Confirme ton e-mail — Ippon League",
+    de: "Bestätige deine E-Mail — Ippon League",
+  },
+  "email.confirmarFallbackNome": {
+    pt: "Campeão",
+    en: "Champion",
+    es: "Campeón",
+    fr: "Champion",
+    de: "Champion",
+  },
+  "email.confirmarSaudacao": {
+    pt: "Olá, {nome}!",
+    en: "Hi, {nome}!",
+    es: "¡Hola, {nome}!",
+    fr: "Salut, {nome} !",
+    de: "Hallo, {nome}!",
+  },
+  "email.confirmarFrase": {
+    pt: "Falta um passo para a tua conta na {marca} ficar completa: confirmar que este email é mesmo teu.",
+    en: "There's one step left to complete your {marca} account: confirming that this email is really yours.",
+    es: "Falta un paso para completar tu cuenta en la {marca}: confirmar que este correo es realmente tuyo.",
+    fr: "Il reste une étape pour finaliser ton compte sur l'{marca} : confirmer que cet e-mail est bien le tien.",
+    de: "Nur noch ein Schritt, um dein Konto bei der {marca} abzuschließen: bestätigen, dass diese E-Mail wirklich dir gehört.",
+  },
+  "email.confirmarBotao": {
+    pt: "Confirmar o meu email",
+    en: "Confirm my email",
+    es: "Confirmar mi correo",
+    fr: "Confirmer mon e-mail",
+    de: "Meine E-Mail bestätigen",
+  },
+  "email.confirmarValidade": {
+    pt: "Serve durante {horas} horas. Se expirar, pedes outro dentro da app.",
+    en: "It works for {horas} hours. If it expires, request another one inside the app.",
+    es: "Sirve durante {horas} horas. Si caduca, pide otro dentro de la app.",
+    fr: "Valable {horas} heures. S'il expire, demandes-en un autre dans l'appli.",
+    de: "Gültig für {horas} Stunden. Wenn er abläuft, fordere in der App einen neuen an.",
+  },
+  "email.confirmarIgnora": {
+    pt: "Se não foste tu que te registaste, ignora este email — sem confirmação, nada acontece.",
+    en: "If you didn't sign up, just ignore this email — without confirmation, nothing happens.",
+    es: "Si no fuiste tú quien se registró, ignora este correo — sin confirmación, no pasa nada.",
+    fr: "Si ce n'est pas toi qui t'es inscrit, ignore cet e-mail — sans confirmation, rien ne se passe.",
+    de: "Wenn du dich nicht registriert hast, ignoriere diese E-Mail einfach — ohne Bestätigung passiert nichts.",
+  },
 };
 
 // Nomes das FAIXAS por língua — iguais aos que a app mostra no resto do ecrã
