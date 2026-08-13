@@ -590,7 +590,12 @@ async function notificarDatasEspeciais(hoje: Date): Promise<{ dia_do_judo: numbe
   // motor com utilizador "neutro" (sem aniversário, sem continente) e a
   // competição da semana — e ficamos só com push=true que NÃO sejam aniversário.
   const compSemana = competicaoDaSemana(hoje);
+  // O motor exige um tradutor, mas aqui só usamos o `tipo` de cada mensagem (o
+  // texto do push vem das chaves do dicionário do servidor). Passa-se um tradutor
+  // trivial — o texto que ele devolvesse seria ignorado.
+  const semTraducao = (k: string) => k;
   const globais = mensagensModaisDeHoje(
+    semTraducao,
     hoje,
     { nome: null, dataNascimento: null, continente: null },
     { nome: compSemana.nome, nivel: compSemana.nivel, classico: compSemana.classico, idCompeticao: compSemana.idCompeticao },
@@ -641,7 +646,7 @@ if (globais.length > 0) {
 for (const u of aniversariantes) {
   const tipo = "evento_aniversario";
   if (jaFeito.has(`${tipo}::${u.id}`)) continue;
-  const msg = mensagensModaisDeHoje(hoje, { nome: null, dataNascimento: u.dataNascimento, continente: null }, null)
+  const msg = mensagensModaisDeHoje((k: string) => k, hoje, { nome: null, dataNascimento: u.dataNascimento, continente: null }, null)
   .find((x) => x.tipo === "aniversario");
   if (!msg) continue;
   try {
