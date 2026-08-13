@@ -213,8 +213,9 @@ async function notificarDonoDoPedido(
   await criarNotificacaoServidor({
     paraUserId: donoId,
     tipo: "liga_pedido",
-    titulo: "Novo pedido na tua liga",
-    corpo: `Alguém quer entrar na liga "${nomeLiga}". Vê os pedidos para aprovar ou recusar.`,
+    chaveTitulo: "liga.pedidoTitulo",
+    chaveCorpo: "liga.pedidoCorpo",
+    vars: { liga: nomeLiga },
     link: "/ligas",
   });
 }
