@@ -166,7 +166,7 @@ export default function Entrar() {
           <input
             value={email}
             onChange={(e) => { setEmail(e.target.value); setErro(""); setAviso(null); }}
-            onBlur={() => setAviso(avisoDoEmail(email))}
+            onBlur={() => setAviso(avisoDoEmail(email, t))}
             onKeyDown={onEnter}
             placeholder={t("entrar.placeholderEmail")}
             inputMode="email"
