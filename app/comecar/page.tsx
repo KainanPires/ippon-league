@@ -84,7 +84,7 @@ export default function Comecar() {
     // que é o caso normal enquanto se está a escrever — o aviso do email nunca
     // aparecia. Só surgiria no clique em que tudo o resto já estivesse certo,
     // e aí a janela da declaração já tinha aberto por cima.
-    const a = avisoDoEmail(form.email);
+    const a = avisoDoEmail(form.email, t);
     if (a && !confirmarEmail) { setAviso(a); setConfirmarEmail(true); return; }
     if (!validate()) return;
     if (!supabaseConfigured) {
@@ -192,7 +192,7 @@ export default function Comecar() {
     type="email"
     value={form.email}
     onChange={(e) => { update("email", e.target.value); setAviso(null); setConfirmarEmail(false); }}
-    onBlur={() => setAviso(avisoDoEmail(form.email))}
+    onBlur={() => setAviso(avisoDoEmail(form.email, t))}
     placeholder={t("comecar.phEmail")}
     />
     {aviso && (
