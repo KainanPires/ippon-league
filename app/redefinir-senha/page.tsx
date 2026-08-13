@@ -8,6 +8,7 @@
 import { useState, useEffect } from "react";
 import { Mascot } from "@/components/Mascot";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -15,6 +16,7 @@ const GOLD = "#d9a441";
 const BLUE = "#8fbef0";
 
 export default function RedefinirSenha() {
+  const t = useT();
   const [estado, setEstado] = useState<"validando" | "pronto" | "invalido">("validando");
   const [senha, setSenha] = useState("");
   const [confirmar, setConfirmar] = useState("");
@@ -60,15 +62,15 @@ export default function RedefinirSenha() {
       }
     })();
 
-    const t = setTimeout(() => { if (!cancelado) setEstado((e) => (e === "validando" ? "invalido" : e)); }, 5000);
-    return () => { cancelado = true; sub.subscription.unsubscribe(); clearTimeout(t); };
+    const to = setTimeout(() => { if (!cancelado) setEstado((e) => (e === "validando" ? "invalido" : e)); }, 5000);
+    return () => { cancelado = true; sub.subscription.unsubscribe(); clearTimeout(to); };
   }, []);
 
   async function guardar() {
     if (saving) return;
     setErro("");
-    if (senha.length < 6) { setErro("A senha precisa de pelo menos 6 caracteres."); return; }
-    if (senha !== confirmar) { setErro("As senhas não coincidem."); return; }
+    if (senha.length < 6) { setErro(t("rs.erroMin6")); return; }
+    if (senha !== confirmar) { setErro(t("rs.erroNaoCoincidem")); return; }
     setSaving(true);
     // Confirma que a sessão de recuperação está mesmo ativa antes de gravar.
     const { data: s } = await supabase.auth.getSession();
@@ -82,9 +84,9 @@ export default function RedefinirSenha() {
     if (error) {
       const m = error.message || "";
       if (/different from the old|should be different/i.test(m)) {
-        setErro("A nova senha tem de ser diferente da anterior.");
+        setErro(t("rs.erroDiferente"));
       } else {
-        setErro("Não foi possível guardar. Volta a abrir o link de recuperação e tenta de novo.");
+        setErro(t("rs.erroGuardar"));
       }
       return;
     }
@@ -103,28 +105,28 @@ export default function RedefinirSenha() {
           {ok ? (
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 34, marginBottom: 8 }}>🥋</div>
-              <h1 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>Senha alterada</h1>
-              <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 16px" }}>Já podes entrar no dojo com a tua nova senha.</p>
-              <a href="/entrar" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "12px 22px", borderRadius: 12, textDecoration: "none" }}>Ir para o login</a>
+              <h1 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>{t("rs.senhaAlterada")}</h1>
+              <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 16px" }}>{t("rs.senhaAlteradaCorpo")}</p>
+              <a href="/entrar" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "12px 22px", borderRadius: 12, textDecoration: "none" }}>{t("rs.irLogin")}</a>
             </div>
           ) : estado === "validando" ? (
-            <div style={{ textAlign: "center", padding: "20px 0", fontFamily: FD, fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7c8a82" }}>A validar o link…</div>
+            <div style={{ textAlign: "center", padding: "20px 0", fontFamily: FD, fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7c8a82" }}>{t("rs.aValidar")}</div>
           ) : estado === "invalido" ? (
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 30, marginBottom: 8 }}>⏳</div>
-              <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>Link inválido</h1>
-              <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 16px" }}>Este link expirou ou já foi usado. Pede um novo no login, em "Esqueceste a senha?".</p>
-              <a href="/entrar" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "12px 22px", borderRadius: 12, textDecoration: "none" }}>Voltar ao login</a>
+              <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>{t("rs.linkInvalido")}</h1>
+              <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 16px" }}>{t("rs.linkInvalidoCorpo")}</p>
+              <a href="/entrar" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 14, padding: "12px 22px", borderRadius: 12, textDecoration: "none" }}>{t("rs.voltarLogin")}</a>
             </div>
           ) : (
             <>
-              <h1 style={{ fontFamily: FD, fontSize: 21, fontWeight: 700, textTransform: "uppercase", textAlign: "center", margin: "0 0 6px" }}>Nova senha</h1>
-              <p style={{ fontSize: 12.5, color: "#93a39a", textAlign: "center", margin: "0 0 16px" }}>Escolhe uma senha nova para a tua conta.</p>
+              <h1 style={{ fontFamily: FD, fontSize: 21, fontWeight: 700, textTransform: "uppercase", textAlign: "center", margin: "0 0 6px" }}>{t("rs.novaSenha")}</h1>
+              <p style={{ fontSize: 12.5, color: "#93a39a", textAlign: "center", margin: "0 0 16px" }}>{t("rs.novaSenhaCorpo")}</p>
 
-              <Label>Nova senha</Label>
+              <Label>{t("rs.novaSenha")}</Label>
               <div style={{ position: "relative" }}>
-                <input value={senha} onChange={(e) => { setSenha(e.target.value); setErro(""); }} type={showPw ? "text" : "password"} placeholder="Mínimo 6 caracteres" style={{ ...inp, paddingRight: 44 }} />
-                <button onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Esconder senha" : "Mostrar senha"} style={{ position: "absolute", right: 8, top: 8, width: 32, height: 32, background: "transparent", border: "none", color: "#93a39a", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <input value={senha} onChange={(e) => { setSenha(e.target.value); setErro(""); }} type={showPw ? "text" : "password"} placeholder={t("rs.min6")} style={{ ...inp, paddingRight: 44 }} />
+                <button onClick={() => setShowPw((v) => !v)} aria-label={showPw ? t("rs.esconderSenha") : t("rs.mostrarSenha")} style={{ position: "absolute", right: 8, top: 8, width: 32, height: 32, background: "transparent", border: "none", color: "#93a39a", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     {showPw
                       ? <><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.4 5.2A9 9 0 0 1 21 12a9.8 9.8 0 0 1-2.3 3M6.1 6.1A9.8 9.8 0 0 0 3 12a9 9 0 0 0 11.6 5.3" /></>
@@ -133,12 +135,12 @@ export default function RedefinirSenha() {
                 </button>
               </div>
 
-              <Label>Confirmar senha</Label>
-              <input value={confirmar} onChange={(e) => { setConfirmar(e.target.value); setErro(""); }} type={showPw ? "text" : "password"} placeholder="Repete a senha" style={inp} />
+              <Label>{t("rs.confirmarSenha")}</Label>
+              <input value={confirmar} onChange={(e) => { setConfirmar(e.target.value); setErro(""); }} type={showPw ? "text" : "password"} placeholder={t("rs.repeteSenha")} style={inp} />
 
               {erro && <div style={{ fontSize: 12, color: "#ef8d83", margin: "6px 0 0" }}>{erro}</div>}
 
-              <button onClick={guardar} disabled={saving} style={{ width: "100%", marginTop: 14, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 14, borderRadius: 12, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>{saving ? "A guardar..." : "Guardar nova senha"}</button>
+              <button onClick={guardar} disabled={saving} style={{ width: "100%", marginTop: 14, background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 14, borderRadius: 12, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>{saving ? t("rs.aGuardar") : t("rs.guardarNovaSenha")}</button>
             </>
           )}
         </div>
