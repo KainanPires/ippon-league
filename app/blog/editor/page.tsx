@@ -129,6 +129,24 @@ export default function EditorBlog() {
     }
   }
 
+  // Ao PUBLICAR, pede a tradução da notícia por IA (EN/ES/FR/DE), para sair já
+  // traduzida a quem lê noutra língua. Corre em segundo plano — não trava o
+  // ecrã; se falhar, a varredura do cron apanha-a na passagem seguinte.
+  // Autoriza-se pelo token da sessão (a rota confirma que é um editor).
+  async function traduzirPublicada(id: string) {
+    if (!id) return;
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) return;
+      await fetch("/api/hub/traduzir", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id }),
+      });
+    } catch { /* a varredura do cron traduz depois */ }
+  }
+
   async function guardar(estado: "rascunho" | "agendada" | "publicada") {
     setErro(""); setMsg("");
     if (!f.titulo.trim()) { setErro(t("be.faltaTitulo")); return; }
@@ -157,16 +175,27 @@ export default function EditorBlog() {
         autor_nome: meuNome || null,
         dados: dadosOriginais,
       };
-      const res = f.id
-        ? await supabase.from("hub_noticias").update(linha).eq("id", f.id)
-        : await supabase.from("hub_noticias").insert(linha);
-      if (res.error) {
-        const e = res.error as { message?: string; details?: string; hint?: string; code?: string };
-        const partes = [e.message, e.details, e.hint, e.code ? t("be.codigo", { code: e.code }) : ""].filter(Boolean);
+      // Guarda e recupera o id — no insert é preciso pedir a coluna de volta,
+      // para depois poder mandar traduzir esta notícia em concreto.
+      let idGravado = f.id || "";
+      let erroBd: { message?: string; details?: string; hint?: string; code?: string } | null = null;
+      if (f.id) {
+        const r = await supabase.from("hub_noticias").update(linha).eq("id", f.id);
+        erroBd = (r.error as typeof erroBd) || null;
+      } else {
+        const r = await supabase.from("hub_noticias").insert(linha).select("id").single();
+        erroBd = (r.error as typeof erroBd) || null;
+        idGravado = r.data?.id ? String(r.data.id) : "";
+      }
+      if (erroBd) {
+        const partes = [erroBd.message, erroBd.details, erroBd.hint, erroBd.code ? t("be.codigo", { code: erroBd.code }) : ""].filter(Boolean);
         setErro(partes.join(" · ") || t("be.naoGuardar"));
         return;
       }
       setMsg(estado === "publicada" ? t("be.publicada") : estado === "agendada" ? t("be.agendadaMsg") : t("be.rascunhoGuardado"));
+      // Só as PUBLICADAS traduzem já; as agendadas são traduzidas pelo cron
+      // quando saírem à hora marcada.
+      if (estado === "publicada" && idGravado) void traduzirPublicada(idGravado);
       setF(VAZIO);
       setDadosOriginais({});
       await carregarLista();
@@ -204,6 +233,7 @@ export default function EditorBlog() {
   async function publicarJa(id: string) {
     await supabase.from("hub_noticias")
       .update({ estado: "publicada", publicar_auto_em: null }).eq("id", id);
+    void traduzirPublicada(id);
     await carregarLista();
   }
 
