@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import type { Athlete } from "@/lib/athletes";
 import { Escudo, type Identity } from "@/components/Escudo";
 import { Mascot } from "@/components/Mascot";
+import { useT } from "@/lib/i18n";
 
 const GOLD = "#d9a441";
 
@@ -25,16 +26,16 @@ export interface CartaoProps {
 
 type Belt = "branca" | "azul" | "amarela" | "verde" | "roxa" | "castanha" | "preta";
 interface BeltTheme {
-  name: string; accent: string; chipText: string; frame: number; frameColor: string; double: boolean; glow: number; glowColor: string;
+  nameK: string; accent: string; chipText: string; frame: number; frameColor: string; double: boolean; glow: number; glowColor: string;
 }
 const BELTS: Record<Belt, BeltTheme> = {
-  branca:   { name: "FAIXA BRANCA",   accent: "#d7dcd6", chipText: "#14181a", frame: 3, frameColor: "#5a635e", double: false, glow: 0,  glowColor: "transparent" },
-  azul:     { name: "FAIXA AZUL",     accent: "#3f86d6", chipText: "#0a1622", frame: 4, frameColor: "#3f86d6", double: false, glow: 34, glowColor: "rgba(63,134,214,0.30)" },
-  amarela:  { name: "FAIXA AMARELA",  accent: "#e6b422", chipText: "#1f1804", frame: 4, frameColor: "#e6b422", double: false, glow: 44, glowColor: "rgba(230,180,34,0.32)" },
-  verde:    { name: "FAIXA VERDE",    accent: "#3f9f5a", chipText: "#08160d", frame: 5, frameColor: "#3f9f5a", double: false, glow: 48, glowColor: "rgba(63,159,90,0.34)" },
-  roxa:     { name: "FAIXA ROXA",     accent: "#9b6cc9", chipText: "#f1ede2", frame: 5, frameColor: "#9b6cc9", double: false, glow: 64, glowColor: "rgba(155,108,201,0.46)" },
-  castanha: { name: "FAIXA CASTANHA", accent: "#a06a3a", chipText: "#f1ede2", frame: 6, frameColor: "#a06a3a", double: true,  glow: 64, glowColor: "rgba(160,106,58,0.46)" },
-  preta:    { name: "FAIXA PRETA",    accent: GOLD,      chipText: "#1f1804", frame: 9, frameColor: GOLD,      double: true,  glow: 96, glowColor: "rgba(217,164,65,0.62)" },
+  branca:   { nameK: "card.faixaBranca",   accent: "#d7dcd6", chipText: "#14181a", frame: 3, frameColor: "#5a635e", double: false, glow: 0,  glowColor: "transparent" },
+  azul:     { nameK: "card.faixaAzul",     accent: "#3f86d6", chipText: "#0a1622", frame: 4, frameColor: "#3f86d6", double: false, glow: 34, glowColor: "rgba(63,134,214,0.30)" },
+  amarela:  { nameK: "card.faixaAmarela",  accent: "#e6b422", chipText: "#1f1804", frame: 4, frameColor: "#e6b422", double: false, glow: 44, glowColor: "rgba(230,180,34,0.32)" },
+  verde:    { nameK: "card.faixaVerde",    accent: "#3f9f5a", chipText: "#08160d", frame: 5, frameColor: "#3f9f5a", double: false, glow: 48, glowColor: "rgba(63,159,90,0.34)" },
+  roxa:     { nameK: "card.faixaRoxa",     accent: "#9b6cc9", chipText: "#f1ede2", frame: 5, frameColor: "#9b6cc9", double: false, glow: 64, glowColor: "rgba(155,108,201,0.46)" },
+  castanha: { nameK: "card.faixaCastanha", accent: "#a06a3a", chipText: "#f1ede2", frame: 6, frameColor: "#a06a3a", double: true,  glow: 64, glowColor: "rgba(160,106,58,0.46)" },
+  preta:    { nameK: "card.faixaPreta",    accent: GOLD,      chipText: "#1f1804", frame: 9, frameColor: GOLD,      double: true,  glow: 96, glowColor: "rgba(217,164,65,0.62)" },
 };
 function beltKey(faixa: string): Belt {
   const k = (faixa || "").trim().toLowerCase();
@@ -42,7 +43,6 @@ function beltKey(faixa: string): Belt {
 }
 
 const MAX_AZUL = "#7fb8f5";
-const MAX_AZUL_FORTE = "#3f86d6";
 
 // premium=true desenha moldura/brilho reforçados; cor = dourado (Pro) ou azul (Pro Max).
 function frameShadow(b: BeltTheme, premium: boolean, cor: string): string {
@@ -145,6 +145,7 @@ function loadHtmlToImage(): Promise<any> {
 }
 
 export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, nivel, pontos, onClose }: CartaoProps & { pro?: boolean; nivel?: "normal" | "pro" | "pro_max"; pontos?: Record<string, number>; onClose: () => void }) {
+  const t = useT();
   // Nível efetivo: usa 'nivel' se vier; senão converte o 'pro' antigo (compat).
   const nivelEf: "normal" | "pro" | "pro_max" = nivel ?? (pro ? "pro" : "normal");
   const ehProMax = nivelEf === "pro_max";
@@ -196,7 +197,7 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, n
     const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean; share?: any };
     try {
       if (nav.canShare && nav.canShare({ files: [file] })) {
-        await nav.share({ files: [file], title: "A minha equipa Ippon League", text: "Vê a minha equipa na Ippon League! Joga também: https://www.ipponleague.com/inicio" });
+        await nav.share({ files: [file], title: t("ce.shareTitle"), text: t("ce.partilhaTexto", { link: "https://www.ipponleague.com/inicio" }) });
         return;
       }
     } catch { /* cancelado */ }
@@ -234,20 +235,20 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, n
     <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 120, overflowY: "auto" }}>
       <style>{CARD_CSS}</style>
       <div style={{ width: "100%", maxWidth: 360, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18, textAlign: "center" }}>
-        <h2 style={{ fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 12px", color: GOLD }}>Partilhar a equipa</h2>
+        <h2 style={{ fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 12px", color: GOLD }}>{t("ce.partilharEquipa")}</h2>
 
         {/* Pré-visualização: o cartão real (1080px) escalado para a largura do modal. */}
         <div ref={previewRef} style={{ width: "100%", aspectRatio: "1080 / 1350", borderRadius: 12, overflow: "hidden", marginBottom: 14, position: "relative", background: "#0c0e0d" }}>
           <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1350, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <CardNode innerRef={cardRef} vars={cardVars} nivel={nivelEf} belt={bk} beltName={b.name} identity={identity} linhas={linhas} capitao={capitao} pontos={pontos} />
+            <CardNode innerRef={cardRef} vars={cardVars} nivel={nivelEf} belt={bk} beltName={t(b.nameK)} identity={identity} linhas={linhas} capitao={capitao} pontos={pontos} />
           </div>
         </div>
 
         {podePartilhar && (
-          <button onClick={partilhar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1, marginBottom: 10 }}>{busy ? "A gerar…" : "Partilhar"}</button>
+          <button onClick={partilhar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1, marginBottom: 10 }}>{busy ? t("cc.aGerar") : t("comum.partilhar")}</button>
         )}
-        <button onClick={guardar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "A gerar…" : "Guardar imagem"}</button>
-        <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer" }}>Fechar</button>
+        <button onClick={guardar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? t("cc.aGerar") : t("cc.guardarImagem")}</button>
+        <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer" }}>{t("comum.fechar")}</button>
       </div>
     </div>
   );
@@ -265,6 +266,7 @@ function CardNode({ innerRef, vars, nivel, belt, beltName, identity, linhas, cap
   capitao: string | null;
   pontos?: Record<string, number>;
 }) {
+  const t = useT();
   const accent = (vars as any)["--accent"] as string;
   const ehPro = nivel === "pro";
   const ehProMax = nivel === "pro_max";
@@ -272,8 +274,8 @@ function CardNode({ innerRef, vars, nivel, belt, beltName, identity, linhas, cap
   // Classe de moldura: dourado (is-pro) ou azul (is-promax). O Dôdo na medalha
   // herda a cor do judogui do contexto, por isso aqui não forçamos cor de judogui.
   const classeNivel = ehProMax ? "is-promax" : ehPro ? "is-pro" : "";
-  const seloTexto = ehProMax ? "★\u00a0\u00a0IPPON\u00a0PRO\u00a0MAX\u00a0\u00a0★" : "★\u00a0\u00a0IPPON\u00a0PRO\u00a0\u00a0★";
-  const rodapeTexto = ehProMax ? "JOGA NO MÁXIMO.\u00a0SÊ\u00a0PRO\u00a0MAX." : "JOGA COM VANTAGEM.\u00a0SÊ\u00a0IPPON\u00a0PRO.";
+  const seloTexto = ehProMax ? "★  IPPON PRO MAX  ★" : "★  IPPON PRO  ★";
+  const rodapeTexto = ehProMax ? t("card.rodapeMax") : t("card.rodapePro");
   // Há pontuação para mostrar? (modo competição). Se vier o mapa de pontos com
   // pelo menos uma entrada, mostramos a coluna de pontos e o total no rodapé.
   const temPontos = !!pontos && Object.keys(pontos).length > 0;
@@ -325,7 +327,7 @@ function CardNode({ innerRef, vars, nivel, belt, beltName, identity, linhas, cap
         <footer className="jcard-foot">
           {temPontos && (
             <div className="foot-total">
-              <span className="lbl">Total da rodada</span>
+              <span className="lbl">{t("ce.totalRodada")}</span>
               <span className="val">{total > 0 ? "+" : ""}{total} pts</span>
             </div>
           )}
@@ -337,7 +339,7 @@ function CardNode({ innerRef, vars, nivel, belt, beltName, identity, linhas, cap
           ) : (
             <>
               <div className="foot-main">IPPON&nbsp;LEAGUE</div>
-              <div className="foot-sub">O jogo oficial dos fãs de judô</div>
+              <div className="foot-sub">{t("sobre.rodape")}</div>
             </>
           )}
         </footer>
