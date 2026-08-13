@@ -1727,7 +1727,7 @@ const PT: Dicionario = {
   "chvm.jaAvisado": "Os jogadores desta competição já tinham sido avisados.",
   "chvm.naoGuardar": "Não foi possível guardar.",
   "chvm.faltaColocar": "Coloca pelo menos um atleta num pool.",
-  "chvm.dica": "Distribui os atletas pelos 4 pools, na ordem em que aparecem na chave da IJF. Marca “bye” em quem salta a 1.ª luta.",
+  "chvm.dica": "Distribui os atletas pelos 4 pools, na ordem da chave da IJF (cabeças-de-série primeiro). Os byes são calculados automaticamente.",
   "chvm.colocados": "{n} colocados",
 };
 
@@ -3361,7 +3361,7 @@ const EN: Dicionario = {
   "chvm.jaAvisado": "Players for this competition had already been notified.",
   "chvm.naoGuardar": "Couldn't save.",
   "chvm.faltaColocar": "Place at least one athlete in a pool.",
-  "chvm.dica": "Spread the athletes across the 4 pools, in the order they appear on the IJF bracket. Mark “bye” for whoever skips the 1st fight.",
+  "chvm.dica": "Spread the athletes across the 4 pools, in the IJF bracket order (top seeds first). Byes are worked out automatically.",
   "chvm.colocados": "{n} placed",
 };
 
@@ -4995,7 +4995,7 @@ const ES: Dicionario = {
   "chvm.jaAvisado": "Los jugadores de esta competición ya habían sido avisados.",
   "chvm.naoGuardar": "No se pudo guardar.",
   "chvm.faltaColocar": "Coloca al menos un atleta en un pool.",
-  "chvm.dica": "Reparte los atletas en los 4 pools, en el orden en que aparecen en el cuadro de la IJF. Marca “bye” a quien salta la 1.ª lucha.",
+  "chvm.dica": "Reparte los atletas en los 4 pools, en el orden del cuadro de la IJF (cabezas de serie primero). Los byes se calculan automáticamente.",
   "chvm.colocados": "{n} colocados",
 };
 
@@ -6629,7 +6629,7 @@ const FR: Dicionario = {
   "chvm.jaAvisado": "Les joueurs de cette compétition avaient déjà été prévenus.",
   "chvm.naoGuardar": "Impossible d'enregistrer.",
   "chvm.faltaColocar": "Place au moins un athlète dans un pool.",
-  "chvm.dica": "Répartis les athlètes dans les 4 pools, dans l'ordre du tableau de l'IJF. Coche « bye » pour qui saute le 1er combat.",
+  "chvm.dica": "Répartis les athlètes dans les 4 pools, dans l'ordre du tableau de l'IJF (têtes de série d'abord). Les byes sont calculés automatiquement.",
   "chvm.colocados": "{n} placés",
 };
 
@@ -8273,7 +8273,7 @@ const DE: Dicionario = {
   "chvm.jaAvisado": "Die Spieler dieses Wettkampfs wurden bereits benachrichtigt.",
   "chvm.naoGuardar": "Konnte nicht gespeichert werden.",
   "chvm.faltaColocar": "Setze mindestens einen Athleten in einen Pool.",
-  "chvm.dica": "Verteile die Athleten auf die 4 Pools, in der Reihenfolge des IJF-Baums. Markiere „Bye“ für alle, die den 1. Kampf überspringen.",
+  "chvm.dica": "Verteile die Athleten auf die 4 Pools, in der Reihenfolge des IJF-Baums (Gesetzte zuerst). Die Freilose werden automatisch berechnet.",
   "chvm.colocados": "{n} zugeteilt",
 };
 
