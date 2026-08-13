@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Escudo, type Identity } from "@/components/Escudo";
 import { Mascot } from "@/components/Mascot";
+import { useT } from "@/lib/i18n";
 
 const GOLD = "#d9a441";
 
@@ -11,12 +12,12 @@ const GOLD = "#d9a441";
 export type PosicaoPodio = "campeao" | "vice" | "terceiro";
 
 interface TemaPosicao {
-  medalha: string; titulo: string; cor: string; corText: string; glow: string; selo: string;
+  medalha: string; tituloK: string; cor: string; corText: string; glow: string; seloK: string;
 }
 const TEMAS: Record<PosicaoPodio, TemaPosicao> = {
-  campeao:  { medalha: "🥇", titulo: "Campeão",       cor: GOLD,      corText: "#1f1804", glow: "rgba(217,164,65,0.55)",  selo: "1º LUGAR" },
-  vice:     { medalha: "🥈", titulo: "Vice-campeão",  cor: "#c8ccd2", corText: "#14181a", glow: "rgba(200,204,210,0.40)", selo: "2º LUGAR" },
-  terceiro: { medalha: "🥉", titulo: "3º lugar",      cor: "#c87f43", corText: "#1c0f06", glow: "rgba(200,127,67,0.42)",  selo: "3º LUGAR" },
+  campeao:  { medalha: "🥇", tituloK: "cc.campeao",  cor: GOLD,      corText: "#1f1804", glow: "rgba(217,164,65,0.55)",  seloK: "cc.selo1" },
+  vice:     { medalha: "🥈", tituloK: "cc.vice",     cor: "#c8ccd2", corText: "#14181a", glow: "rgba(200,204,210,0.40)", seloK: "cc.selo2" },
+  terceiro: { medalha: "🥉", tituloK: "cc.terceiro", cor: "#c87f43", corText: "#1c0f06", glow: "rgba(200,127,67,0.42)",  seloK: "cc.selo3" },
 };
 
 const CARD_CSS = `
@@ -72,13 +73,14 @@ export function CartaoCertificado({
   tituloRodada?: string;
   onClose: () => void;
 }) {
+  const t = useT();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0.3);
   const [busy, setBusy] = useState(false);
   const [podePartilhar, setPodePartilhar] = useState(false);
 
-  const t = TEMAS[posicao];
+  const tema = TEMAS[posicao];
 
   useEffect(() => {
     loadHtmlToImage().catch(() => {});
@@ -120,9 +122,10 @@ export function CartaoCertificado({
     if (!blob) return;
     const file = new File([blob], "ippon-certificado.png", { type: "image/png" });
     const link = "https://www.ipponleague.com/inicio";
+    const entre = nParticipantes === 1 ? t("cc.entre1") : t("cc.entreN", { n: nParticipantes });
     const texto = variante === "rodada"
-      ? `Melhor da Rodada — ${tituloRodada} em ${nomeCopa} na Ippon League, entre ${nParticipantes} ${nParticipantes === 1 ? "participante" : "participantes"}! Joga também: ${link}`
-      : `${t.titulo} da ${nomeCopa} na Ippon League — entre ${nParticipantes} participantes! Joga também: ${link}`;
+      ? t("cc.partilhaRodada", { titulo: tituloRodada || t("cc.melhorRodada"), copa: nomeCopa, entre, link })
+      : t("cc.partilhaAnual", { titulo: t(tema.tituloK), copa: nomeCopa, entre, link });
     const nav = navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean; share?: (d: unknown) => Promise<void> };
     try {
       if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
@@ -141,27 +144,27 @@ export function CartaoCertificado({
   }
 
   const cardVars = {
-    ["--cor" as string]: t.cor,
-    ["--glow" as string]: t.glow,
+    ["--cor" as string]: tema.cor,
+    ["--glow" as string]: tema.glow,
   } as CSSProperties;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 130, overflowY: "auto" }}>
       <style>{CARD_CSS}</style>
       <div style={{ width: "100%", maxWidth: 360, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18, textAlign: "center" }}>
-        <h2 style={{ fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 12px", color: GOLD }}>O teu título</h2>
+        <h2 style={{ fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 12px", color: GOLD }}>{t("cc.oTeuTitulo")}</h2>
 
         <div ref={previewRef} style={{ width: "100%", aspectRatio: "1080 / 1350", borderRadius: 12, overflow: "hidden", marginBottom: 14, position: "relative", background: "#0b0d0a" }}>
           <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1350, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <CertificadoNode innerRef={cardRef} vars={cardVars} tema={t} identity={identity} nomeCopa={nomeCopa} nParticipantes={nParticipantes} variante={variante} tituloRodada={tituloRodada} />
+            <CertificadoNode innerRef={cardRef} vars={cardVars} tema={tema} identity={identity} nomeCopa={nomeCopa} nParticipantes={nParticipantes} variante={variante} tituloRodada={tituloRodada} />
           </div>
         </div>
 
         {podePartilhar && (
-          <button onClick={partilhar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1, marginBottom: 10 }}>{busy ? "A gerar…" : "Partilhar"}</button>
+          <button onClick={partilhar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1, marginBottom: 10 }}>{busy ? t("cc.aGerar") : t("comum.partilhar")}</button>
         )}
-        <button onClick={guardar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "A gerar…" : "Guardar imagem"}</button>
-        <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer" }}>Fechar</button>
+        <button onClick={guardar} disabled={busy} style={{ width: "100%", padding: 13, borderRadius: 12, border: `1px solid ${GOLD}`, background: "transparent", color: GOLD, fontFamily: "var(--font-geist-mono), sans-serif", fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? t("cc.aGerar") : t("cc.guardarImagem")}</button>
+        <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer" }}>{t("comum.fechar")}</button>
       </div>
     </div>
   );
@@ -177,9 +180,10 @@ function CertificadoNode({ innerRef, vars, tema, identity, nomeCopa, nParticipan
   variante: "anual" | "rodada";
   tituloRodada?: string;
 }) {
+  const t = useT();
   const ehRodada = variante === "rodada";
-  const selo = ehRodada ? "MELHOR DA RODADA" : tema.selo;
-  const titulo = ehRodada ? (tituloRodada || "Melhor da Rodada") : tema.titulo;
+  const selo = ehRodada ? t("cc.melhorRodadaSelo") : t(tema.seloK);
+  const titulo = ehRodada ? (tituloRodada || t("cc.melhorRodada")) : t(tema.tituloK);
   return (
     <div ref={innerRef} className="ccard" style={vars}>
       <div className="ccard-bg" />
@@ -192,10 +196,10 @@ function CertificadoNode({ innerRef, vars, tema, identity, nomeCopa, nParticipan
         <div className="ccard-crest"><Escudo config={identity} size={200} /></div>
         <div className="ccard-team">{identity.name}</div>
         <div className="ccard-copa">{nomeCopa}</div>
-        <div className="ccard-part">entre {nParticipantes} {nParticipantes === 1 ? "participante" : "participantes"}</div>
+        <div className="ccard-part">{nParticipantes === 1 ? t("cc.entre1") : t("cc.entreN", { n: nParticipantes })}</div>
         <div className="ccard-foot">
           <div className="ccard-foot-main">IPPON&nbsp;LEAGUE</div>
-          <div className="ccard-foot-sub">O jogo oficial dos fãs de judô</div>
+          <div className="ccard-foot-sub">{t("sobre.rodape")}</div>
         </div>
       </div>
       <div className="ccard-dodo"><Mascot belt={tema.cor} expression="comemorando" /></div>
