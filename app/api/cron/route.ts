@@ -471,16 +471,18 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
           await criarNotificacaoServidor({
               paraUserId: a.user_id,
               tipo: "faixa_subiu",
-              titulo: `🥋 Subiste para a faixa ${nomeFaixa(a.faixa)}!`,
-              corpo: `Parabéns! O teu desempenho levou-te à faixa ${nomeFaixa(a.faixa)}. Estás entre os melhores — continua assim e vai mais longe!`,
+              chaveTitulo: "faixa.subiuTitulo",
+              chaveCorpo: "faixa.subiuCorpo",
+              vars: { faixaCanonica: a.faixa },
               link: "/inicio",
             });
         } else {
           await criarNotificacaoServidor({
               paraUserId: a.user_id,
               tipo: "faixa_desceu",
-              titulo: `Faixa ${nomeFaixa(a.faixa)} — a próxima é tua`,
-              corpo: `Desta vez desceste para a faixa ${nomeFaixa(a.faixa)}, mas isto faz parte do jogo. Monta uma boa equipa na próxima rodada e recupera o teu lugar — acreditamos em ti!`,
+              chaveTitulo: "faixa.desceuTitulo",
+              chaveCorpo: "faixa.desceuCorpo",
+              vars: { faixaCanonica: a.faixa },
               link: "/inicio",
             });
         }
@@ -489,16 +491,17 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
       // MANTEVE a faixa. Dizemos quanto faltou para a seguinte, para o mês não
       // acabar num vazio. Quem já é preta está no topo: não há "seguinte".
       const falta = pontosParaFaixaAcima(a.faixa, a.user_id, jogadores, limites, totalDe);
-      const corpo = falta === null
-      ? `Fechaste o mês na faixa ${nomeFaixa(a.faixa)} — o topo da Ippon League. Agora é aguentar lá em cima: no próximo mês há quem venha atrás do teu lugar.`
-      : falta <= 0
-      ? `Fechaste o mês na faixa ${nomeFaixa(a.faixa)}, mesmo à porta da seguinte. No próximo mês é tua.`
-      : `Fechaste o mês na faixa ${nomeFaixa(a.faixa)}. Faltaram ${falta} pontos para a ${nomeFaixa(faixaAcimaDe(a.faixa))} — dá para ir buscá-los no próximo mês!`;
+      const chaveCorpoMantida = falta === null
+        ? "faixa.mantidaTopoCorpo"
+        : falta <= 0
+        ? "faixa.mantidaPortaCorpo"
+        : "faixa.mantidaFaltaCorpo";
       await criarNotificacaoServidor({
           paraUserId: a.user_id,
           tipo: "faixa_mantida",
-          titulo: `🥋 Mantiveste a faixa ${nomeFaixa(a.faixa)}`,
-          corpo,
+          chaveTitulo: "faixa.mantidaTitulo",
+          chaveCorpo: chaveCorpoMantida,
+          vars: { faixaCanonica: a.faixa, faixaAcimaCanonica: faixaAcimaDe(a.faixa), falta: falta ?? 0 },
           link: "/inicio",
         });
     }
@@ -554,14 +557,8 @@ function ordemFaixa(faixa: string): number {
   };
   return ordem[faixa] ?? 0;
 }
-// Nome bonito da faixa para mostrar nas notificações.
-function nomeFaixa(faixa: string): string {
-  const nomes: Record<string, string> = {
-    branca: "Branca", azul: "Azul", amarela: "Amarela", verde: "Verde",
-    roxa: "Roxa", marrom: "Marrom", preta: "Preta",
-  };
-  return nomes[faixa] ?? faixa;
-}
+// (O nome da faixa para as notificações passou a ser traduzido no renderizador
+// do servidor — ver nomeFaixaEm em lib/dicionarioNotif.)
 // Mês anterior ao da data dada, "AAAA-MM".
 function mesAnteriorDe(d: Date): string {
   const x = new Date(d.getFullYear(), d.getMonth(), 1);
