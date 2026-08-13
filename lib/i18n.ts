@@ -1631,6 +1631,9 @@ const PT: Dicionario = {
   "notif.subiuRankCorpo": "Estás agora em #{pos}.",
   "notif.umDia": "1 dia",
   "notif.nDias": "{n} dias",
+  "hub.traduzido": "Traduzido automaticamente",
+  "hub.verOriginal": "Ver original",
+  "hub.verTraducao": "Ver tradução",
 };
 
 // --- INGLÊS ---
@@ -3167,6 +3170,9 @@ const EN: Dicionario = {
   "notif.subiuRankCorpo": "You're now at #{pos}.",
   "notif.umDia": "1 day",
   "notif.nDias": "{n} days",
+  "hub.traduzido": "Auto-translated",
+  "hub.verOriginal": "See original",
+  "hub.verTraducao": "See translation",
 };
 
 // --- ESPANHOL ---
@@ -4703,6 +4709,9 @@ const ES: Dicionario = {
   "notif.subiuRankCorpo": "Ahora estás en el #{pos}.",
   "notif.umDia": "1 día",
   "notif.nDias": "{n} días",
+  "hub.traduzido": "Traducido automáticamente",
+  "hub.verOriginal": "Ver original",
+  "hub.verTraducao": "Ver traducción",
 };
 
 // --- FRANCÊS ---
@@ -6239,6 +6248,9 @@ const FR: Dicionario = {
   "notif.subiuRankCorpo": "Tu es maintenant #{pos}.",
   "notif.umDia": "1 jour",
   "notif.nDias": "{n} jours",
+  "hub.traduzido": "Traduit automatiquement",
+  "hub.verOriginal": "Voir l'original",
+  "hub.verTraducao": "Voir la traduction",
 };
 
 const DE: Dicionario = {
@@ -7785,6 +7797,9 @@ const DE: Dicionario = {
   "notif.subiuRankCorpo": "Du bist jetzt auf #{pos}.",
   "notif.umDia": "1 Tag",
   "notif.nDias": "{n} Tage",
+  "hub.traduzido": "Automatisch übersetzt",
+  "hub.verOriginal": "Original ansehen",
+  "hub.verTraducao": "Übersetzung ansehen",
 };
 
 const DICIONARIOS: Record<Lingua, Dicionario> = { pt: PT, en: EN, es: ES, fr: FR, de: DE };
