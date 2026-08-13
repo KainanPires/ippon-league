@@ -13,6 +13,7 @@ import {
   marcarTodasLidas,
   marcarCalculadaLida,
   type Notificacao,
+  type OpcoesCalculadas,
 } from "@/lib/notificacoes";
 import { useT } from "@/lib/i18n";
 
@@ -20,7 +21,9 @@ const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
-type CalcOpts = Parameters<typeof listarTudo>[0];
+// As calculadas agora recebem o tradutor como 1.º argumento; o `opts` é o 2.º.
+// Por isso o tipo do `calcOpts` do sino vem do tipo exportado, não de [0].
+type CalcOpts = OpcoesCalculadas;
 
 // Ícone por tipo (emoji simples, sem dependências).
 function iconePorTipo(tipo: string): string {
@@ -54,10 +57,10 @@ export function SinoNotificacoes({ calcOpts }: { calcOpts?: CalcOpts }) {
   // Conta as não lidas ao montar (para o ponto vermelho), sem abrir o painel.
   const atualizarContagem = useCallback(async () => {
     try {
-      const n = await contarNaoLidas(calcOpts);
+      const n = await contarNaoLidas(t, calcOpts);
       setNaoLidas(n);
     } catch {}
-  }, [calcOpts]);
+  }, [calcOpts, t]);
 
   useEffect(() => {
     atualizarContagem();
@@ -68,7 +71,7 @@ export function SinoNotificacoes({ calcOpts }: { calcOpts?: CalcOpts }) {
     setAberto(true);
     setCarregando(true);
     try {
-      const tudo = await listarTudo(calcOpts);
+      const tudo = await listarTudo(t, calcOpts);
       setLista(tudo);
     } catch {
       setLista([]);
