@@ -16,6 +16,7 @@ import { loadSavedCloudFor, resolve, setAthletePool, type TeamState } from "@/li
 import { focoMercado, numeroDaRodada } from "@/lib/calendario";
 import type { Athlete } from "@/lib/athletes";
 import type { Dossie } from "@/lib/scout";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -26,6 +27,7 @@ const VERM = "#ef8d83";
 type EstadoDossie = "carregando" | "erro" | Dossie;
 
 export function ScoutDoTime() {
+  const t = useT();
   const [compNome, setCompNome] = useState("");
   const [rodadaComp, setRodadaComp] = useState<number | null>(null);
   const [atletas, setAtletas] = useState<Athlete[] | null>(null);
@@ -74,21 +76,25 @@ export function ScoutDoTime() {
   const atletaAberto = atletas?.find((a) => a.id === aberto) ?? null;
   const dossieAberto = aberto ? dossies[aberto] : undefined;
 
+  const info = `${compNome}${rodadaComp ? ` · ${t("pl.rodadaN", { n: rodadaComp })}` : ""}`;
+
   return (
     <>
-      <SectionTitle>O scout do teu time</SectionTitle>
+      <SectionTitle>{t("sc.oScoutDoTeuTime")}</SectionTitle>
       {compNome && (
         <p style={{ fontSize: 12, color: "#93a39a", margin: "0 0 12px", lineHeight: 1.5 }}>
-          Média de pontos de cada atleta <strong style={{ color: "#cfd8d2" }}>no nível desta competição</strong> ({compNome}{rodadaComp ? ` · Rodada ${rodadaComp}` : ""}). Toca para o dossiê completo.
+          {t("sc.introMedia", { info }).split(/(%A%)/).map((s, i) =>
+            s === "%A%" ? <strong key={i} style={{ color: "#cfd8d2" }}>{t("sc.noNivel")}</strong> : s
+          )}
         </p>
       )}
 
       {atletas === null ? (
-        <p style={{ fontSize: 13, color: "#7c8a82", marginBottom: 22 }}>A carregar o teu time…</p>
+        <p style={{ fontSize: 13, color: "#7c8a82", marginBottom: 22 }}>{t("sc.aCarregarTime")}</p>
       ) : atletas.length === 0 ? (
         <section style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 16, marginBottom: 22, display: "flex", gap: 12, alignItems: "center" }}>
           <div style={{ width: 52, height: 52, flexShrink: 0 }}><Mascot belt="#141110" expression="indicando" /></div>
-          <p style={{ fontSize: 13.5, color: "#a9b4ac", lineHeight: 1.55, margin: 0 }}>Ainda não tens uma equipa guardada para esta competição. Monta a tua equipa e volta para o scout.</p>
+          <p style={{ fontSize: 13.5, color: "#a9b4ac", lineHeight: 1.55, margin: 0 }}>{t("sc.semEquipa")}</p>
         </section>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 22 }}>
@@ -97,7 +103,7 @@ export function ScoutDoTime() {
             <CartaoResumo key={a.id} atleta={a} ehCapitao={a.id === capitao} dossie={dossies[a.id]} onClick={() => setAberto(a.id)} />
           ))}
           <p style={{ fontSize: 11, color: "#7c8a82", lineHeight: 1.5, margin: "6px 0 0", textAlign: "center" }}>
-            São leituras de histórico para te ajudar — possibilidades, não garantias. A decisão é sempre tua.
+            {t("sc.leiturasHistorico")}
           </p>
         </div>
       )}
@@ -138,6 +144,7 @@ function escolherCapitao(
 }
 
 function DicaCapitao({ atletas, dossies, capitaoAtual, onAbrir }: { atletas: Athlete[]; dossies: Record<string, EstadoDossie>; capitaoAtual: string | null; onAbrir: (id: string) => void }) {
+  const t = useT();
   const r = escolherCapitao(atletas, dossies);
 
   // Ainda a carregar dossiês.
@@ -145,7 +152,7 @@ function DicaCapitao({ atletas, dossies, capitaoAtual, onAbrir }: { atletas: Ath
     return (
       <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px", display: "flex", alignItems: "center", gap: 11 }}>
         <CrownIcon cor="#5f6f67" />
-        <span style={{ fontSize: 12.5, color: "#7c8a82" }}>A analisar o teu time para a dica de capitão…</span>
+        <span style={{ fontSize: 12.5, color: "#7c8a82" }}>{t("sc.aAnalisarDica")}</span>
       </div>
     );
   }
@@ -155,23 +162,25 @@ function DicaCapitao({ atletas, dossies, capitaoAtual, onAbrir }: { atletas: Ath
     return (
       <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px", display: "flex", alignItems: "center", gap: 11 }}>
         <CrownIcon cor="#7c8a82" />
-        <span style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.5 }}>Ainda não há histórico suficiente para uma dica de capitão nesta rodada.</span>
+        <span style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.5 }}>{t("sc.semHistoricoDica")}</span>
       </div>
     );
   }
 
   const positivo = r.pts >= 0;
   const jaECapitao = r.atleta.id === capitaoAtual;
-  const onde = r.rotulo === "neste nível" ? "no nível desta competição" : "na forma recente";
+  const onde = r.rotulo === "neste nível" ? t("sc.noNivel") : t("sc.ondeForma");
+  const nome = sobrenome(r.atleta.name);
+  const pts = fmtPts(r.pts);
 
   // Tom honesto: confiante se positivo; alerta se ninguém tem histórico forte.
   let texto: string;
   if (positivo) {
     texto = jaECapitao
-      ? `Por histórico, ${sobrenome(r.atleta.name)} é o teu melhor candidato a capitão — média de ${fmtPts(r.pts)} ${onde}. E é precisamente o que já tens como capitão. Boa escolha.`
-      : `Por histórico, o teu melhor candidato a capitão é ${sobrenome(r.atleta.name)} — média de ${fmtPts(r.pts)} ${onde}.`;
+      ? t("sc.dicaJaCapitao", { nome, pts, onde })
+      : t("sc.dicaCandidato", { nome, pts, onde });
   } else {
-    texto = `Nenhum do teu time tem histórico forte ${onde}. O menos arriscado seria ${sobrenome(r.atleta.name)} (${fmtPts(r.pts)}), mas é uma rodada difícil para a tua equipa — escolhe com cuidado.`;
+    texto = t("sc.dicaNegativa", { nome, pts, onde });
   }
 
   return (
@@ -185,11 +194,11 @@ function DicaCapitao({ atletas, dossies, capitaoAtual, onAbrir }: { atletas: Ath
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
         <CrownIcon cor={positivo ? GOLD : "#c0a050"} />
-        <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: positivo ? GOLD : "#c0a050" }}>Dica de capitão</span>
+        <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: positivo ? GOLD : "#c0a050" }}>{t("sc.dicaCapitao")}</span>
       </div>
       <p style={{ fontSize: 13, color: "#dfe6e0", lineHeight: 1.55, margin: 0 }}>{texto}</p>
       <div style={{ fontSize: 10.5, color: "#7c8a82", marginTop: 8, lineHeight: 1.45 }}>
-        Por histórico, ainda sem os confrontos da chave. Possibilidade, não garantia. Toca para ver o dossiê.
+        {t("sc.dicaDisclaimer")}
       </div>
     </button>
   );
@@ -212,6 +221,7 @@ function sobrenome(nome: string): string {
  * ========================================================================= */
 
 function CartaoResumo({ atleta, ehCapitao, dossie, onClick }: { atleta: Athlete; ehCapitao: boolean; dossie: EstadoDossie | undefined; onClick: () => void }) {
+  const t = useT();
   const sinal = sinalDoNivel(dossie);
   return (
     <button
@@ -228,25 +238,25 @@ function CartaoResumo({ atleta, ehCapitao, dossie, onClick }: { atleta: Athlete;
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{atleta.name}</span>
-          {ehCapitao && <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, color: "#3a2a08", background: GOLD, padding: "1px 6px", borderRadius: 999, textTransform: "uppercase" }}>Cap.</span>}
+          {ehCapitao && <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, color: "#3a2a08", background: GOLD, padding: "1px 6px", borderRadius: 999, textTransform: "uppercase" }}>{t("sc.cap")}</span>}
         </div>
         <div style={{ fontSize: 11.5, color: "#93a39a", marginTop: 1 }}>{atleta.category}kg · JC {atleta.priceJc}</div>
       </div>
       {/* Sinal: média no nível desta competição */}
       <div style={{ textAlign: "right", flexShrink: 0, minWidth: 64 }}>
         {sinal.estado === "carregando" ? (
-          <span style={{ fontSize: 11, color: "#5f6f67" }}>a analisar…</span>
+          <span style={{ fontSize: 11, color: "#5f6f67" }}>{t("sc.aAnalisar")}</span>
         ) : sinal.estado === "erro" ? (
           <span style={{ fontSize: 11, color: "#5f6f67" }}>—</span>
         ) : sinal.pts === null ? (
           <>
             <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#7c8a82" }}>—</div>
-            <div style={{ fontSize: 9.5, color: "#5f6f67" }}>sem dados</div>
+            <div style={{ fontSize: 9.5, color: "#5f6f67" }}>{t("sc.semDados")}</div>
           </>
         ) : (
           <>
             <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: corPts(sinal.pts) }}>{fmtPts(sinal.pts)}</div>
-            <div style={{ fontSize: 9.5, color: "#7c8a82" }}>{sinal.rotulo}</div>
+            <div style={{ fontSize: 9.5, color: "#7c8a82" }}>{sinal.rotulo === "neste nível" ? t("sc.nesteNivel") : t("sc.formaRecente")}</div>
           </>
         )}
       </div>
@@ -255,6 +265,7 @@ function CartaoResumo({ atleta, ehCapitao, dossie, onClick }: { atleta: Athlete;
 }
 
 // Extrai o sinal-chave: média no nível desta competição (ou forma recente em fallback).
+// rotulo é o VALOR canónico ("neste nível" / "forma recente") — usado na lógica; traduzido só ao mostrar.
 function sinalDoNivel(d: EstadoDossie | undefined): { estado: "carregando" | "erro" | "ok"; pts: number | null; rotulo: string } {
   if (d === undefined || d === "carregando") return { estado: "carregando", pts: null, rotulo: "" };
   if (d === "erro") return { estado: "erro", pts: null, rotulo: "" };
@@ -269,6 +280,7 @@ function sinalDoNivel(d: EstadoDossie | undefined): { estado: "carregando" | "er
  * ========================================================================= */
 
 function DetalheAtleta({ atleta, ehCapitao, dossie, onClose }: { atleta: Athlete; ehCapitao: boolean; dossie: EstadoDossie | undefined; onClose: () => void }) {
+  const t = useT();
   const pronto = dossie && dossie !== "carregando" && dossie !== "erro";
   const d = pronto ? (dossie as Dossie) : null;
 
@@ -292,51 +304,51 @@ function DetalheAtleta({ atleta, ehCapitao, dossie, onClose }: { atleta: Athlete
             <div style={{ minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{atleta.name}</span>
-                {ehCapitao && <span style={{ fontSize: 9, fontWeight: 700, color: "#3a2a08", background: GOLD, padding: "1px 6px", borderRadius: 999, textTransform: "uppercase" }}>Cap.</span>}
+                {ehCapitao && <span style={{ fontSize: 9, fontWeight: 700, color: "#3a2a08", background: GOLD, padding: "1px 6px", borderRadius: 999, textTransform: "uppercase" }}>{t("sc.cap")}</span>}
               </div>
               <div style={{ fontSize: 12, color: "#93a39a", marginTop: 1 }}>
                 {d?.perfil.paisNome ?? ""} · {atleta.category}kg
               </div>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fechar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#cfd8d2", cursor: "pointer", flexShrink: 0, fontSize: 16 }}>✕</button>
+          <button onClick={onClose} aria-label={t("comum.fechar")} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#cfd8d2", cursor: "pointer", flexShrink: 0, fontSize: 16 }}>✕</button>
         </div>
 
         {!pronto ? (
           <p style={{ fontSize: 13, color: dossie === "erro" ? VERM : "#7c8a82", padding: "20px 0", textAlign: "center" }}>
-            {dossie === "erro" ? "Não consegui carregar o dossiê deste atleta. Tenta de novo mais tarde." : "A carregar o dossiê…"}
+            {dossie === "erro" ? t("sc.erroDossie") : t("sc.aCarregarDossie")}
           </p>
         ) : (
           <>
             {/* Perfil */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              {d!.perfil.faixa && <Etiqueta titulo="Faixa" valor={traduzirFaixa(d!.perfil.faixa)} />}
-              {d!.perfil.tecnica && <Etiqueta titulo="Técnica" valor={d!.perfil.tecnica} />}
-              {d!.perfil.treinador && <Etiqueta titulo="Treinador" valor={d!.perfil.treinador} />}
-              {d!.perfil.idade !== null && <Etiqueta titulo="Idade" valor={`${d!.perfil.idade}`} />}
+              {d!.perfil.faixa && <Etiqueta titulo={t("sc.faixaLabel")} valor={traduzirFaixa(d!.perfil.faixa, t)} />}
+              {d!.perfil.tecnica && <Etiqueta titulo={t("sc.tecnica")} valor={d!.perfil.tecnica} />}
+              {d!.perfil.treinador && <Etiqueta titulo={t("sc.treinador")} valor={d!.perfil.treinador} />}
+              {d!.perfil.idade !== null && <Etiqueta titulo={t("sc.idade")} valor={`${d!.perfil.idade}`} />}
             </div>
 
             {/* Destaque: nível desta competição */}
-            <SectionTitle>Nesta competição</SectionTitle>
+            <SectionTitle>{t("sc.nestaCompeticao")}</SectionTitle>
             <BlocoNivelAlvo dossie={d!} />
 
             {/* Números de experiência */}
-            <SectionTitle>Carreira</SectionTitle>
+            <SectionTitle>{t("sc.carreira")}</SectionTitle>
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-              <NumBox label="Lutas" valor={`${d!.experiencia.lutas}`} />
-              <NumBox label="Vitórias" valor={`${Math.round(d!.experiencia.taxaVitoria * 100)}%`} />
-              <NumBox label="Comps." valor={`${d!.experiencia.competicoes}`} />
+              <NumBox label={t("sc.lutas")} valor={`${d!.experiencia.lutas}`} />
+              <NumBox label={t("sc.vitorias")} valor={`${Math.round(d!.experiencia.taxaVitoria * 100)}%`} />
+              <NumBox label={t("sc.comps")} valor={`${d!.experiencia.competicoes}`} />
             </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-              <NumBox label="Ouro" valor={`${d!.medalhas.ouro}`} ouro={d!.medalhas.ouro > 0} />
-              <NumBox label="Prata" valor={`${d!.medalhas.prata}`} />
-              <NumBox label="Bronze" valor={`${d!.medalhas.bronze}`} />
+              <NumBox label={t("sc.ouro")} valor={`${d!.medalhas.ouro}`} ouro={d!.medalhas.ouro > 0} />
+              <NumBox label={t("sc.prata")} valor={`${d!.medalhas.prata}`} />
+              <NumBox label={t("sc.bronze")} valor={`${d!.medalhas.bronze}`} />
             </div>
 
             {/* Títulos grandes */}
-            <SectionTitle>Títulos de peso</SectionTitle>
+            <SectionTitle>{t("sc.titulosDePeso")}</SectionTitle>
             {grandes.length === 0 ? (
-              <p style={{ fontSize: 12.5, color: "#7c8a82", margin: "0 0 16px", lineHeight: 1.5 }}>Sem pódios em competições de topo (Mundial, Grand Slam, Grand Prix, Continental pleno).</p>
+              <p style={{ fontSize: 12.5, color: "#7c8a82", margin: "0 0 16px", lineHeight: 1.5 }}>{t("sc.semPodiosTopo")}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 16 }}>
                 {grandes.map((c, i) => <LinhaConquista key={i} c={c} />)}
@@ -346,9 +358,9 @@ function DetalheAtleta({ atleta, ehCapitao, dossie, onClose }: { atleta: Athlete
             {/* Pequenos Estados — separados, com aviso de contexto */}
             {pequenos.length > 0 && (
               <>
-                <SectionTitle>Pequenos Estados</SectionTitle>
+                <SectionTitle>{t("sc.pequenosEstados")}</SectionTitle>
                 <p style={{ fontSize: 11.5, color: "#7c8a82", margin: "0 0 8px", lineHeight: 1.5 }}>
-                  Campeonatos continentais de baixa concorrência. Contam, mas não comparam com os de topo.
+                  {t("sc.pequenosNota")}
                 </p>
                 <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 16 }}>
                   {pequenos.map((c, i) => <LinhaConquista key={i} c={c} />)}
@@ -357,9 +369,9 @@ function DetalheAtleta({ atleta, ehCapitao, dossie, onClose }: { atleta: Athlete
             )}
 
             {/* Forma recente */}
-            <SectionTitle>Forma recente</SectionTitle>
+            <SectionTitle>{t("sc.formaRecente")}</SectionTitle>
             {d!.formaRecente.competicoes.length === 0 ? (
-              <p style={{ fontSize: 12.5, color: "#7c8a82", margin: "0 0 16px" }}>Sem competições recentes.</p>
+              <p style={{ fontSize: 12.5, color: "#7c8a82", margin: "0 0 16px" }}>{t("sc.semCompsRecentes")}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
                 {d!.formaRecente.competicoes.map((r) => (
@@ -377,7 +389,7 @@ function DetalheAtleta({ atleta, ehCapitao, dossie, onClose }: { atleta: Athlete
             )}
 
             {/* Desempenho por nível */}
-            <SectionTitle>Desempenho por nível</SectionTitle>
+            <SectionTitle>{t("sc.desempenhoPorNivel")}</SectionTitle>
             <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 6 }}>
               {d!.desempenhoPorNivel.map((n) => (
                 <div key={n.nivel} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: n.ehNivelDestaCompeticao ? "#15110a" : "#0f1411", border: `1px solid ${n.ehNivelDestaCompeticao ? GOLD : "#243029"}`, borderRadius: 10, padding: "9px 12px" }}>
@@ -387,9 +399,9 @@ function DetalheAtleta({ atleta, ehCapitao, dossie, onClose }: { atleta: Athlete
                       {n.nivel === "cont_champ" && contChampTemPE && <span style={{ color: "#7c8a82", fontWeight: 400 }}> *</span>}
                     </div>
                     <div style={{ fontSize: 11, color: "#93a39a" }}>
-                      {n.participacoes} {n.participacoes === 1 ? "participação" : "participações"}
-                      {n.podios > 0 ? ` · ${n.podios} pódio${n.podios > 1 ? "s" : ""}` : ""}
-                      {n.melhorColocacao !== "—" ? ` · melhor: ${n.melhorColocacao}` : ""}
+                      {n.participacoes === 1 ? t("sc.participacaoSing", { n: n.participacoes }) : t("sc.participacaoPlur", { n: n.participacoes })}
+                      {n.podios > 0 ? ` · ${n.podios === 1 ? t("sc.podioSing", { n: n.podios }) : t("sc.podioPlur", { n: n.podios })}` : ""}
+                      {n.melhorColocacao !== "—" ? ` · ${t("sc.melhorPrefixo")}: ${n.melhorColocacao}` : ""}
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -403,7 +415,7 @@ function DetalheAtleta({ atleta, ehCapitao, dossie, onClose }: { atleta: Athlete
               ))}
             </div>
             {contChampTemPE && (
-              <p style={{ fontSize: 10.5, color: "#7c8a82", margin: "0 0 14px", lineHeight: 1.5 }}>* inclui campeonatos dos Pequenos Estados — a média sobe por isso.</p>
+              <p style={{ fontSize: 10.5, color: "#7c8a82", margin: "0 0 14px", lineHeight: 1.5 }}>{t("sc.contChampNota")}</p>
             )}
 
             {d!.avisos.length > 0 && (
@@ -418,6 +430,7 @@ function DetalheAtleta({ atleta, ehCapitao, dossie, onClose }: { atleta: Athlete
 
 // Bloco de destaque: a linha do nível desta competição (ou fallback de forma recente).
 function BlocoNivelAlvo({ dossie }: { dossie: Dossie }) {
+  const t = useT();
   const nivel = dossie.desempenhoPorNivel.find((n) => n.ehNivelDestaCompeticao);
   if (nivel) {
     return (
@@ -426,17 +439,17 @@ function BlocoNivelAlvo({ dossie }: { dossie: Dossie }) {
           <div>
             <div style={{ fontSize: 13.5, fontWeight: 700 }}>{nivel.nivelLabel}</div>
             <div style={{ fontSize: 11.5, color: "#93a39a", marginTop: 2 }}>
-              {nivel.participacoes} {nivel.participacoes === 1 ? "participação" : "participações"}
-              {nivel.podios > 0 ? ` · ${nivel.podios} pódio${nivel.podios > 1 ? "s" : ""}` : " · sem pódios"}
+              {nivel.participacoes === 1 ? t("sc.participacaoSing", { n: nivel.participacoes }) : t("sc.participacaoPlur", { n: nivel.participacoes })}
+              {nivel.podios > 0 ? ` · ${nivel.podios === 1 ? t("sc.podioSing", { n: nivel.podios }) : t("sc.podioPlur", { n: nivel.podios })}` : ` · ${t("sc.semPodios")}`}
             </div>
           </div>
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             {nivel.pontosMedios === null ? (
-              <span style={{ fontSize: 12, color: "#7c8a82" }}>sem dados</span>
+              <span style={{ fontSize: 12, color: "#7c8a82" }}>{t("sc.semDados")}</span>
             ) : (
               <>
                 <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: corPts(nivel.pontosMedios) }}>{fmtPts(nivel.pontosMedios)}</div>
-                <div style={{ fontSize: 10, color: "#7c8a82" }}>média de pontos</div>
+                <div style={{ fontSize: 10, color: "#7c8a82" }}>{t("sc.mediaPontos")}</div>
               </>
             )}
           </div>
@@ -448,16 +461,22 @@ function BlocoNivelAlvo({ dossie }: { dossie: Dossie }) {
   return (
     <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 12, padding: "13px 14px", marginBottom: 18 }}>
       <div style={{ fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.5 }}>
-        Não foi possível identificar o nível desta competição. Como referência, a média deste atleta nas últimas competições foi{" "}
-        {dossie.formaRecente.pontosMedios === null ? "— (sem dados)" : <strong style={{ color: corPts(dossie.formaRecente.pontosMedios) }}>{fmtPts(dossie.formaRecente.pontosMedios)} pts</strong>}.
+        {t("sc.nivelFallback").split(/(%A%)/).map((s, i) =>
+          s === "%A%"
+            ? (dossie.formaRecente.pontosMedios === null
+                ? <span key={i}>{t("sc.semDadosParenteses")}</span>
+                : <strong key={i} style={{ color: corPts(dossie.formaRecente.pontosMedios) }}>{fmtPts(dossie.formaRecente.pontosMedios)} pts</strong>)
+            : s
+        )}
       </div>
     </div>
   );
 }
 
 function LinhaConquista({ c }: { c: Dossie["conquistas"][number] }) {
+  const t = useT();
   const cor = c.medalha === "ouro" ? GOLD : c.medalha === "prata" ? "#cfd8d2" : "#c08a5a";
-  const rotulo = c.medalha === "ouro" ? "Ouro" : c.medalha === "prata" ? "Prata" : "Bronze";
+  const rotulo = c.medalha === "ouro" ? t("sc.ouro") : c.medalha === "prata" ? t("sc.prata") : t("sc.bronze");
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#0f1411", border: "1px solid #243029", borderRadius: 10, padding: "9px 12px" }}>
       <span style={{ width: 9, height: 9, borderRadius: "50%", background: cor, flexShrink: 0 }} />
@@ -505,12 +524,12 @@ function corPts(n: number): string {
 }
 
 // "Black belt - II DAN" -> "Preta II Dan" (simplifica o que a API dá).
-function traduzirFaixa(belt: string): string {
+function traduzirFaixa(belt: string, t: ReturnType<typeof useT>): string {
   const b = belt.toLowerCase();
   let cor = belt;
-  if (b.includes("black")) cor = "Preta";
-  else if (b.includes("brown")) cor = "Castanha";
-  else if (b.includes("blue")) cor = "Azul";
+  if (b.includes("black")) cor = t("faixa.preta");
+  else if (b.includes("brown")) cor = t("faixa.marrom");
+  else if (b.includes("blue")) cor = t("faixa.azul");
   const dan = belt.match(/([IVX]+)\s*DAN/i);
   return dan ? `${cor} ${dan[1].toUpperCase()} Dan` : cor;
 }
