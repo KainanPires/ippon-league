@@ -11,7 +11,7 @@
 // aviso sai UMA vez por competição. USAR APENAS NO SERVIDOR.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { enviarPushPara } from "@/lib/pushServer";
-import { focoMercado, estadoMercado, textoFecho, formatarContagem } from "@/lib/calendario";
+import { focoMercado, estadoMercado, formatarContagem } from "@/lib/calendario";
 import { renderNotif, agruparPorLingua, type LinguaNotif } from "@/lib/i18nServidor";
 
 // Janela do lembrete de véspera: dispara quando falta ISTO ou menos para o
@@ -124,11 +124,20 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
   if (foco.alvo && !foco.aDecorrer && estadoMercado(foco.alvo, hoje).estado === "aberto") {
     if (await reservarEvento(`mercado_aberto:${foco.alvo.idCompeticao}`)) {
       const ids = await todosOsUtilizadores();
-      const prazo = textoFecho(foco.alvo, hoje); // ex.: "Mercado fecha em 3 dias"
+      // Prazo até fechar, em formato NEUTRO de língua (ex.: "5d 3h", "3h 20min"),
+      // para o texto sair traduzido sem "vazar" português no meio da frase.
+      const est = estadoMercado(foco.alvo, hoje);
+      let msAteFecho: number | null = est.msAteFecho;
+      if (msAteFecho === null) {
+        const inicioDia = new Date(foco.alvo.de.replace(/\//g, "-") + "T00:00:00").getTime();
+        msAteFecho = inicioDia - hoje.getTime();
+      }
+      const tempo = formatarContagem(Math.max(0, msAteFecho));
       await notificarMuitos(ids, {
         tipo: "mercado",
-        titulo: `🥋 Mercado aberto: ${foco.alvo.nome}`,
-        corpo: `Já podes montar a tua equipa para o ${foco.alvo.nome}. ${prazo} — escala os teus 8 atletas e o capitão antes de fechar!`,
+        chaveTitulo: "mercado.abertoTitulo",
+        chaveCorpo: "mercado.abertoCorpo",
+        vars: { comp: foco.alvo.nome, tempo },
         link: "/inicio",
       });
       aberto = foco.alvo.idCompeticao;
@@ -158,8 +167,9 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
         const restante = formatarContagem(msAteFecho); // ex.: "23h 10min" ou "1d 0h"
         await notificarMuitos(montaram, {
           tipo: "mercado",
-          titulo: `⏰ Última chance para ajustar: ${foco.alvo.nome}`,
-          corpo: `O mercado do ${foco.alvo.nome} fecha em ${restante}. Ainda dá para trocar atletas ou mudar o capitão — confere a tua equipa antes de fechar!`,
+          chaveTitulo: "mercado.ajustarTitulo",
+          chaveCorpo: "mercado.ajustarCorpo",
+          vars: { comp: foco.alvo.nome, tempo: restante },
           link: "/meu-time",
         });
       }
@@ -178,16 +188,18 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
     // Quem montou: a equipa está em jogo.
     await notificarMuitos(montaram, {
       tipo: "mercado",
-      titulo: `Mercado fechado: ${comp.nome} vai começar`,
-      corpo: `A tua equipa está escalada e em jogo no ${comp.nome}. Boa sorte! Acompanha a pontuação ao vivo.`,
+      chaveTitulo: "mercado.fechadoJogoTitulo",
+      chaveCorpo: "mercado.fechadoJogoCorpo",
+      vars: { comp: comp.nome },
       link: "/meu-time",
     });
 
     // Quem não montou: ficou de fora — incentivo para a próxima.
     await notificarMuitos(naoMontaram, {
       tipo: "mercado",
-      titulo: `Mercado fechado: ${comp.nome}`,
-      corpo: `O mercado fechou e não montaste equipa para o ${comp.nome}. Ficaste de fora desta rodada — prepara-te para a próxima!`,
+      chaveTitulo: "mercado.fechadoForaTitulo",
+      chaveCorpo: "mercado.fechadoForaCorpo",
+      vars: { comp: comp.nome },
       link: "/inicio",
     });
 
