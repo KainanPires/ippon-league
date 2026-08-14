@@ -280,18 +280,18 @@ export default function CriarEquipa() {
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 150px" }}>
     <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
-    <a href="/inicio" onClick={(e) => { e.preventDefault(); tryLeave("/inicio"); }} aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+    <a href="/inicio" onClick={(e) => { e.preventDefault(); tryLeave("/inicio"); }} aria-label={t("comum.voltar")} style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
     <BackIcon />
     </a>
     <div style={{ display: "flex", alignItems: "center", gap: 11, color: "#f1ede2", minWidth: 0 }}>
     <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={identity} size={40} /></div>
     <div style={{ minWidth: 0 }}>
     <h1 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name}</h1>
-    <div style={{ fontSize: 11, color: "#93a39a" }}>1 por categoria · 4 masc + 4 fem</div>
+    <div style={{ fontSize: 11, color: "#93a39a" }}>{t("ce.regraCategoria")}</div>
     </div>
     </div>
     </div>
-    <button onClick={openGuide} aria-label="Como montar a equipa" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
+    <button onClick={openGuide} aria-label={t("ce.comoMontar")} style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
     </header>
     {/* Banner do carry-over: atletas da equipa anterior que não estão inscritos
       nesta competição sairam; o JC deles já voltou pelo preço atual. */}
@@ -302,10 +302,10 @@ export default function CriarEquipa() {
         <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{t("ce.reescala")}</div>
         <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "5px 0 0" }}>
         {carry.dropped.length === 1
-          ? "1 atleta da tua equipa não está inscrito nesta competição e saiu."
-          : `${carry.dropped.length} atletas da tua equipa não estão inscritos nesta competição e sairam.`}
-        {carry.captainDropped ? " O teu capitão era um deles — escolhe um novo." : ""}
-        {" "}Os JC voltaram pelo preço atual. Escala quem falta (ou refaz tudo) e guarda.
+          ? t("ce.carrySaiu1")
+          : t("ce.carrySaiuN", { n: carry.dropped.length })}
+        {carry.captainDropped ? ` ${t("ce.carryCapitao")}` : ""}
+        {" "}{t("ce.carryJC")}
         </p>
         <button onClick={() => setCarry(null)} style={{ marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB, padding: 0 }}>{t("ce.percebiDispensar")}</button>
         </div>
@@ -316,10 +316,10 @@ export default function CriarEquipa() {
         <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a1f1c,#10160f)", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "10px 13px", marginBottom: 10 }}>
         <span className="ilpulse" style={{ width: 9, height: 9, borderRadius: "50%", background: "#e2655a", marginTop: 4, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#e2655a" }}>A decorrer agora{atual.classico ? " · Clássico" : ""}</div>
+        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#e2655a" }}>{t("ce.aDecorrerAgora")}{atual.classico ? ` · ${t("ce.classico")}` : ""}</div>
         <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, lineHeight: 1.1, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeAtual}</div>
         <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "6px 0 0" }}>
-        O mercado desta competição já fechou — os preços podem oscilar enquanto os atletas competem. <strong style={{ color: "#f1ede2" }}>{t("ce.jaPodesEscalar")}</strong> {nomeAlvo} — {textoFecho(alvo)}.
+        {t("ce.mercadoFechou")} <strong style={{ color: "#f1ede2" }}>{t("ce.jaPodesEscalar")}</strong> {nomeAlvo} — {textoFecho(alvo, t)}.
         </p>
         </div>
         </div>
@@ -331,9 +331,9 @@ export default function CriarEquipa() {
     <TrophyIcon />
     </div>
     <div style={{ flex: 1, minWidth: 0 }}>
-    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>A escalar para{rodadaAlvo ? ` · Rodada ${rodadaAlvo}` : ""}{alvo.classico ? " · Clássico" : ""}</div>
+    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7fd1a3" }}>{t("ce.aEscalarPara")}{rodadaAlvo ? ` · ${t("pl.rodadaN", { n: rodadaAlvo })}` : ""}{alvo.classico ? ` · ${t("ce.classico")}` : ""}</div>
     <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeAlvo}</div>
-    <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{textoFecho(alvo)}</div>
+    <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{textoFecho(alvo, t)}</div>
     </div>
     <span style={{ background: "#1b211e", color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{alvo.nivel}</span>
     </div>
@@ -346,7 +346,7 @@ export default function CriarEquipa() {
     </div>
     </div>
     <p style={{ fontSize: 12, color: "#93a39a", textAlign: "center", marginTop: 14 }}>
-    Toca num lugar livre para abrir o Mercado. Toca num atleta para o tornar capitão.
+    {t("ce.tocaLugarLivre")}
     </p>
     {!isPro && (
         <a href="/ippon-pro" onClick={(e) => { e.preventDefault(); tryLeave("/ippon-pro"); }} style={{ display: "flex", alignItems: "center", gap: 12, background: GOLD, borderRadius: 16, padding: "10px 14px", marginTop: 16, textDecoration: "none" }}>
@@ -368,13 +368,13 @@ export default function CriarEquipa() {
     <div style={{ fontSize: 11, color: "#cfd8d2" }}>JC {fmt(left)}</div>
     </div>
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-    <button onClick={() => setModal({ kind: "trash" })} aria-label="Limpar equipa" style={roundBtn("#3a2422", "#ef8d83")}>
+    <button onClick={() => setModal({ kind: "trash" })} aria-label={t("mt.ariaLimpar")} style={roundBtn("#3a2422", "#ef8d83")}>
     <TrashIcon />
     </button>
-    <button onClick={() => setModal({ kind: "share" })} aria-label="Partilhar equipa" style={roundBtn("#243029", "#cfd8d2")}>
+    <button onClick={() => setModal({ kind: "share" })} aria-label={t("mt.ariaPartilhar")} style={roundBtn("#243029", "#cfd8d2")}>
     <ShareIcon />
     </button>
-    <button onClick={save} disabled={savingCloud} className={dirty && !savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar equipa"}</button>
+    <button onClick={save} disabled={savingCloud} className={dirty && !savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 18px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? t("mt.aGuardar") : t("ce.salvarEquipa")}</button>
     </div>
     </div>
     </div>
@@ -384,7 +384,7 @@ export default function CriarEquipa() {
         <div style={cardBox}>
         <div style={{ width: 90, height: 90, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="feliz" /></div>
         <h2 style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>{t("ce.vamosMontar")}</h2>
-        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 20px" }}>Eu guio-te! Toca onde eu indicar e, em segundos, tens a tua equipa de 8 atletas pronta para competir.</p>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 20px" }}>{t("ce.guiaBoasVindas")}</p>
         <button onClick={() => setGuide("counter")} style={primaryBtn}>{t("inicio.vamos")}</button>
         <button onClick={naoMostrarMais} style={ghostBtn}>{t("comum.naoMostrarMais")}</button>
         </div>
