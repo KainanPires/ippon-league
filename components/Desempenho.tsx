@@ -6,6 +6,7 @@ import { CartaoDesempenho } from "@/components/CartaoDesempenho";
 import type { Identity } from "@/components/Escudo";
 import type { TeamState } from "@/lib/team";
 import { type DesempenhoRodada, type ResumoExtra, mensagemDesempenho } from "@/lib/desempenho";
+import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -41,6 +42,7 @@ export function Desempenho({
   onFechar: () => void;
   onNaoMostrarMais?: () => void;
 }) {
+  const t = useT();
   const [partilhar, setPartilhar] = useState(false);
   const total = dados.pontuacaoTotal;
   const positivo = total >= 0;
@@ -58,9 +60,9 @@ export function Desempenho({
   // AO VIVO: a competição ainda decorre, os pontos são PARCIAIS. Muda o
   // enquadramento (título, rótulo, mensagem) para não parecer um resultado final.
   const rotuloTopo = aoVivo
-    ? (dados.numeroRodada ? `Rodada ${dados.numeroRodada} · Ao vivo` : "Ao vivo")
-    : (dados.numeroRodada ? `Rodada ${dados.numeroRodada} · O teu desempenho` : "O teu desempenho");
-  const rotuloPontos = aoVivo ? "pontos até agora" : "pontos na rodada";
+    ? (dados.numeroRodada ? t("des.aoVivoRodada", { n: dados.numeroRodada }) : t("des.aoVivo"))
+    : (dados.numeroRodada ? t("des.rodadaDesempenho", { n: dados.numeroRodada }) : t("des.teuDesempenho"));
+  const rotuloPontos = aoVivo ? t("des.pontosAteAgora") : t("cd.pontosNaRodada");
 
   return (
     <>
@@ -91,7 +93,7 @@ export function Desempenho({
             <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>{rotuloPontos}</div>
           </div>
 
-          <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "10px 0 18px" }}>{mensagemDesempenho(total, nome, aoVivo)}</p>
+          <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "10px 0 18px" }}>{mensagemDesempenho(total, nome, aoVivo, t)}</p>
 
           {/* BÓNUS: posição na rodada + comparação com a média. Só no resumo FINAL —
               ao vivo a média/posição ainda estão a mexer, não as mostramos. */}
@@ -100,12 +102,12 @@ export function Desempenho({
               <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center" }}>
                 <div>
                   <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: GOLD }}>{extra.posicao}º</div>
-                  <div style={{ fontSize: 9.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em" }}>de {extra.totalJogadores}</div>
+                  <div style={{ fontSize: 9.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("des.deN", { n: extra.totalJogadores })}</div>
                 </div>
                 <div style={{ width: 1, height: 34, background: "#243029" }} />
                 <div>
                   <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: "#cfd8d2" }}>{extra.media}</div>
-                  <div style={{ fontSize: 9.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em" }}>média geral</div>
+                  <div style={{ fontSize: 9.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("des.mediaGeral")}</div>
                 </div>
                 {extra.patrimonio != null && (
                   <>
@@ -114,17 +116,17 @@ export function Desempenho({
                       <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: extra.ganho >= 0 ? "#7fd1a3" : "#ef8d83" }}>
                         {extra.ganho >= 0 ? "+" : ""}{extra.ganho}
                       </div>
-                      <div style={{ fontSize: 9.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em" }}>JC rodada</div>
+                      <div style={{ fontSize: 9.5, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("des.jcRodada")}</div>
                     </div>
                   </>
                 )}
               </div>
               <div style={{ fontSize: 12, color: extra.acimaDaMedia ? "#7fd1a3" : "#d9a441", marginTop: 10, fontWeight: 700 }}>
-                {extra.acimaDaMedia ? "Acima da média da rodada! 👏" : "Abaixo da média — a próxima é tua."}
+                {extra.acimaDaMedia ? t("des.acimaMedia") : t("des.abaixoMedia")}
               </div>
               {extra.patrimonio != null && (
                 <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>
-                  Património: <span style={{ color: GOLD, fontWeight: 700 }}>JC {extra.patrimonio}</span>
+                  {t("des.patrimonioLabel")} <span style={{ color: GOLD, fontWeight: 700 }}>JC {extra.patrimonio}</span>
                 </div>
               )}
             </div>
@@ -134,7 +136,7 @@ export function Desempenho({
           <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
             {dados.capitao && (
               <DestaqueCard
-                rotulo="O teu capitão"
+                rotulo={t("des.teuCapitao")}
                 nome={sobrenome(dados.capitao.atleta.name)}
                 pais={code3(dados.capitao.atleta.countryIso)}
                 pontos={dados.capitao.pontos}
@@ -143,7 +145,7 @@ export function Desempenho({
             )}
             {dados.melhor && (
               <DestaqueCard
-                rotulo="Melhor atleta"
+                rotulo={t("cd.melhorAtleta")}
                 nome={sobrenome(dados.melhor.atleta.name)}
                 pais={code3(dados.melhor.atleta.countryIso)}
                 pontos={dados.melhor.pontos}
@@ -152,13 +154,13 @@ export function Desempenho({
           </div>
 
           <button onClick={() => setPartilhar(true)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>
-            {aoVivo ? "Partilhar parcial" : "Partilhar desempenho"}
+            {aoVivo ? t("des.partilharParcial") : t("cd.partilharDesempenho")}
           </button>
 
           {/* Rever a equipa que escalei nesta rodada (só-leitura). */}
           {podeVerEquipa && (
             <button onClick={verEquipaDaRodada} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: "1px solid #2a4d3e", background: "transparent", color: "#aee9c9", fontFamily: FD, fontSize: 13.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer" }}>
-              Ver a minha equipa desta rodada
+              {t("des.verEquipaRodada")}
             </button>
           )}
 
@@ -167,17 +169,17 @@ export function Desempenho({
               FINAL da galeria: só "Fechar".
               FINAL automático: "Não mostrar mais" + "Fechar (ver mais tarde)". */}
           {aoVivo ? (
-            <button onClick={onFechar} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Fechar</button>
+            <button onClick={onFechar} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>{t("comum.fechar")}</button>
           ) : daGaleria ? (
-            <button onClick={onFechar} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Fechar</button>
+            <button onClick={onFechar} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>{t("comum.fechar")}</button>
           ) : (
             <>
               {onNaoMostrarMais && (
                 <button onClick={onNaoMostrarMais} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: "1px solid #243029", background: "transparent", color: "#cfd8d2", fontFamily: FB, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
-                  Não mostrar mais
+                  {t("des.naoMostrarMais")}
                 </button>
               )}
-              <button onClick={onFechar} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>Fechar (ver mais tarde)</button>
+              <button onClick={onFechar} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>{t("des.fecharVerMaisTarde")}</button>
             </>
           )}
         </div>
