@@ -1729,6 +1729,15 @@ const PT: Dicionario = {
   "chvm.faltaColocar": "Coloca pelo menos um atleta num pool.",
   "chvm.dica": "Distribui os atletas pelos 4 pools, na ordem da chave da IJF. Os byes são sugeridos automaticamente — toca em “Bye” para ajustar.",
   "chvm.colocados": "{n} colocados",
+  "chvh.titulo": "Horário de início",
+  "chvh.ajuda": "Confirma na IJF a hora de início (hora local da cidade). O fuso é automático. O mercado fecha 1h antes.",
+  "chvh.fusoLabel": "Fuso",
+  "chvh.semFuso": "Fuso da cidade desconhecido — define o horário no calendário (código).",
+  "chvh.guardar": "Guardar horário",
+  "chvh.guardado": "Horário guardado.",
+  "chvh.removido": "Horário removido.",
+  "chvh.limpar": "Limpar",
+  "chvh.invalido": "Data/hora inválida.",
 };
 
 // --- INGLÊS ---
@@ -3363,6 +3372,15 @@ const EN: Dicionario = {
   "chvm.faltaColocar": "Place at least one athlete in a pool.",
   "chvm.dica": "Spread the athletes across the 4 pools, in the IJF bracket order. Byes are suggested automatically — tap “Bye” to adjust.",
   "chvm.colocados": "{n} placed",
+  "chvh.titulo": "Start time",
+  "chvh.ajuda": "Confirm the start time on the IJF (city local time). The timezone is automatic. The market closes 1h before.",
+  "chvh.fusoLabel": "Timezone",
+  "chvh.semFuso": "City timezone unknown — set the time in the calendar (code).",
+  "chvh.guardar": "Save time",
+  "chvh.guardado": "Time saved.",
+  "chvh.removido": "Time removed.",
+  "chvh.limpar": "Clear",
+  "chvh.invalido": "Invalid date/time.",
 };
 
 // --- ESPANHOL ---
@@ -4997,6 +5015,15 @@ const ES: Dicionario = {
   "chvm.faltaColocar": "Coloca al menos un atleta en un pool.",
   "chvm.dica": "Reparte los atletas en los 4 pools, en el orden del cuadro de la IJF. Los byes se sugieren automáticamente — toca “Bye” para ajustar.",
   "chvm.colocados": "{n} colocados",
+  "chvh.titulo": "Hora de inicio",
+  "chvh.ajuda": "Confirma en la IJF la hora de inicio (hora local de la ciudad). El huso es automático. El mercado cierra 1h antes.",
+  "chvh.fusoLabel": "Huso",
+  "chvh.semFuso": "Huso de la ciudad desconocido — define la hora en el calendario (código).",
+  "chvh.guardar": "Guardar hora",
+  "chvh.guardado": "Hora guardada.",
+  "chvh.removido": "Hora eliminada.",
+  "chvh.limpar": "Limpiar",
+  "chvh.invalido": "Fecha/hora inválida.",
 };
 
 // --- FRANCÊS ---
@@ -6631,6 +6658,15 @@ const FR: Dicionario = {
   "chvm.faltaColocar": "Place au moins un athlète dans un pool.",
   "chvm.dica": "Répartis les athlètes dans les 4 pools, dans l'ordre du tableau de l'IJF. Les byes sont suggérés automatiquement — touche « Bye » pour ajuster.",
   "chvm.colocados": "{n} placés",
+  "chvh.titulo": "Heure de début",
+  "chvh.ajuda": "Confirme sur l'IJF l'heure de début (heure locale de la ville). Le fuseau est automatique. Le marché ferme 1h avant.",
+  "chvh.fusoLabel": "Fuseau",
+  "chvh.semFuso": "Fuseau de la ville inconnu — définis l'heure dans le calendrier (code).",
+  "chvh.guardar": "Enregistrer l'heure",
+  "chvh.guardado": "Heure enregistrée.",
+  "chvh.removido": "Heure supprimée.",
+  "chvh.limpar": "Effacer",
+  "chvh.invalido": "Date/heure invalide.",
 };
 
 const DE: Dicionario = {
@@ -8275,6 +8311,15 @@ const DE: Dicionario = {
   "chvm.faltaColocar": "Setze mindestens einen Athleten in einen Pool.",
   "chvm.dica": "Verteile die Athleten auf die 4 Pools, in der Reihenfolge des IJF-Baums. Freilose werden automatisch vorgeschlagen — tippe auf „Bye“, um anzupassen.",
   "chvm.colocados": "{n} zugeteilt",
+  "chvh.titulo": "Startzeit",
+  "chvh.ajuda": "Bestätige die Startzeit auf der IJF (Ortszeit der Stadt). Die Zeitzone ist automatisch. Der Markt schließt 1 Std. vorher.",
+  "chvh.fusoLabel": "Zeitzone",
+  "chvh.semFuso": "Zeitzone der Stadt unbekannt — lege die Zeit im Kalender (Code) fest.",
+  "chvh.guardar": "Zeit speichern",
+  "chvh.guardado": "Zeit gespeichert.",
+  "chvh.removido": "Zeit entfernt.",
+  "chvh.limpar": "Löschen",
+  "chvh.invalido": "Ungültiges Datum/Uhrzeit.",
 };
 
 const DICIONARIOS: Record<Lingua, Dicionario> = { pt: PT, en: EN, es: ES, fr: FR, de: DE };
