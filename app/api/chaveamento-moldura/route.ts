@@ -78,7 +78,7 @@ export async function POST(req: Request) {
   const uid = await chaveadorDoPedido(req);
   if (!uid) return NextResponse.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
 
-  let body: { acao?: string; comp?: string; categoria?: string; genero?: string; pools?: unknown };
+  let body: { acao?: string; comp?: string; categoria?: string; genero?: string; pools?: unknown; inicioUTC?: string };
   try { body = await req.json(); } catch {
     return NextResponse.json({ ok: false, erro: "Pedido inválido." }, { status: 400 });
   }
@@ -143,6 +143,31 @@ export async function POST(req: Request) {
     }
     await supabaseAdmin.from("chaveamento_avisos").insert({ id_competicao: comp });
     return NextResponse.json({ ok: true, avisados });
+  }
+
+  // --- GRAVAR/REMOVER o HORÁRIO de início manual da competição ---
+  // inicioUTC vazio = remover o override (volta à estimativa por fuso).
+  if (acao === "horario") {
+    const inicioUTC = String(body.inicioUTC || "").trim();
+    if (!inicioUTC) {
+      await supabaseAdmin.from("competicao_horarios").delete().eq("id_competicao", comp);
+      return NextResponse.json({ ok: true, removido: true });
+    }
+    if (Number.isNaN(new Date(inicioUTC).getTime())) {
+      return NextResponse.json({ ok: false, erro: "Data/hora inválida." }, { status: 400 });
+    }
+    const { data: ex } = await supabaseAdmin
+      .from("competicao_horarios").select("id_competicao").eq("id_competicao", comp).maybeSingle();
+    if (ex) {
+      const { error } = await supabaseAdmin.from("competicao_horarios")
+        .update({ inicio_utc: inicioUTC, atualizada_em: new Date().toISOString() }).eq("id_competicao", comp);
+      if (error) return NextResponse.json({ ok: false, erro: "Não foi possível guardar." }, { status: 500 });
+    } else {
+      const { error } = await supabaseAdmin.from("competicao_horarios")
+        .insert({ id_competicao: comp, inicio_utc: inicioUTC });
+      if (error) return NextResponse.json({ ok: false, erro: "Não foi possível guardar." }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ ok: false, erro: "Ação desconhecida." }, { status: 400 });
