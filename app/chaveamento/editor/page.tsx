@@ -2,26 +2,21 @@
 
 // app/chaveamento/editor/page.tsx
 //
-// EDITOR DA CHAVE (moldura) — onde o responsável (is_chaveador) monta a chave
-// ao vivo de cada categoria. Substitui o antigo editor de prints.
+// EDITOR DA CHAVE (moldura) + HORÁRIO de início — área do responsável (is_chaveador).
 //
-// COMO FUNCIONA
-//   1) Escolhe a competição (não-clássica).
-//   2) A app carrega os inscritos (/api/atletas) — já vêm com categoria e género.
-//   3) Escolhe uma categoria; vê só os inscritos dela.
-//   4) Distribui-os pelos 4 pools (A/B/C/D), na ordem da chave da IJF.
-//   5) Os BYES são SUGERIDOS automaticamente pelo tamanho do pool, mas cada um é
-//      EDITÁVEL: toca no "Bye" de um atleta para ligar/desligar. Ao tocar, esse
-//      pool passa a manual (a sugestão automática deixa de mexer nele).
-//   6) Guarda a categoria -> grava em `chave_atletas`. O cron "Chave Maestro"
-//      preenche o movimento e a chave ao vivo do Pro/Pro Max aparece sozinha.
-//   7) "Avisar jogadores" dispara a notificação a todos (uma vez por competição).
+// MOLDURA: distribui os inscritos de cada categoria pelos 4 pools (A/B/C/D); os
+//   byes são sugeridos automaticamente e editáveis (toca em "Bye"). Grava em
+//   `chave_atletas` -> alimenta a chave ao vivo do Pro/Pro Max.
+// HORÁRIO: mete a hora de início LOCAL da competição (confirmada na IJF). A
+//   cidade->fuso é automática. Guarda em `competicao_horarios` -> o mercado fecha
+//   1h antes. Passa à frente da estimativa por fuso.
+// AVISAR: notifica todos (uma vez por competição).
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Mascot } from "@/components/Mascot";
 import { useT } from "@/lib/i18n";
-import { CALENDARIO_2026, competicaoDaSemana, proximaDepoisDe } from "@/lib/calendario";
+import { CALENDARIO_2026, competicaoDaSemana, proximaDepoisDe, fusoDaCompeticao } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -44,14 +39,19 @@ function compPorOmissao(): string {
   return COMPS[0]?.idCompeticao || "";
 }
 
-// Sugestão de byes para um pool de n atletas: os primeiros (2^ceil(log2 n) − n)
-// da lista recebem bye. É só uma SUGESTÃO — o responsável ajusta à mão.
 function calcByes(ids: string[]): string[] {
   const n = ids.length;
   if (n <= 1) return [];
   let pow = 1;
   while (pow < n) pow *= 2;
   return ids.slice(0, pow - n);
+}
+
+// "-05:00" / "+09:00" a partir do fuso (offset em horas).
+function offsetStr(fuso: number): string {
+  const sign = fuso < 0 ? "-" : "+";
+  const h = Math.abs(fuso);
+  return `${sign}${String(h).padStart(2, "0")}:00`;
 }
 
 const norm = (c?: string) => String(c || "").toLowerCase().replace(/kg/g, "").replace(/\s+/g, "");
@@ -71,7 +71,6 @@ export default function EditorChave() {
   const [carregando, setCarregando] = useState(false);
   const [cat, setCat] = useState<string>("-73");
   const [pools, setPools] = useState<Pools>(POOLS_VAZIOS);
-  // Byes: em "auto" seguem calcByes(pools); em "manual" seguem o que o utilizador escolheu.
   const [manualByes, setManualByes] = useState<Pools>(POOLS_VAZIOS);
   const [autoBye, setAutoBye] = useState<Record<PoolId, boolean>>(AUTO_TODOS);
   const [feitas, setFeitas] = useState<Record<string, boolean>>({});
@@ -79,8 +78,14 @@ export default function EditorChave() {
   const [aGravar, setAGravar] = useState(false);
   const [msg, setMsg] = useState("");
   const [erro, setErro] = useState("");
+  // Horário de início.
+  const [horariosMap, setHorariosMap] = useState<Record<string, string>>({});
+  const [horarioLocal, setHorarioLocal] = useState("");
+  const [hMsg, setHMsg] = useState("");
+  const [hErro, setHErro] = useState("");
 
   const genero = CATS_M.includes(cat) ? "M" : "F";
+  const fuso = fusoDaCompeticao(comp);
 
   useEffect(() => {
     let vivo = true;
@@ -100,7 +105,6 @@ export default function EditorChave() {
     return data.session?.access_token || "";
   }
 
-  // Byes efetivos de um pool: automáticos (sugestão) ou manuais (escolha do utilizador).
   const byesDe = (p: PoolId): string[] => (autoBye[p] ? calcByes(pools[p]) : manualByes[p]);
 
   const carregarCat = useCallback((categoria: string, c: Record<string, MolduraGuardada>) => {
@@ -116,21 +120,18 @@ export default function EditorChave() {
     if (byesRaw) for (const p of POOLS) nb[p] = Array.isArray(byesRaw[p]) ? (byesRaw[p] as unknown[]).map(String) : [];
     setPools(np);
     setManualByes(nb);
-    // Moldura já guardada -> respeita os byes guardados (manual).
     setAutoBye({ A: false, B: false, C: false, D: false });
     setMsg(""); setErro("");
   }, []);
 
   const carregarComp = useCallback(async (idc: string) => {
-    setCarregando(true); setMsg(""); setErro("");
+    setCarregando(true); setMsg(""); setErro(""); setHMsg(""); setHErro("");
     try {
-      const [rAtletas, rMold] = await Promise.all([
+      const tk = await token();
+      const [rAtletas, rMold, rHor] = await Promise.all([
         fetch(`/api/atletas?id=${encodeURIComponent(idc)}`).then((r) => r.json()).catch(() => null),
-        (async () => {
-          const tk = await token();
-          return fetch(`/api/chaveamento-moldura?comp=${encodeURIComponent(idc)}`, tk ? { headers: { authorization: `Bearer ${tk}` } } : undefined)
-            .then((r) => r.json()).catch(() => null);
-        })(),
+        fetch(`/api/chaveamento-moldura?comp=${encodeURIComponent(idc)}`, tk ? { headers: { authorization: `Bearer ${tk}` } } : undefined).then((r) => r.json()).catch(() => null),
+        fetch(`/api/horarios`).then((r) => r.json()).catch(() => null),
       ]);
       setAtletas(Array.isArray(rAtletas?.atletas) ? rAtletas.atletas : []);
       const novoCache: Record<string, MolduraGuardada> = {};
@@ -143,6 +144,12 @@ export default function EditorChave() {
       }
       setCache(novoCache); setFeitas(novasFeitas);
       carregarCat(cat, novoCache);
+      // Horário: override guardado, senão o do calendário (se houver).
+      const mapa = (rHor?.horarios && typeof rHor.horarios === "object" ? rHor.horarios : {}) as Record<string, string>;
+      setHorariosMap(mapa);
+      const doCalendario = CALENDARIO_2026.find((s) => s.idCompeticao === idc)?.inicioUTC || "";
+      const stored = mapa[idc] || doCalendario;
+      setHorarioLocal(stored ? stored.slice(0, 16) : "");
     } finally {
       setCarregando(false);
     }
@@ -162,19 +169,13 @@ export default function EditorChave() {
       np[pool] = [...np[pool], id];
       return np;
     });
-    // Ao (re)colocar, tira-o de qualquer lista manual de byes; os pools em auto
-    // recalculam a sugestão sozinhos.
-    setManualByes((prev) => {
-      const nb: Pools = { A: prev.A.filter((x) => x !== id), B: prev.B.filter((x) => x !== id), C: prev.C.filter((x) => x !== id), D: prev.D.filter((x) => x !== id) };
-      return nb;
-    });
+    setManualByes((prev) => ({ A: prev.A.filter((x) => x !== id), B: prev.B.filter((x) => x !== id), C: prev.C.filter((x) => x !== id), D: prev.D.filter((x) => x !== id) }));
     setMsg("");
   }
   function tirar(id: string) {
     setPools((prev) => ({ A: prev.A.filter((x) => x !== id), B: prev.B.filter((x) => x !== id), C: prev.C.filter((x) => x !== id), D: prev.D.filter((x) => x !== id) }));
     setManualByes((prev) => ({ A: prev.A.filter((x) => x !== id), B: prev.B.filter((x) => x !== id), C: prev.C.filter((x) => x !== id), D: prev.D.filter((x) => x !== id) }));
   }
-  // Liga/desliga o bye de um atleta. Ao mexer, o pool passa a manual.
   function alternarBye(id: string, pool: PoolId) {
     const atual = byesDe(pool);
     const novo = atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id];
@@ -238,6 +239,37 @@ export default function EditorChave() {
     else setErro(t("chvm.naoGuardar"));
   }
 
+  // --- HORÁRIO ---
+  async function guardarHorario() {
+    setHErro(""); setHMsg("");
+    if (fuso === null) return;
+    if (!horarioLocal) { setHErro(t("chvh.invalido")); return; }
+    const iso = `${horarioLocal}:00${offsetStr(fuso)}`; // ex.: 2026-08-14T11:00:00-05:00
+    if (Number.isNaN(new Date(iso).getTime())) { setHErro(t("chvh.invalido")); return; }
+    const tk = await token();
+    const r = await fetch("/api/chaveamento-moldura", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${tk}` },
+      body: JSON.stringify({ acao: "horario", comp, inicioUTC: iso }),
+    });
+    const j = await r.json().catch(() => null);
+    if (!j?.ok) { setHErro(t("chvm.naoGuardar")); return; }
+    setHorariosMap((m) => ({ ...m, [comp]: iso }));
+    setHMsg(t("chvh.guardado"));
+  }
+  async function limparHorario() {
+    setHErro(""); setHMsg("");
+    const tk = await token();
+    await fetch("/api/chaveamento-moldura", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${tk}` },
+      body: JSON.stringify({ acao: "horario", comp, inicioUTC: "" }),
+    });
+    setHorariosMap((m) => { const n = { ...m }; delete n[comp]; return n; });
+    setHorarioLocal("");
+    setHMsg(t("chvh.removido"));
+  }
+
   if (acesso === "a-ver") return <Centro texto={t("be.aVerificar")} />;
   if (acesso === "nao") return <SemAcesso />;
 
@@ -270,6 +302,27 @@ export default function EditorChave() {
             {COMPS.map((s) => <option key={s.idCompeticao} value={s.idCompeticao}>{s.nome}</option>)}
           </select>
         </Campo>
+
+        {/* HORÁRIO DE INÍCIO */}
+        <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 12, padding: "12px 13px", marginBottom: 16 }}>
+          <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: GOLD, marginBottom: 7 }}>{t("chvh.titulo")}</div>
+          {fuso === null ? (
+            <div style={{ fontSize: 12, color: "#ef8d83", lineHeight: 1.5 }}>{t("chvh.semFuso")}</div>
+          ) : (
+            <>
+              <input type="datetime-local" value={horarioLocal} onChange={(e) => setHorarioLocal(e.target.value)} style={{ ...inp, appearance: "auto" }} />
+              <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 5, lineHeight: 1.45 }}>
+                {t("chvh.fusoLabel")}: UTC{fuso >= 0 ? "+" : ""}{fuso} · {t("chvh.ajuda")}
+              </div>
+              {hErro && <Aviso cor="#ef8d83" texto={hErro} />}
+              {hMsg && <Aviso cor="#7fd1a3" texto={hMsg} />}
+              <div style={{ display: "flex", gap: 8, marginTop: 9 }}>
+                <button onClick={guardarHorario} style={btnSec}>{t("chvh.guardar")}</button>
+                {horariosMap[comp] && <button onClick={limparHorario} style={btnSec}>{t("chvh.limpar")}</button>}
+              </div>
+            </>
+          )}
+        </div>
 
         {carregando ? (
           <div style={{ fontSize: 13, color: "#7c8a82", textAlign: "center", padding: "24px 0", fontFamily: FD, letterSpacing: "0.08em", textTransform: "uppercase" }}>{t("chvm.aCarregarInscritos")}</div>
