@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Oswald, Manrope } from "next/font/google";
 import "./globals.css";
 import { RegistarServiceWorker } from "@/components/RegistarServiceWorker";
+import { CarregarHorarios } from "@/components/CarregarHorarios";
 import { JudoguiProvider } from "@/components/JudoguiProvider";
 import { TatameProvider } from "@/components/TatameProvider";
 import { LinguaProvider } from "@/lib/i18n";
@@ -57,6 +58,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <RegistarServiceWorker />
+        <CarregarHorarios />
         {/* O LinguaProvider envolve TUDO: qualquer ecrã pode chamar useT() sem
             se preocupar em ser embrulhado. Fica por fora dos outros providers
             porque não depende de nenhum deles — e porque, se um dia o judogui
