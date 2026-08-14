@@ -17,7 +17,7 @@ import { useNivel } from "@/lib/useNivel";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
 import { useTatame } from "@/components/TatameProvider";
-import { useT } from "@/lib/i18n";
+import { useT, useRotuloFaixa } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -145,7 +145,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   // Nível para o cartão de partilha. Do useNivel() (tabela `users`).
   const { ehPro: souPro, ehProMax: souProMax } = useNivel();
   const meuNivel: "normal" | "pro" | "pro_max" = souProMax ? "pro_max" : souPro ? "pro" : "normal";
-  const [nomeTime, setNomeTime] = useState("Equipa");
+  const [nomeTime, setNomeTime] = useState(t("res.equipa"));
   const [escudoAlvo, setEscudoAlvo] = useState<Identity | null>(null);
   const [nomeComp, setNomeComp] = useState<string>("");
   const [itens, setItens] = useState<ItemVisita[]>([]);
@@ -171,7 +171,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
       if (partes.length !== 3) return "";
       return `${partes[2]}/${partes[1]}/${partes[0]}`;
     })();
-  const linhaRodada = [rodadaNum ? `Rodada ${rodadaNum}` : "", dataRodada].filter(Boolean).join(" · ");
+  const linhaRodada = [rodadaNum ? t("pl.rodadaN", { n: rodadaNum }) : "", dataRodada].filter(Boolean).join(" · ");
   // Nome a MOSTRAR desta competição: esconde a cidade se for um clássico ainda
   // por abrir. Importa sobretudo no ecrã "mercado ainda aberto" — seria absurdo
   // dizer "ainda não podes ver" e no mesmo fôlego revelar a cidade de 2018.
@@ -214,7 +214,7 @@ useEffect(() => {
             const p = pool.get(id);
             return {
               id,
-              nome: p?.name || String(a.nome || "Atleta"),
+              nome: p?.name || String(a.nome || t("mt.atletaFallback")),
               pais: p?.countryIso || String(a.pais || ""),
               categoria: p?.category || String(a.categoria || ""),
               capitao: !!a.capitao,
@@ -226,7 +226,7 @@ useEffect(() => {
         for (const a of base) pontosBase[String(a.id)] = Number(a.pontos) || 0;
         setItens(novosItens);
         setCapitao(eqJson.capitao ? String(eqJson.capitao) : null);
-        setNomeTime(String(eqJson.nome_time || "Equipa"));
+        setNomeTime(String(eqJson.nome_time || t("res.equipa")));
         setEscudoAlvo((eqJson.escudo as Identity) ?? null);
         setPontos(pontosBase);
         // Ronda passada -> há resultados congelados; ronda a decorrer -> espera a
@@ -284,7 +284,7 @@ return (
   <style>{`@keyframes ilp{0%,100%{opacity:1}50%{opacity:.25}} .ilp{animation:ilp 1.1s ease-in-out infinite}`}</style>
   <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 40px" }}>
   <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
-  <button onClick={() => router.back()} aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", cursor: "pointer", flexShrink: 0 }}>
+  <button onClick={() => router.back()} aria-label={t("comum.voltar")} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", cursor: "pointer", flexShrink: 0 }}>
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
   </button>
   <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>{souEu ? t("mt.teuDojo") : t("mt.dojoRival")}</h1>
@@ -313,8 +313,9 @@ return (
       <div style={{ fontSize: 32, marginBottom: 6 }}>🔒</div>
       <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>{t("mt.mercadoAberto")}</h2>
       <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: 0 }}>
-      As equipas {nomeCompMostrar ? <>de <strong style={{ color: "#f1ede2" }}>{nomeCompMostrar}</strong> </> : "desta rodada "}
-      só ficam visíveis quando o mercado fechar. Assim ninguém copia a escalação antes da hora — volta quando a competição começar.
+      {nomeCompMostrar
+        ? (() => { const p = t("mt.bloqComComp").split("%A%"); return <>{p[0]}<strong style={{ color: "#f1ede2" }}>{nomeCompMostrar}</strong>{p[1]}</>; })()
+        : t("mt.bloqSemComp")}
       </p>
       </div>
     )}
@@ -374,7 +375,7 @@ return (
       <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={corFaixa} expression={phase === "ao-vivo" ? "determinado" : "feliz"} /></div>
       <div>
       <div style={{ fontSize: 12, color: "#93a39a" }}>{aDecorrerAgora ? t("equipa.rodadaADecorrer") : t("mt.resultadoRodada")}</div>
-      {squadValue && <div style={{ fontSize: 12, color: "#7fd1a3", fontWeight: 700, marginTop: 2 }}>{`Valor da equipa: JC ${squadValue}`}</div>}
+      {squadValue && <div style={{ fontSize: 12, color: "#7fd1a3", fontWeight: 700, marginTop: 2 }}>{t("mt.valorEquipa", { v: squadValue })}</div>}
       </div>
       </div>
       <div style={{ textAlign: "right" }}>
@@ -386,7 +387,7 @@ return (
           <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 11, color: "#7fd1a3" }}>
           <span className="ilp" style={{ width: 7, height: 7, borderRadius: "50%", background: "#7fd1a3" }} />
-          Ao vivo · atualizado às {horaTick}
+          {t("mt.aoVivoAtualizado", { hora: horaTick })}
           </div>
           </div>
         )}
@@ -400,7 +401,7 @@ return (
       {souEu && itens.length > 0 && (
           <button onClick={() => setPartilhar(true)} style={{ width: "100%", marginTop: 8, padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
-          Partilhar a minha equipa
+          {t("mt.partilharMinhaEquipa")}
           </button>
         )}
       </>
@@ -470,7 +471,8 @@ function MeuTimeInner() {
   const router = useRouter();
   // Faixa REAL do jogador: cor para o Dôdo, nome para o cabeçalho e para o
   // cartão de partilha. Substitui os antigos BELT/BELT_HEX fixos.
-  const { cor: corFaixa, nome: nomeFaixa } = useFaixa();
+  const { faixa: faixaKey, cor: corFaixa, nome: nomeFaixa } = useFaixa();
+  const rotuloFaixa = useRotuloFaixa();
   // Marca "montar" (?montar=1): ativada pelo lixo. Enquanto está no ciclo
   // mercado<->meu-time, o meu-time mostra VAZIO (ignora a equipa salva) para a
   // pessoa montar uma nova. Sair do ciclo (link sem o param) restaura a antiga;
@@ -855,11 +857,11 @@ function MeuTimeInner() {
     <style>{`@keyframes ilp{0%,100%{opacity:1}50%{opacity:.25}} .ilp{animation:ilp 1.1s ease-in-out infinite} @keyframes ilsave{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.30)}} .ilsave{animation:ilsave 1.2s ease-in-out infinite} @keyframes ilglow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .ilglow{animation:ilglow 1.3s ease-in-out infinite;border-radius:14px} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
     <div style={{ maxWidth: 460, margin: "0 auto", padding: dirty ? "14px 14px 96px" : "14px 14px 40px" }}>
     <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
-    <a href="/inicio" onClick={(e) => { e.preventDefault(); tryLeave("/inicio"); }} aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
+    <a href="/inicio" onClick={(e) => { e.preventDefault(); tryLeave("/inicio"); }} aria-label={t("comum.voltar")} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
     </a>
     <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, flex: 1 }}>{t("mt.titulo")}</h1>
-    <button onClick={() => { setTutKeyAberta(emCompeticao ? TUT_COMP_KEY : TUT_EDICAO_KEY); setGuide(0); }} aria-label="Como funciona" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
+    <button onClick={() => { setTutKeyAberta(emCompeticao ? TUT_COMP_KEY : TUT_EDICAO_KEY); setGuide(0); }} aria-label={t("mt.comoFunciona")} style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
     </header>
     {(!temEquipa || equipaIrresoluvel) ? (
         <div style={{ textAlign: "center", padding: "26px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
@@ -882,7 +884,7 @@ function MeuTimeInner() {
         <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name}</div>
         <div style={{ fontSize: 12, color: GOLD, display: "flex", alignItems: "center", gap: 6 }}>
         <span style={{ width: 10, height: 10, borderRadius: 3, background: corFaixa, border: "1px solid rgba(255,255,255,0.25)", flexShrink: 0 }} />
-        Faixa {nomeFaixa}
+        {rotuloFaixa(faixaKey)}
         </div>
         </div>
         </div>
@@ -893,7 +895,7 @@ function MeuTimeInner() {
         {patrimonio !== null ? `JC ${fmt(patrimonio)}` : "—"}
         </div>
         {/* O saldo também interessa aqui: é com ele que se compra. */}
-        <div style={{ fontSize: 10, color: "#7c8a82", marginTop: 2 }}>Saldo JC {fmt(saldo)}</div>
+        <div style={{ fontSize: 10, color: "#7c8a82", marginTop: 2 }}>{t("mt.saldoJC", { v: fmt(saldo) })}</div>
         </div>
         </div>
         </div>
@@ -905,7 +907,7 @@ function MeuTimeInner() {
             <div style={{ width: 30, height: 30, flexShrink: 0 }}><Mascot belt={corFaixa} expression="indicando" /></div>
             <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: "#e2655a" }}>
-            {ausentesIds.length === 1 ? "1 atleta indisponível" : `${ausentesIds.length} atletas indisponíveis`}
+            {ausentesIds.length === 1 ? t("mt.umIndispTitulo") : t("mt.variosIndispTitulo", { n: ausentesIds.length })}
             </div>
             <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "5px 0 0" }}>
             {ausentesIds.length === 1
@@ -952,7 +954,7 @@ function MeuTimeInner() {
         {ausentesIds.length > 0 && (
             <div style={{ marginTop: 14, background: "#121815", border: "1px solid #3a2422", borderRadius: 14, padding: "12px 14px" }}>
             <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#ef8d83", marginBottom: 10 }}>
-            Indisponíveis nesta competição
+            {t("mt.indisponiveisComp")}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {ausentesIds.map((id) => (
@@ -977,10 +979,10 @@ function MeuTimeInner() {
         <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={corFaixa} expression={emCompeticao ? "determinado" : "feliz"} /></div>
         <div>
         <div style={{ fontSize: 12, color: "#93a39a" }}>
-        {emCompeticao ? t("equipa.rodadaADecorrer") : "Mercado aberto"}
+        {emCompeticao ? t("equipa.rodadaADecorrer") : t("mt.mercadoAbertoStatus")}
         </div>
         <div style={{ fontSize: 12, color: "#7fd1a3", fontWeight: 700, marginTop: 2 }}>
-        {`Valor da equipa: JC ${squadValue}`}
+        {t("mt.valorEquipa", { v: squadValue })}
         </div>
         </div>
         </div>
@@ -988,38 +990,38 @@ function MeuTimeInner() {
         <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>
         {emCompeticao ? totalPts : `JC ${squadValue}`}
         </div>
-        <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{emCompeticao ? "pts" : "valor"}</div>
+        <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{emCompeticao ? "pts" : t("mt.valor")}</div>
         </div>
         </div>
         {emCompeticao ? (
             <>
             <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
-            A tua equipa está em competição. Podes acompanhar os pontos aqui — o mercado abre de novo para a próxima rodada.
+            {t("mt.equipaEmCompeticao")}
             {horaTick && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 6, fontSize: 11, color: "#7fd1a3" }}>
                 <span className="ilp" style={{ width: 7, height: 7, borderRadius: "50%", background: "#7fd1a3" }} />
-                Ao vivo · atualizado às {horaTick}
+                {t("mt.aoVivoAtualizado", { hora: horaTick })}
                 </div>
               )}
             </div>
             <button onClick={() => setModal({ kind: "share" })} style={{ width: "100%", marginTop: 12, padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
             <ShareIcon />
-            Partilhar a minha equipa
+            {t("mt.partilharMinhaEquipa")}
             </button>
             </>
           ) : (
             <>
             <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-            <button onClick={() => setModal({ kind: "trash" })} aria-label="Limpar equipa" style={{ width: 46, borderRadius: 11, border: "1px solid #3a2422", background: "transparent", color: "#ef8d83", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <button onClick={() => setModal({ kind: "trash" })} aria-label={t("mt.ariaLimpar")} style={{ width: 46, borderRadius: 11, border: "1px solid #3a2422", background: "transparent", color: "#ef8d83", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
             <TrashIcon />
             </button>
-            <button onClick={() => setModal({ kind: "share" })} aria-label="Partilhar equipa" style={{ width: 46, borderRadius: 11, border: "1px solid #243029", background: "transparent", color: "#cfd8d2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <button onClick={() => setModal({ kind: "share" })} aria-label={t("mt.ariaPartilhar")} style={{ width: 46, borderRadius: 11, border: "1px solid #243029", background: "transparent", color: "#cfd8d2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
             <ShareIcon />
             </button>
             <a href={montar ? "/mercado?montar=1" : "/mercado"} onClick={(e) => { e.preventDefault(); tryLeave(montar ? "/mercado?montar=1" : "/mercado"); }} style={{ flex: 1, textAlign: "center", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{t("mt.verMercado")}</a>
             </div>
             <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 14 }}>
-            Toca num atleta para o tornares capitão ou venderes. Toca num lugar vazio para ir ao Mercado.
+            {t("mt.tocaAtleta")}
             </p>
             </>
           )}
@@ -1031,7 +1033,7 @@ function MeuTimeInner() {
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 60 }}>
         <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ flex: 1, fontSize: 12, color: "#cfd8d2" }}>{t("mt.porGuardar")}</div>
-        <button onClick={() => salvar()} disabled={savingCloud} className={!savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : "Salvar equipa"}</button>
+        <button onClick={() => salvar()} disabled={savingCloud} className={!savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? t("mt.aGuardar") : t("mt.salvarEquipa")}</button>
         </div>
         </div>
       )}
@@ -1097,7 +1099,7 @@ function MeuTimeInner() {
         <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
         <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>{t("mt.cuidadoAlteracoes")}</h2>
         <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>{t("mt.cuidadoSub")}</p>
-        <button onClick={() => salvar(leaveTo)} disabled={savingCloud} style={{ ...primaryBtn, opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? "A guardar…" : t("mt.salvarAlteracoes")}</button>
+        <button onClick={() => salvar(leaveTo)} disabled={savingCloud} style={{ ...primaryBtn, opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? t("mt.aGuardar") : t("mt.salvarAlteracoes")}</button>
         <button onClick={() => { setModal(null); setLeaveTo(null); }} style={ghostBtn}>{t("comum.fechar")}</button>
         </div>
         </div>
@@ -1120,11 +1122,11 @@ function MeuTimeInner() {
         <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>{t("mt.equipaIncompleta")}</h2>
         <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>
         {isComplete(saved)
-          ? "As tuas alterações estão incompletas e não podem ser guardadas assim. Se saíres, mantemos a tua equipa anterior — completa — e descartamos estas alterações."
+          ? t("mt.incompletaMantem")
           : t("mt.soCompleta")}
         </p>
         <button onClick={sairDescartando} style={{ ...primaryBtn, background: "#e2655a", color: "#1b0f0e" }}>
-        {isComplete(saved) ? "Sair e manter a anterior" : "Sair sem equipa"}
+        {isComplete(saved) ? t("mt.sairManter") : t("mt.sairSemEquipa")}
         </button>
         <button onClick={() => { setModal(null); setLeaveTo(null); }} style={ghostBtn}>{t("mt.continuarMontar")}</button>
         </div>
@@ -1231,7 +1233,7 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
     </div>
     <div style={{ fontSize: 12, color: "#93a39a" }}>{code3(a.countryIso)} · {a.category}kg</div>
     </div>
-    <button onClick={onClose} aria-label="Fechar" style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer" }}>✕</button>
+    <button onClick={onClose} aria-label={t("comum.fechar")} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 20, cursor: "pointer" }}>✕</button>
     </div>
     <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
     <div style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "10px 12px" }}>
@@ -1245,7 +1247,7 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
         {resumoLutas ? (
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2 }}>
             <span style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: "#f1ede2" }}>{resumoLutas.lutas}</span>
-            <span style={{ fontSize: 11, color: "#93a39a" }}>{resumoLutas.lutas === 1 ? "luta" : "lutas"}</span>
+            <span style={{ fontSize: 11, color: "#93a39a" }}>{resumoLutas.lutas === 1 ? t("mt.luta") : t("mt.lutas")}</span>
             <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#7fd1a3", marginLeft: 2 }}>{resumoLutas.vitorias}V</span>
             <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#ef8d83" }}>{resumoLutas.derrotas}D</span>
             </div>
@@ -1273,7 +1275,7 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
         <div style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "14px", textAlign: "center", fontSize: 12.5, color: "#93a39a", marginBottom: editavel ? 16 : 0, lineHeight: 1.5 }}>
         {podeVerPontos
           ? t("mt.aindaNaoComecou")
-          : "🔒 Os pontos só aparecem depois de o mercado fechar. Assim ninguém escolhe a equipa a olhar para os resultados."}
+          : t("mt.pontosBloqueados")}
         </div>
       )}
     {/* DECOMPOSIÇÃO luta-a-luta — só quando há resultados E se podem ver. */}
@@ -1299,7 +1301,7 @@ function DetalheLutas({ estado, captain }: { estado: EstadoDetalhe; captain: boo
   if (estado.fase === "carregando") {
     return (
       <div style={{ marginTop: 14, textAlign: "center", fontSize: 12, color: "#93a39a", fontFamily: FD, letterSpacing: "0.05em" }}>
-      A carregar o detalhe…
+      {t("mt.aCarregarDetalhe")}
       </div>
     );
   }
@@ -1315,7 +1317,7 @@ function DetalheLutas({ estado, captain }: { estado: EstadoDetalhe; captain: boo
   return (
     <div style={{ marginTop: 16 }}>
     <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a", marginBottom: 10 }}>
-    Como pontuou {captain && <span style={{ color: "#FF8F00" }}>· valores simples (capitão dobra no total)</span>}
+    {t("mt.comoPontuou")} {captain && <span style={{ color: "#FF8F00" }}>{t("mt.valoresSimplesCap")}</span>}
     </div>
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
     {estado.lutas.map((l, idx) => (
@@ -1353,7 +1355,7 @@ function DetalheLutas({ estado, captain }: { estado: EstadoDetalhe; captain: boo
     </div>
     {captain && (
         <div style={{ fontSize: 11, color: "#FF8F00", marginTop: 6, textAlign: "center" }}>
-        Como capitão, este total conta a dobrar na tua pontuação da rodada.
+        {t("mt.comoCapitaoDobra")}
         </div>
       )}
     </div>
@@ -1388,7 +1390,7 @@ function SeletorTatame({ aberto, onToggle, atual, isProMax, onEscolher }: { aber
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
             </span>
             <div style={{ fontSize: 12, color: "#cdd9e6", lineHeight: 1.5 }}>
-            Trocar a cor do tatame é exclusivo do <strong style={{ color: "#7fb8f5" }}>Pro Max</strong>. Toca num tema para saber mais.
+            {(() => { const p = t("mt.tatameProMax").split("%A%"); return <>{p[0]}<strong style={{ color: "#7fb8f5" }}>Pro Max</strong>{p[1]}</>; })()}
             </div>
             </div>
           )}
