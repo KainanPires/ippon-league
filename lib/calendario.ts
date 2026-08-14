@@ -115,7 +115,7 @@ export const CALENDARIO_2026: SemanaCalendario[] = [
   { semana: 30, idCompeticao: "1601", nome: "Grand Slam 2018 — Clássico", nomeCompleto: "Grand Slam Osaka 2018 — Clássico", nivel: "Grand Slam", de: "2026/07/25", classico: true, anoOriginal: 2018 },
   { semana: 31, idCompeticao: "1598", nome: "Grand Prix 2018 — Clássico", nomeCompleto: "Grand Prix The Hague 2018 — Clássico", nivel: "Grand Prix", de: "2026/08/01", classico: true, anoOriginal: 2018 },
   { semana: 32, idCompeticao: "1746", nome: "Grand Prix 2019 — Clássico", nomeCompleto: "Grand Prix Montreal 2019 — Clássico", nivel: "Grand Prix", de: "2026/08/08", classico: true, anoOriginal: 2019 },
-  { semana: 33, idCompeticao: "3205", nome: "Lima Grand Prix",                         nivel: "Grand Prix",    de: "2026/08/14", classico: false },
+  { semana: 33, idCompeticao: "3205", nome: "Lima Grand Prix",                         nivel: "Grand Prix",    de: "2026/08/14", classico: false, inicioUTC: "2026-08-14T11:00:00-05:00" },
   { semana: 34, idCompeticao: "3335", nome: "Lima Panamerican Open",                   nivel: "Open",          de: "2026/08/18", classico: false },
   { semana: 35, idCompeticao: "3225", nome: "Lausanne Grand Slam",                     nivel: "Grand Slam",    de: "2026/08/28", classico: false },
   { semana: 36, idCompeticao: "3336", nome: "San Salvador Panamerican Open",           nivel: "Open",          de: "2026/09/05", classico: false },
@@ -202,28 +202,34 @@ export interface EstadoMercado {
  * - Com hora oficial (inicioUTC): fecho = início - 1h, ao minuto.
  * - Sem hora oficial: cai no comportamento por data (aberto até ao dia do início).
  */
+// Melhor estimativa do INÍCIO oficial (em UTC), por ordem de confiança:
+//   1) `inicioUTC` confirmado (preciso);
+//   2) 9h LOCAIS do dia `de`, no fuso da cidade (FUSO_POR_CIDADE) — a política
+//      acordada quando não há horário: "começa às 9h locais";
+//   3) meia-noite UTC do dia `de` (último recurso, cidade desconhecida).
+// É a MESMA verdade usada pelo fecho do mercado E pela regra das 60h.
+function inicioEstimado(s: SemanaCalendario): { inicio: Date; preciso: boolean } {
+  if (s.inicioUTC) return { inicio: new Date(s.inicioUTC), preciso: true };
+  const [ano, mes, dia] = s.de.split("/").map((x) => parseInt(x, 10));
+  const fuso = FUSO_POR_CIDADE[chaveCidade(s.nome)];
+  if (fuso !== undefined) return { inicio: new Date(Date.UTC(ano, mes - 1, dia, 9 - fuso, 0, 0)), preciso: false };
+  return { inicio: new Date(Date.UTC(ano, mes - 1, dia, 0, 0, 0)), preciso: false };
+}
+
 export function estadoMercado(s: SemanaCalendario, agora: Date = new Date()): EstadoMercado {
-  if (s.inicioUTC) {
-    const inicio = new Date(s.inicioUTC);
-    const fecho = new Date(inicio.getTime() - FECHO_ANTES_MS);
-    const msAteFecho = fecho.getTime() - agora.getTime();
-    return {
-      estado: msAteFecho > 0 ? "aberto" : "fechado",
-      temHora: true,
-      inicio,
-      fecho,
-      msAteFecho,
-    };
-  }
-  // Fallback por data (sem hora confirmada): aberto enquanto não chega o dia do início.
-  const inicioDia = new Date(s.de.replace(/\//g, "-") + "T00:00:00");
-  const aberto = agora.getTime() < inicioDia.getTime();
+  // Fecho = 1h antes do INÍCIO ESTIMADO. Antes, sem `inicioUTC`, fechava à
+  // meia-noite UTC do dia `de` — ignorava o fuso e podia fechar o mercado muitas
+  // horas antes do início real (ex.: Lima, UTC-5, fechava de madrugada quando a
+  // competição só começava à tarde em UTC). Agora usa o fuso da cidade.
+  const { inicio, preciso } = inicioEstimado(s);
+  const fecho = new Date(inicio.getTime() - FECHO_ANTES_MS);
+  const msAteFecho = fecho.getTime() - agora.getTime();
   return {
-    estado: aberto ? "aberto" : "fechado",
-    temHora: false,
-    inicio: inicioDia,
-    fecho: null,
-    msAteFecho: null,
+    estado: msAteFecho > 0 ? "aberto" : "fechado",
+    temHora: preciso,
+    inicio,
+    fecho,
+    msAteFecho,
   };
 }
 
@@ -281,8 +287,9 @@ export function textoFecho(s: SemanaCalendario, agora: Date = new Date()): strin
   const e = estadoMercado(s, agora);
   if (e.estado === "fechado") return "Mercado fechado";
   if (e.temHora && e.msAteFecho !== null) return `Mercado fecha em ${formatarContagem(e.msAteFecho)}`;
-  const inicioDia = new Date(s.de.replace(/\//g, "-") + "T00:00:00");
-  const dias = Math.max(0, Math.ceil((inicioDia.getTime() - agora.getTime()) / 86400000));
+  // Sem hora confirmada: conta os dias até ao fecho estimado (1h antes do início local).
+  const alvo = e.fecho ? e.fecho.getTime() : agora.getTime();
+  const dias = Math.max(0, Math.ceil((alvo - agora.getTime()) / 86400000));
   if (dias <= 1) return "Mercado fecha em 1 dia";
   return `Mercado fecha em ${dias} dias`;
 }
@@ -307,7 +314,6 @@ export function textoFecho(s: SemanaCalendario, agora: Date = new Date()): strin
 // ===========================================================================
 
 export const HORAS_ATE_FECHO_COPA = 60;
-const HORAS_FALLBACK_SEM_FUSO = 60; // alinhado com a regra (60h): cobre competições
 
 // Fuso horário (offset base em horas vs UTC) das cidades do CALENDARIO_2026.
 // Offsets-BASE (sem horário de verão): a margem de 60h absorve a diferença de
@@ -371,26 +377,11 @@ function chaveCidade(nome: string): string {
  * Regra das 60h a partir do início (ver explicação acima).
  */
 export function competicaoFechada(s: SemanaCalendario, agora: Date = new Date()): boolean {
-  // 1) Hora oficial confirmada: início + 60h.
-  if (s.inicioUTC) {
-    const fim = new Date(s.inicioUTC).getTime() + HORAS_ATE_FECHO_COPA * 3600 * 1000;
-    return agora.getTime() >= fim;
-  }
-
-  // 2) Sem hora: 9h locais do dia `de`, no fuso da cidade.
-  const fuso = FUSO_POR_CIDADE[chaveCidade(s.nome)];
-  if (fuso !== undefined) {
-    // 9h locais = 9h - fuso, em UTC. Ex.: Tahiti (-10) → 9h locais = 19h UTC.
-    const [ano, mes, dia] = s.de.split("/").map((x) => parseInt(x, 10));
-    const inicioUtcMs = Date.UTC(ano, mes - 1, dia, 9 - fuso, 0, 0);
-    const fim = inicioUtcMs + HORAS_ATE_FECHO_COPA * 3600 * 1000;
-    return agora.getTime() >= fim;
-  }
-
-  // 3) Cidade desconhecida: fallback seguro (meia-noite UTC do dia `de` + 72h).
-  const [ano, mes, dia] = s.de.split("/").map((x) => parseInt(x, 10));
-  const inicioUtcMs = Date.UTC(ano, mes - 1, dia, 0, 0, 0);
-  const fim = inicioUtcMs + HORAS_FALLBACK_SEM_FUSO * 3600 * 1000;
+  // Início estimado + 60h. Uma competição de judô dura 1-2 dias; 60h cobre com
+  // folga e absorve desvios de fuso/horário de verão. Usa a MESMA estimativa do
+  // fecho do mercado (inicioEstimado), para haver uma só verdade sobre o início.
+  const { inicio } = inicioEstimado(s);
+  const fim = inicio.getTime() + HORAS_ATE_FECHO_COPA * 3600 * 1000;
   return agora.getTime() >= fim;
 }
 
