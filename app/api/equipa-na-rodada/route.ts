@@ -30,6 +30,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { CALENDARIO_2026, estadoMercado, nomeCompeticao } from "@/lib/calendario";
+import { hidratarHorarios } from "@/lib/horarios";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -52,6 +53,7 @@ export async function GET(req: Request) {
   // PORTÃO ANTI-CÓPIA: mercado ainda aberto -> não revelamos a escalação.
   // (Se a competição não estiver no calendário, não há "mercado" gerido aqui;
   // nesse caso seguimos em frente — só os ids do calendário valem como rodadas.)
+  await hidratarHorarios();
   const semana = CALENDARIO_2026.find((c) => c.idCompeticao === comp);
   if (semana && estadoMercado(semana).estado === "aberto") {
     return NextResponse.json({
