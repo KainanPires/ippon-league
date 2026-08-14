@@ -23,8 +23,12 @@ import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { focoMercado, rotuloRodada } from "@/lib/calendario";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
+import { useT } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const GOLD = "#d9a441";
+// Tradutor injetado (mesmo tipo do useT). metaPosicao é módulo-puro (fora do
+// componente), por isso recebe o `t` de quem a chama — o efeito, que tem useT.
+type Tradutor = (chave: string, vars?: Record<string, string | number>) => string;
 // Um certificado partilhável (1º/2º/3º ou Melhor da Rodada).
 interface Positivo {
   chave: string;
@@ -61,15 +65,16 @@ interface MinhaLiga {
 function ident(escudo: Identity | null | undefined, nome: string): Identity {
   return { ...DEFAULT_IDENTITY, ...(escudo || {}), name: nome };
 }
-function metaPosicao(pos: PosicaoPodio): { medalha: string; cor: string; rotulo: string } {
-  if (pos === "campeao") return { medalha: "🥇", cor: GOLD, rotulo: "Campeão" };
-  if (pos === "vice") return { medalha: "🥈", cor: "#c8ccd2", rotulo: "Vice-campeão" };
-  return { medalha: "🥉", cor: "#c87f43", rotulo: "3º lugar" };
+function metaPosicao(t: Tradutor, pos: PosicaoPodio): { medalha: string; cor: string; rotulo: string } {
+  if (pos === "campeao") return { medalha: "🥇", cor: GOLD, rotulo: t("cc.campeao") };
+  if (pos === "vice") return { medalha: "🥈", cor: "#c8ccd2", rotulo: t("cc.vice") };
+  return { medalha: "🥉", cor: "#c87f43", rotulo: t("cc.terceiro") };
 }
 function posicaoDePodio(n: number): PosicaoPodio | null {
   return n === 1 ? "campeao" : n === 2 ? "vice" : n === 3 ? "terceiro" : null;
 }
 export function ResultadosConteudo() {
+  const t = useT();
   const [aCarregar, setACarregar] = useState(true);
   const [semSessao, setSemSessao] = useState(false);
   const [positivos, setPositivos] = useState<Positivo[]>([]);
@@ -99,7 +104,7 @@ export function ResultadosConteudo() {
         for (const r of mr.historico as Array<Record<string, unknown>>) {
           const nomeComp = String(r.nome_competicao || "");
           const rodada = rotuloRodada(String(r.id_competicao));       // "Rodada 24" ou ""
-          const escopo = String(r.rotulo || "Melhor da Rodada");      // "Mundial + Europa"
+          const escopo = String(r.rotulo || t("cc.melhorRodada"));    // "Mundial + Europa"
           // No CERTIFICADO: rodada + competição (o que o Kainan pediu).
           const nomeNoCertificado = rodada ? `${rodada} · ${nomeComp}` : nomeComp;
           // No CARTÃO da lista: a rodada vai na linha pequena, com o âmbito, e o
@@ -110,7 +115,7 @@ export function ResultadosConteudo() {
             variante: "rodada",
             posicao: "campeao",
             tituloRodada: escopo,
-            identity: ident(r.escudo as Identity | null, String(r.nome_time || "Equipa")),
+            identity: ident(r.escudo as Identity | null, String(r.nome_time || t("res.equipa"))),
             nomeCertificado: nomeNoCertificado,
             nParticipantes: Number(r.n_participantes || 0),
             medalha: "🥇",
@@ -147,20 +152,20 @@ export function ResultadosConteudo() {
         let nPart = 0;
         const g = await getJSON(`/api/liga/geral?tipo=${tipo}&comp=${idComp}&user_id=${uid}`);
         if (g && Array.isArray(g.membros)) nPart = (g.membros as unknown[]).length;
-        const m = metaPosicao(posPodio);
+        const m = metaPosicao(t, posPodio);
         const nomeLiga = tipo === "mundial"
-          ? `Liga Mundial ${ano}`
-          : `Liga Continental ${ano}`;
+          ? `${t("lg.ligaMundial")} ${ano}`
+          : `${t("lg.ligaContinental")} ${ano}`;
         pos.push({
           chave: `ano-${tipo}-${ano}`,
           variante: "anual",
           posicao: posPodio,
-          identity: ident(eu.escudo as Identity | null, String(eu.nome_time || "Equipa")),
-          nomeCertificado: `${nomeLiga} · Época completa`,
+          identity: ident(eu.escudo as Identity | null, String(eu.nome_time || t("res.equipa"))),
+          nomeCertificado: `${nomeLiga} · ${t("res.epocaCompleta")}`,
           nParticipantes: nPart,
           medalha: m.medalha,
           cor: m.cor,
-          rotulo: `${m.rotulo} do ano`,
+          rotulo: t("res.doAno", { rotulo: m.rotulo }),
           contexto: nomeLiga,
           pontos: Number(eu.pontos || 0),
         });
@@ -195,7 +200,7 @@ export function ResultadosConteudo() {
             String(podio.vice) === uid ? "vice" :
             terceiros.includes(uid) ? "terceiro" : null;
           if (minhaPos) {
-            const m = metaPosicao(minhaPos);
+            const m = metaPosicao(t, minhaPos);
             pos.push({
               chave: `copa-${l.id}`,
               variante: "anual",
@@ -214,7 +219,7 @@ export function ResultadosConteudo() {
               chave: `copa-${l.id}`,
               identity: ident((meuIdent.escudo as Identity | null) ?? l.escudo, String(meuIdent.nome_time || l.name)),
               contexto: l.name,
-              detalhe: "Copa Ippon · eliminado",
+              detalhe: `Copa Ippon · ${t("res.eliminado")}`,
             });
           }
         } else {
@@ -226,7 +231,7 @@ export function ResultadosConteudo() {
           const minhaPos = eu ? Number(eu.posicao) : 0;
           const posPodio = posicaoDePodio(minhaPos);
           if (eu && posPodio) {
-            const m = metaPosicao(posPodio);
+            const m = metaPosicao(t, posPodio);
             pos.push({
               chave: `liga-${l.id}`,
               variante: "anual",
@@ -237,7 +242,7 @@ export function ResultadosConteudo() {
               medalha: m.medalha,
               cor: m.cor,
               rotulo: m.rotulo,
-              contexto: `${l.name} · Pontos corridos`,
+              contexto: `${l.name} · ${t("res.pontosCorridos")}`,
               pontos: eu.pontos_geral != null ? Number(eu.pontos_geral) : null,
             });
           } else {
@@ -245,7 +250,7 @@ export function ResultadosConteudo() {
               chave: `liga-${l.id}`,
               identity: ident((eu?.escudo as Identity | null) ?? l.escudo, String(eu?.nome_time || l.name)),
               contexto: l.name,
-              detalhe: eu && minhaPos > 0 ? `Pontos corridos · ${minhaPos}º de ${total}` : "Pontos corridos · terminada",
+              detalhe: eu && minhaPos > 0 ? `${t("res.pontosCorridos")} · ${t("res.posDeN", { pos: minhaPos, total })}` : `${t("res.pontosCorridos")} · ${t("res.terminada")}`,
             });
           }
         }
@@ -259,20 +264,20 @@ export function ResultadosConteudo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   if (aCarregar) {
-    return <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>A carregar…</div>;
+    return <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("comum.carregando")}</div>;
   }
   if (semSessao) {
     return (
       <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
-        <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 12 }}>Entra na tua conta para veres os teus resultados e certificados.</div>
-        <a href="/entrar?voltar=/ligas" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>Entrar</a>
+        <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 12 }}>{t("res.entraConta")}</div>
+        <a href="/entrar?voltar=/ligas" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 14 }}>{t("comecar.entrar")}</a>
       </div>
     );
   }
   if (positivos.length === 0 && outros.length === 0) {
     return (
       <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
-        <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Ainda não tens resultados.<br />Quando ficares no pódio de uma liga, copa ou rodada, o teu certificado aparece aqui.</div>
+        <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{t("res.semResultadosT")}<br />{t("res.semResultadosSub")}</div>
       </div>
     );
   }
@@ -281,8 +286,8 @@ export function ResultadosConteudo() {
       {/* Sub-abas: Títulos (conquistas, com certificado) vs Participações (4º+). */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14, borderBottom: "1px solid #1a221d" }}>
         {([
-          ["titulos", `Títulos${positivos.length ? ` (${positivos.length})` : ""}`],
-          ["participacoes", `Participações${outros.length ? ` (${outros.length})` : ""}`],
+          ["titulos", `${t("res.titulos")}${positivos.length ? ` (${positivos.length})` : ""}`],
+          ["participacoes", `${t("res.participacoes")}${outros.length ? ` (${outros.length})` : ""}`],
         ] as const).map(([k, label]) => (
           <button key={k} onClick={() => setAba(k)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${aba === k ? GOLD : "transparent"}`, color: aba === k ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>{label}</button>
         ))}
@@ -291,11 +296,11 @@ export function ResultadosConteudo() {
       {aba === "titulos" && (
         positivos.length === 0 ? (
           <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
-            <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Ainda não tens títulos.<br />Fica no top 3 de uma liga, copa ou rodada para ganhares o teu certificado.</div>
+            <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{t("res.semTitulosT")}<br />{t("res.semTitulosSub")}</div>
           </div>
         ) : (
           <>
-            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-2px 0 12px", lineHeight: 1.5 }}>As tuas conquistas — pódios de copa e liga, Campeão do ano e Melhor da Rodada. Toca para ver e partilhar o certificado.</p>
+            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-2px 0 12px", lineHeight: 1.5 }}>{t("res.introTitulos")}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {positivos.map((p) => (
                 <div key={p.chave} style={{ background: "#121815", border: `1px solid ${p.cor}`, borderRadius: 12, padding: "10px 12px" }}>
@@ -315,7 +320,7 @@ export function ResultadosConteudo() {
                   </div>
                   <button onClick={() => setCert(p)} style={{ width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: p.cor, color: p.posicao === "vice" ? "#14181a" : "#1b1208", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
-                    Ver / partilhar certificado
+                    {t("res.verPartilharCert")}
                   </button>
                 </div>
               ))}
@@ -327,11 +332,11 @@ export function ResultadosConteudo() {
       {aba === "participacoes" && (
         outros.length === 0 ? (
           <div style={{ background: "#121815", border: "1px dashed #2a3a33", borderRadius: 14, padding: "20px 14px", textAlign: "center" }}>
-            <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Sem participações por aqui.<br />As ligas e copas em que jogaste sem subir ao pódio aparecem nesta lista.</div>
+            <div style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{t("res.semPartT")}<br />{t("res.semPartSub")}</div>
           </div>
         ) : (
           <>
-            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-2px 0 12px", lineHeight: 1.5 }}>Ligas e copas em que participaste e não subiste ao pódio. Fazem parte do teu histórico.</p>
+            <p style={{ fontSize: 12, color: "#7c8a82", margin: "-2px 0 12px", lineHeight: 1.5 }}>{t("res.introParticipacoes")}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {outros.map((o) => (
                 <div key={o.chave} style={{ display: "flex", alignItems: "center", gap: 11, background: "#10140f", border: "1px solid #1f2a23", borderRadius: 12, padding: "10px 12px" }}>
