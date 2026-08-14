@@ -7,7 +7,7 @@ import { Desempenho } from "@/components/Desempenho";
 import { GaleriaResumos } from "@/components/GaleriaResumos";
 import { desempenhosVistosConta, marcarDesempenhoVisto, aoVivoVistoConta, marcarAoVivoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
-import { focoMercado, textoFecho, competicaoDaSemana, nomeCompeticao } from "@/lib/calendario";
+import { focoMercado, textoFecho, competicaoDaSemana, nomeCompeticao, estadoMercado } from "@/lib/calendario";
 import { mensagensModaisDeHoje, type MensagemEspecial } from "@/lib/mensagensEspeciais";
 import { continenteDoPais } from "@/lib/continentes";
 import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
@@ -284,6 +284,12 @@ export default function Inicio() {
               if (!active) return;
               if (aDecorrer) {
                 if (vistos[aDecorrer.idCompeticao]) return;
+                // A competição ainda NÃO começou. O mercado fecha 1h ANTES do
+                // início, por isso entre o fecho e o início real a rodada ainda
+                // vai acontecer — não há desempenho para mostrar. Sem isto,
+                // aparecia "+0 pontos" como se a rodada já tivesse terminado.
+                const emAoVivo = estadoMercado(aDecorrer);
+                if (emAoVivo.inicio && Date.now() < emAoVivo.inicio.getTime()) return;
                 // Já vi o ponto de situação ao vivo desta competição (guardado na CONTA)?
                 // Então não reaparece automaticamente — fica acessível pela galeria de
                 // resumos ("Os meus resumos"). Só aparece sozinho UMA vez.
