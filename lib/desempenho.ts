@@ -16,6 +16,11 @@ import { resolve, type TeamState } from "@/lib/team";
 import type { Athlete } from "@/lib/athletes";
 import { numeroDaRodada } from "@/lib/calendario";
 
+// Tradutor injetado (mesmo tipo do useT). Módulo puro: não usa hooks, recebe o
+// `t` de quem o chama (o componente Desempenho tem useT e passa-o). Assim as
+// mensagens ficam na língua do utilizador. Ver lib/i18n (chaves des.*).
+type Tradutor = (chave: string, vars?: Record<string, string | number>) => string;
+
 export interface DesempenhoRodada {
   idCompeticao: string;
   nomeCompeticao: string;
@@ -194,8 +199,27 @@ export async function buscarResumoExtra(idCompeticao: string, userId: string): P
 // `aoVivo` muda o enquadramento: durante a competição (vários dias) o resultado
 // é PARCIAL — nada de tom definitivo ("rodada para esquecer"). É um ponto de
 // situação: "vais com X, ainda dá para subir". O tom final só quando fecha.
-export function mensagemDesempenho(pontos: number, nome: string, aoVivo = false): string {
-  const n = nome || "Campeão";
+export function mensagemDesempenho(pontos: number, nome: string, aoVivo = false, t?: Tradutor): string {
+  const n = nome || (t ? t("des.campeao") : "Campeão");
+  // Caminho traduzido: quando o chamador passa o `t` (ex.: o modal Desempenho,
+  // que tem useT), devolvemos a mensagem na língua do utilizador. As chaves e o
+  // {n}/{pts} estão em lib/i18n (namespace des.*).
+  if (t) {
+    if (aoVivo) {
+      if (pontos >= 60) return t("des.msgVivo60", { n, pts: pontos });
+      if (pontos >= 30) return t("des.msgVivo30", { n, pts: pontos });
+      if (pontos >= 10) return t("des.msgVivo10", { n, pts: pontos });
+      if (pontos >= 0) return t("des.msgVivo0", { n, pts: pontos });
+      return t("des.msgVivoNeg", { n, pts: pontos });
+    }
+    if (pontos >= 60) return t("des.msg60", { n, pts: pontos });
+    if (pontos >= 30) return t("des.msg30", { n, pts: pontos });
+    if (pontos >= 10) return t("des.msg10", { n, pts: pontos });
+    if (pontos >= 0) return t("des.msg0", { n, pts: pontos });
+    return t("des.msgNeg", { n, pts: pontos });
+  }
+  // Fallback PT: chamadas sem tradutor (ex.: notificação local em app/inicio, que
+  // será migrada para passar o `t` na sua própria leva). Mantém o comportamento.
   if (aoVivo) {
     if (pontos >= 60) return `Que arranque, ${n}! Vais com ${pontos} pts e ainda há lutas pela frente. 🔥`;
     if (pontos >= 30) return `Bom ritmo, ${n}! Já levas ${pontos} pts — e a competição ainda vai a meio.`;
