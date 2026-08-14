@@ -306,15 +306,19 @@ export function focoMercado(agora: Date = new Date()): FocoMercado {
  * Texto pronto para mostrar o prazo do mercado de uma competição.
  * Usa a hora real (ao minuto) se houver `inicioUTC`; senão, conta por dias.
  */
-export function textoFecho(s: SemanaCalendario, agora: Date = new Date()): string {
+type Tradutor = (chave: string, vars?: Record<string, string | number>) => string;
+// textoFecho aceita um tradutor OPCIONAL: quem tem useT (ex.: /inicio) passa o
+// `t` e o texto sai na língua do utilizador; sem ele, mantém o PT (fallback para
+// chamadas ainda por migrar). Chaves em lib/i18n (cal.*).
+export function textoFecho(s: SemanaCalendario, t?: Tradutor, agora: Date = new Date()): string {
   const e = estadoMercado(s, agora);
-  if (e.estado === "fechado") return "Mercado fechado";
-  if (e.temHora && e.msAteFecho !== null) return `Mercado fecha em ${formatarContagem(e.msAteFecho)}`;
+  if (e.estado === "fechado") return t ? t("cal.mercadoFechado") : "Mercado fechado";
+  if (e.temHora && e.msAteFecho !== null) return t ? t("cal.fechaEm", { t: formatarContagem(e.msAteFecho) }) : `Mercado fecha em ${formatarContagem(e.msAteFecho)}`;
   // Sem hora confirmada: conta os dias até ao fecho estimado (1h antes do início local).
   const alvo = e.fecho ? e.fecho.getTime() : agora.getTime();
   const dias = Math.max(0, Math.ceil((alvo - agora.getTime()) / 86400000));
-  if (dias <= 1) return "Mercado fecha em 1 dia";
-  return `Mercado fecha em ${dias} dias`;
+  if (dias <= 1) return t ? t("cal.fecha1Dia") : "Mercado fecha em 1 dia";
+  return t ? t("cal.fechaNDias", { n: dias }) : `Mercado fecha em ${dias} dias`;
 }
 
 // ===========================================================================
