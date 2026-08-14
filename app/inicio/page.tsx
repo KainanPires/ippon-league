@@ -343,7 +343,7 @@ export default function Inicio() {
               setDesempenhoAoVivo(false);
               setDesempenho({ dados, team: teamComp });
               setExtra(ex);
-              await notificarResumo(cong.comp, cong.nome, dados);
+              await notificarResumo(cong.comp, cong.nome, dados, t);
             })();
         });
       return () => { active = false; };
@@ -541,7 +541,7 @@ export default function Inicio() {
         </a>
       )}
     <div ref={teamRef} className={glow("team")}>
-    {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo)} faixa={faixaJogo} patrimonio={patrimonio} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} />}
+    {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo, t)} faixa={faixaJogo} patrimonio={patrimonio} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} />}
     </div>
     {/* Lembrete de notificações: aparece depois de ter equipa montada. */}
     {!visitante && teamInfo && userIdState && <LembreteNotificacoes userId={userIdState} />}
@@ -554,7 +554,7 @@ export default function Inicio() {
     </div>
     <div style={{ fontSize: 15, fontWeight: 700 }}>{nomeComp}</div>
     <div style={{ fontSize: 12, color: "#93a39a", marginTop: 2 }}>
-    {comp.nivel}{ehClassico ? " · rodada especial" : ""} · está a valer pontos
+    {comp.nivel}{ehClassico ? ` · ${t("inicio.rodadaEspecial")}` : ""} · {t("inicio.aValerPontos")}
     </div>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
     {emAndamento ? (
@@ -563,7 +563,7 @@ export default function Inicio() {
         Em andamento · acompanha aqui
         </span>
       ) : (
-        <span style={{ fontSize: 12, color: "#7fd1a3" }}>{textoFecho(comp)}</span>
+        <span style={{ fontSize: 12, color: "#7fd1a3" }}>{textoFecho(comp, t)}</span>
       )}
     {emAndamento ? (
         visitante ? (
@@ -584,7 +584,7 @@ export default function Inicio() {
         </div>
         <div style={{ fontSize: 13, fontWeight: 700 }}>{nomeADecorrer ?? nomeComp}</div>
         <div style={{ fontSize: 12, color: "#93a39a", marginTop: 3, lineHeight: 1.4 }}>
-        A competição está a decorrer. Acompanha o chaveamento ao vivo e segue o caminho dos teus atletas na chave.
+        {t("inicio.competicaoDecorrer")}
         </div>
         {/* Botão para a chave ao vivo. Aparece a todos (com competição a
             decorrer), mas com destinos diferentes por nível:
@@ -626,13 +626,13 @@ export default function Inicio() {
         <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6 }}>{t("inicio.aCarregarLigas")}</div>
       ) : minhasLigas.length === 0 ? (
         <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6, lineHeight: 1.4 }}>
-        Não tens nenhuma liga a decorrer. Entra numa liga oficial, cria uma com os teus amigos — ou vê os teus títulos em Resultados.
+        {t("inicio.semLigas")}
         </div>
       ) : (
         minhasLigas.slice(0, 4).map((l) => (
             <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
             <span style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "70%" }}>{l.name}</span>
-            <span style={{ fontSize: 12, color: "#93a39a" }}>{l.membros} {l.membros === 1 ? "membro" : "membros"}</span>
+            <span style={{ fontSize: 12, color: "#93a39a" }}>{l.membros} {l.membros === 1 ? t("inicio.membro") : t("inicio.membros")}</span>
             </div>
           ))
       )}
@@ -689,17 +689,18 @@ export default function Inicio() {
     </main>
   );
 }
-async function notificarResumo(idComp: string, nomeComp: string, dados: DesempenhoRodada) {
+async function notificarResumo(idComp: string, nomeComp: string, dados: DesempenhoRodada, t: (chave: string, vars?: Record<string, string | number>) => string) {
   try {
     const chaveResumo = `ippon_notif_resumo_${idComp}`;
     if (localStorage.getItem(chaveResumo)) return;
     const cap = dados.capitao;
+    const msg = mensagemDesempenho(dados.pontuacaoTotal, "", false, t);
     const corpo = cap
-    ? `${mensagemDesempenho(dados.pontuacaoTotal, "")} Fizeste ${dados.pontuacaoTotal} pts — o teu capitão ${cap.atleta.name.split(" ").slice(-1)[0]} somou ${cap.pontos}.`
-    : `${mensagemDesempenho(dados.pontuacaoTotal, "")} Fizeste ${dados.pontuacaoTotal} pts nesta rodada.`;
+    ? t("inicio.resumoCorpoCap", { msg, pts: dados.pontuacaoTotal, cap: cap.atleta.name.split(" ").slice(-1)[0], capPts: cap.pontos })
+    : t("inicio.resumoCorpo", { msg, pts: dados.pontuacaoTotal });
     await criarNotificacao({
         tipo: "resumo_rodada",
-        titulo: `Resumo: ${nomeComp}`,
+        titulo: t("inicio.resumoTitulo", { comp: nomeComp }),
         corpo: corpo.trim(),
         link: "/meu-time",
       });
@@ -807,7 +808,7 @@ function TeamCreate({ corDodo = "#efeadd" }: { corDodo?: string }) {
     <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase" }}>{t("inicio.criarEquipa")}</div>
     <div style={{ fontSize: 12, color: "#cfe4d8", margin: "4px 0 14px" }}>{t("inicio.criarEquipaSub")}</div>
     <a href="/criar-equipa" style={{ display: "block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 13, borderRadius: 11, fontSize: 15, textDecoration: "none" }}>
-    Criar a minha equipa
+    {t("inicio.criarMinhaEquipa")}
     </a>
     </div>
     </div>
@@ -854,7 +855,7 @@ function TeamBuilt({ info, fechoTexto, faixa, patrimonio }: { info: { name: stri
     </div>
     <div style={{ fontSize: 12, color: "#7fd1a3", marginBottom: 10 }}>{fechoTexto}</div>
     <a href="/meu-time" style={{ display: "block", background: GOLD, color: "#1b211e", textAlign: "center", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 14, textDecoration: "none" }}>
-    Ver o meu time
+    {t("inicio.verMeuTime")}
     </a>
     </div>
     </div>
