@@ -202,6 +202,28 @@ export interface EstadoMercado {
  * - Com hora oficial (inicioUTC): fecho = início - 1h, ao minuto.
  * - Sem hora oficial: cai no comportamento por data (aberto até ao dia do início).
  */
+// ---------------------------------------------------------------------------
+// HORÁRIOS MANUAIS (override) — postos pelo responsável e guardados na base
+// (competicao_horarios). A app (components/CarregarHorarios) e o servidor
+// (lib/horarios) injetam-nos aqui UMA vez; a partir daí toda a lógica de mercado
+// os usa. Passam à frente do `inicioUTC` do calendário e da estimativa por fuso.
+// ---------------------------------------------------------------------------
+const OVERRIDES: Record<string, string> = {};
+
+/** Injeta/atualiza horários manuais. iso vazio/null remove o override. */
+export function aplicarHorarios(map: Record<string, string | null | undefined>): void {
+  for (const [id, iso] of Object.entries(map || {})) {
+    if (iso) OVERRIDES[String(id)] = String(iso);
+    else delete OVERRIDES[String(id)];
+  }
+}
+
+/** O início efetivo (override manual, senão o do calendário). undefined se nenhum. */
+export function horarioEfetivo(idCompeticao: string): string | undefined {
+  const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
+  return OVERRIDES[String(idCompeticao)] || s?.inicioUTC;
+}
+
 // Melhor estimativa do INÍCIO oficial (em UTC), por ordem de confiança:
 //   1) `inicioUTC` confirmado (preciso);
 //   2) 9h LOCAIS do dia `de`, no fuso da cidade (FUSO_POR_CIDADE) — a política
@@ -209,7 +231,8 @@ export interface EstadoMercado {
 //   3) meia-noite UTC do dia `de` (último recurso, cidade desconhecida).
 // É a MESMA verdade usada pelo fecho do mercado E pela regra das 60h.
 function inicioEstimado(s: SemanaCalendario): { inicio: Date; preciso: boolean } {
-  if (s.inicioUTC) return { inicio: new Date(s.inicioUTC), preciso: true };
+  const manual = OVERRIDES[s.idCompeticao] || s.inicioUTC;
+  if (manual) return { inicio: new Date(manual), preciso: true };
   const [ano, mes, dia] = s.de.split("/").map((x) => parseInt(x, 10));
   const fuso = FUSO_POR_CIDADE[chaveCidade(s.nome)];
   if (fuso !== undefined) return { inicio: new Date(Date.UTC(ano, mes - 1, dia, 9 - fuso, 0, 0)), preciso: false };
@@ -465,4 +488,16 @@ export function pontosVisiveis(s: SemanaCalendario, agora: Date = new Date()): b
 export function pontosVisiveisPorId(idCompeticao: string, agora: Date = new Date()): boolean {
   const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
   return s ? pontosVisiveis(s, agora) : false;
+}
+
+/**
+ * O fuso horário (offset base vs UTC) da cidade de uma competição, deduzido do
+ * nome (mesma tabela da regra das 60h). null se a cidade não estiver na tabela.
+ * Serve o editor de horários: a cidade -> fuso é automática.
+ */
+export function fusoDaCompeticao(idCompeticao: string): number | null {
+  const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
+  if (!s) return null;
+  const f = FUSO_POR_CIDADE[chaveCidade(s.nome)];
+  return f === undefined ? null : f;
 }
