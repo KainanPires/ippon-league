@@ -404,7 +404,7 @@ export default function Ligas() {
         <DodoRow dodo={dodo} />
         {!souPro && (
             <a href="/ippon-pro" style={{ display: "block", textAlign: "center", marginTop: 2, marginBottom: 4, background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "11px 14px", borderRadius: 10, textDecoration: "none", fontSize: 12.5, lineHeight: 1.4 }}>
-            🔒 Vês o ranking, mas só Pro concorre aos prémios · passa a Pro
+            {t("lg.bannerProPremios")}
             </a>
           )}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, marginBottom: 10 }}>
@@ -422,7 +422,7 @@ export default function Ligas() {
             <>
             {ativas.map((l) => (
                   <a key={l.id} href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}>
-                  <LeagueRow cfg={l.escudo || DEFAULT_IDENTITY} name={l.name} sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`} right={<ActionBtn kind="ver">{t("lg.abrir")}</ActionBtn>} />
+                  <LeagueRow cfg={l.escudo || DEFAULT_IDENTITY} name={l.name} sub={`${l.formato === "copa" ? "Copa Ippon" : t("res.pontosCorridos")} · ${l.membros} ${l.membros === 1 ? t("inicio.membro") : t("inicio.membros")}`} right={<ActionBtn kind="ver">{t("lg.abrir")}</ActionBtn>} />
                   </a>
                 ))}
             {semEspaco ? (
@@ -430,13 +430,13 @@ export default function Ligas() {
                 souPro={souPro}
                 titulo={t("lg.atingisteMaximo")}
                 texto={nivel === "promax"
-                  ? `Já estás em ${lim.pontos} ligas e ${lim.copa} mata-matas — é o máximo, mesmo com Pro Max.`
+                  ? t("lg.limiteMaxPromax", { pontos: lim.pontos, copa: lim.copa })
                   : nivel === "pro"
-                  ? `Já estás em ${lim.pontos} ligas e ${lim.copa} mata-matas. Com o Pro Max sobes até ${LIMITES.promax.pontos} de cada.`
-                  : `Com a conta gratuita tens ${lim.pontos} liga e ${lim.copa} mata-mata. Com o Ippon Pro sobes até ${LIMITES.pro.pontos} de cada.`}
+                  ? t("lg.limiteProSobe", { pontos: lim.pontos, copa: lim.copa, max: LIMITES.promax.pontos })
+                  : t("lg.limiteFreeMax", { pontos: lim.pontos, copa: lim.copa, max: LIMITES.pro.pontos })}
                 />
               ) : (
-                <a href="/criar-liga" style={{ display: "block", textAlign: "center", marginTop: 10, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 13 }}>+ Criar outra liga</a>
+                <a href="/criar-liga" style={{ display: "block", textAlign: "center", marginTop: 10, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, textDecoration: "none", fontSize: 13 }}>{t("lg.criarOutra")}</a>
               )}
             </>
           ) : (
@@ -451,16 +451,16 @@ export default function Ligas() {
             souPro={souPro}
             titulo={t("lg.semEspaco")}
             texto={nivel === "promax"
-              ? `Já estás em ${lim.pontos} ligas e ${lim.copa} mata-matas — é o máximo. Para entrares noutra liga, sai de uma; os mata-matas libertam-se quando terminarem.`
+              ? t("lg.limiteSemEspacoPromax", { pontos: lim.pontos, copa: lim.copa })
               : nivel === "pro"
-              ? `Já estás em ${lim.pontos} ligas e ${lim.copa} mata-matas. Com o Pro Max sobes até ${LIMITES.promax.pontos} de cada.`
-              : `Com a conta gratuita tens ${lim.pontos} liga e ${lim.copa} mata-mata. Para trocar de liga, sai da atual — ou passa a Ippon Pro para teres ${LIMITES.pro.pontos} de cada.`}
+              ? t("lg.limiteProSobe", { pontos: lim.pontos, copa: lim.copa, max: LIMITES.promax.pontos })
+              : t("lg.limiteFreeSemEspaco", { pontos: lim.pontos, copa: lim.copa, max: LIMITES.pro.pontos })}
             />
           ) : (
             <>
             <div style={{ display: "flex", gap: 8 }}>
             <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} placeholder={t("lg.codigoConvite")} maxLength={8} style={{ flex: 1, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "11px 13px", color: "#f1ede2", fontSize: 15, fontFamily: FD, letterSpacing: "0.1em", outline: "none", textTransform: "uppercase" }} />
-            <button onClick={() => entrarPorCodigo()} disabled={aEntrar} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{aEntrar ? "…" : "Entrar"}</button>
+            <button onClick={() => entrarPorCodigo()} disabled={aEntrar} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "0 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>{aEntrar ? "…" : t("lg.entrar")}</button>
             </div>
             {erroEntrar && (
                 erroEntrar.includes("Pro") ? (
@@ -476,7 +476,7 @@ export default function Ligas() {
     {tab === "mercado" && (
         <>
         <Section>{t("lg.abertas")}</Section>
-        <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>Ligas públicas. Nas abertas entras já; nas por aprovação o dono aceita o teu pedido. As fechadas não aparecem aqui — só por código.</p>
+        <p style={{ fontSize: 12, color: "#7c8a82", margin: "-4px 0 12px", lineHeight: 1.5 }}>{t("lg.mercadoIntro")}</p>
         {mercado === null || aCarregarMercado ? (
             <div style={{ textAlign: "center", padding: "20px", color: "#7c8a82", fontFamily: FD, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("comum.carregando")}</div>
           ) : mercado.length === 0 ? (
@@ -491,14 +491,14 @@ export default function Ligas() {
                   key={l.id}
                   cfg={l.escudo || DEFAULT_IDENTITY}
                   name={l.name}
-                  sub={`${l.formato === "copa" ? "Copa Ippon" : "Pontos corridos"} · ${l.membros} ${l.membros === 1 ? "membro" : "membros"}`}
+                  sub={`${l.formato === "copa" ? "Copa Ippon" : t("res.pontosCorridos")} · ${l.membros} ${l.membros === 1 ? t("inicio.membro") : t("inicio.membros")}`}
                   right={
                     l.sou_membro ? (
                       <a href={`/liga/${l.invite_code}`} style={{ textDecoration: "none" }}><ActionBtn kind="ver">{t("lg.abrir")}</ActionBtn></a>
                     ) : pedidoEnviado[l.id] ? (
                       <span style={{ background: "#23291f", color: "#93a39a", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, padding: "7px 11px", borderRadius: 8, whiteSpace: "nowrap" }}>{t("lg.pedidoEnviado")}</span>
                     ) : (
-                      <button onClick={() => acaoMercado(l)} disabled={aEntrarId === l.id} style={{ background: l.privacidade === "mediante_pedido" ? "#3a2f12" : "#3f8f5a", color: l.privacidade === "mediante_pedido" ? GOLD : "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 14px", borderRadius: 8, whiteSpace: "nowrap", cursor: aEntrarId === l.id ? "default" : "pointer", opacity: aEntrarId === l.id ? 0.7 : 1 }}>{aEntrarId === l.id ? "…" : l.privacidade === "mediante_pedido" ? "Solicitar" : "Entrar"}</button>
+                      <button onClick={() => acaoMercado(l)} disabled={aEntrarId === l.id} style={{ background: l.privacidade === "mediante_pedido" ? "#3a2f12" : "#3f8f5a", color: l.privacidade === "mediante_pedido" ? GOLD : "#06140d", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 11, padding: "7px 14px", borderRadius: 8, whiteSpace: "nowrap", cursor: aEntrarId === l.id ? "default" : "pointer", opacity: aEntrarId === l.id ? 0.7 : 1 }}>{aEntrarId === l.id ? "…" : l.privacidade === "mediante_pedido" ? t("lg.solicitar") : t("lg.entrar")}</button>
                     )
                   }
                   />
@@ -597,10 +597,10 @@ function OficialRow({ cfg, name, sub, href, pos, souPro }: { cfg: Identity; name
 function DodoRow({ dodo }: { dodo: EstadoDodo | null | undefined }) {
   const t = useT();
   if (dodo === undefined) {
-    return <LinhaDodo titulo="Copa do Dôdo" sub="A carregar…" botao="Ver" destaque={false} />;
+    return <LinhaDodo titulo="Copa do Dôdo" sub={t("comum.carregando")} botao={t("lg.ver")} destaque={false} />;
   }
   if (dodo === null) {
-    return <LinhaDodo titulo="Copa do Dôdo" sub={t("lg.proximaEdicao")} botao="Ver" destaque={false} />;
+    return <LinhaDodo titulo="Copa do Dôdo" sub={t("lg.proximaEdicao")} botao={t("lg.ver")} destaque={false} />;
   }
   const { inscricoes: insc, aDecorrer: jogo } = dodo;
   const linhas: React.ReactNode[] = [];
@@ -610,9 +610,9 @@ if (insc && insc.aberta) {
     linhas.push(
       <LinhaDodo
       key="insc"
-      titulo={`${insc.numero}ª Copa · inscrição feita`}
+      titulo={t("lg.inscricaoFeita", { n: insc.numero })}
       sub={t("lg.jaNoSorteio")}
-      botao="Ver"
+      botao={t("lg.ver")}
       destaque={false}
       />
     );
@@ -622,9 +622,9 @@ if (insc && insc.aberta) {
     linhas.push(
       <LinhaDodo
       key="insc"
-      titulo={`${insc.numero}ª Copa · inscrições abertas`}
-      sub={`${insc.inscritos} ${insc.inscritos === 1 ? "inscrito" : "inscritos"} até agora`}
-      botao="Inscrever"
+      titulo={t("lg.inscricoesAbertas", { n: insc.numero })}
+      sub={insc.inscritos === 1 ? t("lg.inscritoAteAgora", { n: insc.inscritos }) : t("lg.inscritosAteAgora", { n: insc.inscritos })}
+      botao={t("lg.inscrever")}
       destaque
       />
     );
@@ -637,9 +637,9 @@ if (jogo) {
   linhas.push(
     <LinhaDodo
     key="jogo"
-    titulo={`${jogo.numero}ª Copa · a decorrer`}
-    sub={jogo.naChave ? t("lg.nestaChave") : "Acompanha a chave ao vivo"}
-    botao="Ver a chave"
+    titulo={t("lg.copaADecorrer", { n: jogo.numero })}
+    sub={jogo.naChave ? t("lg.nestaChave") : t("lg.acompanhaChave")}
+    botao={t("lg.verChave")}
     destaque={false}
     href={jogo.invite_code ? `/liga/${jogo.invite_code}` : "/dodo"}
     realce={jogo.naChave}
@@ -649,7 +649,7 @@ if (jogo) {
 // Nem inscrição visível nem Copa a decorrer: uma linha neutra, para a Copa
 // nunca desaparecer da lista.
 if (linhas.length === 0) {
-  return <LinhaDodo titulo="Copa do Dôdo" sub={t("lg.proximaEdicao")} botao="Ver" destaque={false} />;
+  return <LinhaDodo titulo="Copa do Dôdo" sub={t("lg.proximaEdicao")} botao={t("lg.ver")} destaque={false} />;
 }
 return <>{linhas}</>;
 }
