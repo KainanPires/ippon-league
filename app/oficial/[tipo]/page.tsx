@@ -181,10 +181,10 @@ return (
   <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.85)", lineHeight: 1.5 }}>
   {ehMundial
     ? t("of.melhoresMundo")
-    : `Os melhores de ${nomeContinente || t("of.teuContinente")}. Concorre aos prémios continentais.`}
+    : t("of.melhoresContinente", { continente: nomeContinente || t("of.teuContinente") })}
   </div>
   <div style={{ marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
-  Só membros Pro entram no ranking · {compAtual.nome}
+  {t("of.soPro", { comp: compAtual.nome })}
   </div>
   </div>
   {/* Informativo de ÉPOCA ANUAL (Mundial e Continental). A época vai de
@@ -203,14 +203,14 @@ return (
   {/* Banner Pro para quem não é Pro */}
   {!souPro && estado === "pronto" && (
       <a href="/ippon-pro" style={{ display: "block", textAlign: "center", marginBottom: 14, background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "11px 14px", borderRadius: 10, textDecoration: "none", fontSize: 12.5, lineHeight: 1.4 }}>
-      🔒 Estás a ver o ranking dos Pro · passa a Pro para entrares
+      {t("of.bannerPro")}
       </a>
   )}
   {/* Seletor Geral / Rodada (Geral é a vista principal) */}
   <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: "1px solid #1a221d" }}>
   {(["geral", "rodada"] as Vista[]).map((v) => (
         <button key={v} onClick={() => setVista(v)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${vista === v ? GOLD : "transparent"}`, color: vista === v ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", padding: "9px 0", cursor: "pointer" }}>
-        {v === "geral" ? "Ranking Geral" : t("of.lideresRodada")}
+        {v === "geral" ? t("of.rankingGeral") : t("of.lideresRodada")}
         </button>
   ))}
   </div>
@@ -230,7 +230,7 @@ return (
       <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#aee9c9" }}>{t("of.tuaPosicao")}</div>
       <div style={{ fontSize: 12, color: "#c7d0c9", marginTop: 2 }}>
       {minhaPos !== null
-        ? <>{vista === "geral" ? t("of.rankingAno") : "Nesta rodada"} · entre {totalVista} {totalVista === 1 ? "jogador" : "jogadores"}</>
+        ? <>{vista === "geral" ? t("of.rankingAno") : t("of.nestaRodada")} · {totalVista === 1 ? t("of.entreJogador", { n: totalVista }) : t("of.entreJogadores", { n: totalVista })}</>
         : (vista === "geral" ? t("of.semPontosAno") : t("of.naoEscalasteRodada"))}
       </div>
       </div>
@@ -246,7 +246,7 @@ return (
   {estado === "sem_continente" && (
       <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
       <div style={{ fontSize: 30, marginBottom: 6 }}>🗺️</div>
-      <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>Ainda não sabemos o teu continente. Define o teu país no perfil para entrares na liga continental.</p>
+      <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{t("of.semContinente")}</p>
       </div>
   )}
   {/* Barra de pesquisa partilhada pelas duas vistas */}
