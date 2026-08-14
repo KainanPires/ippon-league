@@ -253,7 +253,7 @@ export default function Dodo() {
             {insc.numero}ª Copa do Dôdo
             </div>
             <div style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5 }}>
-            Mata-mata mundial entre continentes · {insc.ano || new Date().getFullYear()}
+            {t("dd.subtituloMundial", { ano: insc.ano || new Date().getFullYear() })}
             </div>
             </div>
             {aberta && restam && (
@@ -308,10 +308,10 @@ export default function Dodo() {
             >
             <span>
             <span style={{ display: "block", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cfd8d2" }}>
-            Onde há mais concorrência
+            {t("dd.ondeConcorrencia")}
             </span>
             <span style={{ display: "block", fontSize: 11, color: "#7c8a82", marginTop: 2 }}>
-            {insc.inscritos} inscritos · {vagasCont} vagas por continente
+            {t("dd.inscritosVagas", { i: insc.inscritos, v: vagasCont })}
             </span>
             </span>
             <span style={{ flexShrink: 0, color: "#7c8a82", fontSize: 16, transform: verContinentes ? "rotate(180deg)" : "none", transition: "transform .15s" }}>⌄</span>
@@ -319,14 +319,14 @@ export default function Dodo() {
             {verContinentes && (
                 <div style={{ marginTop: 10 }}>
                 <p style={{ fontSize: 12, color: "#7c8a82", margin: "0 0 12px", lineHeight: 1.5 }}>
-                De cada continente saem {vagasCont} no sorteio, por isso quanto mais inscritos ali, mais disputada é a vaga.
+                {t("dd.deCadaContinente", { v: vagasCont })}
                 </p>
                 {(Object.keys(NOME_CONTINENTE) as Continente[]).map((c) => {
                       const n = insc.porContinente?.[c] ?? 0;
                       return (
                         <LinhaContinente
                         key={c}
-                        nome={NOME_CONTINENTE[c]}
+                        nome={t("cont." + c)}
                         n={n}
                         maior={maiorContinente}
                         meu={meuContinente === c}
@@ -381,12 +381,12 @@ export default function Dodo() {
             disabled={aEnviar}
             style={{ background: GOLD, border: "none", color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", padding: "9px 16px", borderRadius: 999, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar ? 0.6 : 1 }}
             >
-            {aEnviar ? "A inscrever…" : `Inscrever-me na ${insc.numero}ª`}
+            {aEnviar ? t("dd.aInscrever") : t("dd.inscreverMeNa", { n: insc.numero })}
             </button>
         )}
         {insc && aberta && eu?.inscrito && (
             <span style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: VERDE, padding: "9px 4px" }}>
-            ✓ Inscrito na {insc.numero}ª
+            {t("dd.inscritoNa", { n: insc.numero })}
             </span>
         )}
         {insc && aberta && eu && !eu.podeInscrever && !eu.inscrito && eu.motivo && (
@@ -411,7 +411,7 @@ export default function Dodo() {
         <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "#121815", border: "1px solid #2a3a33", borderRadius: 16, padding: "20px 18px" }}>
         <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "#f1ede2", textAlign: "center", marginBottom: 10 }}>{t("dd.sairDaCopa")}</div>
         <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, textAlign: "center", margin: "0 0 16px" }}>
-        Perdes o teu lugar no sorteio. Podes voltar a inscrever-te enquanto as inscrições estiverem abertas.
+        {t("dd.perdesLugar")}
         </p>
         <div style={{ display: "flex", gap: 9 }}>
         <button onClick={() => setConfirmarSaida(false)} style={{ flex: 1, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>{t("dd.ficar")}</button>
@@ -480,12 +480,12 @@ function SemEdicao({ abreEm, agora }: { abreEm: string | null; agora: number }) 
         <>
         <div style={{ fontFamily: FD, fontSize: 24, fontWeight: 700, color: GOLD, lineHeight: 1, margin: "6px 0 6px" }}>{falta}</div>
         <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.55, margin: "0 0 16px" }}>
-        Abrem a {dataCurta(abreEm)}. Lê as regras aqui em baixo para chegares preparado.
+        {t("dd.abremA", { data: dataCurta(abreEm) })}
         </p>
         </>
       ) : (
         <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.55, margin: "0 0 16px" }}>
-        A próxima edição abre inscrições antes da competição que a inicia, e avisamos-te por notificação. Entretanto, as regras estão todas aqui em baixo — vale a pena saber o que é preciso antes de abrir.
+        {t("dd.proximaEdicaoInscricoes")}
         </p>
     )}
     </div>
@@ -506,10 +506,10 @@ function Regras({ vagasCont, totalVagas }: { vagasCont: number; totalVagas: numb
     <div style={{ background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 14, padding: "14px 15px" }}>
     <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: GOLD, marginBottom: 7 }}>{t("dd.soMembrosPro")}</div>
     <p style={{ fontSize: 12.5, color: "#c7b98f", lineHeight: 1.55, margin: "0 0 9px" }}>
-    A subscrição é mensal e renova-se sozinha todos os meses, até cancelares. Quem cancela fica com acesso até ao fim do mês já pago.
+    {t("dd.regraPro1")}
     </p>
     <p style={{ fontSize: 12.5, color: "#c7b98f", lineHeight: 1.55, margin: 0 }}>
-    Uma Copa não cabe num mês: uma chave de {totalVagas} leva cinco competições a decidir-se, o que pode dar três ou quatro meses. Inscreveres-te é comprometeres-te a manter a subscrição até ao fim.
+    {t("dd.regraPro2", { totalVagas })}
     </p>
     </div>
     {/* Curto e em vermelho, porque com subscrição mensal isto deixou de ser
@@ -518,44 +518,44 @@ function Regras({ vagasCont, totalVagas }: { vagasCont: number; totalVagas: numb
     <div style={{ background: "#241614", border: "1px solid #5c332c", borderRadius: 14, padding: "12px 15px", marginTop: 9 }}>
     <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: "#ef8d83", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 6 }}>{t("dd.seSubscricaoAcabar")}</div>
     <p style={{ fontSize: 12.5, color: "#d6b3ad", lineHeight: 1.55, margin: 0 }}>
-    Sais da Copa e o teu adversário avança sem jogar. A pontuação da Copa vive das funcionalidades Pro, e sem elas não há como te pontuar. Conta os meses antes de te inscreveres.
+    {t("dd.regraSubAcaba")}
     </p>
     </div>
     <Section style={{ marginTop: 20 }}>{t("dd.vagasSorteio")}</Section>
     <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "14px 15px" }}>
-    <Regra n="1" titulo={`Cinco continentes, ${vagasCont} vagas cada`}>
-    Europa, América, Ásia, África e Oceânia — as cinco federações da IJF. Cada uma tem {vagasCont} lugares reservados.
+    <Regra n="1" titulo={t("dd.regra1Titulo", { v: vagasCont })}>
+    {t("dd.regra1", { v: vagasCont })}
     </Regra>
     <Regra n="2" titulo={t("dd.concorresPeloContinente")}>
-    Fica gravado na inscrição. Mudar de país depois não te muda de continente.
+    {t("dd.regra2")}
     </Regra>
     <Regra n="3" titulo={t("dd.vagasRedistribuidas")}>
-    Se um continente não encher as suas, as que ficaram por usar juntam-se e são sorteadas entre todos os que não foram sorteados, seja qual for o continente deles. É assim que se completam os {totalVagas} lugares.
+    {t("dd.regra3", { totalVagas })}
     </Regra>
     <Regra n="4" titulo={t("dd.entradaPorSorteio")} ultima>
-    Entre os inscritos de cada continente, quando as inscrições fecham. Não é por ordem de chegada: inscreveres-te no primeiro dia ou no último dá exatamente a mesma hipótese.
+    {t("dd.regra4")}
     </Regra>
     </div>
     <Section style={{ marginTop: 20 }}>{t("dd.comoSeJoga")}</Section>
     <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "14px 15px" }}>
     <Regra n="5" titulo={t("dd.cadaRondaCompeticao")}>
-    Depois do sorteio ficas com um adversário. Escalas a tua equipa para a competição seguinte do calendário, e a pontuação dessa competição é o resultado do vosso confronto.
+    {t("dd.regra5")}
     </Regra>
     <Regra n="6" titulo={t("dd.quemPontuaAvanca")}>
-    Quem pontua menos sai. Em caso de empate, decide quem fez mais pontos com o capitão; se ainda assim empatar, vai a sorteio. Quem não escalar conta como zero — não escalar é perder.
+    {t("dd.regra6")}
     </Regra>
     <Regra n="7" titulo={t("dd.jogaSeComQuemEstiver")}>
-    Ninguém é excluído por o número não ser redondo. Quando os inscritos não chegam para encher a chave, alguns recebem passagem automática na primeira ronda, por sorteio, como acontece numa competição de judô.
+    {t("dd.regra7")}
     </Regra>
     <Regra n="8" titulo={t("dd.repescagemDoisTerceiros")}>
-    Como numa chave internacional. Quem perde para um semifinalista volta a jogar na repescagem, e cruza com o perdedor da meia-final do lado oposto. Saem dois medalhados de bronze, não um.
+    {t("dd.regra8")}
     </Regra>
     <Regra n="9" titulo={t("dd.finalSomaAteFim")} ultima>
-    A contagem da final começa quando os dois finalistas estão apurados — o que fizeram nos quartos e nas meias não conta para o título. Enquanto a repescagem decorre, os finalistas continuam a somar, e o dia da disputa dos bronzes é a última competição que conta. Ganha a Copa quem tiver mais no total. Quem terminar no pódio recebe um certificado digital para partilhar, guardado na aba Resultados.
+    {t("dd.regra9")}
     </Regra>
     </div>
     <p style={{ fontSize: 11.5, color: "#6f7d76", lineHeight: 1.6, margin: "14px 2px 0" }}>
-    As regras podem ser ajustadas entre edições. Qualquer alteração é anunciada antes de as inscrições abrirem, nunca com uma Copa a decorrer.
+    {t("dd.regrasAjustadas")}
     </p>
     </>
   );
@@ -577,9 +577,9 @@ function Selo({ estado, aberta }: { estado: string; aberta: boolean }) {
     fundo = "#161c19";
     borda = "#243029";
   } else if (estado === "sorteada") {
-    texto = "Sorteio feito";
+    texto = t("dd.sorteioFeito");
   } else if (estado === "a_decorrer") {
-    texto = "A decorrer";
+    texto = t("dd.aDecorrer");
   }
   return (
     <span style={{ display: "inline-block", background: fundo, border: `1px solid ${borda}`, color: cor, fontFamily: FD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 9px", borderRadius: 999 }}>{texto}</span>
@@ -694,7 +694,7 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
     if (!uid) return { titulo: "—", vazio: true };
     const i = identidades[uid];
     return {
-      titulo: i?.nome_time || "Equipa",
+      titulo: i?.nome_time || t("res.equipa"),
       // O continente é o que dá sentido a uma Copa "entre continentes".
       subtitulo: [i?.continente, i?.pais].filter(Boolean).join(" · ") || null,
       resultado: pts == null ? null : String(pts),
@@ -725,7 +725,7 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
   return (
     <div style={{ marginTop: 22 }}>
     <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: GOLD }}>
-    {numero}ª Copa do Dôdo · a chave
+    {numero}ª Copa do Dôdo · {t("dd.aChave")}
     </div>
     <BlocoChave
     titulo={t("chave.principal")}
@@ -759,16 +759,16 @@ function CopaADecorrer({ jogo, compacta }: { jogo: EdicaoDecorrer; compacta: boo
   const t = useT();
   const sub = jogo.naChave
   ? t("dd.estasNestaChave")
-  : jogo.estado === "sorteada" ? t("dd.sorteioFeito") : "A decorrer";
+  : jogo.estado === "sorteada" ? t("dd.sorteioFeito") : t("dd.aDecorrer");
   if (compacta) {
     return (
       <div style={{ marginTop: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px" }}>
       <div style={{ flexShrink: 0, display: "flex", width: 34, justifyContent: "center" }}>
-      <TrofeuDodo size={32} base={false} titulo="Copa a decorrer" />
+      <TrofeuDodo size={32} base={false} titulo={t("dd.copaEmCurso")} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2" }}>{jogo.numero}ª Copa · a decorrer</div>
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f1ede2" }}>{t("lg.copaADecorrer", { n: jogo.numero })}</div>
       <div style={{ fontSize: 11, color: jogo.naChave ? GOLD : "#93a39a" }}>{sub}</div>
       </div>
       </div>
@@ -778,7 +778,7 @@ function CopaADecorrer({ jogo, compacta }: { jogo: EdicaoDecorrer; compacta: boo
   return (
     <div style={{ background: "linear-gradient(160deg,#17201b,#111614)", border: "1px solid #4a3f18", borderRadius: 16, padding: "20px 16px 18px" }}>
     <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-    <TrofeuDodo size={108} numero={`${jogo.numero}ª`} titulo={`Troféu da ${jogo.numero}ª Copa do Dôdo`} />
+    <TrofeuDodo size={108} numero={`${jogo.numero}ª`} titulo={t("dd.trofeuCopa", { n: jogo.numero })} />
     </div>
     <div style={{ textAlign: "center" }}>
     <span style={{ display: "inline-block", background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 9px", borderRadius: 999 }}>{t("dd.aDecorrer")}</span>
@@ -824,7 +824,7 @@ function MeuEstado({
       return (
         <Cartao borda="#4a3f18" fundo="#1c1a10">
         <Titulo cor={GOLD}>{t("dd.estasNaChave")}</Titulo>
-        <Texto>A tua vaga saiu no sorteio. A partir da próxima competição do calendário, cada rodada elimina metade dos que sobram.</Texto>
+        <Texto>{t("dd.vagaSaiuTexto")}</Texto>
         </Cartao>
       );
     }
@@ -832,7 +832,7 @@ function MeuEstado({
       return (
         <Cartao>
         <Titulo cor="#cfd8d2">{t("dd.vagaNaoSaiu")}</Titulo>
-        <Texto>Foram mais inscritos do que vagas e o sorteio decidiu. A próxima edição volta a abrir com todas as vagas em jogo.</Texto>
+        <Texto>{t("dd.vagaNaoSaiuTexto")}</Texto>
         </Cartao>
       );
     }
@@ -840,11 +840,11 @@ function MeuEstado({
     // nenhum, de propósito — uma pessoa, uma inscrição.
     return (
       <Cartao borda="#2c4a36" fundo="#131c17">
-      <Titulo cor="#7fd39b">✓ Já fizeste a tua inscrição</Titulo>
+      <Titulo cor="#7fd39b">{t("dd.jaInscrito")}</Titulo>
       <Texto>
       {aberta
-        ? `Está registada e não é preciso fazer mais nada. O sorteio${dataSorteio ? ` sai a ${dataCurta(dataSorteio)}` : " sai quando as inscrições fecharem"} e avisamos-te aqui e no sininho. Obrigado, e boa sorte!`
-        : "As inscrições fecharam. Assim que o sorteio correr, ficas a saber aqui se entraste. Boa sorte!"}
+        ? (dataSorteio ? t("dd.inscritaRegistadaData", { data: dataCurta(dataSorteio) }) : t("dd.inscritaRegistadaSemData"))
+        : t("dd.inscricoesFecharamAviso")}
       </Texto>
       {aberta && (
           <button onClick={onSair} disabled={aEnviar} style={{ ...botaoSecundario, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar ? 0.6 : 1 }}>
@@ -859,9 +859,9 @@ function MeuEstado({
     return (
       <Cartao borda="#4a3f18" fundo="#1c1a10">
       <Titulo cor={GOLD}>{t("dd.vagaEmJogo")}</Titulo>
-      <Texto>Inscreves-te agora e entras no sorteio{dataSorteio ? `, que sai a ${dataCurta(dataSorteio)}` : ""}. Não há corrida ao relógio — o dia em que te inscreves não muda nada.</Texto>
+      <Texto>{dataSorteio ? t("dd.inscreveTextoData", { data: dataCurta(dataSorteio) }) : t("dd.inscreveTextoSemData")}</Texto>
       <button onClick={onInscrever} disabled={aEnviar} style={{ ...botaoPrimario, cursor: aEnviar ? "default" : "pointer", opacity: aEnviar ? 0.6 : 1 }}>
-      {aEnviar ? "A inscrever…" : t("dd.inscreverMe")}
+      {aEnviar ? t("dd.aInscrever") : t("dd.inscreverMe")}
       </button>
       </Cartao>
     );
@@ -872,7 +872,7 @@ function MeuEstado({
     return (
       <Cartao borda="#5a4a18" fundo="#2a2410">
       <Titulo cor={GOLD}>{t("dd.copaParaPro")}</Titulo>
-      <Texto>Um mata-mata mundial só funciona se cada lugar for levado a sério até ao fim. O Ippon Pro dá-te a entrada.</Texto>
+      <Texto>{t("dd.copaParaProTexto")}</Texto>
       <a href="/ippon-pro" style={botaoPrimario}>{t("lg.conhecerPro")}</a>
       </Cartao>
     );
@@ -899,7 +899,7 @@ function LinhaContinente({ nome, n, maior, meu }: { nome: string; n: number; mai
     {meu && <span style={{ fontFamily: FD, fontSize: 9.5, fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.06em", marginLeft: 7 }}>{t("dd.oTeu")}</span>}
     </span>
     <span style={{ fontFamily: FD, fontSize: 11.5, fontWeight: 700, color: oMaior ? "#e0894f" : "#7c8a82", whiteSpace: "nowrap" }}>
-    {n} {n === 1 ? "inscrito" : "inscritos"}
+    {n === 1 ? t("dd.nInscrito", { n }) : t("dd.nInscritos", { n })}
     </span>
     </div>
     <div style={{ height: 5, borderRadius: 999, background: "#1a221d", overflow: "hidden" }}>
