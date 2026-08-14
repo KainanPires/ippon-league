@@ -563,7 +563,7 @@ export default function PaginaLiga() {
     </a>
     <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>{t("pl.titulo")}</h1>
     </header>
-    {(estado === "a_entrar" || aRedirecionar) && <Aviso>{aRedirecionar ? "A abrir a chave…" : "A abrir a liga…"}</Aviso>}
+    {(estado === "a_entrar" || aRedirecionar) && <Aviso>{aRedirecionar ? t("pl.aAbrirChave") : t("pl.aAbrirLiga")}</Aviso>}
     {!aRedirecionar && estado === "sem_sessao" && (
         <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
         <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 8 }}>{t("pl.convite")}</div>
@@ -581,9 +581,9 @@ export default function PaginaLiga() {
         </div>
         <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", marginTop: 10, wordBreak: "break-word" }}>{liga.name}</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-        <span style={{ background: "#16201b", border: "1px solid #243029", borderRadius: 999, fontSize: 11, fontWeight: 700, color: "#cfd8d2", padding: "4px 11px" }}>{liga.formato === "copa" ? "🏆 Copa Ippon" : "🏅 Pontos corridos"}</span>
+        <span style={{ background: "#16201b", border: "1px solid #243029", borderRadius: 999, fontSize: 11, fontWeight: 700, color: "#cfd8d2", padding: "4px 11px" }}>{liga.formato === "copa" ? "🏆 Copa Ippon" : `🏅 ${t("res.pontosCorridos")}`}</span>
         <span style={{ background: "#16201b", border: "1px solid #243029", borderRadius: 999, fontSize: 11, fontWeight: 700, color: "#cfd8d2", padding: "4px 11px" }}>{nomePrivacidade(liga.privacidade, t)}</span>
-        <span style={{ background: "#16201b", border: "1px solid #243029", borderRadius: 999, fontSize: 11, fontWeight: 700, color: "#cfd8d2", padding: "4px 11px" }}>{nMembros} {nMembros === 1 ? "membro" : "membros"}</span>
+        <span style={{ background: "#16201b", border: "1px solid #243029", borderRadius: 999, fontSize: 11, fontWeight: 700, color: "#cfd8d2", padding: "4px 11px" }}>{nMembros} {nMembros === 1 ? t("inicio.membro") : t("inicio.membros")}</span>
         </div>
         </div>
         {/* Informativo automático da época (pontos corridos com janela). */}
@@ -635,13 +635,13 @@ export default function PaginaLiga() {
         <div style={{ flexShrink: 0 }}><Escudo config={liga.escudo || DEFAULT_IDENTITY} size={46} /></div>
         <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{liga.name}</div>
-        <div style={{ fontSize: 11, color: "#93a39a" }}>{nomePrivacidade(liga.privacidade, t)} · {membros.length} {membros.length === 1 ? "membro" : "membros"}</div>
+        <div style={{ fontSize: 11, color: "#93a39a" }}>{nomePrivacidade(liga.privacidade, t)} · {membros.length} {membros.length === 1 ? t("inicio.membro") : t("inicio.membros")}</div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0, marginRight: 4 }}>
         <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>{t("pl.codigo")}</div>
         <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, color: GOLD, letterSpacing: "0.06em" }}>{liga.invite_code}</div>
         </div>
-        <button onClick={partilhar} aria-label="Partilhar liga" style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "transparent", border: "1px solid #243029", borderRadius: 10, padding: "7px 10px", cursor: "pointer", color: GOLD }}>
+        <button onClick={partilhar} aria-label={t("pl.partilharLiga")} style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "transparent", border: "1px solid #243029", borderRadius: 10, padding: "7px 10px", cursor: "pointer", color: GOLD }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
         <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>{t("pl.convidar")}</span>
         </button>
@@ -693,7 +693,7 @@ export default function PaginaLiga() {
             <>
             {/* Seletor das três vistas: Geral (principal), Rodada, Judocoins. */}
             <div style={{ display: "flex", gap: 6, marginBottom: 14, borderBottom: "1px solid #1a221d" }}>
-            {([["geral", "Geral"], ["rodada", "Rodada"], ["jc", "Judocoins"]] as [VistaLiga, string][]).map(([v, label]) => (
+            {([["geral", t("pl.vistaGeral")], ["rodada", t("pl.vistaRodada")], ["jc", "Judocoins"]] as [VistaLiga, string][]).map(([v, label]) => (
                   <button key={v} onClick={() => setVista(v)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${vista === v ? GOLD : "transparent"}`, color: vista === v ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", padding: "8px 0", cursor: "pointer" }}>{label}</button>
             ))}
             </div>
@@ -723,15 +723,15 @@ export default function PaginaLiga() {
             {/* Cabeçalho da vista + estado ao vivo */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>
-            {vista === "geral" ? t("pl.rankingGeral") : vista === "rodada" ? `Rodada · ${nomeCompeticao(compVista)}` : t("pl.judocoinsPatrimonio")}
+            {vista === "geral" ? t("pl.rankingGeral") : vista === "rodada" ? t("pl.rodadaComp", { comp: nomeCompeticao(compVista) }) : t("pl.judocoinsPatrimonio")}
             </span>
             {emAndamento && vista === "rodada" && rodadaEhAtual ? (
                 <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo {horaTick && `· ${horaTick}`}
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> {t("pl.aoVivo")} {horaTick && `· ${horaTick}`}
                 </span>
               ) : emAndamento && vista === "geral" ? (
                 <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> {t("pl.aoVivo")}
                 </span>
               ) : vista === "rodada" && rodadaEhAtual ? (
                 <span style={{ fontSize: 11, color: "#7fd1a3" }}>{t("pl.preCompeticao")}</span>
@@ -742,7 +742,7 @@ export default function PaginaLiga() {
                 !rodadaVistaCarregada ? (
                   <Aviso>{t("pl.aCarregarRodada")}</Aviso>
                 ) : membrosVista.length === 0 ? (
-                  <Aviso>{rodadaEhAtual ? "Ainda sem pontos nesta rodada." : t("pl.ninguemEscalou")}</Aviso>
+                  <Aviso>{rodadaEhAtual ? t("pl.semPontosRodada") : t("pl.ninguemEscalou")}</Aviso>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                   {membrosVista.map((m) => {
@@ -851,7 +851,7 @@ export default function PaginaLiga() {
         onClick={() => { setErroSair(""); setConfirmarSair(true); }}
         style={{ background: "transparent", border: "none", color: "#7c8a82", fontSize: 12, cursor: "pointer", fontFamily: FB, textDecoration: "underline" }}
         >
-        Sair desta liga
+        {t("pl.sairDestaLiga")}
         </button>
         </div>
         </>
@@ -863,10 +863,10 @@ export default function PaginaLiga() {
         <div style={{ width: "100%", maxWidth: 320, background: "#121815", border: "1px solid #5a2f2c", borderRadius: 16, padding: 22, textAlign: "center" }}>
         <div style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px", color: "#ef8d83" }}>{t("pl.sairDaLiga")}</div>
         <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 8px" }}>
-        Vais deixar de ver o ranking de <strong style={{ color: "#f1ede2" }}>{liga.name}</strong> e de contar para ele.
+        {(() => { const p = t("pl.sairTexto1").split("%A%"); return <>{p[0]}<strong style={{ color: "#f1ede2" }}>{liga.name}</strong>{p[1]}</>; })()}
         </p>
         <p style={{ fontSize: 12, color: "#93a39a", lineHeight: 1.5, margin: "0 0 18px" }}>
-        A tua equipa e os teus pontos não se perdem — são teus e ficam no histórico das rodadas. Para voltar, precisas do código.
+        {t("pl.sairTexto2")}
         </p>
         {erroSair && (
             <div style={{ background: "#1a1110", border: "1px solid #3a2420", borderRadius: 10, padding: "10px 12px", marginBottom: 14, fontSize: 12.5, color: "#ef8d83", lineHeight: 1.5 }}>
@@ -878,13 +878,13 @@ export default function PaginaLiga() {
         disabled={aSair}
         style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: "#e2655a", color: "#1b0f0e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: aSair ? "default" : "pointer", opacity: aSair ? 0.7 : 1 }}
         >
-        {aSair ? "A sair…" : t("pl.simSair")}
+        {aSair ? t("perfil.aSair") : t("pl.simSair")}
         </button>
         <button
         onClick={() => { setConfirmarSair(false); setErroSair(""); }}
         style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12.5, cursor: "pointer", fontFamily: FB }}
         >
-        Ficar na liga
+        {t("pl.ficarNaLiga")}
         </button>
         </div>
         </div>
@@ -901,7 +901,7 @@ export default function PaginaLiga() {
         {t("pl.arrancouNa", { inicio: confirmarComeco.rodadaInicio, entrada: confirmarComeco.rodadaEntrada })}
         </p>
         <p style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5, margin: "0 0 18px" }}>{t("pl.comecasZeroPontos", { zero: t("pl.zeroPontos") })}</p>
-        <button onClick={() => entrarAgora(true)} disabled={aEntrar} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: aEntrar ? "default" : "pointer", opacity: aEntrar ? 0.7 : 1 }}>{aEntrar ? "A entrar…" : "Entrar mesmo assim"}</button>
+        <button onClick={() => entrarAgora(true)} disabled={aEntrar} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: aEntrar ? "default" : "pointer", opacity: aEntrar ? 0.7 : 1 }}>{aEntrar ? t("entrar.aEntrar") : t("lg.entrarMesmoAssim")}</button>
         <button onClick={() => setConfirmarComeco(null)} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>{t("comum.cancelar")}</button>
         </div>
         </div>
@@ -1019,7 +1019,7 @@ function PodioLiga({ podio, meuId, onPartilhar }: {
             {souEu && (
                 <button onClick={() => onPartilhar(meta.pos)} style={{ width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: meta.cor, color: meta.pos === "vice" ? "#14181a" : "#1b1208", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
-                Partilhar o meu título
+                {t("pl.partilharTitulo")}
                 </button>
             )}
             </div>
@@ -1043,17 +1043,17 @@ function CartaoCopa({ estado, fecho, inscritos, meuId, codigo }: { estado: strin
   if (estado === "inscricao" && !prazoPassou) {
     icone = "📝";
     titulo = t("pl.inscricoesAbertas");
-    texto = "Esta é uma Copa Ippon (mata-mata). Quem entrar antes do fecho entra na chave. O sorteio é automático e aleatório.";
-    rodape = quandoFecha ? `Fecham a ${quandoFecha}` : "";
+    texto = t("pl.copaTextoInscricao");
+    rodape = quandoFecha ? t("pl.fechamA", { data: quandoFecha }) : "";
   } else if (estado === "inscricao") {
     icone = "⏳";
     titulo = t("pl.inscricoesFechadas");
-    texto = "As inscrições fecharam. A chave vai ser sorteada — abre daqui a pouco para veres o teu primeiro confronto.";
+    texto = t("pl.copaTextoFechadas");
   } else {
     // sorteada / a_decorrer / terminada: a página redireciona à chave; este
     // cartão raramente é visto, mas mantemos um fallback com botão para a chave.
     icone = "⚔️";
-    titulo = "Copa em jogo";
+    titulo = t("pl.copaEmJogo");
     texto = t("pl.chaveFormada");
   }
   return (
@@ -1068,7 +1068,7 @@ function CartaoCopa({ estado, fecho, inscritos, meuId, codigo }: { estado: strin
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(217,164,65,0.25)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 9 }}>
         <span style={{ fontFamily: FD, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cdb86a" }}>
-        {n} {n === 1 ? "equipa inscrita" : "equipas inscritas"}
+        {n === 1 ? t("pl.equipaInscrita", { n }) : t("pl.equipasInscritas", { n })}
         </span>
         {rodape && <span style={{ fontSize: 11, color: "#a9b4ac", fontFamily: FD }}>{rodape}</span>}
         </div>
@@ -1091,7 +1091,7 @@ function CartaoCopa({ estado, fecho, inscritos, meuId, codigo }: { estado: strin
       oferece o botão para a chave. */}
     {estado !== "inscricao" && (
         <a href={`/liga/${codigo}/chave`} style={{ display: "block", textAlign: "center", marginTop: 12, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 11, textDecoration: "none" }}>
-        {estado === "terminada" ? t("pl.verPodioChave") : "Ver a chave"}
+        {estado === "terminada" ? t("pl.verPodioChave") : t("lg.verChave")}
         </a>
     )}
     </div>
