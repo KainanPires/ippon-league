@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { enviarPushPara } from "@/lib/pushServer";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,7 +29,23 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get("key");
   if (!autorizado(key)) {
-    return NextResponse.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
+    const a = process.env.CRON_SECRET;
+    const b = process.env.LEMBRETE_CRON_SECRET;
+    return NextResponse.json(
+      {
+        ok: false,
+        erro: "Não autorizado.",
+        // apenas comprimentos — nunca os valores
+        debug: {
+          tem_cron_secret: !!a,
+          comprimento_cron_secret: a ? a.length : 0,
+          tem_lembrete_cron_secret: !!b,
+          comprimento_lembrete_cron_secret: b ? b.length : 0,
+          comprimento_key_recebida: key ? key.length : 0,
+        },
+      },
+      { status: 401 }
+    );
   }
   const user = (searchParams.get("user") || "").trim();
   if (!user) {
@@ -36,6 +53,18 @@ export async function GET(req: Request) {
   }
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem base de dados." }, { status: 500 });
+  }
+
+  // VIA REAL: usa a MESMA função que os avisos de atleta favorito usam
+  // (criarNotificacaoServidor -> enviarPushPara). Se ?real=1, testamos o caminho
+  // de produção exato, não o envio direto. Chega ao telemóvel => favoritos OK.
+  if (searchParams.get("real") === "1") {
+    const r = await enviarPushPara([user], {
+      titulo: "🥋 Teste (via real)",
+      corpo: "Se vês isto, o caminho dos avisos de favorito está a funcionar.",
+      link: "/chave-atletas",
+    });
+    return NextResponse.json({ ok: r.enviadas > 0, via: "enviarPushPara", ...r });
   }
 
   // Estado das chaves VAPID (sem revelar os valores — só se existem e o tamanho).
