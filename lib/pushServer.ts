@@ -19,8 +19,16 @@ function prepararVapid(): boolean {
 
 export type PayloadPush = { titulo: string; corpo?: string; link?: string };
 
+// Códigos que significam "esta subscrição já não serve" — apagamos a linha para
+// não a tentar de novo (e para as contagens de "enviadas" serem honestas):
+//   404 / 410 — subscrição não existe / expirou (o clássico).
+//   403 / 401 — a Apple/Google recusa esta subscrição (credencial gasta): foi
+//               ISTO que deixava subscrições mortas a apodrecer na base sem push.
+//   400       — subscrição malformada (endpoint/chaves inválidas).
+const CODIGOS_MORTOS = new Set([400, 401, 403, 404, 410]);
+
 // Envia uma push para todos os aparelhos subscritos dos utilizadores indicados.
-// Remove automaticamente subscrições mortas (404/410).
+// Remove automaticamente subscrições mortas.
 export async function enviarPushPara(userIds: string[], n: PayloadPush): Promise<{ enviadas: number; removidas: number }> {
   if (!supabaseAdmin) return { enviadas: 0, removidas: 0 };
   if (!prepararVapid()) return { enviadas: 0, removidas: 0 };
@@ -42,7 +50,7 @@ export async function enviarPushPara(userIds: string[], n: PayloadPush): Promise
       enviadas++;
     } catch (err: unknown) {
       const code = (err as { statusCode?: number })?.statusCode;
-      if (code === 404 || code === 410) {
+      if (typeof code === "number" && CODIGOS_MORTOS.has(code)) {
         await supabaseAdmin.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
         removidas++;
       }
