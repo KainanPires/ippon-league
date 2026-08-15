@@ -1,6 +1,30 @@
 // Funções de notificações push (lado do cliente).
 // A subscrição é guardada no servidor via /api/push/subscrever.
 const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+
+// INTENÇÃO DA PESSOA (guardada no próprio aparelho). Distingue duas coisas que a
+// permissão do iOS não distingue:
+//   • "on"  — a pessoa QUER push (carregou Ativar).
+//   • "off" — a pessoa DESATIVOU dentro da app (não queremos importuná-la).
+// A auto-cura no arranque só recria a subscrição quando a intenção é "on".
+// Se a pessoa desativou, fica desativado — mesmo que a permissão do iOS continue
+// "granted" (que é o que acontece quando se desativa dentro da app).
+const CHAVE_INTENCAO = "ippon_push_intencao";
+function lerIntencao(): "on" | "off" | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const v = window.localStorage.getItem(CHAVE_INTENCAO);
+    return v === "on" || v === "off" ? v : null;
+  } catch {
+    return null;
+  }
+}
+function guardarIntencao(v: "on" | "off"): void {
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(CHAVE_INTENCAO, v);
+  } catch {}
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -63,29 +87,46 @@ export async function ativarPush(userId: string): Promise<{ ok: boolean; erro?: 
     }
     const ok = await registarNoServidor(userId, sub);
     if (!ok) return { ok: false, erro: "Falha ao registar." };
+    // A pessoa QUER push: guarda a intenção para a auto-cura poder renovar depois.
+    guardarIntencao("on");
     return { ok: true };
   } catch {
     return { ok: false, erro: "Não foi possível ativar agora." };
   }
 }
 
-// RECONCILIAÇÃO SILENCIOSA: garante que a subscrição EXISTENTE deste aparelho
-// fica associada à conta ATUAL no servidor. Chamar no arranque (com sessão),
-// quando a permissão já está concedida. Resolve o caso em que se troca de conta
-// no mesmo telemóvel: a permissão do iOS já está "granted" (logo nunca se chama
-// ativarPush), mas a subscrição no servidor continuava ligada à conta anterior,
-// deixando a nova conta sem push. Não pede permissão nem cria nada novo: só
-// reenvia a subscrição que já existe, para a passar para a conta certa.
+// RECONCILIAÇÃO SILENCIOSA (AUTO-CURA no arranque da app). Chamar no arranque,
+// com sessão. Regra de ouro: NUNCA importunar quem desligou.
 //
-// Não faz nada se: não suporta push, não há userId, a permissão não está
-// concedida, ou ainda não há subscrição no browser. É seguro chamar sempre.
+//  • Permissão "denied" (a pessoa desligou nas Definições do iOS) => não faz nada.
+//  • Existe subscrição => reenvia-a (mantém o servidor fresco e liga-a à conta
+//    atual) e regista a intenção "on", captando a realidade de quem já usa.
+//  • NÃO existe subscrição:
+//      - intenção "on"  => o iOS/Android reciclou-a em silêncio; recriamos aqui,
+//        sem prompt (a permissão já está dada). É a auto-cura.
+//      - intenção "off"/ausente => a pessoa desativou (ou nunca ativou); NÃO
+//        recriamos. Fica como ela deixou.
+//
+// É seguro chamar sempre.
 export async function reconciliarPush(userId: string): Promise<void> {
   try {
     if (!suportaPush() || !userId) return;
-    if (Notification.permission !== "granted") return;
+    if (Notification.permission !== "granted") return; // Definições do iOS OFF => respeitamos
+    if (!VAPID_PUBLIC) return;
     const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
-    if (!sub) return; // permissão dada mas sem subscrição: o utilizador terá de ativar (cria-a)
+    let sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      // Já subscrito neste aparelho: mantém tudo fresco e capta a intenção real.
+      guardarIntencao("on");
+      await registarNoServidor(userId, sub);
+      return;
+    }
+    // Sem subscrição: só recriamos se a pessoa QUER push. Se desativou, fica off.
+    if (lerIntencao() !== "on") return;
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+    });
     await registarNoServidor(userId, sub);
   } catch {
     // silencioso: a reconciliação nunca deve partir o arranque da app
@@ -93,6 +134,9 @@ export async function reconciliarPush(userId: string): Promise<void> {
 }
 
 export async function desativarPush(): Promise<void> {
+  // A pessoa DESATIVOU: guarda a intenção "off" ANTES de tudo, para a auto-cura
+  // no próximo arranque não a voltar a ligar.
+  guardarIntencao("off");
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
