@@ -4,7 +4,7 @@
  */
 
 import type { ActionType } from "@/lib/engine";
-import { scoreActions, scoreShidosSofridos, POINTS } from "@/lib/engine";
+import { scoreActions, scoreShidosSofridos, scoreShidosProvocados } from "@/lib/engine";
 import type { Athlete, Gender, AthleteStatus } from "@/lib/athletes";
 
 const IJF = "https://data.ijf.org/api/get_json";
@@ -271,14 +271,16 @@ export function isHansokuMake(f: IjfContest): boolean {
  *
  *  - Ações de valor fixo (ippon/waza/yuko, feitos e sofridos): tabela POINTS.
  *  - SOFRER shido: custo CRESCENTE (1.º -2, 2.º -3, 3.º -4). 3 shidos = -9.
- *  - PROVOCAR shido: +1 cada; só DOBRA (x2) se a vitória foi por hansoku-make.
+ *  - PROVOCAR shido: bónus CRESCENTE (1.º +1, 2.º +2, 3.º +3). 3 shidos = +6.
+ *    Espelho do sofrido; sem multiplicadores (a acumulação já dá +6 aos 3, que
+ *    é precisamente a vitória por hansoku-make).
  *  - HANSOKU-MAKE: o ippon que o JudoBase regista é FANTASMA (existe só para
  *    marcar o vencedor). Ignora-se dos DOIS lados — nem o vencedor leva +10,
  *    nem o perdedor leva -5. Conta só os shidos.
  *
  * Exemplos validados:
- *   Vitória por hansoku (3 shidos provocados): vencedor +6 (3x1 x2), perdedor -9.
- *   Ippon a sério com 2 shidos provocados:     vencedor +12, perdedor -10.
+ *   Vitória por hansoku (3 shidos provocados): vencedor +6 (1+2+3), perdedor -9.
+ *   Ippon a sério com 2 shidos provocados:     vencedor +13 (10+1+2), perdedor -10.
  *   Ippon limpo sem shidos:                    vencedor +10, perdedor -5.
  */
 export function scoreContestSide(f: IjfContest, side: "b" | "w"): number {
@@ -296,15 +298,11 @@ export function scoreContestSide(f: IjfContest, side: "b" | "w"): number {
   const shidosSofridos = campo(f, `penalty_${side}`);
   total += scoreShidosSofridos(shidosSofridos);
 
-  // Shidos PROVOCADOS por este lado (penalty do adversário): +1 cada.
+  // Shidos PROVOCADOS por este lado (penalty do adversário): bónus CRESCENTE,
+  // espelho do sofrido — 1.º +1, 2.º +2, 3.º +3 (total +6 aos 3, que é quando o
+  // adversário perde por hansoku-make). Sem multiplicadores.
   const shidosProvocados = campo(f, `penalty_${opp}`);
-  let provocados = shidosProvocados * POINTS["shido_provocado"];
-
-  // Dobra os provocados SÓ se este lado venceu POR hansoku-make:
-  // é hansoku na luta E quem levou os 3+ shidos foi o adversário (não este lado).
-  const esteLadoVenceuPorHansoku = hansoku && shidosSofridos < 3 && shidosProvocados >= 3;
-  if (esteLadoVenceuPorHansoku) provocados *= 2;
-  total += provocados;
+  total += scoreShidosProvocados(shidosProvocados);
 
   return total;
 }
