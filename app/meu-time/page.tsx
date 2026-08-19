@@ -1506,12 +1506,12 @@ function TutorialMeuTime({ passos, step, setStep, onClose, cor }: { passos: { t:
     <div style={{ textAlign: "right", marginBottom: 6 }}>
     <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>{t("comum.pular")} ✕</button>
     </div>
-    <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{s.t}</div>
-    <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{s.x}</p>
+    <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{t(s.t)}</div>
+    <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{t(s.x)}</p>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
     <button onClick={() => step > 0 && setStep(step - 1)} style={{ background: "transparent", border: "none", color: step === 0 ? "#3c463f" : "#93a39a", fontSize: 13, fontWeight: 700, cursor: step === 0 ? "default" : "pointer", fontFamily: FB }}>{t("comum.anterior")}</button>
     <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
-    <button onClick={() => (step === total - 1 ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{step === total - 1 ? "Concluir" : "Seguinte"}</button>
+    <button onClick={() => (step === total - 1 ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{step === total - 1 ? t("comum.concluir") : t("comum.seguinte")}</button>
     </div>
     </div>
     </div>
