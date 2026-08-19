@@ -677,7 +677,7 @@ function Tutorial({ step, setStep, onClose, cor }: { step: number; setStep: (s: 
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
     <button onClick={() => step > 0 && setStep(step - 1)} style={{ background: "transparent", border: "none", color: step === 0 ? "#3c463f" : "#93a39a", fontSize: 13, fontWeight: 700, cursor: step === 0 ? "default" : "pointer", fontFamily: FB }}>{t("comum.anterior")}</button>
     <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
-    <button onClick={() => (step === total - 1 ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{step === total - 1 ? t("mk.comecar") : "Seguinte"}</button>
+    <button onClick={() => (step === total - 1 ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{step === total - 1 ? t("mk.comecar") : t("comum.seguinte")}</button>
     </div>
   );
   const skip = (
@@ -693,7 +693,7 @@ function Tutorial({ step, setStep, onClose, cor }: { step: number; setStep: (s: 
       <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
       <div style={{ width: 54, height: 54, flexShrink: 0 }}><Mascot belt={cor} expression="sabio" /></div>
-      <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase" }}>{s.t}</div>
+      <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase" }}>{t(s.t)}</div>
       </div>
       {STATUS_LEGEND.map((l) => (
             <div key={l.label} style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 7 }}>
@@ -715,8 +715,8 @@ function Tutorial({ step, setStep, onClose, cor }: { step: number; setStep: (s: 
     {/* No mercado, tudo o que se destaca está acima do balão: seta sempre para cima. */}
     <SetaTutorial dir="up" />
     {skip}
-    <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{s.t}</div>
-    <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{s.x}</p>
+    <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{t(s.t)}</div>
+    <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{t(s.x)}</p>
     {controls}
     </div>
     </div>
