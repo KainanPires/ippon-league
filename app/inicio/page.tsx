@@ -47,6 +47,9 @@ const STEPS = [
   { title: "tut.sobeFaixa", text: "tut.sobeFaixaSub" },
 ];
 const PRO_BENEFITS = ["vant.scout", "vant.analise", "vant.valorizacao", "vant.aoVivo"];
+// Benefícios destacados quando o passo da oferta é PARA subir de Pro a Pro Max
+// (chaves já traduzidas do grupo pro.*). Todos fazem parte do Pro Max.
+const PRO_MAX_BENEFITS = ["pro.vaAoVivoT", "pro.vaChaveamentoT", "pro.va5LigasT", "pro.vaDesignT"];
 type TutTarget = "team" | "ligas" | "belt" | "pro" | null;
 function targetForStep(step: number): TutTarget {
   const idx = step - 1;
@@ -643,7 +646,7 @@ export default function Inicio() {
     <HubCarrossel />
     </div>
     <BarraInferior ativo="inicio" />
-    {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || t("inicio.campeao")} target={tutTarget} cor={corDaFaixa(faixaJogo)} />}
+    {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || t("inicio.campeao")} target={tutTarget} cor={corDaFaixa(faixaJogo)} contaPro={isPro} contaProMax={isProMax} />}
     {/* Modais de evento (aniversário, grande competição, etc.). Aparecem 1x por
       evento; em sequência quando coincidem; ao fechar vão para o sino. */}
     {podeMostrarModalEvento && modalEvento && (
@@ -894,18 +897,27 @@ function ModalEvento({ msg, onClose, cor }: { msg: MensagemEspecial; onClose: ()
   );
 }
 // `cor` = a faixa REAL do jogador (ver a nota do ModalEvento).
-// CUIDADO: a variável `isPro` aqui dentro é LOCAL e significa "este é o passo do
-// Ippon Pro" — não tem nada a ver com a subscrição do utilizador.
-function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string; target: TutTarget; cor: string }) {
+// A oferta final adapta-se ao nível do utilizador:
+//   grátis  -> oferece Ippon Pro
+//   Pro     -> oferece Ippon Pro Max (subir de nível)
+//   Pro Max -> NÃO há passo de oferta (o tutorial acaba um passo antes)
+// CUIDADO: a variável `isPro` aqui dentro é LOCAL e significa "este é o passo da
+// oferta" — não confundir com contaPro/contaProMax (o nível de subscrição real).
+function Tutorial({ step, setStep, onClose, name, target, cor, contaPro, contaProMax }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string; target: TutTarget; cor: string; contaPro: boolean; contaProMax: boolean }) {
   const t = useT();
-  const total = STEPS.length + 2;
+  // Pro Max já tem tudo: não vê passo de oferta. Os outros têm-no no fim.
+  const temOferta = !contaProMax;
+  const total = STEPS.length + 1 + (temOferta ? 1 : 0);
   const isWelcome = step === 0;
-  const isPro = step === STEPS.length + 1;
+  const isPro = temOferta && step === STEPS.length + 1; // este é o passo da OFERTA
+  const isLast = step === total - 1;                    // último passo (fecha o tutorial)
+  // Quem já é Pro (mas não Max) recebe a oferta de SUBIR para Pro Max.
+  const ofereceMax = contaPro && !contaProMax;
   const teach = STEPS[step - 1];
   if (target) {
-    const title = isPro ? "Ippon Pro" : t(teach.title);
+    const title = isPro ? (ofereceMax ? "Ippon Pro Max" : "Ippon Pro") : t(teach.title);
     const text = isPro
-    ? t("inicio.tocaProSub", { preco: PRECO.atualComPeriodo })
+    ? (ofereceMax ? t("inicio.ofertaMaxSub") : t("inicio.tocaProSub", { preco: PRECO.atualComPeriodo }))
     : t(teach.text);
     return (
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
@@ -920,7 +932,7 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
       <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>{t("comum.anterior")}</button>
       <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
-      <button onClick={() => (isPro ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{isPro ? "Concluir" : "Seguinte"}</button>
+      <button onClick={() => (isLast ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{isLast ? t("comum.concluir") : t("comum.seguinte")}</button>
       </div>
       </div>
       </div>
@@ -958,21 +970,25 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
         <Mascot belt={cor} expression="sabio" />
         </div>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>{t("inicio.ofertaLancamento")}</div>
-        <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0" }}>Ippon Pro</div>
+        <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0" }}>{ofereceMax ? "Ippon Pro Max" : "Ippon Pro"}</div>
+        {ofereceMax ? (
+        <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: "6px 0 14px" }}>{t("inicio.ofertaMaxSub")}</p>
+        ) : (
         <div style={{ margin: "6px 0 14px" }}>
         {PRECO.emPromocao && <><span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through" }}>{PRECO.normal}</span>{" "}</>}
         <span style={{ fontFamily: FD, fontSize: 30, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
         <span style={{ fontSize: 12, color: "#93a39a" }}>{t("precos.porMes")}</span>
         </div>
+        )}
         <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
-        {PRO_BENEFITS.map((b) => (
+        {(ofereceMax ? PRO_MAX_BENEFITS : PRO_BENEFITS).map((b) => (
               <div key={b} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
               <span style={{ color: GOLD, fontWeight: 700 }}>✓</span>
               <span style={{ fontSize: 13, color: "#c7d0c9" }}>{t(b)}</span>
               </div>
             ))}
         </div>
-        <a href="/ippon-pro" style={{ display: "block", width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 15, borderRadius: 12, fontSize: 16, textDecoration: "none", boxSizing: "border-box" }}>{t("inicio.sejaProAgora")}</a>
+        <a href="/ippon-pro" style={{ display: "block", width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 15, borderRadius: 12, fontSize: 16, textDecoration: "none", boxSizing: "border-box" }}>{ofereceMax ? t("pro.passarMax") : t("inicio.sejaProAgora")}</a>
         <a href="/ippon-pro" style={{ display: "block", marginTop: 9, textAlign: "center", color: GOLD, fontSize: 13, fontWeight: 700, textDecoration: "none", fontFamily: FB }}>{t("inicio.saberMais")}</a>
         <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB }}>{t("inicio.continuarSemPagar")}</button>
         </div>
@@ -990,7 +1006,7 @@ function Tutorial({ step, setStep, onClose, name, target, cor }: { step: number;
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
         <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>{t("comum.anterior")}</button>
         <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
-        <button onClick={() => setStep(step + 1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{t("comum.seguinte")}</button>
+        <button onClick={() => (isLast ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{isLast ? t("comum.concluir") : t("comum.seguinte")}</button>
         </div>
         </div>
       )}
