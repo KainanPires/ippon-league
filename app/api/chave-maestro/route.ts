@@ -25,6 +25,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, contestActions } from "@/lib/ijf";
 import { focoMercado } from "@/lib/calendario";
+import { lerLutasManuais, indexarManuaisPorAtleta, aplicarManuaisAoVivo } from "@/lib/lutasManuais";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -112,6 +113,9 @@ async function processarCategoria(comp: string, cat: string) {
     }
   } catch { /* segue sem identidades */ }
 
+  // Lutas manuais desta categoria (resultados que o JudoBase não leu), por atleta.
+  const manuaisIdx = indexarManuaisPorAtleta(await lerLutasManuais(comp, cat));
+
   let comResultados = 0, falhas = 0;
   const linhas: Record<string, unknown>[] = [];
   for (let i = 0; i < ids.length; i += LOTE_ATLETAS) {
@@ -119,13 +123,14 @@ async function processarCategoria(comp: string, cat: string) {
     const res = await Promise.all(lote.map(async (id) => ({ id, v: await vivoDoAtleta(id, comp).catch(() => null) })));
     for (const { id, v } of res) {
       if (v === null) { falhas++; continue; }
-      if (v.nLutas > 0) comResultados++;
+      const vm = aplicarManuaisAoVivo(v, manuaisIdx.get(id) || [], id);
+      if (vm.nLutas > 0) comResultados++;
       const info = ident.get(id);
       linhas.push({
         id_competicao: comp, id_person: id, weight_category: cat,
         gender: info?.gender || null, nome: info?.nome || null, country_code: info?.pais || null,
-        vitorias: v.vitorias, derrotas: v.derrotas, n_lutas: v.nLutas, pontos: v.pontos,
-        vencidos: v.vencidos, lutas: v.lutas, acoes: v.acoes,
+        vitorias: vm.vitorias, derrotas: vm.derrotas, n_lutas: vm.nLutas, pontos: vm.pontos,
+        vencidos: vm.vencidos, lutas: vm.lutas, acoes: vm.acoes,
       });
     }
   }
