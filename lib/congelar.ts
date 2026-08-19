@@ -38,6 +38,7 @@ import {
 import { calcularForma } from "@/lib/forma";
 import { computeNewPrice } from "@/lib/engine";
 import { notificarFimDeCompeticao } from "@/lib/notificarCompeticao";
+import { lerLutasManuais, indexarManuaisPorAtleta, aplicarManuaisNoCongelamento } from "@/lib/lutasManuais";
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 // Orçamento de tempo por execução do congelamento de UMA competição. Deixa
 // folga dentro do maxDuration do cron (300s). Se estourar, para e retoma na
@@ -116,6 +117,9 @@ async function pontuarAtletasDaCompeticao(
   .select("id_person, preco_atual");
   const precoAtualPorId = new Map<string, number>();
   for (const p of precosLinhas || []) precoAtualPorId.set(String(p.id_person), Number(p.preco_atual));
+  // Lutas manuais desta competição (o JudoBase não as leu), por atleta — para
+  // contarem nos pontos e no preço, tal como as reais.
+  const manuaisIdx = indexarManuaisPorAtleta(await lerLutasManuais(idComp));
   let processados = 0;
   let faltam = 0;
   for (const atleta of inscritos) {
@@ -136,14 +140,19 @@ async function pontuarAtletasDaCompeticao(
     }
     // Lutas DESTA competição -> pontos, n_lutas, V/D.
     const desta = (lutas || []).filter((f) => String(f.id_competition) === idComp);
-    if (desta.length === 0) continue; // inscrito mas não lutou: não entra no ranking
+    const manuaisDoAtleta = manuaisIdx.get(id) || [];
+    // Inscrito mas não lutou (e sem luta manual): não entra no ranking.
+    if (desta.length === 0 && manuaisDoAtleta.length === 0) continue;
     let pontos = 0;
     let vitorias = 0;
     let derrotas = 0;
+    const advsLidos = new Set<string>(); // adversários já dados pelo JudoBase
     // Agregado de AÇÕES (a "razão" do ponto): soma de todas as lutas. Só para
     // exibição no popup do ranking. O total de pontos vem de scoreContestForPerson.
     const acc = { ippon: 0, waza: 0, yuko: 0, shido_provocado: 0, ippon_sof: 0, waza_sof: 0, yuko_sof: 0, shido_sof: 0 };
     for (const f of desta) {
+      const oppId = String(f.id_person_blue) === id ? String(f.id_person_white ?? "") : String(f.id_person_blue ?? "");
+      if (oppId) advsLidos.add(oppId);
       pontos += scoreContestForPerson(f, id);
       const w = String(f.id_winner ?? "");
       if (w && w !== "0") {
@@ -169,6 +178,12 @@ async function pontuarAtletasDaCompeticao(
         acc.shido_sof += num(`penalty_${lado}`); // shido deste lado = sofrido
       }
     }
+    // Funde as lutas manuais (as que o JudoBase não leu) nos pontos, V/D e ações.
+    // `advsLidos` evita duplicar quando o JudoBase já apanhou o confronto.
+    const extraManual = aplicarManuaisNoCongelamento(acc, manuaisDoAtleta, id, advsLidos);
+    pontos += extraManual.pontos;
+    vitorias += extraManual.vitorias;
+    derrotas += extraManual.derrotas;
     pontos = round1(pontos);
     // Remove os campos a zero para o jsonb ficar compacto (o popup só mostra o que existe).
     const acoes: Record<string, number> = {};
@@ -191,7 +206,7 @@ async function pontuarAtletasDaCompeticao(
         weight_category: atleta.category,
         gender: atleta.gender,
         pontos,
-        n_lutas: desta.length,
+        n_lutas: desta.length + extraManual.nLutas,
         vitorias,
         derrotas,
         preco_antes: round1(precoAntes),
