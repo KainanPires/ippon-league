@@ -67,6 +67,15 @@ const CHAVE_ESTADO: Record<string, string> = {
   "Barganha": "estado.barganha",
   "Aposta": "estado.aposta",
 };
+// Descrição de cada estado (para a legenda do tutorial). A chave (valor interno,
+// PT) mapeia para a tradução — mesmo padrão do CHAVE_ESTADO dos rótulos.
+const CHAVE_ESTADO_DESC: Record<string, string> = {
+  "Elite": "estadoDesc.elite",
+  "Em alta": "estadoDesc.emAlta",
+  "Em baixa": "estadoDesc.emBaixa",
+  "Barganha": "estadoDesc.barganha",
+  "Aposta": "estadoDesc.aposta",
+};
 
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 const code3 = (iso: string) => iso;
@@ -697,8 +706,8 @@ function Tutorial({ step, setStep, onClose, cor }: { step: number; setStep: (s: 
       </div>
       {STATUS_LEGEND.map((l) => (
             <div key={l.label} style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 7 }}>
-            <span style={{ background: "rgba(255,255,255,0.05)", color: l.color, fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{l.label}</span>
-            <span style={{ fontSize: 12, color: "#c7d0c9" }}>{l.desc}</span>
+            <span style={{ background: "rgba(255,255,255,0.05)", color: l.color, fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{t(CHAVE_ESTADO[l.label] ?? l.label)}</span>
+            <span style={{ fontSize: 12, color: "#c7d0c9" }}>{t(CHAVE_ESTADO_DESC[l.label] ?? l.label)}</span>
             </div>
           ))}
       {controls}
