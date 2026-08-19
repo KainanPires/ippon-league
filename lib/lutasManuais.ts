@@ -71,7 +71,9 @@ export function pontosLadoManual(propria: AcoesLado, adversario: AcoesLado): num
   return total;
 }
 
-type MovId = { vitorias: number; derrotas: number; vencidos: string[] };
+// Campos OPCIONAIS de propósito: é a forma do ResultadosPorId do motorChave
+// (vitorias?/derrotas?/vencidos?). Garantimos os valores dentro do garante().
+type MovId = { vitorias?: number; derrotas?: number; vencidos?: string[] };
 type InfoId = { pontos: number; nLutas: number; acoes: unknown };
 type SelosPar = Record<string, { i: number; w: number; y: number; s: number }>;
 
@@ -87,7 +89,15 @@ export function fundirManuaisNaChave(
   infos: Record<string, InfoId>,
   selosPar: SelosPar,
 ): void {
-  const garante = (id: string): MovId => (resultados[id] ||= { vitorias: 0, derrotas: 0, vencidos: [] });
+  // Devolve sempre um registo com os três campos preenchidos (o tipo de entrada
+  // tem-nos opcionais). Muta o mapa recebido.
+  const garante = (id: string): Required<MovId> => {
+    const cur = resultados[id] ?? (resultados[id] = { vitorias: 0, derrotas: 0, vencidos: [] });
+    cur.vitorias ??= 0;
+    cur.derrotas ??= 0;
+    cur.vencidos ??= [];
+    return cur as Required<MovId>;
+  };
   const garanteInfo = (id: string): InfoId => (infos[id] ||= { pontos: 0, nLutas: 0, acoes: null });
 
   for (const m of manuais) {
