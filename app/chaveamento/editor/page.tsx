@@ -60,6 +60,16 @@ interface Atleta { id: string; name: string; countryIso?: string; category?: str
 type Pools = Record<PoolId, string[]>;
 interface MolduraGuardada { pools: Record<string, unknown>; genero: string | null }
 
+// --- Completar lutas (resultados manuais) ---
+type Ac = { i: number; w: number; y: number; s: number };
+const AC0: Ac = { i: 0, w: 0, y: 0, s: 0 };
+interface LutaManualRow {
+  id: string; weight_category: string;
+  id_person_a: string; id_person_b: string; id_vencedor: string;
+  a_ippon: number; a_waza: number; a_yuko: number; a_shido: number;
+  b_ippon: number; b_waza: number; b_yuko: number; b_shido: number;
+}
+
 const POOLS_VAZIOS: Pools = { A: [], B: [], C: [], D: [] };
 const AUTO_TODOS: Record<PoolId, boolean> = { A: true, B: true, C: true, D: true };
 
@@ -83,6 +93,16 @@ export default function EditorChave() {
   const [horarioLocal, setHorarioLocal] = useState("");
   const [hMsg, setHMsg] = useState("");
   const [hErro, setHErro] = useState("");
+  // Completar lutas (resultados manuais desta competição; filtra-se por categoria).
+  const [manuais, setManuais] = useState<LutaManualRow[]>([]);
+  const [mfA, setMfA] = useState("");
+  const [mfB, setMfB] = useState("");
+  const [mfVenc, setMfVenc] = useState("");
+  const [acA, setAcA] = useState<Ac>(AC0);
+  const [acB, setAcB] = useState<Ac>(AC0);
+  const [mfMsg, setMfMsg] = useState("");
+  const [mfErro, setMfErro] = useState("");
+  const [mfAGravar, setMfAGravar] = useState(false);
 
   const genero = CATS_M.includes(cat) ? "M" : "F";
   const fuso = fusoDaCompeticao(comp);
@@ -128,11 +148,13 @@ export default function EditorChave() {
     setCarregando(true); setMsg(""); setErro(""); setHMsg(""); setHErro("");
     try {
       const tk = await token();
-      const [rAtletas, rMold, rHor] = await Promise.all([
+      const [rAtletas, rMold, rHor, rMan] = await Promise.all([
         fetch(`/api/atletas?id=${encodeURIComponent(idc)}`).then((r) => r.json()).catch(() => null),
         fetch(`/api/chaveamento-moldura?comp=${encodeURIComponent(idc)}`, tk ? { headers: { authorization: `Bearer ${tk}` } } : undefined).then((r) => r.json()).catch(() => null),
         fetch(`/api/horarios`).then((r) => r.json()).catch(() => null),
+        fetch(`/api/chaveamento-resultado?comp=${encodeURIComponent(idc)}`, tk ? { headers: { authorization: `Bearer ${tk}` } } : undefined).then((r) => r.json()).catch(() => null),
       ]);
+      setManuais(Array.isArray(rMan?.lutas) ? rMan.lutas : []);
       setAtletas(Array.isArray(rAtletas?.atletas) ? rAtletas.atletas : []);
       const novoCache: Record<string, MolduraGuardada> = {};
       const novasFeitas: Record<string, boolean> = {};
@@ -160,6 +182,50 @@ export default function EditorChave() {
   function escolherCat(c: string) {
     setCat(c);
     carregarCat(c, cache);
+    resetLutaForm();
+  }
+
+  // --- COMPLETAR LUTAS (resultados manuais) ---
+  function resetLutaForm() {
+    setMfA(""); setMfB(""); setMfVenc(""); setAcA(AC0); setAcB(AC0); setMfMsg(""); setMfErro("");
+  }
+  async function recarregarManuais() {
+    const tk = await token();
+    const r = await fetch(`/api/chaveamento-resultado?comp=${encodeURIComponent(comp)}`, { headers: { authorization: `Bearer ${tk}` } })
+      .then((x) => x.json()).catch(() => null);
+    setManuais(Array.isArray(r?.lutas) ? r.lutas : []);
+  }
+  async function gravarLuta() {
+    setMfErro(""); setMfMsg("");
+    if (!mfA || !mfB || mfA === mfB) { setMfErro(t("chvr.erroLados")); return; }
+    if (mfVenc !== mfA && mfVenc !== mfB) { setMfErro(t("chvr.erroVencedor")); return; }
+    setMfAGravar(true);
+    try {
+      const tk = await token();
+      const r = await fetch("/api/chaveamento-resultado", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${tk}` },
+        body: JSON.stringify({ acao: "gravar", comp, categoria: cat, a: mfA, b: mfB, vencedor: mfVenc, aAcoes: acA, bAcoes: acB }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!j?.ok) { setMfErro(j?.erro || t("chvm.naoGuardar")); return; }
+      resetLutaForm();
+      setMfMsg(t("chvr.guardado"));
+      await recarregarManuais();
+    } catch {
+      setMfErro(t("chvm.naoGuardar"));
+    } finally {
+      setMfAGravar(false);
+    }
+  }
+  async function apagarLuta(id: string) {
+    const tk = await token();
+    await fetch("/api/chaveamento-resultado", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${tk}` },
+      body: JSON.stringify({ acao: "apagar", id }),
+    });
+    await recarregarManuais();
   }
 
   function colocar(id: string, pool: PoolId) {
@@ -282,6 +348,7 @@ export default function EditorChave() {
   const totalColocados = colocado.size;
 
   const nomeCurto = (a?: Atleta) => (a ? `${a.name}${a.countryIso ? ` (${a.countryIso})` : ""}` : "—");
+  const manuaisDaCat = manuais.filter((m) => m.weight_category === cat);
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -411,6 +478,78 @@ export default function EditorChave() {
                   {feitas[cat] && <button onClick={apagar} disabled={aGravar} style={btnSec}>{t("chvm.apagarCat")}</button>}
                 </div>
                 <div style={{ fontSize: 11, color: "#5f6f67", marginTop: 8 }}>{t("chvm.colocados", { n: totalColocados })}</div>
+
+                {/* COMPLETAR LUTAS — resultado manual quando o JudoBase não leu a luta. */}
+                <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #1a221d" }}>
+                  <div style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", color: GOLD, marginBottom: 4 }}>{t("chvr.titulo")}</div>
+                  <div style={{ fontSize: 11.5, color: "#7c8a82", lineHeight: 1.5, marginBottom: 12 }}>{t("chvr.sub")}</div>
+
+                  <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                    <label style={{ flex: 1, minWidth: 0 }}>
+                      <div style={rotulo}>{t("chvr.atletaA")}</div>
+                      <select value={mfA} onChange={(e) => { const v = e.target.value; setMfA(v); if (mfVenc && mfVenc !== v && mfVenc !== mfB) setMfVenc(""); }} style={{ ...inp, appearance: "auto" }}>
+                        <option value="">{t("chvr.escolher")}</option>
+                        {daCat.map((a) => <option key={a.id} value={a.id} disabled={a.id === mfB}>{nomeCurto(a)}</option>)}
+                      </select>
+                    </label>
+                    <label style={{ flex: 1, minWidth: 0 }}>
+                      <div style={rotulo}>{t("chvr.atletaB")}</div>
+                      <select value={mfB} onChange={(e) => { const v = e.target.value; setMfB(v); if (mfVenc && mfVenc !== v && mfVenc !== mfA) setMfVenc(""); }} style={{ ...inp, appearance: "auto" }}>
+                        <option value="">{t("chvr.escolher")}</option>
+                        {daCat.map((a) => <option key={a.id} value={a.id} disabled={a.id === mfA}>{nomeCurto(a)}</option>)}
+                      </select>
+                    </label>
+                  </div>
+
+                  {mfA && mfB && (
+                    <>
+                      <div style={rotulo}>{t("chvr.vencedor")}</div>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                        {[mfA, mfB].map((id) => {
+                          const sel = mfVenc === id;
+                          return (
+                            <button key={id} onClick={() => setMfVenc(id)}
+                              style={{ flex: 1, minWidth: 0, background: sel ? GOLD : "transparent", border: `1px solid ${sel ? GOLD : "#2a3a33"}`, color: sel ? "#1b211e" : "#cfd8d2", fontFamily: FD, fontSize: 12.5, fontWeight: 700, padding: "9px 8px", borderRadius: 9, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {nomeCurto(idA[id])}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 10 }}>
+                        <AcoesLado nome={nomeCurto(idA[mfA])} ac={acA} set={setAcA} />
+                        <AcoesLado nome={nomeCurto(idA[mfB])} ac={acB} set={setAcB} />
+                      </div>
+                      <div style={{ fontSize: 11, color: "#5f6f67", lineHeight: 1.45, marginBottom: 10 }}>{t("chvr.shidoNota")}</div>
+
+                      {mfErro && <Aviso cor="#ef8d83" texto={mfErro} />}
+                      {mfMsg && <Aviso cor="#7fd1a3" texto={mfMsg} />}
+                      <button onClick={gravarLuta} disabled={mfAGravar} style={{ ...btnPri, width: "100%", marginTop: 4 }}>
+                        {mfAGravar ? t("chvr.aGuardar") : t("chvr.guardar")}
+                      </button>
+                    </>
+                  )}
+                  {(!mfA || !mfB) && (mfMsg || mfErro) && <Aviso cor={mfErro ? "#ef8d83" : "#7fd1a3"} texto={mfErro || mfMsg} />}
+
+                  {manuaisDaCat.length > 0 ? (
+                    <div style={{ marginTop: 14 }}>
+                      <div style={rotulo}>{t("chvr.jaInseridas")} · {manuaisDaCat.length}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {manuaisDaCat.map((m) => (
+                          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#121815", border: "1px solid #243029", borderRadius: 9, padding: "7px 9px" }}>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: "#d6ddd6", lineHeight: 1.4 }}>
+                              {nomeCurto(idA[m.id_person_a])} <span style={{ color: "#5f6f67" }}>vs</span> {nomeCurto(idA[m.id_person_b])}
+                              {" · "}<span style={{ color: "#7fd1a3" }}>{nomeCurto(idA[m.id_vencedor])} {t("ck.venceu")}</span>
+                            </span>
+                            <button onClick={() => apagarLuta(m.id)} aria-label={t("chvr.remover")} style={{ flexShrink: 0, background: "transparent", border: "none", color: "#ef8d83", fontSize: 15, cursor: "pointer", lineHeight: 1, padding: "0 2px" }}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 12, fontSize: 12, color: "#5f6f67" }}>{t("chvr.semManuais")}</div>
+                  )}
+                </div>
               </>
             )}
 
@@ -421,6 +560,34 @@ export default function EditorChave() {
         )}
       </div>
     </main>
+  );
+}
+
+// Um lado de uma luta manual: os quatro contadores de ações. Os termos de judo
+// (Ippon, Waza-ari, Yuko, Shido) não se traduzem. Shido vai até 3 (hansoku-make).
+function AcoesLado({ nome, ac, set }: { nome: string; ac: Ac; set: (a: Ac) => void }) {
+  const campos: { k: keyof Ac; label: string; max: number }[] = [
+    { k: "i", label: "Ippon", max: 9 },
+    { k: "w", label: "Waza-ari", max: 9 },
+    { k: "y", label: "Yuko", max: 9 },
+    { k: "s", label: "Shido", max: 3 },
+  ];
+  return (
+    <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 10, padding: "9px 11px" }}>
+      <div style={{ fontSize: 12.5, color: "#d6ddd6", fontWeight: 700, marginBottom: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nome}</div>
+      <div style={{ display: "flex", gap: 6 }}>
+        {campos.map((c) => (
+          <div key={c.k} style={{ flex: 1, textAlign: "center" }}>
+            <div style={{ fontSize: 9.5, color: "#7c8a82", fontFamily: FD, textTransform: "uppercase", marginBottom: 4, whiteSpace: "nowrap" }}>{c.label}</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+              <button onClick={() => set({ ...ac, [c.k]: Math.max(0, ac[c.k] - 1) })} style={passo} aria-label="−">−</button>
+              <span style={{ minWidth: 14, fontFamily: FD, fontSize: 14, fontWeight: 700, color: ac[c.k] > 0 ? GOLD : "#5f6f67" }}>{ac[c.k]}</span>
+              <button onClick={() => set({ ...ac, [c.k]: Math.min(c.max, ac[c.k] + 1) })} style={passo} aria-label="+">+</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -477,4 +644,12 @@ const btnSec: React.CSSProperties = {
 const miniPool: React.CSSProperties = {
   flexShrink: 0, width: 26, height: 26, background: "transparent", border: "1px solid #2a3a33",
   color: GOLD, fontSize: 12, fontWeight: 700, borderRadius: 7, cursor: "pointer", fontFamily: FD,
+};
+const rotulo: React.CSSProperties = {
+  fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase",
+  letterSpacing: "0.05em", color: "#93a39a", marginBottom: 5,
+};
+const passo: React.CSSProperties = {
+  width: 24, height: 24, background: "transparent", border: "1px solid #2a3a33",
+  color: "#cfd8d2", fontSize: 15, lineHeight: 1, borderRadius: 6, cursor: "pointer", fontFamily: FD,
 };
