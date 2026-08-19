@@ -716,7 +716,7 @@ function Tutorial({ step, setStep, onClose, cor }: { step: number; setStep: (s: 
     <SetaTutorial dir="up" />
     {skip}
     <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{t(s.t)}</div>
-    <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{t(s.x)}</p>
+    <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{s.x ? t(s.x) : null}</p>
     {controls}
     </div>
     </div>
