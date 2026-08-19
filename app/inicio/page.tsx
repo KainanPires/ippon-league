@@ -956,8 +956,8 @@ function Tutorial({ step, setStep, onClose, name, target, cor, contaPro, contaPr
         <Mascot belt={cor} expression="comemorando" />
         </div>
         <div>
-        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>Olá, {name}! Sou o Dôdo</div>
-        <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>Sou o teu sensei aqui na Ippon League e vou guiar-te. Vou apontar no ecrã o que importa. Bora começar?</p>
+        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>{t("tut.olaDodo", { nome: name })}</div>
+        <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{t("tut.senseiIntro")}</p>
         </div>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
