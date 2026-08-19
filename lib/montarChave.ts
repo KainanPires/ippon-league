@@ -17,6 +17,7 @@ import {
   type PoolId,
   type ChaveDesenhada,
 } from "@/lib/motorChave";
+import { lerLutasManuais, fundirManuaisNaChave } from "@/lib/lutasManuais";
 
 export type EstadoCategoria = "naoComecou" | "aDecorrer" | "terminada";
 
@@ -114,6 +115,15 @@ export async function montarChaveDaBase(comp: string, cat: string): Promise<Chav
       identidades[id] = atual;
     }
   } catch { /* segue com o que houver */ }
+
+  // 3.5) Funde os resultados MANUAIS (lutas que o JudoBase não leu). Acrescenta
+  // o head-to-head (para o motor avançar), soma pontos/ações, e ignora as que o
+  // JudoBase já tenha apanhado (não duplica). Vive à parte da resultados_atletas
+  // de propósito — senão o cron apagava-as na corrida seguinte.
+  try {
+    const manuais = await lerLutasManuais(comp, cat);
+    if (manuais.length) fundirManuaisNaChave(manuais, resultados, infos, acoesPar);
+  } catch { /* sem manuais, segue com o que houver */ }
 
   // 4) Corre o motor.
   const chave = desenharChave(moldura, resultados, identidades);
