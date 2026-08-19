@@ -47,6 +47,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, contestActions } from "@/lib/ijf";
 import { focoMercado } from "@/lib/calendario";
+import { lerLutasManuais, indexarManuaisPorAtleta, aplicarManuaisAoVivo } from "@/lib/lutasManuais";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60; // fôlego para as chamadas (Vercel Pro; no hobby é 10s)
@@ -184,6 +185,10 @@ export async function GET(req: Request) {
       });
     }
   } catch { /* segue sem identidades */ }
+  // Lutas manuais desta competição (resultados que o JudoBase não leu), por
+  // atleta. Fundidas no vivo de cada um, para contarem nos pontos.
+  const manuaisIdx = indexarManuaisPorAtleta(await lerLutasManuais(comp));
+
   // ---- Processa CATEGORIA A CATEGORIA, dentro do orçamento ----
   // Parar entre categorias (e não a meio de uma) mantém a base sempre coerente:
   // ou uma categoria está toda atualizada, ou não foi tocada nesta corrida.
@@ -217,7 +222,8 @@ export async function GET(req: Request) {
       const res = await Promise.all(lote.map(async (id) => ({ id, v: await vivoDoAtleta(id, comp).catch(() => null) })));
       for (const { id, v } of res) {
         if (v === null) { falhas++; continue; }
-        if (v.nLutas > 0) comResultados++;
+        const vm = aplicarManuaisAoVivo(v, manuaisIdx.get(id) || [], id);
+        if (vm.nLutas > 0) comResultados++;
         const info = ident.get(id);
       linhas.push({
         id_competicao: comp,
@@ -226,13 +232,13 @@ export async function GET(req: Request) {
         gender: info?.gender || null,
         nome: info?.nome || null,
         country_code: info?.pais || null,
-        vitorias: v.vitorias,
-        derrotas: v.derrotas,
-        n_lutas: v.nLutas,
-        pontos: v.pontos,
-        vencidos: v.vencidos,
-        lutas: v.lutas,
-        acoes: v.acoes,
+        vitorias: vm.vitorias,
+        derrotas: vm.derrotas,
+        n_lutas: vm.nLutas,
+        pontos: vm.pontos,
+        vencidos: vm.vencidos,
+        lutas: vm.lutas,
+        acoes: vm.acoes,
       });
       }
     }
