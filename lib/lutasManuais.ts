@@ -130,3 +130,100 @@ export function fundirManuaisNaChave(
     selosPar[`${m.b}->${m.a}`] = { i: m.bAcoes.i, w: m.bAcoes.w, y: m.bAcoes.y, s: m.bAcoes.s };
   }
 }
+
+// ---------------------------------------------------------------------------
+// FASE 3B — propagar as lutas manuais para os PONTOS dos utilizadores.
+//
+// Os crons (chave-viva / chave-maestro) e o congelamento (lib/congelar) calculam
+// cada atleta a partir do JudoBase. Aqui fundimos as lutas manuais no MESMO
+// cálculo, para que os pontos de uma luta não lida contem no ranking, no mercado
+// e no património — não só na chave. Se o JudoBase já leu o confronto (o
+// adversário já aparece nas lutas do atleta), a manual é ignorada: nunca duplica.
+// ---------------------------------------------------------------------------
+
+export type AcoesAgregadas = {
+  ippon: number; waza: number; yuko: number; shido_provocado: number;
+  ippon_sof: number; waza_sof: number; yuko_sof: number; shido_sof: number;
+};
+
+// Forma do resultado por atleta que os crons produzem (vivoDoAtleta).
+export interface VivoAtleta {
+  vitorias: number;
+  derrotas: number;
+  nLutas: number;
+  pontos: number;
+  vencidos: string[];
+  acoes: AcoesAgregadas;
+  lutas: Array<{ adv: string; venceu: boolean; i: number; w: number; y: number; s: number }>;
+}
+
+/** Indexa as lutas manuais por atleta (aparece nas duas pontas do confronto). */
+export function indexarManuaisPorAtleta(manuais: LutaManual[]): Map<string, LutaManual[]> {
+  const idx = new Map<string, LutaManual[]>();
+  const add = (id: string, m: LutaManual) => {
+    const arr = idx.get(id);
+    if (arr) arr.push(m); else idx.set(id, [m]);
+  };
+  for (const m of manuais) { if (m.a) add(m.a, m); if (m.b) add(m.b, m); }
+  return idx;
+}
+
+/**
+ * Funde as lutas manuais de UM atleta no resultado "ao vivo" (crons). Muta e
+ * devolve `v`. Ignora um confronto que o JudoBase já leu (adversário já em
+ * v.lutas). Reproduz a contabilidade do vivoDoAtleta: V/D, vencidos, nLutas,
+ * pontos (com pontosLadoManual) e o agregado de ações.
+ */
+export function aplicarManuaisAoVivo(v: VivoAtleta, manuaisDoAtleta: LutaManual[], idPerson: string): VivoAtleta {
+  if (!manuaisDoAtleta.length) return v;
+  const advsLidos = new Set(v.lutas.map((l) => l.adv));
+  for (const m of manuaisDoAtleta) {
+    const souA = m.a === idPerson;
+    const opp = souA ? m.b : m.a;
+    if (!opp || opp === idPerson || advsLidos.has(opp)) continue;
+    const minhas = souA ? m.aAcoes : m.bAcoes;
+    const dele = souA ? m.bAcoes : m.aAcoes;
+    const venceu = m.vencedor === idPerson;
+    if (venceu) { v.vitorias += 1; if (!v.vencidos.includes(opp)) v.vencidos.push(opp); }
+    else v.derrotas += 1;
+    v.nLutas += 1;
+    v.pontos += pontosLadoManual(minhas, dele);
+    v.acoes.ippon += minhas.i; v.acoes.waza += minhas.w; v.acoes.yuko += minhas.y;
+    v.acoes.ippon_sof += dele.i; v.acoes.waza_sof += dele.w; v.acoes.yuko_sof += dele.y;
+    v.acoes.shido_provocado += dele.s; v.acoes.shido_sof += minhas.s;
+    v.lutas.push({ adv: opp, venceu, i: minhas.i, w: minhas.w, y: minhas.y, s: minhas.s });
+    advsLidos.add(opp);
+  }
+  v.pontos = Math.round(v.pontos * 10) / 10;
+  return v;
+}
+
+/**
+ * Funde as lutas manuais de UM atleta no CONGELAMENTO (lib/congelar). Muta o
+ * agregado de ações `acc` e devolve os deltas a somar (pontos, V/D, nº de lutas).
+ * `advsLidos` = adversários que o JudoBase já deu para este atleta (evita
+ * duplicar); a função acrescenta-lhe os que for aplicando.
+ */
+export function aplicarManuaisNoCongelamento(
+  acc: AcoesAgregadas,
+  manuaisDoAtleta: LutaManual[],
+  idPerson: string,
+  advsLidos: Set<string>,
+): { pontos: number; vitorias: number; derrotas: number; nLutas: number } {
+  const delta = { pontos: 0, vitorias: 0, derrotas: 0, nLutas: 0 };
+  for (const m of manuaisDoAtleta) {
+    const souA = m.a === idPerson;
+    const opp = souA ? m.b : m.a;
+    if (!opp || opp === idPerson || advsLidos.has(opp)) continue;
+    const minhas = souA ? m.aAcoes : m.bAcoes;
+    const dele = souA ? m.bAcoes : m.aAcoes;
+    delta.pontos += pontosLadoManual(minhas, dele);
+    if (m.vencedor === idPerson) delta.vitorias += 1; else delta.derrotas += 1;
+    delta.nLutas += 1;
+    acc.ippon += minhas.i; acc.waza += minhas.w; acc.yuko += minhas.y;
+    acc.ippon_sof += dele.i; acc.waza_sof += dele.w; acc.yuko_sof += dele.y;
+    acc.shido_provocado += dele.s; acc.shido_sof += minhas.s;
+    advsLidos.add(opp);
+  }
+  return delta;
+}
