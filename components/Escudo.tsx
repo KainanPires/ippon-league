@@ -1,7 +1,6 @@
 "use client";
 
-// Copiado do repositório da Ippon League. A única mudança está em como se
-// encontra o escudo guardado — ver loadIdentity() mais abaixo.
+import { uid } from "@/lib/team";
 
 export type ShapeId = "classic" | "round" | "circle" | "hex" | "diamond";
 export type PatternId = "solido" | "listras-v" | "listras-h" | "xadrez" | "cruz" | "diagonal" | "metade";
@@ -39,40 +38,15 @@ export const DEFAULT_IDENTITY: Identity = {
   iconBorder: "#141110", // contorno escuro tipo autocolante (destaca o ícone)
 };
 
-// ONDE ESTÁ O ESCUDO
-//
-// O Fantasy guarda a identidade no localStorage deste endereço, com a chave
-// "ippon_identity__<id da conta>". Como os dois produtos passaram a viver no
-// mesmo endereço, a Academy lê e escreve na MESMA gaveta — não é uma cópia do
-// escudo, é o escudo.
-//
-// O id da conta lê-se do próprio token de sessão que a Supabase guarda ao
-// lado, que é exactamente como o Fantasy o obtém. Assim as duas chaves são a
-// mesma string, sem nenhuma combinação entre os dois códigos.
+// Chave da identidade, ISOLADA POR CONTA: "ippon_identity__<uid>".
+// Assim o nome/escudo de uma conta não aparece noutra no mesmo browser.
 const KEY_BASE = "ippon_identity";
-
-function uidDaSessao(): string {
-  try {
-    if (typeof window === "undefined" || !window.localStorage) return "anon";
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k || !k.startsWith("sb-") || !k.endsWith("-auth-token")) continue;
-      const raw = localStorage.getItem(k);
-      if (!raw) continue;
-      const p = JSON.parse(raw);
-      // O token pode vir como { user: {...} } ou { currentSession: { user } }.
-      const id = p?.user?.id ?? p?.currentSession?.user?.id ?? null;
-      if (typeof id === "string" && id) return id;
-    }
-  } catch { /* sem sessão legível */ }
-  return "anon";
-}
-
-function identityKey() { return `${KEY_BASE}__${uidDaSessao()}`; }
+function identityKey() { return `${KEY_BASE}__${uid()}`; }
 
 export function loadIdentity(): Identity {
   try {
-    // A chave da conta; se não houver, a chave antiga sem sufixo.
+    // Primeiro a chave isolada por conta; se não houver, tenta a chave antiga
+    // (migração suave de quem já tinha identidade gravada na chave global).
     const raw = localStorage.getItem(identityKey()) ?? localStorage.getItem(KEY_BASE);
     if (!raw) return DEFAULT_IDENTITY;
     return { ...DEFAULT_IDENTITY, ...JSON.parse(raw) };
@@ -80,9 +54,8 @@ export function loadIdentity(): Identity {
     return DEFAULT_IDENTITY;
   }
 }
-
 export function saveIdentity(id: Identity) {
-  try { localStorage.setItem(identityKey(), JSON.stringify(id)); } catch { /* sem storage */ }
+  try { localStorage.setItem(identityKey(), JSON.stringify(id)); } catch {}
 }
 
 export const SHAPES: ShapeId[] = ["classic", "round", "circle", "hex", "diamond"];
