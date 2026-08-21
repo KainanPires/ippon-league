@@ -5,6 +5,7 @@ import { RegistarServiceWorker } from "@/components/RegistarServiceWorker";
 import { CarregarHorarios } from "@/components/CarregarHorarios";
 import { JudoguiProvider } from "@/components/JudoguiProvider";
 import { TatameProvider } from "@/components/TatameProvider";
+import { BarraTopo } from "@/components/BarraTopo";
 import { LinguaProvider } from "@/lib/i18n";
 
 const geistSans = Manrope({
@@ -59,6 +60,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <RegistarServiceWorker />
         <CarregarHorarios />
+        {/* A barra de troca entre os dois produtos. Fica por fora dos
+            providers de propósito: não precisa de nenhum deles e assim é a
+            primeira coisa que o browser desenha, sem esperar por nada. */}
+        <BarraTopo />
         {/* O LinguaProvider envolve TUDO: qualquer ecrã pode chamar useT() sem
             se preocupar em ser embrulhado. Fica por fora dos outros providers
             porque não depende de nenhum deles — e porque, se um dia o judogui
