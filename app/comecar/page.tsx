@@ -9,6 +9,8 @@ import { COUNTRIES, flagEmoji, nomeDoPais, procurarPaises } from "@/lib/countrie
 import { useT, useLingua } from "@/lib/i18n";
 import { SeletorLingua } from "@/components/SeletorLingua";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
+// Idade mínima (13) e a mensagem traduzida — ver secção "Menores" da Política.
+import { IDADE_MINIMA, LEGAL_UI } from "@/lib/legal";
 const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
 const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -21,6 +23,17 @@ const GOLD = "#d9a441";
 // A única linha traduzida é a última, que não é uma faixa mas uma resposta.
 const BELTS = ["Branca", "Azul", "Amarela", "Verde", "Roxa", "Marrom", "Preta"];
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+// Idade em anos completos a partir de "YYYY-MM-DD". Usada para barrar menores
+// de 13 no registo (o judoca de 13 anos j\u00e1 pode; o de 12 ainda n\u00e3o).
+function idadeEmAnos(iso: string): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return 0;
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - y;
+  const mes = hoje.getMonth() + 1;
+  if (mes < m || (mes === m && hoje.getDate() < d)) idade -= 1;
+  return idade;
+}
 type Form = {
   name: string;
   email: string;
@@ -63,6 +76,9 @@ export default function Comecar() {
     else if (form.senha.length < 6) e.senha = t("erro.senhaCurta");
     if (!form.dataNasc) e.dataNasc = t("erro.dataFalta");
     else if (form.dataNasc > maxData) e.dataNasc = t("erro.dataFutura");
+    // Barreira de idade: menores de 13 não podem criar conta (ver Política, secção
+    // "Menores", e Termos, secção "Elegibilidade"). Mensagem na língua da app.
+    else if (idadeEmAnos(form.dataNasc) < IDADE_MINIMA) e.dataNasc = (LEGAL_UI[lingua] ?? LEGAL_UI.pt).idadeMinima;
     // Telefone é opcional — sem validação.
     if (!form.belt) e.belt = t("erro.faixaFalta");
     if (!form.countryIso) e.countryIso = t("erro.paisFalta");
