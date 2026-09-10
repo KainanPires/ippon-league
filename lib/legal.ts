@@ -5,18 +5,17 @@
 // CONTEÚDO LEGAL DA IPPON LEAGUE — Termos de Utilização e Política de Privacidade.
 //
 // O português é a VERSÃO OFICIAL. As outras línguas são traduções por
-// conveniência; em caso de divergência, prevalece o português (é o que a nota
-// "oficial" de cada documento diz, e o que a página mostra a quem lê noutra
-// língua).
+// conveniência; em caso de divergência, prevalece o português.
 //
 // ATUALIZAR: quando o texto legal mudar, muda-se aqui — e as CINCO línguas
 // mudam sempre no mesmo lote. Se uma tradução ficar para trás, sobe-se a versão
-// só no PT: a página deteta que a tradução tem versão diferente da portuguesa e
-// mostra um aviso "esta tradução pode estar desatualizada — ver versão oficial".
-// Assim nunca aparece texto velho em silêncio.
+// só no PT: a página deteta a diferença de versão e mostra o português oficial
+// com um aviso, para nunca aparecer texto velho em silêncio.
 //
-// Este ficheiro foi gerado a partir dos documentos-fonte (.md) para o texto na
-// app ser exatamente igual aos documentos entregues.
+// Gerado a partir dos documentos-fonte (.md), para o texto na app ser igual aos
+// documentos entregues. Inclui as cláusulas que já viviam nas páginas antigas:
+// "Ippon Pro é informativo — não garante resultados", os prémios por liga, e as
+// comunicações de marketing com consentimento.
 
 import type { Lingua } from "@/lib/i18n";
 
@@ -32,10 +31,7 @@ export type LegalDoc = {
   seccoes: LegalSeccao[];
 };
 
-// A versão oficial é a portuguesa. Comparar a versão de cada tradução com esta
-// diz à página se a tradução está a par (mesmo lote) ou atrasada.
 export const VERSAO_OFICIAL = "1.0";
-
 
 export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
   "pt": {
@@ -132,6 +128,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
               "**Processar a tua assinatura e cobrança** — base: execução do contrato e cumprimento de obrigações legais (fiscais/contabilísticas).",
               "**Enviar notificações push** (o teu atleta vai lutar, avisos de mercado, etc.) — base: o teu consentimento, que podes retirar a qualquer momento no perfil ou nas definições do aparelho.",
               "**Emails de serviço** (confirmação de email, recuperação de palavra-passe, avisos essenciais) — base: execução do contrato.",
+              "**Enviar novidades e ofertas** sobre a Ippon League — base: o teu consentimento, que podes retirar a qualquer momento (cada email traz uma forma de cancelar; cancelar não afeta a tua conta nem o jogo).",
               "**Segurança, prevenção de fraude e abuso, e melhoria do produto** — base: interesse legítimo."
             ]
           },
@@ -337,6 +334,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
               "**To process your subscription and billing** — basis: performance of the contract and compliance with legal (tax/accounting) obligations.",
               "**To send push notifications** (your athlete is about to fight, market alerts, etc.) — basis: your consent, which you can withdraw at any time in your profile or in your device settings.",
               "**Service emails** (email confirmation, password recovery, essential alerts) — basis: performance of the contract.",
+              "**Send news and offers** about Ippon League — basis: your consent, which you can withdraw at any time (every email has an unsubscribe link; unsubscribing does not affect your account or the game).",
               "**Security, fraud and abuse prevention, and product improvement** — basis: legitimate interest."
             ]
           },
@@ -542,6 +540,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
               "**Procesar tu suscripción y cobro** — base: ejecución del contrato y cumplimiento de obligaciones legales (fiscales/contables).",
               "**Enviar notificaciones push** (tu atleta va a luchar, avisos de mercado, etc.) — base: tu consentimiento, que puedes retirar en cualquier momento en tu perfil o en los ajustes del dispositivo.",
               "**Correos de servicio** (confirmación de correo, recuperación de contraseña, avisos esenciales) — base: ejecución del contrato.",
+              "**Enviar novedades y ofertas** sobre Ippon League — base: tu consentimiento, que puedes retirar en cualquier momento (cada correo incluye una forma de cancelar; cancelar no afecta a tu cuenta ni al juego).",
               "**Seguridad, prevención de fraude y abuso, y mejora del producto** — base: interés legítimo."
             ]
           },
@@ -747,6 +746,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
               "**Traiter ton abonnement et la facturation** — base : exécution du contrat et respect des obligations légales (fiscales/comptables).",
               "**Envoyer des notifications push** (ton athlète va combattre, alertes de marché, etc.) — base : ton consentement, que tu peux retirer à tout moment dans ton profil ou dans les paramètres de l'appareil.",
               "**E-mails de service** (confirmation d'e-mail, récupération de mot de passe, alertes essentielles) — base : exécution du contrat.",
+              "**Envoyer des nouveautés et des offres** sur Ippon League — base : ton consentement, que tu peux retirer à tout moment (chaque e-mail contient un lien de désabonnement ; se désabonner n'affecte ni ton compte ni le jeu).",
               "**Sécurité, prévention de la fraude et des abus, et amélioration du produit** — base : intérêt légitime."
             ]
           },
@@ -952,6 +952,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
               "**Abwicklung deines Abonnements und der Abrechnung** — Grundlage: Vertragserfüllung und Erfüllung gesetzlicher (steuer-/buchhalterischer) Pflichten.",
               "**Versand von Push-Benachrichtigungen** (dein Athlet kämpft gleich, Marktwarnungen usw.) — Grundlage: deine Einwilligung, die du jederzeit in deinem Profil oder in den Geräteeinstellungen widerrufen kannst.",
               "**Service-E-Mails** (E-Mail-Bestätigung, Passwortwiederherstellung, wesentliche Warnungen) — Grundlage: Vertragserfüllung.",
+              "**Neuigkeiten und Angebote senden** über Ippon League — Grundlage: deine Einwilligung, die du jederzeit widerrufen kannst (jede E-Mail enthält einen Abmeldelink; die Abmeldung wirkt sich nicht auf dein Konto oder das Spiel aus).",
               "**Sicherheit, Betrugs- und Missbrauchsprävention sowie Produktverbesserung** — Grundlage: berechtigtes Interesse."
             ]
           },
@@ -1120,7 +1121,7 @@ export const TERMOS: Record<Lingua, LegalDoc> = {
             "itens": [
               "Os **Judocoins (JC)** são uma moeda virtual do jogo, sem qualquer valor monetário. Não se compram, não se vendem, não se convertem em dinheiro e não são transferíveis.",
               "A Ippon League **não é uma aposta nem um jogo de azar**. Não apostas dinheiro, não há prémios em dinheiro dependentes de sorte, e a assinatura paga dá acesso a funcionalidades — nunca a maiores probabilidades de ganhar dinheiro.",
-              "Quaisquer prémios ou experiências que venham a ser oferecidos serão regidos por regras próprias, publicadas na altura."
+              "A Ippon League pode atribuir prémios em determinadas ligas (por exemplo, prémios por rodada e de fim de época na Liga Mundial, e de fim de época na Liga Continental). Os prémios, as condições de elegibilidade e as formas de atribuição são definidos a cada época, podem depender de patrocinadores e podem ser alterados. A elegibilidade pode estar associada à assinatura Ippon Pro."
             ]
           }
         ]
@@ -1135,17 +1136,16 @@ export const TERMOS: Record<Lingua, LegalDoc> = {
               "Quem nunca subscreveu tem **7 dias de teste gratuito**. Só há um teste por pessoa.",
               "O preço é o que aparece no ecrã de subscrição no momento em que subscreves. O pagamento e os impostos aplicáveis são tratados pela **Stripe**.",
               "Ao subscreveres, declaras ter idade e capacidade legal para contratar ou, se aplicável, autorização do titular do meio de pagamento que usares.",
-              "**Cancelamento:** podes cancelar a qualquer momento no teu perfil."
+              "**Cancelamento:** podes cancelar a qualquer momento no teu perfil.",
+              "Durante o teste gratuito, cancelar desliga a renovação e mantém o acesso até ao fim dos 7 dias, sem qualquer cobrança.",
+              "Depois do teste, cancelar mantém o acesso até ao fim do período mensal já pago; não há nova cobrança e o acesso termina nessa data.",
+              "**Reembolsos:** por se tratar de conteúdo digital de acesso imediato, e havendo um período de teste gratuito, os valores já cobrados de um período em curso não são, em regra, reembolsados, salvo quando a lei o exija. Os teus direitos de consumidor ao abrigo da lei portuguesa e da UE mantêm-se."
             ]
-          },
-          {
-            "tipo": "p",
-            "texto": "- Durante o teste gratuito, cancelar desliga a renovação e mantém o acesso até ao fim dos 7 dias, sem qualquer cobrança. - Depois do teste, cancelar mantém o acesso até ao fim do período mensal já pago; não há nova cobrança e o acesso termina nessa data."
           },
           {
             "tipo": "lista",
             "itens": [
-              "**Reembolsos:** por se tratar de conteúdo digital de acesso imediato, e havendo um período de teste gratuito, os valores já cobrados de um período em curso não são, em regra, reembolsados, salvo quando a lei o exija. Os teus direitos de consumidor ao abrigo da lei portuguesa e da UE mantêm-se."
+              "**O Ippon Pro é informativo e não garante resultados.** Dá acesso a informação baseada em dados e no histórico dos atletas (resultados passados e tendências de desempenho). Não monta a tua equipa, não indica em quem apostar e não diz quem vai ganhar. Ao subscrever, aceitas que o Ippon Pro é meramente informativo e não garante qualquer resultado — nem vitórias, nem pontuação, nem subida de faixa, nem prémios. As leituras que mostramos são possibilidades e tendências, nunca certezas, e a decisão é sempre tua."
             ]
           }
         ]
@@ -1285,7 +1285,7 @@ export const TERMOS: Record<Lingua, LegalDoc> = {
             "itens": [
               "**Judocoins (JC)** are a virtual in-game currency, with no monetary value. They cannot be bought, sold, converted into money, or transferred.",
               "Ippon League is **not gambling or a game of chance**. You do not bet money, there are no cash prizes dependent on luck, and the paid subscription gives access to features — never to higher chances of winning money.",
-              "Any prizes or experiences that may be offered will be governed by their own rules, published at the time."
+              "Ippon League may award prizes in certain leagues (for example, per-round and end-of-season prizes in the World League, and end-of-season prizes in the Continental League). The prizes, eligibility conditions, and how they are awarded are defined each season, may depend on sponsors, and may change. Eligibility may be linked to the Ippon Pro subscription."
             ]
           }
         ]
@@ -1300,17 +1300,16 @@ export const TERMOS: Record<Lingua, LegalDoc> = {
               "Anyone who has never subscribed gets a **7-day free trial**. There is only one trial per person.",
               "The price is what appears on the subscription screen at the time you subscribe. Payment and applicable taxes are handled by **Stripe**.",
               "By subscribing, you declare that you are of legal age and have the legal capacity to contract or, where applicable, the authorisation of the holder of the payment method you use.",
-              "**Cancellation:** you can cancel at any time in your profile."
+              "**Cancellation:** you can cancel at any time in your profile.",
+              "During the free trial, cancelling turns off renewal and keeps access until the end of the 7 days, with no charge.",
+              "After the trial, cancelling keeps access until the end of the monthly period already paid; there is no new charge and access ends on that date.",
+              "**Refunds:** because this is digital content with immediate access, and there is a free trial period, amounts already charged for an ongoing period are, as a rule, not refunded, except where the law requires it. Your consumer rights under Portuguese and EU law remain unaffected."
             ]
-          },
-          {
-            "tipo": "p",
-            "texto": "- During the free trial, cancelling turns off renewal and keeps access until the end of the 7 days, with no charge. - After the trial, cancelling keeps access until the end of the monthly period already paid; there is no new charge and access ends on that date."
           },
           {
             "tipo": "lista",
             "itens": [
-              "**Refunds:** because this is digital content with immediate access, and there is a free trial period, amounts already charged for an ongoing period are, as a rule, not refunded, except where the law requires it. Your consumer rights under Portuguese and EU law remain unaffected."
+              "**Ippon Pro is informational and does not guarantee results.** It gives access to information based on data and on athletes' history (past results and performance trends). It does not build your team, does not tell you who to bet on, and does not say who will win. By subscribing, you accept that Ippon Pro is merely informational and does not guarantee any result — not wins, not points, not belt promotion, not prizes. The readings we show are possibilities and trends, never certainties, and the decision is always yours."
             ]
           }
         ]
@@ -1450,7 +1449,7 @@ export const TERMOS: Record<Lingua, LegalDoc> = {
             "itens": [
               "Los **Judocoins (JC)** son una moneda virtual del juego, sin ningún valor monetario. No se compran, no se venden, no se convierten en dinero y no son transferibles.",
               "Ippon League **no es una apuesta ni un juego de azar**. No apuestas dinero, no hay premios en efectivo dependientes de la suerte, y la suscripción de pago da acceso a funcionalidades — nunca a mayores probabilidades de ganar dinero.",
-              "Cualesquiera premios o experiencias que lleguen a ofrecerse se regirán por reglas propias, publicadas en su momento."
+              "Ippon League puede otorgar premios en determinadas ligas (por ejemplo, premios por jornada y de fin de temporada en la Liga Mundial, y de fin de temporada en la Liga Continental). Los premios, las condiciones de elegibilidad y las formas de atribución se definen cada temporada, pueden depender de patrocinadores y pueden cambiar. La elegibilidad puede estar asociada a la suscripción Ippon Pro."
             ]
           }
         ]
@@ -1465,17 +1464,16 @@ export const TERMOS: Record<Lingua, LegalDoc> = {
               "Quien nunca se ha suscrito tiene **7 días de prueba gratuita**. Solo hay una prueba por persona.",
               "El precio es el que aparece en la pantalla de suscripción en el momento en que te suscribes. El pago y los impuestos aplicables los gestiona **Stripe**.",
               "Al suscribirte, declaras tener edad y capacidad legal para contratar o, si procede, la autorización del titular del medio de pago que utilices.",
-              "**Cancelación:** puedes cancelar en cualquier momento en tu perfil."
+              "**Cancelación:** puedes cancelar en cualquier momento en tu perfil.",
+              "Durante la prueba gratuita, cancelar desactiva la renovación y mantiene el acceso hasta el final de los 7 días, sin ningún cobro.",
+              "Después de la prueba, cancelar mantiene el acceso hasta el final del periodo mensual ya pagado; no hay nuevo cobro y el acceso termina en esa fecha.",
+              "**Reembolsos:** por tratarse de contenido digital de acceso inmediato, y existiendo un periodo de prueba gratuita, los importes ya cobrados de un periodo en curso no se reembolsan, por regla general, salvo cuando la ley lo exija. Tus derechos de consumidor al amparo de la ley portuguesa y de la UE se mantienen."
             ]
-          },
-          {
-            "tipo": "p",
-            "texto": "- Durante la prueba gratuita, cancelar desactiva la renovación y mantiene el acceso hasta el final de los 7 días, sin ningún cobro. - Después de la prueba, cancelar mantiene el acceso hasta el final del periodo mensual ya pagado; no hay nuevo cobro y el acceso termina en esa fecha."
           },
           {
             "tipo": "lista",
             "itens": [
-              "**Reembolsos:** por tratarse de contenido digital de acceso inmediato, y existiendo un periodo de prueba gratuita, los importes ya cobrados de un periodo en curso no se reembolsan, por regla general, salvo cuando la ley lo exija. Tus derechos de consumidor al amparo de la ley portuguesa y de la UE se mantienen."
+              "**Ippon Pro es informativo y no garantiza resultados.** Da acceso a información basada en datos y en el historial de los atletas (resultados pasados y tendencias de rendimiento). No monta tu equipo, no indica a quién apostar y no dice quién va a ganar. Al suscribirte, aceptas que Ippon Pro es meramente informativo y no garantiza ningún resultado — ni victorias, ni puntuación, ni subida de cinturón, ni premios. Las lecturas que mostramos son posibilidades y tendencias, nunca certezas, y la decisión es siempre tuya."
             ]
           }
         ]
@@ -1615,7 +1613,7 @@ export const TERMOS: Record<Lingua, LegalDoc> = {
             "itens": [
               "Les **Judocoins (JC)** sont une monnaie virtuelle du jeu, sans aucune valeur monétaire. Ils ne s'achètent pas, ne se vendent pas, ne se convertissent pas en argent et ne sont pas transférables.",
               "Ippon League **n'est pas un pari ni un jeu de hasard**. Tu ne paries pas d'argent, il n'y a pas de prix en espèces dépendant de la chance, et l'abonnement payant donne accès à des fonctionnalités — jamais à de plus grandes chances de gagner de l'argent.",
-              "Tout prix ou expérience qui viendrait à être offert sera régi par des règles propres, publiées le moment venu."
+              "Ippon League peut attribuer des prix dans certaines ligues (par exemple, des prix par journée et de fin de saison dans la Ligue Mondiale, et de fin de saison dans la Ligue Continentale). Les prix, les conditions d'éligibilité et les modalités d'attribution sont définis chaque saison, peuvent dépendre de partenaires et peuvent changer. L'éligibilité peut être liée à l'abonnement Ippon Pro."
             ]
           }
         ]
@@ -1630,17 +1628,16 @@ export const TERMOS: Record<Lingua, LegalDoc> = {
               "Quiconque ne s'est jamais abonné bénéficie de **7 jours d'essai gratuit**. Il n'y a qu'un essai par personne.",
               "Le prix est celui qui apparaît sur l'écran d'abonnement au moment où tu t'abonnes. Le paiement et les taxes applicables sont gérés par **Stripe**.",
               "En t'abonnant, tu déclares avoir l'âge et la capacité juridique de contracter ou, le cas échéant, l'autorisation du titulaire du moyen de paiement que tu utilises.",
-              "**Annulation :** tu peux annuler à tout moment dans ton profil."
+              "**Annulation :** tu peux annuler à tout moment dans ton profil.",
+              "Pendant l'essai gratuit, annuler désactive le renouvellement et maintient l'accès jusqu'à la fin des 7 jours, sans aucun débit.",
+              "Après l'essai, annuler maintient l'accès jusqu'à la fin de la période mensuelle déjà payée ; il n'y a pas de nouveau débit et l'accès prend fin à cette date.",
+              "**Remboursements :** s'agissant de contenu numérique d'accès immédiat, et en présence d'une période d'essai gratuite, les montants déjà débités pour une période en cours ne sont, en règle générale, pas remboursés, sauf lorsque la loi l'exige. Tes droits de consommateur au titre de la loi portugaise et de l'UE restent inchangés."
             ]
-          },
-          {
-            "tipo": "p",
-            "texto": "- Pendant l'essai gratuit, annuler désactive le renouvellement et maintient l'accès jusqu'à la fin des 7 jours, sans aucun débit. - Après l'essai, annuler maintient l'accès jusqu'à la fin de la période mensuelle déjà payée ; il n'y a pas de nouveau débit et l'accès prend fin à cette date."
           },
           {
             "tipo": "lista",
             "itens": [
-              "**Remboursements :** s'agissant de contenu numérique d'accès immédiat, et en présence d'une période d'essai gratuite, les montants déjà débités pour une période en cours ne sont, en règle générale, pas remboursés, sauf lorsque la loi l'exige. Tes droits de consommateur au titre de la loi portugaise et de l'UE restent inchangés."
+              "**Ippon Pro est informatif et ne garantit pas de résultats.** Il donne accès à des informations fondées sur des données et sur l'historique des athlètes (résultats passés et tendances de performance). Il ne compose pas ton équipe, n'indique pas sur qui parier et ne dit pas qui va gagner. En t'abonnant, tu acceptes qu'Ippon Pro est purement informatif et ne garantit aucun résultat — ni victoires, ni points, ni passage de ceinture, ni prix. Les lectures que nous montrons sont des possibilités et des tendances, jamais des certitudes, et la décision t'appartient toujours."
             ]
           }
         ]
@@ -1780,7 +1777,7 @@ export const TERMOS: Record<Lingua, LegalDoc> = {
             "itens": [
               "Die **Judocoins (JC)** sind eine virtuelle Spielwährung ohne jeglichen Geldwert. Sie können nicht gekauft, verkauft, in Geld umgewandelt oder übertragen werden.",
               "Ippon League ist **keine Wette und kein Glücksspiel**. Du setzt kein Geld ein, es gibt keine vom Zufall abhängigen Geldpreise, und das kostenpflichtige Abonnement gibt Zugang zu Funktionen — niemals zu höheren Chancen, Geld zu gewinnen.",
-              "Etwaige Preise oder Erlebnisse, die angeboten werden, unterliegen eigenen Regeln, die zu gegebener Zeit veröffentlicht werden."
+              "Ippon League kann in bestimmten Ligen Preise vergeben (zum Beispiel Preise pro Runde und zum Saisonende in der Welt-Liga sowie zum Saisonende in der Kontinental-Liga). Die Preise, die Teilnahmebedingungen und die Art der Vergabe werden je Saison festgelegt, können von Sponsoren abhängen und können sich ändern. Die Berechtigung kann an das Ippon-Pro-Abonnement geknüpft sein."
             ]
           }
         ]
@@ -1795,17 +1792,16 @@ export const TERMOS: Record<Lingua, LegalDoc> = {
               "Wer noch nie abonniert hat, erhält **7 Tage kostenlose Testphase**. Es gibt nur eine Testphase pro Person.",
               "Der Preis ist der, der zum Zeitpunkt deines Abonnements auf dem Abonnement-Bildschirm erscheint. Zahlung und anwendbare Steuern werden von **Stripe** abgewickelt.",
               "Mit dem Abonnement erklärst du, das gesetzliche Alter und die gesetzliche Fähigkeit zum Vertragsabschluss zu haben oder, sofern zutreffend, die Zustimmung des Inhabers des von dir verwendeten Zahlungsmittels.",
-              "**Kündigung:** Du kannst jederzeit in deinem Profil kündigen."
+              "**Kündigung:** Du kannst jederzeit in deinem Profil kündigen.",
+              "Während der kostenlosen Testphase deaktiviert eine Kündigung die Verlängerung und behält den Zugang bis zum Ende der 7 Tage, ohne jegliche Belastung.",
+              "Nach der Testphase behält eine Kündigung den Zugang bis zum Ende des bereits bezahlten Monatszeitraums; es erfolgt keine neue Belastung und der Zugang endet an diesem Datum.",
+              "**Erstattungen:** Da es sich um digitale Inhalte mit sofortigem Zugang handelt und eine kostenlose Testphase besteht, werden bereits berechnete Beträge für einen laufenden Zeitraum in der Regel nicht erstattet, außer wo das Gesetz es verlangt. Deine Verbraucherrechte nach portugiesischem und EU-Recht bleiben unberührt."
             ]
-          },
-          {
-            "tipo": "p",
-            "texto": "- Während der kostenlosen Testphase deaktiviert eine Kündigung die Verlängerung und behält den Zugang bis zum Ende der 7 Tage, ohne jegliche Belastung. - Nach der Testphase behält eine Kündigung den Zugang bis zum Ende des bereits bezahlten Monatszeitraums; es erfolgt keine neue Belastung und der Zugang endet an diesem Datum."
           },
           {
             "tipo": "lista",
             "itens": [
-              "**Erstattungen:** Da es sich um digitale Inhalte mit sofortigem Zugang handelt und eine kostenlose Testphase besteht, werden bereits berechnete Beträge für einen laufenden Zeitraum in der Regel nicht erstattet, außer wo das Gesetz es verlangt. Deine Verbraucherrechte nach portugiesischem und EU-Recht bleiben unberührt."
+              "**Ippon Pro ist informativ und garantiert keine Ergebnisse.** Es gibt Zugang zu Informationen auf Basis von Daten und der Historie der Athleten (frühere Ergebnisse und Leistungstrends). Es stellt nicht dein Team zusammen, sagt dir nicht, auf wen du setzen sollst, und sagt nicht, wer gewinnen wird. Mit dem Abonnement akzeptierst du, dass Ippon Pro rein informativ ist und kein Ergebnis garantiert — weder Siege noch Punkte noch Gürtelaufstieg noch Preise. Die angezeigten Einschätzungen sind Möglichkeiten und Trends, niemals Gewissheiten, und die Entscheidung liegt immer bei dir."
             ]
           }
         ]
