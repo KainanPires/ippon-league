@@ -76,6 +76,7 @@ const AUTO_TODOS: Record<PoolId, boolean> = { A: true, B: true, C: true, D: true
 export default function EditorChave() {
   const t = useT();
   const [acesso, setAcesso] = useState<"a-ver" | "sim" | "nao">("a-ver");
+  const [busca, setBusca] = useState(""); // filtro da lista "por colocar" (nome ou país)
   const [comp, setComp] = useState<string>(compPorOmissao());
   const [atletas, setAtletas] = useState<Atleta[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -347,6 +348,14 @@ export default function EditorChave() {
   const porColocar = daCat.filter((a) => !colocado.has(a.id));
   const totalColocados = colocado.size;
 
+  // Pesquisa: filtra a lista "por colocar" por nome do atleta ou país (a sigla
+  // tal como aparece na lista — BRA, ISR, RUS). Sem acentos, sem maiúsculas.
+  const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const q = semAcento(busca).trim();
+  const porColocarVis = q
+    ? porColocar.filter((a) => semAcento(`${a.name} ${a.countryIso || ""}`).includes(q))
+    : porColocar;
+
   const nomeCurto = (a?: Atleta) => (a ? `${a.name}${a.countryIso ? ` (${a.countryIso})` : ""}` : "—");
   const manuaisDaCat = manuais.filter((m) => m.weight_category === cat);
 
@@ -420,18 +429,35 @@ export default function EditorChave() {
                 {porColocar.length > 0 && (
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#93a39a", marginBottom: 6 }}>
-                      {t("chvm.porColocar")} · {porColocar.length}
+                      {t("chvm.porColocar")} · {q ? `${porColocarVis.length}/${porColocar.length}` : porColocar.length}
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {porColocar.map((a) => (
-                        <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#121815", border: "1px solid #243029", borderRadius: 9, padding: "7px 9px" }}>
-                          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "#d6ddd6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeCurto(a)}</span>
-                          {POOLS.map((p) => (
-                            <button key={p} onClick={() => colocar(a.id, p)} style={miniPool}>{p}</button>
-                          ))}
-                        </div>
-                      ))}
+                    {/* Pesquisa por país ou nome — acelera a montagem de categorias grandes. */}
+                    <div style={{ position: "relative", marginBottom: 8 }}>
+                      <input
+                        value={busca}
+                        onChange={(e) => setBusca(e.target.value)}
+                        placeholder="Pesquisar por país ou nome (ex.: BRA, ISR, Green)"
+                        style={{ ...inp, paddingRight: busca ? 34 : 12 }}
+                      />
+                      {busca && (
+                        <button onClick={() => setBusca("")} aria-label="Limpar"
+                          style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", color: "#93a39a", fontSize: 15, cursor: "pointer", lineHeight: 1, padding: "0 4px" }}>✕</button>
+                      )}
                     </div>
+                    {porColocarVis.length === 0 ? (
+                      <div style={{ fontSize: 12.5, color: "#5f6f67", padding: "6px 2px" }}>Nenhum atleta encontrado para “{busca}”.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {porColocarVis.map((a) => (
+                          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "#121815", border: "1px solid #243029", borderRadius: 9, padding: "7px 9px" }}>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "#d6ddd6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nomeCurto(a)}</span>
+                            {POOLS.map((p) => (
+                              <button key={p} onClick={() => colocar(a.id, p)} style={miniPool}>{p}</button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
