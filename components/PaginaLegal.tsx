@@ -9,7 +9,9 @@
 // um aviso e um atalho para o português, para nunca aparecer texto velho em
 // silêncio.
 
+import { useEffect, useState } from "react";
 import { useLingua } from "@/lib/i18n";
+import { temSessao } from "@/lib/auth";
 import { SeletorLingua } from "@/components/SeletorLingua";
 import { VERSAO_OFICIAL, LEGAL_UI, type LegalDoc } from "@/lib/legal";
 import type { Lingua } from "@/lib/i18n";
@@ -43,23 +45,24 @@ export function PaginaLegal({ docs }: { docs: Record<Lingua, LegalDoc> }) {
   // oficial e um aviso por cima. Nunca aparece conteúdo desatualizado em silêncio.
   const doc = desatualizada ? oficialPt : traducao;
 
-  function voltar() {
-    if (typeof window === "undefined") return;
-    if (window.history.length > 1) window.history.back();
-    else window.location.href = "/inicio";
-  }
+  // Mesmo comportamento das páginas antigas: volta ao perfil se houver sessão,
+  // senão à entrada. (A janela de registo abre estas páginas num separador novo,
+  // onde ainda não há sessão — daí o fallback para "/".)
+  const [logado, setLogado] = useState(false);
+  useEffect(() => { temSessao().then(setLogado).catch(() => setLogado(false)); }, []);
+  const destinoVoltar = logado ? "/perfil" : "/";
 
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#c7d0c9", fontFamily: FB }}>
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "14px 18px 56px" }}>
         <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
-          <button
-            onClick={voltar}
+          <a
+            href={destinoVoltar}
             aria-label={ui.voltar}
-            style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", cursor: "pointer", flexShrink: 0 }}
+            style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", cursor: "pointer", flexShrink: 0 }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-          </button>
+          </a>
           <div style={{ marginLeft: "auto" }}>
             <SeletorLingua compacto />
           </div>
