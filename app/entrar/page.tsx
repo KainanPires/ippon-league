@@ -9,7 +9,7 @@ import { Mascot } from "@/components/Mascot";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 import { useT } from "@/lib/i18n";
 import { SeletorLingua } from "@/components/SeletorLingua";
-import { track } from "@/lib/analytics";
+import { track, aoTerConsentimento } from "@/lib/analytics";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -36,8 +36,9 @@ export default function Entrar() {
   // possível sem perceber uma palavra do que está escrito.
   const t = useT();
 
-  // Aquisição: alguém chegou à porta da Ippon League. Dispara uma vez.
-  useEffect(() => { track("landing_viewed"); }, []);
+  // Aquisição: alguém chegou à porta da Ippon League. Espera pelo consentimento
+  // (e pelo id estável) para o funil ligar esta pessoa aos passos seguintes.
+  useEffect(() => { aoTerConsentimento(() => track("landing_viewed")); }, []);
 
   const [email, setEmail] = useState("");
   // Aviso amigável sobre o email (sugestão de correção ou email temporário).
