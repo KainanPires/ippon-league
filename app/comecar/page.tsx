@@ -11,7 +11,7 @@ import { SeletorLingua } from "@/components/SeletorLingua";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 // Idade mínima (13) e a mensagem traduzida — ver secção "Menores" da Política.
 import { IDADE_MINIMA, LEGAL_UI } from "@/lib/legal";
-import { track, identify } from "@/lib/analytics";
+import { track, identify, aoTerConsentimento } from "@/lib/analytics";
 const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
 const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -64,9 +64,9 @@ export default function Comecar() {
   const [confirmarEmail, setConfirmarEmail] = useState(false);
   const [mostrarDeclaracao, setMostrarDeclaracao] = useState(false);
 
-  // Aquisição: chegou ao ecrã de criar conta. Dispara uma vez (não mede
-  // preenchimento de campos — só que a pessoa entrou no cadastro).
-  useEffect(() => { track("signup_started"); }, []);
+  // Aquisição: chegou ao ecrã de criar conta. Espera pelo consentimento (e pelo
+  // id estável) — só mede que a pessoa entrou no cadastro, não os campos.
+  useEffect(() => { aoTerConsentimento(() => track("signup_started")); }, []);
   const maxData = new Date().toISOString().slice(0, 10);
   function update(field: keyof Form, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
