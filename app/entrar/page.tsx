@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 // Deteção de erros de escrita no domínio ("@gamil.com" -> "@gmail.com").
 // Não valida se o email existe — isso é impossível do lado do cliente; a prova
 // real é a confirmação por email. Isto apanha os enganos de teclado.
@@ -9,6 +9,7 @@ import { Mascot } from "@/components/Mascot";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 import { useT } from "@/lib/i18n";
 import { SeletorLingua } from "@/components/SeletorLingua";
+import { track } from "@/lib/analytics";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -34,6 +35,9 @@ export default function Entrar() {
   // bandeiras está no topo, ANTES do formulário — trocar a língua tem de ser
   // possível sem perceber uma palavra do que está escrito.
   const t = useT();
+
+  // Aquisição: alguém chegou à porta da Ippon League. Dispara uma vez.
+  useEffect(() => { track("landing_viewed"); }, []);
 
   const [email, setEmail] = useState("");
   // Aviso amigável sobre o email (sugestão de correção ou email temporário).
