@@ -12,6 +12,7 @@ import { supabase, supabaseConfigured } from "@/lib/supabase";
 // Idade mínima (13) e a mensagem traduzida — ver secção "Menores" da Política.
 import { IDADE_MINIMA, LEGAL_UI } from "@/lib/legal";
 import { track, identify, aoTerConsentimento } from "@/lib/analytics";
+import { lerAtribuicaoGuardada } from "@/lib/atribuicao";
 const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
 const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -157,6 +158,18 @@ export default function Comecar() {
     const novoId = data.user?.id || data.session?.user?.id || "";
     if (novoId) identify(novoId);
     track("signup_completed", { country: form.countryIso });
+    // Atribuição (Fase D): liga a origem guardada à conta. Fire-and-forget —
+    // não bloqueia a entrada no jogo mesmo que falhe.
+    try {
+      const tk = data.session?.access_token;
+      if (tk) {
+        void fetch("/api/atribuicao", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tk}` },
+          body: JSON.stringify(lerAtribuicaoGuardada()),
+        });
+      }
+    } catch { /* sem token/atribuição: segue na mesma */ }
     if (data.session) {
       window.location.href = "/inicio";
     } else {
