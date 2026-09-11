@@ -13,6 +13,7 @@
 import { Suspense, useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { initAnalytics, trackPageview } from "@/lib/analytics";
+import { capturarAtribuicao } from "@/lib/atribuicao";
 import { ConsentimentoAnalytics } from "@/components/ConsentimentoAnalytics";
 
 function RastreadorPageview() {
@@ -27,7 +28,13 @@ function RastreadorPageview() {
 }
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => { initAnalytics(); }, []);
+  useEffect(() => {
+    initAnalytics();
+    // Atribuição de primeira-parte: capta a origem (utm/ref/referrer) em cada
+    // carga e guarda-a no aparelho. Independente do consentimento do analytics —
+    // é para a NOSSA base, ligada à conta no registo. Não envia nada sozinha.
+    capturarAtribuicao();
+  }, []);
   return (
     <>
       {children}
