@@ -64,9 +64,38 @@ const PROIBIDAS = new Set([
 // -------------------------------------------------------------------------
 let iniciado = false;
 
+// -------------------------------------------------------------------------
+// "Consentimento pronto": callbacks que só devem correr QUANDO houver
+// consentimento E com o id já estável. É isto que faz o funil ligar: o
+// landing_viewed e o signup_started esperam por aqui, em vez de dispararem
+// cedo demais (opted-out) ou com um id que ainda muda entre páginas.
+// -------------------------------------------------------------------------
+let consentePronto = false;
+const filaConsentimento: Array<() => void> = [];
+
+function dispararConsentimentoPronto(): void {
+  if (consentePronto) return;
+  consentePronto = true;
+  while (filaConsentimento.length) {
+    const cb = filaConsentimento.shift();
+    if (cb) { try { cb(); } catch {} }
+  }
+}
+
+/** Corre `cb` quando houver consentimento — já concedido, ou no instante em que
+ *  a pessoa aceita. Usado para os eventos de entrada (landing/signup_started). */
+export function aoTerConsentimento(cb: () => void): void {
+  if (consentePronto) { try { cb(); } catch {} return; }
+  filaConsentimento.push(cb);
+}
+
 export function initAnalytics(): void {
   if (iniciado || typeof window === "undefined" || !KEY) return;
   iniciado = true;
+
+  let jaConsentiu = false;
+  try { jaConsentiu = localStorage.getItem(CONSENT_KEY) === "granted"; } catch {}
+
   posthog.init(KEY, {
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "/ingest",
     ui_host: "https://eu.posthog.com",
@@ -74,13 +103,15 @@ export function initAnalytics(): void {
     capture_pageview: false,   // pageviews manuais (App Router) — ver PostHogProvider
     capture_pageleave: true,
     autocapture: false,        // só eventos explícitos; sem cliques automáticos
-    opt_out_capturing_by_default: true, // CONSENTIMENTO: nada sai até aceitarem
-    persistence: "memory",
+    // SEM consentimento: opted-out e em MEMÓRIA (nada é enviado, nenhum cookie).
+    // COM consentimento já dado: opted-in e PERSISTENTE — o MESMO id em todas as
+    // páginas, para o funil ligar a jornada da pessoa do início ao fim.
+    opt_out_capturing_by_default: !jaConsentiu,
+    persistence: jaConsentiu ? "localStorage+cookie" : "memory",
   });
-  // Se a pessoa já tinha aceitado antes, respeita sem voltar a perguntar.
-  try {
-    if (localStorage.getItem(CONSENT_KEY) === "granted") aplicar(true);
-  } catch { /* storage indisponível: fica opted-out */ }
+
+  // Já tinha aceitado antes: o id é estável desde já, liberta a fila.
+  if (jaConsentiu) dispararConsentimentoPronto();
 }
 
 function aplicar(sim: boolean): void {
@@ -106,7 +137,9 @@ export function consentimentoGuardado(): "granted" | "denied" | null {
 }
 export function concederConsentimento(): void {
   try { localStorage.setItem(CONSENT_KEY, "granted"); } catch {}
-  aplicar(true);
+  aplicar(true);          // opt-in + passa a persistir o id (fica estável)
+  trackPageview();        // regista a página atual, agora que há consentimento
+  dispararConsentimentoPronto(); // liberta landing_viewed / signup_started em espera
 }
 export function negarConsentimento(): void {
   try { localStorage.setItem(CONSENT_KEY, "denied"); } catch {}
