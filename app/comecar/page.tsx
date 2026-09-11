@@ -11,6 +11,7 @@ import { SeletorLingua } from "@/components/SeletorLingua";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 // Idade mínima (13) e a mensagem traduzida — ver secção "Menores" da Política.
 import { IDADE_MINIMA, LEGAL_UI } from "@/lib/legal";
+import { track, identify } from "@/lib/analytics";
 const FONT_DISPLAY = "var(--font-geist-mono), system-ui, sans-serif";
 const FONT_BODY = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -62,6 +63,10 @@ export default function Comecar() {
   const [aviso, setAviso] = useState<AvisoEmail | null>(null);
   const [confirmarEmail, setConfirmarEmail] = useState(false);
   const [mostrarDeclaracao, setMostrarDeclaracao] = useState(false);
+
+  // Aquisição: chegou ao ecrã de criar conta. Dispara uma vez (não mede
+  // preenchimento de campos — só que a pessoa entrou no cadastro).
+  useEffect(() => { track("signup_started"); }, []);
   const maxData = new Date().toISOString().slice(0, 10);
   function update(field: keyof Form, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -147,6 +152,11 @@ export default function Comecar() {
       localStorage.setItem("ippon_onboarding", "pending");
       localStorage.setItem("ippon_name", form.name.trim().split(" ")[0] || "");
     } catch {}
+    // Ativação/aquisição: conta criada. Liga a jornada anónima ao novo
+    // utilizador (só o id — nunca nome/email) e regista a conversão.
+    const novoId = data.user?.id || data.session?.user?.id || "";
+    if (novoId) identify(novoId);
+    track("signup_completed", { country: form.countryIso });
     if (data.session) {
       window.location.href = "/inicio";
     } else {
