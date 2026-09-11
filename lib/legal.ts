@@ -36,7 +36,7 @@ export const VERSAO_OFICIAL = "1.0";
 export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
   "pt": {
     "titulo": "Política de Privacidade — Ippon League",
-    "atualizado": "10 de setembro de 2026",
+    "atualizado": "11 de setembro de 2026",
     "versao": "1.0",
     "oficial": "**Versão oficial:** esta Política foi redigida em português, que é a versão oficial. As traduções para outras línguas são fornecidas por conveniência; em caso de divergência, prevalece a versão portuguesa.",
     "seccoes": [
@@ -151,6 +151,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
               "**Supabase** — base de dados e autenticação (conta, dados de perfil).",
               "**Stripe** — pagamentos e gestão de assinaturas.",
               "**Vercel** — alojamento da aplicação, rede de entrega e registos técnicos.",
+              "**PostHog** (região UE) — análise de utilização do produto, só com o teu consentimento (ver a secção dos cookies).",
               "**Apple** (Apple Push Notification service) e **Google** (Firebase Cloud Messaging) — entrega das notificações push ao teu aparelho.",
               "**cron-job.org** — serviço que aciona tarefas automáticas no horário certo (não recebe dados pessoais para além do necessário para chamar o serviço).",
               "**Fornecedor de email** — envio dos emails de serviço."
@@ -207,7 +208,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
         "blocos": [
           {
             "tipo": "p",
-            "texto": "Não usamos cookies de publicidade nem de rastreamento. Usamos apenas o armazenamento essencial no teu navegador para: manter a sessão iniciada, lembrar a língua escolhida, lembrar que já viste os tutoriais e as tuas preferências de interface. Sem estes, a aplicação não funciona corretamente."
+            "texto": "Usamos armazenamento essencial no teu navegador para: manter a sessão iniciada, lembrar a língua escolhida, lembrar que já viste os tutoriais e as tuas preferências de interface — sem estes, a aplicação não funciona. Além disso, com o **teu consentimento**, usamos o **PostHog** (na região UE) para análise de utilização do produto: perceber como o jogo é usado e melhorá-lo. Só ativamos esta análise depois de aceitares o aviso que aparece na aplicação, e podes recusar sem afetar o jogo. Não usamos cookies de publicidade."
           }
         ]
       },
@@ -242,7 +243,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
   },
   "en": {
     "titulo": "Privacy Policy — Ippon League",
-    "atualizado": "10 September 2026",
+    "atualizado": "11 September 2026",
     "versao": "1.0",
     "oficial": "**Official version:** this Policy was drafted in Portuguese, which is the official version. Translations into other languages are provided for convenience; in case of any discrepancy, the Portuguese version prevails.",
     "seccoes": [
@@ -357,6 +358,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
               "**Supabase** — database and authentication (account, profile data).",
               "**Stripe** — payments and subscription management.",
               "**Vercel** — application hosting, delivery network, and technical logs.",
+              "**PostHog** (EU region) — product usage analytics, only with your consent (see the cookies section).",
               "**Apple** (Apple Push Notification service) and **Google** (Firebase Cloud Messaging) — delivery of push notifications to your device.",
               "**cron-job.org** — service that triggers automated tasks on schedule (receives no personal data beyond what is needed to call the service).",
               "**Email provider** — sending service emails."
@@ -413,7 +415,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
         "blocos": [
           {
             "tipo": "p",
-            "texto": "We do not use advertising or tracking cookies. We use only essential storage in your browser to: keep your session logged in, remember your chosen language, remember that you have already seen the tutorials, and your interface preferences. Without these, the app does not work properly."
+            "texto": "We use essential storage in your browser to: keep your session logged in, remember your chosen language, remember that you have seen the tutorials, and your interface preferences — without these, the app does not work. In addition, with **your consent**, we use **PostHog** (in the EU region) for product usage analytics: to understand how the game is used and improve it. We only enable this after you accept the notice shown in the app, and you can decline without affecting the game. We do not use advertising cookies."
           }
         ]
       },
@@ -448,7 +450,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
   },
   "es": {
     "titulo": "Política de Privacidad — Ippon League",
-    "atualizado": "10 de septiembre de 2026",
+    "atualizado": "11 de septiembre de 2026",
     "versao": "1.0",
     "oficial": "**Versión oficial:** esta Política fue redactada en portugués, que es la versión oficial. Las traducciones a otros idiomas se ofrecen por conveniencia; en caso de discrepancia, prevalece la versión portuguesa.",
     "seccoes": [
@@ -563,6 +565,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
               "**Supabase** — base de datos y autenticación (cuenta, datos de perfil).",
               "**Stripe** — pagos y gestión de suscripciones.",
               "**Vercel** — alojamiento de la aplicación, red de entrega y registros técnicos.",
+              "**PostHog** (región UE) — analítica de uso del producto, solo con tu consentimiento (ver la sección de cookies).",
               "**Apple** (Apple Push Notification service) y **Google** (Firebase Cloud Messaging) — entrega de las notificaciones push a tu dispositivo.",
               "**cron-job.org** — servicio que activa tareas automáticas en el horario correcto (no recibe datos personales más allá de lo necesario para llamar al servicio).",
               "**Proveedor de correo** — envío de los correos de servicio."
@@ -619,7 +622,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
         "blocos": [
           {
             "tipo": "p",
-            "texto": "No usamos cookies de publicidad ni de rastreo. Usamos solo el almacenamiento esencial en tu navegador para: mantener la sesión iniciada, recordar el idioma elegido, recordar que ya viste los tutoriales y tus preferencias de interfaz. Sin estos, la aplicación no funciona correctamente."
+            "texto": "Usamos almacenamiento esencial en tu navegador para: mantener la sesión iniciada, recordar el idioma elegido, recordar que ya viste los tutoriales y tus preferencias de interfaz — sin estos, la aplicación no funciona. Además, con **tu consentimiento**, usamos **PostHog** (en la región UE) para analítica de uso del producto: entender cómo se usa el juego y mejorarlo. Solo lo activamos después de que aceptes el aviso que aparece en la aplicación, y puedes rechazarlo sin afectar al juego. No usamos cookies de publicidad."
           }
         ]
       },
@@ -654,7 +657,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
   },
   "fr": {
     "titulo": "Politique de Confidentialité — Ippon League",
-    "atualizado": "10 septembre 2026",
+    "atualizado": "11 septembre 2026",
     "versao": "1.0",
     "oficial": "**Version officielle :** cette Politique a été rédigée en portugais, qui est la version officielle. Les traductions dans d'autres langues sont fournies par commodité ; en cas de divergence, la version portugaise prévaut.",
     "seccoes": [
@@ -769,6 +772,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
               "**Supabase** — base de données et authentification (compte, données de profil).",
               "**Stripe** — paiements et gestion des abonnements.",
               "**Vercel** — hébergement de l'application, réseau de distribution et journaux techniques.",
+              "**PostHog** (région UE) — analyse d'utilisation du produit, uniquement avec ton consentement (voir la section cookies).",
               "**Apple** (Apple Push Notification service) et **Google** (Firebase Cloud Messaging) — livraison des notifications push à ton appareil.",
               "**cron-job.org** — service qui déclenche des tâches automatiques à l'heure prévue (ne reçoit pas de données personnelles au-delà de ce qui est nécessaire pour appeler le service).",
               "**Prestataire d'e-mail** — envoi des e-mails de service."
@@ -825,7 +829,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
         "blocos": [
           {
             "tipo": "p",
-            "texto": "Nous n'utilisons pas de cookies publicitaires ni de suivi. Nous utilisons uniquement le stockage essentiel dans ton navigateur pour : maintenir ta session connectée, mémoriser la langue choisie, mémoriser que tu as déjà vu les tutoriels et tes préférences d'interface. Sans cela, l'application ne fonctionne pas correctement."
+            "texto": "Nous utilisons le stockage essentiel dans ton navigateur pour : maintenir ta session connectée, mémoriser la langue choisie, mémoriser que tu as vu les tutoriels et tes préférences d'interface — sans cela, l'application ne fonctionne pas. De plus, avec **ton consentement**, nous utilisons **PostHog** (dans la région UE) pour l'analyse d'utilisation du produit : comprendre comment le jeu est utilisé et l'améliorer. Nous ne l'activons qu'après que tu aies accepté l'avis affiché dans l'application, et tu peux refuser sans que le jeu soit affecté. Nous n'utilisons pas de cookies publicitaires."
           }
         ]
       },
@@ -860,7 +864,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
   },
   "de": {
     "titulo": "Datenschutzerklärung — Ippon League",
-    "atualizado": "10. September 2026",
+    "atualizado": "11. September 2026",
     "versao": "1.0",
     "oficial": "**Offizielle Fassung:** Diese Erklärung wurde auf Portugiesisch verfasst, was die offizielle Fassung ist. Übersetzungen in andere Sprachen werden aus Gründen der Zweckmäßigkeit bereitgestellt; im Falle von Abweichungen ist die portugiesische Fassung maßgeblich.",
     "seccoes": [
@@ -975,6 +979,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
               "**Supabase** — Datenbank und Authentifizierung (Konto, Profildaten).",
               "**Stripe** — Zahlungen und Abonnementverwaltung.",
               "**Vercel** — Hosting der Anwendung, Auslieferungsnetzwerk und technische Protokolle.",
+              "**PostHog** (EU-Region) — Produktnutzungsanalyse, nur mit deiner Einwilligung (siehe Abschnitt Cookies).",
               "**Apple** (Apple Push Notification service) und **Google** (Firebase Cloud Messaging) — Zustellung der Push-Benachrichtigungen an dein Gerät.",
               "**cron-job.org** — Dienst, der automatisierte Aufgaben zur richtigen Zeit auslöst (erhält keine personenbezogenen Daten über das zum Aufruf des Dienstes Notwendige hinaus).",
               "**E-Mail-Anbieter** — Versand der Service-E-Mails."
@@ -1031,7 +1036,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
         "blocos": [
           {
             "tipo": "p",
-            "texto": "Wir verwenden keine Werbe- oder Tracking-Cookies. Wir verwenden nur den wesentlichen Speicher in deinem Browser, um: deine Sitzung angemeldet zu halten, die gewählte Sprache zu merken, zu merken, dass du die Tutorials bereits gesehen hast, und deine Oberflächen-Einstellungen. Ohne diese funktioniert die Anwendung nicht richtig."
+            "texto": "Wir verwenden wesentlichen Speicher in deinem Browser, um: deine Sitzung angemeldet zu halten, die gewählte Sprache zu merken, zu merken, dass du die Tutorials gesehen hast, und deine Oberflächen-Einstellungen — ohne diese funktioniert die App nicht. Zusätzlich verwenden wir mit **deiner Einwilligung** **PostHog** (in der EU-Region) zur Produktnutzungsanalyse: um zu verstehen, wie das Spiel genutzt wird, und es zu verbessern. Wir aktivieren dies erst, nachdem du den Hinweis in der App akzeptiert hast, und du kannst ablehnen, ohne dass das Spiel beeinträchtigt wird. Wir verwenden keine Werbe-Cookies."
           }
         ]
       },
