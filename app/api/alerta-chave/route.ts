@@ -37,6 +37,7 @@ import { focoMercado, nomeCompeticao } from "@/lib/calendario";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { montarChaveDaBase } from "@/lib/montarChave";
+import { linguasDeVarios, type LinguaNotif } from "@/lib/i18nServidor";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -86,15 +87,120 @@ function advTxt(l?: LadoRico): string {
   const pais = (l?.pais || "").trim();
   return pais ? `${nome} (${pais})` : nome;
 }
-// Método da vitória, a partir das ações do VENCEDOR nesse combate.
-function metodoVitoria(ac?: AcoesLado): string {
-  if (!ac) return "";
-  if (ac.i > 0) return " por ippon";
-  if (ac.w >= 2) return " por dois waza-áris";
-  if (ac.w === 1) return " por waza-ári";
-  if (ac.y > 0) return " por yuko";
-  return "";
+// TEXTOS DAS NOTIFICAÇÕES DE FAVORITOS, nas 5 línguas.
+// Render por LÍNGUA DE QUEM RECEBE (linguasDeVarios). Os termos de judô (ippon,
+// waza-ári, yuko) NÃO se traduzem — só o conector e a estrutura da frase. O
+// adversário "SOBRENOME (PAÍS)" e o nome da competição são iguais em todas.
+interface TxtNotif {
+  metodo: (ac?: AcoesLado) => string; // " por ippon" (com espaço à frente) ou ""
+  proxTitulo: (a: string) => string;
+  proxCorpo: (comp: string, a: string) => string;
+  venceuTitulo: (a: string) => string;
+  venceuCorpo: (comp: string, a: string, adv: string, met: string) => string;
+  perdeuTitulo: (a: string) => string;
+  perdeuCorpo: (comp: string, a: string, adv: string, met: string) => string;
+  bronzeTitulo: (a: string) => string;
+  bronzeCom: (comp: string, a: string, adv: string) => string;
+  bronzeSem: (comp: string, a: string) => string;
+  finalTitulo: (a: string) => string;
+  finalCom: (comp: string, a: string, adv: string) => string;
+  finalSem: (comp: string, a: string) => string;
+  ouroTitulo: (a: string) => string;   ouroCorpo: (comp: string, a: string, cat: string) => string;
+  prataTitulo: (a: string) => string;  prataCorpo: (comp: string, a: string, cat: string) => string;
+  bronzeMedTitulo: (a: string) => string; bronzeMedCorpo: (comp: string, a: string, cat: string) => string;
 }
+const TXT: Record<LinguaNotif, TxtNotif> = {
+  pt: {
+    metodo: (ac) => !ac ? "" : ac.i > 0 ? " por ippon" : ac.w >= 2 ? " por dois waza-áris" : ac.w === 1 ? " por waza-ári" : ac.y > 0 ? " por yuko" : "",
+    proxTitulo: (a) => `🥋 ${a} é já a seguir!`,
+    proxCorpo: (comp, a) => `Em ${comp}, ${a} é a próxima luta no seu bloco. Fica atento — vai entrar no tatame.`,
+    venceuTitulo: (a) => `🥋 ${a} venceu e avança`,
+    venceuCorpo: (comp, a, adv, met) => `Em ${comp}, ${a} venceu ${adv}${met} e avança.`,
+    perdeuTitulo: (a) => `🥋 ${a} perdeu`,
+    perdeuCorpo: (comp, a, adv, met) => `Em ${comp}, ${a} perdeu para ${adv}${met}.`,
+    bronzeTitulo: (a) => `🥋 ${a} vai ao bronze`,
+    bronzeCom: (comp, a, adv) => `Em ${comp}, ${a} vai lutar pelo bronze com ${adv}.`,
+    bronzeSem: (comp, a) => `Em ${comp}, ${a} vai lutar pelo bronze.`,
+    finalTitulo: (a) => `🥋 ${a} está na final!`,
+    finalCom: (comp, a, adv) => `Em ${comp}, ${a} está na final, contra ${adv}!`,
+    finalSem: (comp, a) => `Em ${comp}, ${a} está na final!`,
+    ouroTitulo: (a) => `🥇 ${a} é campeão!`,       ouroCorpo: (comp, a, cat) => `Em ${comp}, ${a} é campeão em ${cat} kg.`,
+    prataTitulo: (a) => `🥈 ${a} é vice-campeão!`,  prataCorpo: (comp, a, cat) => `Em ${comp}, ${a} é vice-campeão (prata) em ${cat} kg.`,
+    bronzeMedTitulo: (a) => `🥉 ${a} é bronze!`,    bronzeMedCorpo: (comp, a, cat) => `Em ${comp}, ${a} fica com o bronze em ${cat} kg.`,
+  },
+  en: {
+    metodo: (ac) => !ac ? "" : ac.i > 0 ? " by ippon" : ac.w >= 2 ? " by two waza-ari" : ac.w === 1 ? " by waza-ari" : ac.y > 0 ? " by yuko" : "",
+    proxTitulo: (a) => `🥋 ${a} is up next!`,
+    proxCorpo: (comp, a) => `At ${comp}, ${a} is up next in their block. Stay tuned — stepping onto the mat.`,
+    venceuTitulo: (a) => `🥋 ${a} won and advances`,
+    venceuCorpo: (comp, a, adv, met) => `At ${comp}, ${a} beat ${adv}${met} and advances.`,
+    perdeuTitulo: (a) => `🥋 ${a} lost`,
+    perdeuCorpo: (comp, a, adv, met) => `At ${comp}, ${a} lost to ${adv}${met}.`,
+    bronzeTitulo: (a) => `🥋 ${a} fights for bronze`,
+    bronzeCom: (comp, a, adv) => `At ${comp}, ${a} will fight for bronze against ${adv}.`,
+    bronzeSem: (comp, a) => `At ${comp}, ${a} will fight for bronze.`,
+    finalTitulo: (a) => `🥋 ${a} is in the final!`,
+    finalCom: (comp, a, adv) => `At ${comp}, ${a} is in the final, against ${adv}!`,
+    finalSem: (comp, a) => `At ${comp}, ${a} is in the final!`,
+    ouroTitulo: (a) => `🥇 ${a} is the champion!`,     ouroCorpo: (comp, a, cat) => `At ${comp}, ${a} is the champion in ${cat} kg.`,
+    prataTitulo: (a) => `🥈 ${a} takes silver!`,        prataCorpo: (comp, a, cat) => `At ${comp}, ${a} is runner-up (silver) in ${cat} kg.`,
+    bronzeMedTitulo: (a) => `🥉 ${a} takes bronze!`,    bronzeMedCorpo: (comp, a, cat) => `At ${comp}, ${a} takes bronze in ${cat} kg.`,
+  },
+  es: {
+    metodo: (ac) => !ac ? "" : ac.i > 0 ? " por ippon" : ac.w >= 2 ? " por dos waza-ari" : ac.w === 1 ? " por waza-ari" : ac.y > 0 ? " por yuko" : "",
+    proxTitulo: (a) => `🥋 ¡${a} es el siguiente!`,
+    proxCorpo: (comp, a) => `En ${comp}, ${a} es el próximo combate de su bloque. Atento — sube al tatami.`,
+    venceuTitulo: (a) => `🥋 ${a} venció y avanza`,
+    venceuCorpo: (comp, a, adv, met) => `En ${comp}, ${a} venció a ${adv}${met} y avanza.`,
+    perdeuTitulo: (a) => `🥋 ${a} perdió`,
+    perdeuCorpo: (comp, a, adv, met) => `En ${comp}, ${a} perdió ante ${adv}${met}.`,
+    bronzeTitulo: (a) => `🥋 ${a} pelea por el bronce`,
+    bronzeCom: (comp, a, adv) => `En ${comp}, ${a} peleará por el bronce contra ${adv}.`,
+    bronzeSem: (comp, a) => `En ${comp}, ${a} peleará por el bronce.`,
+    finalTitulo: (a) => `🥋 ¡${a} está en la final!`,
+    finalCom: (comp, a, adv) => `En ${comp}, ${a} está en la final, contra ${adv}!`,
+    finalSem: (comp, a) => `En ${comp}, ${a} está en la final!`,
+    ouroTitulo: (a) => `🥇 ¡${a} es campeón!`,       ouroCorpo: (comp, a, cat) => `En ${comp}, ${a} es campeón en ${cat} kg.`,
+    prataTitulo: (a) => `🥈 ¡${a} es subcampeón!`,   prataCorpo: (comp, a, cat) => `En ${comp}, ${a} es subcampeón (plata) en ${cat} kg.`,
+    bronzeMedTitulo: (a) => `🥉 ¡${a} es bronce!`,    bronzeMedCorpo: (comp, a, cat) => `En ${comp}, ${a} se lleva el bronce en ${cat} kg.`,
+  },
+  fr: {
+    metodo: (ac) => !ac ? "" : ac.i > 0 ? " par ippon" : ac.w >= 2 ? " par deux waza-ari" : ac.w === 1 ? " par waza-ari" : ac.y > 0 ? " par yuko" : "",
+    proxTitulo: (a) => `🥋 ${a} arrive !`,
+    proxCorpo: (comp, a) => `À ${comp}, ${a} est le prochain combat de son bloc. Reste attentif — il entre sur le tatami.`,
+    venceuTitulo: (a) => `🥋 ${a} gagne et avance`,
+    venceuCorpo: (comp, a, adv, met) => `À ${comp}, ${a} a battu ${adv}${met} et avance.`,
+    perdeuTitulo: (a) => `🥋 ${a} a perdu`,
+    perdeuCorpo: (comp, a, adv, met) => `À ${comp}, ${a} a perdu contre ${adv}${met}.`,
+    bronzeTitulo: (a) => `🥋 ${a} pour le bronze`,
+    bronzeCom: (comp, a, adv) => `À ${comp}, ${a} disputera le bronze contre ${adv}.`,
+    bronzeSem: (comp, a) => `À ${comp}, ${a} disputera le bronze.`,
+    finalTitulo: (a) => `🥋 ${a} est en finale !`,
+    finalCom: (comp, a, adv) => `À ${comp}, ${a} est en finale, contre ${adv} !`,
+    finalSem: (comp, a) => `À ${comp}, ${a} est en finale !`,
+    ouroTitulo: (a) => `🥇 ${a} est champion !`,       ouroCorpo: (comp, a, cat) => `À ${comp}, ${a} est champion en ${cat} kg.`,
+    prataTitulo: (a) => `🥈 ${a} est vice-champion !`,  prataCorpo: (comp, a, cat) => `À ${comp}, ${a} est vice-champion (argent) en ${cat} kg.`,
+    bronzeMedTitulo: (a) => `🥉 ${a} en bronze !`,      bronzeMedCorpo: (comp, a, cat) => `À ${comp}, ${a} décroche le bronze en ${cat} kg.`,
+  },
+  de: {
+    metodo: (ac) => !ac ? "" : ac.i > 0 ? " durch Ippon" : ac.w >= 2 ? " durch zwei Waza-ari" : ac.w === 1 ? " durch Waza-ari" : ac.y > 0 ? " durch Yuko" : "",
+    proxTitulo: (a) => `🥋 ${a} ist gleich dran!`,
+    proxCorpo: (comp, a) => `Bei ${comp} ist ${a} als Nächstes im Block dran. Bleib dran — gleich auf der Matte.`,
+    venceuTitulo: (a) => `🥋 ${a} gewinnt und zieht weiter`,
+    venceuCorpo: (comp, a, adv, met) => `Bei ${comp} hat ${a} ${adv}${met} besiegt und zieht weiter.`,
+    perdeuTitulo: (a) => `🥋 ${a} verliert`,
+    perdeuCorpo: (comp, a, adv, met) => `Bei ${comp} hat ${a} gegen ${adv}${met} verloren.`,
+    bronzeTitulo: (a) => `🥋 ${a} kämpft um Bronze`,
+    bronzeCom: (comp, a, adv) => `Bei ${comp} kämpft ${a} gegen ${adv} um Bronze.`,
+    bronzeSem: (comp, a) => `Bei ${comp} kämpft ${a} um Bronze.`,
+    finalTitulo: (a) => `🥋 ${a} steht im Finale!`,
+    finalCom: (comp, a, adv) => `Bei ${comp} steht ${a} im Finale, gegen ${adv}!`,
+    finalSem: (comp, a) => `Bei ${comp} steht ${a} im Finale!`,
+    ouroTitulo: (a) => `🥇 ${a} ist Meister!`,        ouroCorpo: (comp, a, cat) => `Bei ${comp} ist ${a} Meister in ${cat} kg.`,
+    prataTitulo: (a) => `🥈 ${a} holt Silber!`,       prataCorpo: (comp, a, cat) => `Bei ${comp} ist ${a} Vizemeister (Silber) in ${cat} kg.`,
+    bronzeMedTitulo: (a) => `🥉 ${a} holt Bronze!`,   bronzeMedCorpo: (comp, a, cat) => `Bei ${comp} holt ${a} Bronze in ${cat} kg.`,
+  },
+};
 // A próxima luta de um conjunto: 1ª ainda SEM vencedor com AMBOS os lados
 // definidos. (Mesma regra do pontinho da página.) A ordem já vem correta da
 // biblioteca (as lutas são geradas por ronda), por isso basta a primeira.
@@ -187,8 +293,10 @@ export async function GET(req: Request) {
   // direto da base). OTIMIZAÇÃO FUTURA: só as categorias com favoritos — por
   // agora, com poucos utilizadores, as 14 são leves.
   const avisos: { user_id: string; id_person: string; nome: string; id_fight: string; cat: string }[] = [];
-  // Narração: resultado / bronze / final / medalha (mensagens já prontas).
-  const eventos: { user_id: string; id_fight: string; tipo: string; titulo: string; corpo: string; cat: string }[] = [];
+  // Narração: resultado / bronze / final / medalha. Guardamos um RENDER (monta o
+  // texto na língua de quem recebe), não texto fixo — traduz para as 5 línguas.
+  type Render = (lg: LinguaNotif) => { titulo: string; corpo: string };
+  const eventos: { user_id: string; id_fight: string; tipo: string; cat: string; render: Render }[] = [];
   const POOLS = ["A", "B", "C", "D"];
   for (const cat of CATS) {
     const m = await montarChaveDaBase(comp, cat);
@@ -213,10 +321,12 @@ export async function GET(req: Request) {
     }
 
     // (B) NARRAÇÃO — vale para a decorrer E para terminada (as medalhas saem no fim).
-    const emite = (idPerson: string, id_fight: string, tipo: string, titulo: string, corpo: string) => {
+    // Guardamos um RENDER por evento (não texto): a mensagem é montada na língua
+    // de quem recebe, mais abaixo. Assim traduz para as 5 línguas.
+    const emite = (idPerson: string, id_fight: string, tipo: string, render: Render) => {
       const seg = seguidoresDe.get(idPerson);
       if (!seg) return;
-      for (const u of seg) eventos.push({ user_id: u, id_fight, tipo, titulo, corpo, cat });
+      for (const u of seg) eventos.push({ user_id: u, id_fight, tipo, cat, render });
     };
     // Nome/país de cada id desta categoria (as medalhas vêm só como ids).
     const identDe = new Map<string, LadoRico>();
@@ -240,13 +350,16 @@ export async function GET(req: Request) {
         const outro = lado.id === l.azul?.id ? l.branco : l.azul;
         if (!outro?.id) continue; // sem adversário (bye): não há "venceu fulano"
         const venceu = l.vencedor === lado.id;
-        const met = metodoVitoria(venceu ? lado.acoes : outro.acoes);
         const ap = apelido(lado.nome || "");
-        const corpo = venceu
-          ? `Em ${nomeComp}, ${ap} venceu ${advTxt(outro)}${met} e avança.`
-          : `Em ${nomeComp}, ${ap} perdeu para ${advTxt(outro)}${met}.`;
-        emite(lado.id, `res#${cat}#${l.chaveId}#${lado.id}`, "resultado",
-          `🥋 ${ap} ${venceu ? "venceu e avança" : "perdeu"}`, corpo);
+        const adv = advTxt(outro);
+        const acVenc = venceu ? lado.acoes : outro.acoes; // ações de QUEM venceu
+        emite(lado.id, `res#${cat}#${l.chaveId}#${lado.id}`, "resultado", (lg) => {
+          const T = TXT[lg];
+          const met = T.metodo(acVenc);
+          return venceu
+            ? { titulo: T.venceuTitulo(ap), corpo: T.venceuCorpo(nomeComp, ap, adv, met) }
+            : { titulo: T.perdeuTitulo(ap), corpo: T.perdeuCorpo(nomeComp, ap, adv, met) };
+        });
       }
     }
     // Disputa do bronze (ainda por lutar): avisa quem lá está; nomeia o adversário se já se souber.
@@ -256,10 +369,11 @@ export async function GET(req: Request) {
         if (!lado?.id || !seguidoresDe.has(lado.id)) continue;
         const outro = lado.id === l.azul?.id ? l.branco : l.azul;
         const ap = apelido(lado.nome || "");
-        const corpo = outro?.id
-          ? `Em ${nomeComp}, ${ap} vai lutar pelo bronze com ${advTxt(outro)}.`
-          : `Em ${nomeComp}, ${ap} vai lutar pelo bronze.`;
-        emite(lado.id, `bronze#${cat}#${lado.id}`, "bronze", `🥋 ${ap} vai ao bronze`, corpo);
+        const adv = outro?.id ? advTxt(outro) : null;
+        emite(lado.id, `bronze#${cat}#${lado.id}`, "bronze", (lg) => {
+          const T = TXT[lg];
+          return { titulo: T.bronzeTitulo(ap), corpo: adv ? T.bronzeCom(nomeComp, ap, adv) : T.bronzeSem(nomeComp, ap) };
+        });
       }
     }
     // Final (ainda por lutar): nomeia o adversário se já se souber.
@@ -269,24 +383,37 @@ export async function GET(req: Request) {
         if (!lado?.id || !seguidoresDe.has(lado.id)) continue;
         const outro = lado.id === fin.azul?.id ? fin.branco : fin.azul;
         const ap = apelido(lado.nome || "");
-        const corpo = outro?.id
-          ? `Em ${nomeComp}, ${ap} está na final, contra ${advTxt(outro)}!`
-          : `Em ${nomeComp}, ${ap} está na final!`;
-        emite(lado.id, `final#${cat}#${lado.id}`, "final", `🥋 ${ap} está na final!`, corpo);
+        const adv = outro?.id ? advTxt(outro) : null;
+        emite(lado.id, `final#${cat}#${lado.id}`, "final", (lg) => {
+          const T = TXT[lg];
+          return { titulo: T.finalTitulo(ap), corpo: adv ? T.finalCom(nomeComp, ap, adv) : T.finalSem(nomeComp, ap) };
+        });
       }
     }
     // Medalhas (categoria terminada / final e bronzes decididos).
-    const medalhas: Array<{ id?: string | null; emoji: string; txt: string }> = [
-      { id: chaveR.campeao ?? null, emoji: "🥇", txt: "é campeão" },
-      { id: chaveR.vice ?? null, emoji: "🥈", txt: "é vice-campeão (prata)" },
-      ...(chaveR.terceiros || []).map((tid) => ({ id: tid, emoji: "🥉", txt: "fica com o bronze" })),
+    const medalhas: Array<{ id?: string | null; medalha: "ouro" | "prata" | "bronze" }> = [
+      { id: chaveR.campeao ?? null, medalha: "ouro" },
+      { id: chaveR.vice ?? null, medalha: "prata" },
+      ...(chaveR.terceiros || []).map((tid) => ({ id: tid, medalha: "bronze" as const })),
     ];
     for (const md of medalhas) {
       if (!md.id || !seguidoresDe.has(md.id)) continue;
       const ap = apelido(identDe.get(md.id)?.nome || "");
-      emite(md.id, `medalha#${cat}#${md.id}`, "medalha", `${md.emoji} ${ap} ${md.txt}!`, `Em ${nomeComp}, ${ap} ${md.txt} em ${cat} kg.`);
+      const kind = md.medalha;
+      const catAtual = cat;
+      emite(md.id, `medalha#${cat}#${md.id}`, "medalha", (lg) => {
+        const T = TXT[lg];
+        if (kind === "ouro") return { titulo: T.ouroTitulo(ap), corpo: T.ouroCorpo(nomeComp, ap, catAtual) };
+        if (kind === "prata") return { titulo: T.prataTitulo(ap), corpo: T.prataCorpo(nomeComp, ap, catAtual) };
+        return { titulo: T.bronzeMedTitulo(ap), corpo: T.bronzeMedCorpo(nomeComp, ap, catAtual) };
+      });
     }
   }
+  // LÍNGUA DE CADA DESTINATÁRIO, numa só consulta (para render por pessoa). Quem
+  // não tiver língua definida cai em "pt".
+  const mapaLingua = await linguasDeVarios([...avisos.map((a) => a.user_id), ...eventos.map((e) => e.user_id)]);
+  const lgDe = (userId: string): LinguaNotif => mapaLingua[userId] || "pt";
+
   // --- (A) PRÓXIMA LUTA: anti-repetição + envio (comportamento original) ---
   // Lê de uma vez os pares (user_id, id_fight) já registados para estas lutas.
   const fights = Array.from(new Set(avisos.map((a) => a.id_fight)));
@@ -318,11 +445,13 @@ export async function GET(req: Request) {
     } catch { inseriu = false; }
     if (!inseriu) continue;
     try {
+      const T = TXT[lgDe(a.user_id)];
+      const ap = apelido(a.nome);
       await criarNotificacaoServidor({
         paraUserId: a.user_id,
         tipo: "proxima_luta",
-        titulo: `🥋 ${apelido(a.nome)} é já a seguir!`,
-        corpo: `Em ${nomeComp}, ${apelido(a.nome)} é a próxima luta no seu bloco. Fica atento — vai a entrar no tatame.`,
+        titulo: T.proxTitulo(ap),
+        corpo: T.proxCorpo(nomeComp, ap),
         // Link com a categoria DO atleta (e a competição): ao tocar, a chave abre
         // já na categoria certa — ex.: Davi Lima (-81) abre nos -81, não nos -73.
         link: `/chave-atletas?comp=${encodeURIComponent(comp)}&cat=${encodeURIComponent(a.cat)}`,
@@ -345,11 +474,12 @@ export async function GET(req: Request) {
     } catch { inseriu = false; }
     if (!inseriu) continue;
     try {
+      const { titulo, corpo } = e.render(lgDe(e.user_id));
       await criarNotificacaoServidor({
         paraUserId: e.user_id,
         tipo: e.tipo,
-        titulo: e.titulo,
-        corpo: e.corpo,
+        titulo,
+        corpo,
         link: `/chave-atletas?comp=${encodeURIComponent(comp)}&cat=${encodeURIComponent(e.cat)}`,
       });
       eventosEnviados++;
