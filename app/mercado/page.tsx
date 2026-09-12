@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
 import { loadDraftFor, saveDraftFor, setAthletePool } from "@/lib/team";
@@ -12,6 +12,9 @@ import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 import { useFaixa } from "@/lib/useFaixa";
 import { useT } from "@/lib/i18n";
+// Fase E (Ativação) — SÓ medição. track() é no-op sem consentimento; nomes vêm
+// do tipo fechado EventName em lib/analytics.
+import { track, aoTerConsentimento } from "@/lib/analytics";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -87,6 +90,8 @@ function MercadoInner() {
   // do rascunho vazio, e (b) o "Voltar ao Dojo" levar de volta a /meu-time?montar=1.
   const searchParams = useSearchParams();
   const montar = searchParams.get("montar") === "1";
+  // Guarda de disparo único do market_viewed (Strict Mode corre o efeito 2x em dev).
+  const contouMercado = useRef(false);
   const [pool, setPool] = useState<Athlete[]>([]);
   const [loading, setLoading] = useState(true);
   // Nível da tabela `users` — nunca do metadata. `ehPro` é verdadeiro também
@@ -155,6 +160,11 @@ function MercadoInner() {
       let active = true;
       // Se o mercado está fechado (competição a decorrer), não carrega nada.
       if (competicaoADecorrer) { setLoading(false); return; }
+      // ATIVAÇÃO: viu o mercado (aberto). Espera pelo consentimento e conta uma vez.
+      if (!contouMercado.current) {
+        contouMercado.current = true;
+        aoTerConsentimento(() => track("market_viewed", { competicao: COMPETICAO }));
+      }
       let draft: { ids: string[]; captain: string | null } = { ids: [], captain: null };
       try {
         // Com a marca "montar" (veio do lixo), o mercado parte do VAZIO: a equipa
@@ -356,6 +366,10 @@ function MercadoInner() {
     if (st.kind === "buy") {
       if (!(await temSessao())) { setPedirLogin(true); return; }
       persist([...team, a.id]);
+      // ATIVAÇÃO: contratou um atleta. E, se este é o 8.º, a equipa ficou completa
+      // (o botão bloqueia acima dos 4 por género, por isso 8 = 4M+4F).
+      track("athlete_added", { athlete: a.id, gender: a.gender, price: a.priceJc, competicao: COMPETICAO });
+      if (team.length + 1 === 8) track("team_completed", { competicao: COMPETICAO });
       const g = a.gender;
       const newCount = (g === "M" ? countM : countF) + 1;
       if (newCount >= 4) {
