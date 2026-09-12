@@ -61,6 +61,40 @@ interface ChaveNova {
   repescagens: LutaChave[];
   bronzes: LutaChave[];
 }
+// Vista RICA da mesma chave: a biblioteca devolve mais do que o ChaveNova usa —
+// estado por luta, ações por lado (para o MÉTODO da vitória) e os medalhados.
+interface AcoesLado { i: number; w: number; y: number; s: number }
+interface LadoRico { id: string | null; nome?: string; pais?: string; acoes?: AcoesLado }
+interface LutaRica { chaveId?: string; azul: LadoRico; branco: LadoRico; vencedor: string | null; estado?: string }
+interface ChaveRica {
+  pools: Record<string, { lutas: LutaRica[] }>;
+  meias: LutaRica[];
+  final: LutaRica | null;
+  repescagens: LutaRica[];
+  bronzes: LutaRica[];
+  campeao?: string | null;
+  vice?: string | null;
+  terceiros?: string[];
+}
+// Sobrenome em maiúsculas do JudoBase (ex.: "LIMA"), com recurso à 1ª palavra.
+function apelido(n: string): string {
+  return (n || "").trim().split(/\s+/).filter((w) => w.length > 1 && w === w.toUpperCase())[0] || (n || "").split(/\s+/)[0] || "o teu atleta";
+}
+// Adversário como "Sobrenome (PAÍS)" — sem parênteses se não houver país.
+function advTxt(l?: LadoRico): string {
+  const nome = apelido(l?.nome || "");
+  const pais = (l?.pais || "").trim();
+  return pais ? `${nome} (${pais})` : nome;
+}
+// Método da vitória, a partir das ações do VENCEDOR nesse combate.
+function metodoVitoria(ac?: AcoesLado): string {
+  if (!ac) return "";
+  if (ac.i > 0) return " por ippon";
+  if (ac.w >= 2) return " por dois waza-áris";
+  if (ac.w === 1) return " por waza-ári";
+  if (ac.y > 0) return " por yuko";
+  return "";
+}
 // A próxima luta de um conjunto: 1ª ainda SEM vencedor com AMBOS os lados
 // definidos. (Mesma regra do pontinho da página.) A ordem já vem correta da
 // biblioteca (as lutas são geradas por ronda), por isso basta a primeira.
@@ -153,50 +187,128 @@ export async function GET(req: Request) {
   // direto da base). OTIMIZAÇÃO FUTURA: só as categorias com favoritos — por
   // agora, com poucos utilizadores, as 14 são leves.
   const avisos: { user_id: string; id_person: string; nome: string; id_fight: string; cat: string }[] = [];
+  // Narração: resultado / bronze / final / medalha (mensagens já prontas).
+  const eventos: { user_id: string; id_fight: string; tipo: string; titulo: string; corpo: string; cat: string }[] = [];
+  const POOLS = ["A", "B", "C", "D"];
   for (const cat of CATS) {
     const m = await montarChaveDaBase(comp, cat);
-    // Só interessa se a categoria existe e está a decorrer (há próximas lutas).
-    if (!m.existeMoldura || !m.chave || m.estado !== "aDecorrer") continue;
-    const chave = m.chave as unknown as ChaveNova;
-    // (5) Próxima luta de cada bloco; se um lado é seguido, marca aviso.
-    for (const luta of blocosDaChave(chave)) {
-      // id_fight único por competição: categoria + posição na chave (chaveId).
-      const idFight = `${cat}#${luta.chaveId || `${luta.azul?.id}-${luta.branco?.id}`}`;
-      for (const lado of [luta.azul, luta.branco]) {
-        if (!lado?.id) continue;
-        const seguidores = seguidoresDe.get(String(lado.id));
-        if (!seguidores) continue;
-        for (const uid of seguidores) {
-          avisos.push({ user_id: uid, id_person: String(lado.id), nome: lado.nome || "", id_fight: idFight, cat });
+    // Categoria sem moldura ou que ainda nem começou: nada a fazer.
+    if (!m.existeMoldura || !m.chave || m.estado === "naoComecou") continue;
+    const chave = m.chave as unknown as ChaveNova;   // para a próxima luta
+    const chaveR = m.chave as unknown as ChaveRica;   // para a narração
+
+    // (A) PRÓXIMA LUTA — só enquanto a categoria DECORRE (comportamento original).
+    if (m.estado === "aDecorrer") {
+      for (const luta of blocosDaChave(chave)) {
+        const idFight = `${cat}#${luta.chaveId || `${luta.azul?.id}-${luta.branco?.id}`}`;
+        for (const lado of [luta.azul, luta.branco]) {
+          if (!lado?.id) continue;
+          const seguidores = seguidoresDe.get(String(lado.id));
+          if (!seguidores) continue;
+          for (const u of seguidores) {
+            avisos.push({ user_id: u, id_person: String(lado.id), nome: lado.nome || "", id_fight: idFight, cat });
+          }
         }
       }
     }
+
+    // (B) NARRAÇÃO — vale para a decorrer E para terminada (as medalhas saem no fim).
+    const emite = (idPerson: string, id_fight: string, tipo: string, titulo: string, corpo: string) => {
+      const seg = seguidoresDe.get(idPerson);
+      if (!seg) return;
+      for (const u of seg) eventos.push({ user_id: u, id_fight, tipo, titulo, corpo, cat });
+    };
+    // Nome/país de cada id desta categoria (as medalhas vêm só como ids).
+    const identDe = new Map<string, LadoRico>();
+    const reg = (l?: LadoRico) => { if (l?.id) identDe.set(l.id, l); };
+    for (const p of POOLS) for (const l of chaveR.pools?.[p]?.lutas || []) { reg(l.azul); reg(l.branco); }
+    for (const l of [...(chaveR.meias || []), chaveR.final, ...(chaveR.repescagens || []), ...(chaveR.bronzes || [])]) {
+      if (l) { reg(l.azul); reg(l.branco); }
+    }
+
+    // Resultado de cada luta DECIDIDA (pools + meias + repescagens). A final e os
+    // bronzes têm eventos próprios (final / medalha) — não entram aqui.
+    const lutasResultado: LutaRica[] = [
+      ...POOLS.flatMap((p) => chaveR.pools?.[p]?.lutas || []),
+      ...(chaveR.meias || []),
+      ...(chaveR.repescagens || []),
+    ];
+    for (const l of lutasResultado) {
+      if (!l || l.estado !== "decidida" || !l.vencedor || !l.chaveId) continue;
+      for (const lado of [l.azul, l.branco]) {
+        if (!lado?.id || !seguidoresDe.has(lado.id)) continue;
+        const outro = lado.id === l.azul?.id ? l.branco : l.azul;
+        if (!outro?.id) continue; // sem adversário (bye): não há "venceu fulano"
+        const venceu = l.vencedor === lado.id;
+        const met = metodoVitoria(venceu ? lado.acoes : outro.acoes);
+        const ap = apelido(lado.nome || "");
+        const corpo = venceu
+          ? `Em ${nomeComp}, ${ap} venceu ${advTxt(outro)}${met} e avança.`
+          : `Em ${nomeComp}, ${ap} perdeu para ${advTxt(outro)}${met}.`;
+        emite(lado.id, `res#${cat}#${l.chaveId}#${lado.id}`, "resultado",
+          `🥋 ${ap} ${venceu ? "venceu e avança" : "perdeu"}`, corpo);
+      }
+    }
+    // Disputa do bronze (ainda por lutar): avisa quem lá está; nomeia o adversário se já se souber.
+    for (const l of chaveR.bronzes || []) {
+      if (!l || l.estado === "decidida") continue;
+      for (const lado of [l.azul, l.branco]) {
+        if (!lado?.id || !seguidoresDe.has(lado.id)) continue;
+        const outro = lado.id === l.azul?.id ? l.branco : l.azul;
+        const ap = apelido(lado.nome || "");
+        const corpo = outro?.id
+          ? `Em ${nomeComp}, ${ap} vai lutar pelo bronze com ${advTxt(outro)}.`
+          : `Em ${nomeComp}, ${ap} vai lutar pelo bronze.`;
+        emite(lado.id, `bronze#${cat}#${lado.id}`, "bronze", `🥋 ${ap} vai ao bronze`, corpo);
+      }
+    }
+    // Final (ainda por lutar): nomeia o adversário se já se souber.
+    const fin = chaveR.final;
+    if (fin && fin.estado !== "decidida") {
+      for (const lado of [fin.azul, fin.branco]) {
+        if (!lado?.id || !seguidoresDe.has(lado.id)) continue;
+        const outro = lado.id === fin.azul?.id ? fin.branco : fin.azul;
+        const ap = apelido(lado.nome || "");
+        const corpo = outro?.id
+          ? `Em ${nomeComp}, ${ap} está na final, contra ${advTxt(outro)}!`
+          : `Em ${nomeComp}, ${ap} está na final!`;
+        emite(lado.id, `final#${cat}#${lado.id}`, "final", `🥋 ${ap} está na final!`, corpo);
+      }
+    }
+    // Medalhas (categoria terminada / final e bronzes decididos).
+    const medalhas: Array<{ id?: string | null; emoji: string; txt: string }> = [
+      { id: chaveR.campeao ?? null, emoji: "🥇", txt: "é campeão" },
+      { id: chaveR.vice ?? null, emoji: "🥈", txt: "é vice-campeão (prata)" },
+      ...(chaveR.terceiros || []).map((tid) => ({ id: tid, emoji: "🥉", txt: "fica com o bronze" })),
+    ];
+    for (const md of medalhas) {
+      if (!md.id || !seguidoresDe.has(md.id)) continue;
+      const ap = apelido(identDe.get(md.id)?.nome || "");
+      emite(md.id, `medalha#${cat}#${md.id}`, "medalha", `${md.emoji} ${ap} ${md.txt}!`, `Em ${nomeComp}, ${ap} ${md.txt} em ${cat} kg.`);
+    }
   }
-  if (avisos.length === 0) {
-    return NextResponse.json({ ok: true, a_decorrer: nomeComp, candidatos: 0, enviados: 0, ms: Date.now() - t0 });
-  }
-  // Anti-repetição: tira os que já foram avisados sobre aquela luta.
+  // --- (A) PRÓXIMA LUTA: anti-repetição + envio (comportamento original) ---
   // Lê de uma vez os pares (user_id, id_fight) já registados para estas lutas.
   const fights = Array.from(new Set(avisos.map((a) => a.id_fight)));
   const jaAvisado = new Set<string>(); // chave "user_id::id_fight"
-  try {
-    const { data } = await supabaseAdmin
-      .from("alertas_enviados")
-      .select("user_id, id_fight")
-      .eq("tipo", "proxima_luta")
-      .in("id_fight", fights);
-    for (const r of data || []) jaAvisado.add(`${r.user_id}::${r.id_fight}`);
-  } catch { /* se falhar a leitura, seguimos — o unique da tabela ainda protege */ }
+  if (fights.length) {
+    try {
+      const { data } = await supabaseAdmin
+        .from("alertas_enviados")
+        .select("user_id, id_fight")
+        .eq("tipo", "proxima_luta")
+        .in("id_fight", fights);
+      for (const r of data || []) jaAvisado.add(`${r.user_id}::${r.id_fight}`);
+    } catch { /* se falhar a leitura, seguimos — o unique da tabela ainda protege */ }
+  }
   // Envia os que faltam. Grava primeiro o "já avisei" (idempotente pelo unique),
   // e só envia o push se o INSERT foi novo — assim, mesmo com dois disparos quase
   // simultâneos, não há push duplicado.
   let enviados = 0;
-  const apelido = (n: string) => (n || "").trim().split(/\s+/).filter((w) => w.length > 1 && w === w.toUpperCase())[0] || (n || "").split(/\s+/)[0] || "o teu atleta";
   for (const a of avisos) {
-    const chave = `${a.user_id}::${a.id_fight}`;
-    if (jaAvisado.has(chave)) continue;
-    jaAvisado.add(chave); // evita duplicar dentro do mesmo disparo (vários blocos)
-    // Tenta gravar o registo. Se já existir (corrida), o unique faz falhar e não enviamos.
+    const chaveA = `${a.user_id}::${a.id_fight}`;
+    if (jaAvisado.has(chaveA)) continue;
+    jaAvisado.add(chaveA); // evita duplicar dentro do mesmo disparo (vários blocos)
     let inseriu = false;
     try {
       const { error } = await supabaseAdmin
@@ -218,6 +330,32 @@ export async function GET(req: Request) {
       enviados++;
     } catch { /* push de um não bloqueia os outros */ }
   }
+
+  // --- (B) NARRAÇÃO: resultado / bronze / final / medalha ---
+  // Uma vez cada, garantido pelo INSERT único (id_fight já traz o prefixo do tipo).
+  // Mensagem e link já vêm prontos de cima.
+  let eventosEnviados = 0;
+  for (const e of eventos) {
+    let inseriu = false;
+    try {
+      const { error } = await supabaseAdmin
+        .from("alertas_enviados")
+        .insert({ user_id: e.user_id, id_fight: e.id_fight, tipo: e.tipo });
+      inseriu = !error;
+    } catch { inseriu = false; }
+    if (!inseriu) continue;
+    try {
+      await criarNotificacaoServidor({
+        paraUserId: e.user_id,
+        tipo: e.tipo,
+        titulo: e.titulo,
+        corpo: e.corpo,
+        link: `/chave-atletas?comp=${encodeURIComponent(comp)}&cat=${encodeURIComponent(e.cat)}`,
+      });
+      eventosEnviados++;
+    } catch { /* push de um não bloqueia os outros */ }
+  }
+
   return NextResponse.json({
     ok: true,
     a_decorrer: nomeComp,
@@ -227,6 +365,8 @@ export async function GET(req: Request) {
     seguidores_promax: proMax.size,
     candidatos: avisos.length,
     enviados,
+    eventos: eventos.length,
+    eventos_enviados: eventosEnviados,
     ms: Date.now() - t0,
   });
 }
