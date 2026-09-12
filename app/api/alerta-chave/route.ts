@@ -152,7 +152,7 @@ export async function GET(req: Request) {
   // (4) Lê a chave de cada categoria pela biblioteca (a mesma verdade da página,
   // direto da base). OTIMIZAÇÃO FUTURA: só as categorias com favoritos — por
   // agora, com poucos utilizadores, as 14 são leves.
-  const avisos: { user_id: string; id_person: string; nome: string; id_fight: string }[] = [];
+  const avisos: { user_id: string; id_person: string; nome: string; id_fight: string; cat: string }[] = [];
   for (const cat of CATS) {
     const m = await montarChaveDaBase(comp, cat);
     // Só interessa se a categoria existe e está a decorrer (há próximas lutas).
@@ -167,7 +167,7 @@ export async function GET(req: Request) {
         const seguidores = seguidoresDe.get(String(lado.id));
         if (!seguidores) continue;
         for (const uid of seguidores) {
-          avisos.push({ user_id: uid, id_person: String(lado.id), nome: lado.nome || "", id_fight: idFight });
+          avisos.push({ user_id: uid, id_person: String(lado.id), nome: lado.nome || "", id_fight: idFight, cat });
         }
       }
     }
@@ -211,7 +211,9 @@ export async function GET(req: Request) {
         tipo: "proxima_luta",
         titulo: `🥋 ${apelido(a.nome)} é já a seguir!`,
         corpo: `Em ${nomeComp}, ${apelido(a.nome)} é a próxima luta no seu bloco. Fica atento — vai a entrar no tatame.`,
-        link: "/chave-atletas",
+        // Link com a categoria DO atleta (e a competição): ao tocar, a chave abre
+        // já na categoria certa — ex.: Davi Lima (-81) abre nos -81, não nos -73.
+        link: `/chave-atletas?comp=${encodeURIComponent(comp)}&cat=${encodeURIComponent(a.cat)}`,
       });
       enviados++;
     } catch { /* push de um não bloqueia os outros */ }
