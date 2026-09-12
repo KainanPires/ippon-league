@@ -24,6 +24,22 @@ const FUNDO = "#0c0e0d";
 const CATS_M = ["-60", "-66", "-73", "-81", "-90", "-100", "+100"];
 const CATS_F = ["-48", "-52", "-57", "-63", "-70", "-78", "+78"];
 const CAT_INICIAL = "-73";
+// Deep-link das notificações de favoritos: /chave-atletas?comp=<id>&cat=<categoria>.
+// Lemos os parâmetros do endereço no arranque para a chave abrir já na categoria
+// certa (ex.: -81 do Davi Lima) em vez do valor por omissão. Guarda de SSR: no
+// servidor não há window, devolve o fallback. `cat` é validada contra as
+// categorias reais, para um parâmetro inválido não partir nada.
+function lerParamUrl(nome: string, fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const v = new URLSearchParams(window.location.search).get(nome);
+    return v && v.trim() ? v.trim() : fallback;
+  } catch { return fallback; }
+}
+function catInicialDoUrl(): string {
+  const c = lerParamUrl("cat", CAT_INICIAL);
+  return ["-60","-66","-73","-81","-90","-100","+100","-48","-52","-57","-63","-70","-78","+78"].includes(c) ? c : CAT_INICIAL;
+}
 // Espaçamentos da árvore.
 const COLGAP = 34;
 const ROWGAP = 12;
@@ -239,9 +255,9 @@ const PontosContexto = createContext<Record<string, InfoAtleta> | null>(null);
 export default function ChaveAtletasPage() {
   const t = useT();
   const [nivel, setNivel] = useState<"verificar" | "promax" | "pro" | "gratis">("verificar");
-  const [comp, setComp] = useState<string>("");
+  const [comp, setComp] = useState<string>(() => lerParamUrl("comp", ""));
   const [compNome, setCompNome] = useState<string | null>(null);
-  const [cat, setCat] = useState<string>(CAT_INICIAL);
+  const [cat, setCat] = useState<string>(() => catInicialDoUrl());
   const [aba, setAba] = useState<"chave" | "confrontos">("chave");
   const [chave, setChave] = useState<Chave | null>(null);
   const [infos, setInfos] = useState<Record<string, InfoAtleta>>({});
