@@ -235,6 +235,8 @@ export default function CriarEquipa() {
     // isso significa sempre 8 atletas + capitão. cloud_ok distingue guardado na
     // conta vs. só no aparelho (falha de rede).
     track("team_saved", { competicao: alvo.idCompeticao, cloud_ok: res.ok, rodada: rodadaAlvo ?? null });
+    // FASE I: guardou a equipa DA PRÓXIMA durante a janela (há competição a decorrer).
+    if (emAndamento) track("next_competition_team_saved", { competicao: alvo.idCompeticao });
     setSaved(draft);
     // Sincroniza o rascunho local com o guardado, para não ficar um rascunho
     // "fantasma" que faria o meu-time pedir para guardar sem haver alterações.
