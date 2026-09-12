@@ -476,7 +476,7 @@ function MercadoInner() {
     : txtJanela.inscritosCedo;
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-    <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none} @keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
+    <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none} @keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite} @keyframes ilfalta{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0)}50%{box-shadow:0 0 0 5px rgba(217,164,65,0.32)}} .ilfalta{animation:ilfalta 1.2s ease-in-out infinite} @keyframes ilpronto{0%,100%{box-shadow:0 0 0 0 rgba(127,209,163,0)}50%{box-shadow:0 0 0 6px rgba(127,209,163,0.45)}} .ilpronto{animation:ilpronto 1.1s ease-in-out infinite}`}</style>
     <div style={{ maxWidth: 460, margin: "0 auto" }}>
     <div style={{ position: "sticky", top: 0, background: "#0c0e0d", borderBottom: "1px solid #1a221d", zIndex: 5, padding: "12px 14px 10px" }}>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -521,8 +521,8 @@ function MercadoInner() {
         </div>
       )}
     <div style={{ display: "flex", gap: 8, marginBottom: 9 }}>
-    <button onClick={() => { setGender("M"); setCat(CATEGORIES.M[0]); }} style={genderBtn(gender === "M")}>Masculino {countM}/4</button>
-    <button onClick={() => { setGender("F"); setCat(CATEGORIES.F[0]); }} style={genderBtn(gender === "F")}>Feminino {countF}/4</button>
+    <button onClick={() => { setGender("M"); setCat(CATEGORIES.M[0]); }} className={countM < 4 ? "ilfalta" : undefined} style={genderBtn(gender === "M")}>Masculino {countM}/4</button>
+    <button onClick={() => { setGender("F"); setCat(CATEGORIES.F[0]); }} className={countF < 4 ? "ilfalta" : undefined} style={genderBtn(gender === "F")}>Feminino {countF}/4</button>
     </div>
     <div className="noscroll" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 9 }}>
     <button onClick={() => setFavOnly((v) => !v)} aria-label={t("mk.soFavoritos")} className={guide === 3 ? "glow" : undefined} style={{ flexShrink: 0, width: 46, height: 42, borderRadius: 11, border: `1.5px solid ${guide === 3 ? GOLD : favOnly ? GOLD : "#2a3a33"}`, background: favOnly ? "#3a2f12" : "#121815", color: guide === 3 || favOnly ? GOLD : "#5f6f67", fontSize: 18, cursor: "pointer" }}>★</button>
@@ -619,7 +619,7 @@ function MercadoInner() {
     <span style={{ fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 16 }}>{countM + countF}</span>
     <span style={{ fontFamily: FD, fontWeight: 700, color: "#93a39a", fontSize: 13 }}>/8</span> atletas
     </div>
-    <a href={voltarPara} style={{ background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 18px", borderRadius: 10, fontSize: 14, textDecoration: "none" }}>{t("mk.voltarDojo")}</a>
+    <a href={voltarPara} className={countM + countF === 8 ? "ilpronto" : undefined} style={{ background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 18px", borderRadius: 10, fontSize: 14, textDecoration: "none" }}>{t("mk.voltarDojo")}</a>
     </div>
     </div>
     {sheet === "ord" && (
