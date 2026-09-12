@@ -13,7 +13,8 @@ import { supabase } from "@/lib/supabase";
 import { useNivel } from "@/lib/useNivel";
 import { uid } from "@/lib/team";
 import { AnaliseConfrontos } from "@/components/AnaliseConfrontos";
-import { useT } from "@/lib/i18n";
+import { useT, useLingua, type Lingua } from "@/lib/i18n";
+import { focoMercado } from "@/lib/calendario";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -40,6 +41,52 @@ function catInicialDoUrl(): string {
   const c = lerParamUrl("cat", CAT_INICIAL);
   return ["-60","-66","-73","-81","-90","-100","+100","-48","-52","-57","-63","-70","-78","+78"].includes(c) ? c : CAT_INICIAL;
 }
+// AVISO DE SEMANA DE CLÁSSICO — um clássico não tem chaveamento próprio; a página
+// mostra o da ÚLTIMA competição oficial. Explicamos isso ao entrar. "Percebi"
+// fecha só desta vez (reaparece na próxima visita); "Não mostrar mais" silencia
+// para sempre (localStorage). Textos locais por língua (não incham o i18n.ts).
+const CLASSICO_DISMISS = "ippon_aviso_classico_chave";
+function classicoAvisoSilenciado(): boolean {
+  if (typeof window === "undefined") return false;
+  try { return localStorage.getItem(CLASSICO_DISMISS) === "skip"; } catch { return false; }
+}
+const AVISO_CLASSICO: Record<Lingua, { titulo: string; corpo: string; corpoComNome: string; ok: string; naoMostrar: string }> = {
+  pt: {
+    titulo: "Semana de clássico",
+    corpo: "Esta semana o jogo é sobre um clássico, e um clássico não tem chaveamento próprio. O que vês aqui é o chaveamento da última competição oficial — serve só de referência.",
+    corpoComNome: "Esta semana o jogo é sobre um clássico, e um clássico não tem chaveamento próprio. O que vês aqui é o chaveamento de {comp} — a última competição oficial, só como referência.",
+    ok: "Percebi",
+    naoMostrar: "Não mostrar mais",
+  },
+  en: {
+    titulo: "Classic week",
+    corpo: "This week's game is a classic, and a classic has no bracket of its own. What you see here is the bracket of the last official competition — just for reference.",
+    corpoComNome: "This week's game is a classic, and a classic has no bracket of its own. What you see here is the bracket of {comp} — the last official competition, just for reference.",
+    ok: "Got it",
+    naoMostrar: "Don't show again",
+  },
+  es: {
+    titulo: "Semana de clásico",
+    corpo: "Esta semana el juego es sobre un clásico, y un clásico no tiene cuadro propio. Lo que ves aquí es el cuadro de la última competición oficial — solo como referencia.",
+    corpoComNome: "Esta semana el juego es sobre un clásico, y un clásico no tiene cuadro propio. Lo que ves aquí es el cuadro de {comp} — la última competición oficial, solo como referencia.",
+    ok: "Entendido",
+    naoMostrar: "No mostrar más",
+  },
+  fr: {
+    titulo: "Semaine de classique",
+    corpo: "Cette semaine, le jeu porte sur un classique, et un classique n'a pas de tableau propre. Ce que tu vois ici est le tableau de la dernière compétition officielle — à titre de référence.",
+    corpoComNome: "Cette semaine, le jeu porte sur un classique, et un classique n'a pas de tableau propre. Ce que tu vois ici est le tableau de {comp} — la dernière compétition officielle, à titre de référence.",
+    ok: "Compris",
+    naoMostrar: "Ne plus afficher",
+  },
+  de: {
+    titulo: "Klassiker-Woche",
+    corpo: "Diese Woche dreht sich das Spiel um einen Klassiker, und ein Klassiker hat keinen eigenen Turnierbaum. Was du hier siehst, ist der Baum des letzten offiziellen Wettbewerbs — nur als Referenz.",
+    corpoComNome: "Diese Woche dreht sich das Spiel um einen Klassiker, und ein Klassiker hat keinen eigenen Turnierbaum. Was du hier siehst, ist der Baum von {comp} — dem letzten offiziellen Wettbewerb, nur als Referenz.",
+    ok: "Verstanden",
+    naoMostrar: "Nicht mehr anzeigen",
+  },
+};
 // Espaçamentos da árvore.
 const COLGAP = 34;
 const ROWGAP = 12;
@@ -254,6 +301,10 @@ const PontosContexto = createContext<Record<string, InfoAtleta> | null>(null);
 // ----------------------------------------------------------------------------
 export default function ChaveAtletasPage() {
   const t = useT();
+  const { lingua } = useLingua();
+  // Semana de clássico? Um clássico não tem chaveamento próprio (ver aviso).
+  const eClassico = (() => { try { return focoMercado().atual?.classico === true; } catch { return false; } })();
+  const [avisoClassico, setAvisoClassico] = useState(false);
   const [nivel, setNivel] = useState<"verificar" | "promax" | "pro" | "gratis">("verificar");
   const [comp, setComp] = useState<string>(() => lerParamUrl("comp", ""));
   const [compNome, setCompNome] = useState<string | null>(null);
@@ -277,6 +328,14 @@ export default function ChaveAtletasPage() {
       else if (ehPro) setNivel("pro");
       else setNivel("gratis");
     }, [nivelPronto, ehPro, ehProMax]);
+  // Aviso de clássico: aparece ao entrar, se for semana de clássico e o utilizador
+  // não o tiver silenciado. Reavaliado a cada montagem — "Percebi" fecha só desta
+  // vez; "Não mostrar mais" grava o silêncio permanente.
+  useEffect(() => {
+      if ((nivel === "promax" || nivel === "pro") && eClassico && !classicoAvisoSilenciado()) {
+        setAvisoClassico(true);
+      }
+    }, [nivel, eClassico]);
   // Carregar favoritos.
   useEffect(() => {
       const u = uid();
@@ -377,6 +436,8 @@ export default function ChaveAtletasPage() {
   }
   const generoCat = CATS_M.includes(cat) ? t("ck.masc") : t("ck.fem");
   const bloquearPro = nivel === "pro" && bloqueadoSrv;
+  const txtClassico = AVISO_CLASSICO[lingua] ?? AVISO_CLASSICO.pt;
+  const corpoClassico = compNome ? txtClassico.corpoComNome.replace("{comp}", compNome) : txtClassico.corpo;
   return (
     <FavoritosContexto.Provider value={favCtx}>
     <PontosContexto.Provider value={infos}>
@@ -534,6 +595,17 @@ export default function ChaveAtletasPage() {
         </>
       )}
     </div>
+    {avisoClassico && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 200 }}>
+        <div style={{ width: "100%", maxWidth: 340, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
+        <div style={{ fontSize: 30, marginBottom: 6 }}>🥋</div>
+        <h2 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px", color: GOLD }}>{txtClassico.titulo}</h2>
+        <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 20px" }}>{corpoClassico}</p>
+        <button onClick={() => setAvisoClassico(false)} style={{ width: "100%", padding: 13, borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: "pointer" }}>{txtClassico.ok}</button>
+        <button onClick={() => { try { localStorage.setItem(CLASSICO_DISMISS, "skip"); } catch {} setAvisoClassico(false); }} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB }}>{txtClassico.naoMostrar}</button>
+        </div>
+        </div>
+      )}
     </main>
     </PontosContexto.Provider>
     </FavoritosContexto.Provider>
