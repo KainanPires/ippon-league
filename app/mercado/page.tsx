@@ -172,7 +172,7 @@ function MercadoInner() {
     // de "mercado fechado" faz um return cedo; hooks têm de correr sempre).
   const { cor: corFaixa } = useFaixa();
   // Língua atual — para os textos locais da experiência "monta para a próxima".
-  const lingua = useLingua();
+  const { lingua } = useLingua();
   // LEMBRETE "esqueceste de salvar o teu time" — hook reutilizável (o mesmo da
     // meu-time). É AQUI que ele mais conta: a edição real acontece no mercado, e
   // sair daqui com um rascunho por salvar passa agora a agendar o lembrete.
