@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
@@ -17,6 +17,9 @@ import { useNivel } from "@/lib/useNivel";
 import { supabase } from "@/lib/supabase";
 import { PRECO } from "@/lib/precos";
 import { useT } from "@/lib/i18n";
+// Fase E (Ativação) — SÓ medição. Nenhuma destas chamadas altera comportamento:
+// track() é no-op sem consentimento. Nomes vêm do tipo fechado EventName.
+import { track, aoTerConsentimento } from "@/lib/analytics";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -71,6 +74,8 @@ export default function CriarEquipa() {
   const { ehPro: isPro } = useNivel();
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const router = useRouter();
+  // Guardas de disparo único (Strict Mode corre o efeito 2x em dev). Só medição.
+  const contouInicio = useRef(false);
   // Faixa REAL do jogador (cor para o Dôdo, nome para o cartão de partilha).
   const { cor: corFaixa, nome: nomeFaixa } = useFaixa();
   // Foco do mercado (regra única no calendário): competição-alvo (mercado aberto),
@@ -86,6 +91,12 @@ export default function CriarEquipa() {
   useEffect(() => {
       let active = true;
       const idAlvo = alvo.idCompeticao;
+      // ATIVAÇÃO: abriu o Dojo para montar equipa. Espera pelo consentimento e
+      // dispara uma só vez (o track é no-op se a pessoa recusou).
+      if (!contouInicio.current) {
+        contouInicio.current = true;
+        aoTerConsentimento(() => track("team_creation_started", { competicao: idAlvo }));
+      }
       try {
         // Guia do Dojo: só aparece se ainda não foi visto neste aparelho NEM na conta.
         if (!tutorialVistoLocal("ippon_team_tutorial")) {
@@ -197,6 +208,8 @@ export default function CriarEquipa() {
   function naoMostrarMais() { marcarTutorialVisto("ippon_team_tutorial"); setGuide(null); }
   function openGuide() { setGuide("welcome"); }
   function setCaptain(id: string) {
+    // ATIVAÇÃO: só conta quando ESCOLHE um capitão (não ao remover).
+    if (draft.captain !== id) track("captain_selected", { competicao: alvo.idCompeticao });
     update({ ...draft, captain: draft.captain === id ? null : id });
     setModal(null);
   }
@@ -218,6 +231,10 @@ export default function CriarEquipa() {
       if (idc) { ident = juntarIdentidade(ident, idc); setIdentity(ident); }
     }
     const res = await commitSavedCloudFor(alvo.idCompeticao, draft, ident);
+    // ATIVAÇÃO (evento-chave): equipa guardada. Aqui já passou o isComplete, por
+    // isso significa sempre 8 atletas + capitão. cloud_ok distingue guardado na
+    // conta vs. só no aparelho (falha de rede).
+    track("team_saved", { competicao: alvo.idCompeticao, cloud_ok: res.ok, rodada: rodadaAlvo ?? null });
     setSaved(draft);
     // Sincroniza o rascunho local com o guardado, para não ficar um rascunho
     // "fantasma" que faria o meu-time pedir para guardar sem haver alterações.
@@ -270,7 +287,7 @@ export default function CriarEquipa() {
         const a = list[i];
         const highlight = guide === "slot" && firstEmpty != null && firstEmpty.row === row && firstEmpty.i === i;
         return a
-        ? <FilledSlot key={row + i} a={a} isCaptain={draft.captain === a.id} onClick={() => setModal({ kind: "athlete", a })} />
+        ? <FilledSlot key={row + i} a={a} isCaptain={draft.captain === a.id} onClick={() => { track("athlete_viewed", { athlete: a.id, country: a.countryIso, gender: a.gender }); setModal({ kind: "athlete", a }); }} />
         : <EmptySlot key={row + i} highlight={highlight} />;
       });
   }
