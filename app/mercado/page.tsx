@@ -5,17 +5,61 @@ import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatu
 import { loadDraftFor, saveDraftFor, setAthletePool } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
-import { focoMercado, nomeCompeticao } from "@/lib/calendario";
+import { focoMercado, nomeCompeticao, textoFecho } from "@/lib/calendario";
 import { supabase } from "@/lib/supabase";
 import { useNivel } from "@/lib/useNivel";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 import { useFaixa } from "@/lib/useFaixa";
-import { useT } from "@/lib/i18n";
+import { useT, useLingua, type Lingua } from "@/lib/i18n";
 // Fase E (Ativação) — SÓ medição. track() é no-op sem consentimento; nomes vêm
 // do tipo fechado EventName em lib/analytics.
 import { track, aoTerConsentimento } from "@/lib/analytics";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
+// Fase I — textos da experiência "monta para a próxima" (janela entre competições).
+// Guardados LOCALMENTE por língua (padrão já usado na FAQ/legal/consentimento),
+// para não inflar o lib/i18n.ts. Termos de produto (nomes de competição) entram
+// por interpolação e não se traduzem.
+const JANELA: Record<Lingua, {
+  etiqueta: string; trancado: string; jaPodes: string;
+  inscritosCedo: string; inscritosPerto: string;
+}> = {
+  pt: {
+    etiqueta: "A decorrer ao vivo",
+    trancado: "O mercado desta competição está trancado durante a rodada.",
+    jaPodes: "Já podes montar a tua equipa para a próxima:",
+    inscritosCedo: "As inscrições ainda podem mudar até perto do início — volta a conferir mais perto do dia.",
+    inscritosPerto: "Últimos inscritos confirmados. Confere a tua escalação!",
+  },
+  en: {
+    etiqueta: "Live now",
+    trancado: "This competition's market is locked during the round.",
+    jaPodes: "You can already build your team for the next one:",
+    inscritosCedo: "Entries may still change closer to the start — check back nearer the day.",
+    inscritosPerto: "Final entries confirmed. Double-check your lineup!",
+  },
+  es: {
+    etiqueta: "En directo",
+    trancado: "El mercado de esta competición está bloqueado durante la ronda.",
+    jaPodes: "Ya puedes montar tu equipo para la próxima:",
+    inscritosCedo: "Las inscripciones aún pueden cambiar cerca del inicio — vuelve a revisar más cerca del día.",
+    inscritosPerto: "Últimos inscritos confirmados. ¡Revisa tu alineación!",
+  },
+  fr: {
+    etiqueta: "En direct",
+    trancado: "Le marché de cette compétition est verrouillé pendant la manche.",
+    jaPodes: "Tu peux déjà composer ton équipe pour la prochaine :",
+    inscritosCedo: "Les inscriptions peuvent encore changer avant le début — reviens vérifier plus près du jour.",
+    inscritosPerto: "Dernières inscriptions confirmées. Vérifie ta composition !",
+  },
+  de: {
+    etiqueta: "Jetzt live",
+    trancado: "Der Markt dieses Wettbewerbs ist während der Runde gesperrt.",
+    jaPodes: "Du kannst dein Team schon für den nächsten aufstellen:",
+    inscritosCedo: "Die Meldungen können sich bis kurz vor Beginn noch ändern — schau näher am Tag nochmal.",
+    inscritosPerto: "Letzte Meldungen bestätigt. Prüfe deine Aufstellung!",
+  },
+};
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const START_JC = 100;
@@ -92,6 +136,8 @@ function MercadoInner() {
   const montar = searchParams.get("montar") === "1";
   // Guarda de disparo único do market_viewed (Strict Mode corre o efeito 2x em dev).
   const contouMercado = useRef(false);
+  // Fase I — guarda de disparo único da experiência "janela entre competições".
+  const contouJanela = useRef(false);
   const [pool, setPool] = useState<Athlete[]>([]);
   const [loading, setLoading] = useState(true);
   // Nível da tabela `users` — nunca do metadata. `ehPro` é verdadeiro também
@@ -125,6 +171,8 @@ function MercadoInner() {
   // Declarado com os outros hooks, ANTES de qualquer return condicional (o ecrã
     // de "mercado fechado" faz um return cedo; hooks têm de correr sempre).
   const { cor: corFaixa } = useFaixa();
+  // Língua atual — para os textos locais da experiência "monta para a próxima".
+  const lingua = useLingua();
   // LEMBRETE "esqueceste de salvar o teu time" — hook reutilizável (o mesmo da
     // meu-time). É AQUI que ele mais conta: a edição real acontece no mercado, e
   // sair daqui com um rascunho por salvar passa agora a agendar o lembrete.
@@ -156,10 +204,25 @@ function MercadoInner() {
   // como o resto da app. Não importa por que caminho se chega aqui — fica bloqueado.
   const focoAgora = focoMercado();
   const competicaoADecorrer = focoAgora.aDecorrer;
+  // FASE I — janela entre competições. Quando há uma competição a decorrer, o
+  // `alvo` do calendário já é a PRÓXIMA. Se o mercado dessa próxima estiver
+  // ABERTO, em vez de bater no muro deixamos montar para ela (a equipa da que
+  // decorre continua trancada — é OUTRA linha em `equipas`, por competição).
+  const mercadoProximaAberto = focoAgora.estadoAlvo?.estado === "aberto";
+  const montarProxima = !!competicaoADecorrer && mercadoProximaAberto;
   useEffect(() => {
       let active = true;
-      // Se o mercado está fechado (competição a decorrer), não carrega nada.
-      if (competicaoADecorrer) { setLoading(false); return; }
+      // FASE I (medição): viu a experiência de mercado fechado / próxima competição.
+      // Uma vez, quando há competição a decorrer (com ou sem próxima aberta).
+      if (competicaoADecorrer && !contouJanela.current) {
+        contouJanela.current = true;
+        const idDec = competicaoADecorrer.idCompeticao;
+        aoTerConsentimento(() => track("market_closed_experience_viewed", {
+          competicao_a_decorrer: idDec, proxima: COMPETICAO, proxima_aberta: mercadoProximaAberto,
+        }));
+      }
+      // Só bloqueia (não carrega nada) se NÃO houver próxima com mercado aberto.
+      if (competicaoADecorrer && !montarProxima) { setLoading(false); return; }
       // ATIVAÇÃO: viu o mercado (aberto). Espera pelo consentimento e conta uma vez.
       if (!contouMercado.current) {
         contouMercado.current = true;
@@ -288,8 +351,10 @@ function MercadoInner() {
   function clearFilters() {
     setPriceMin(PRICE_MIN); setPriceMax(PRICE_MAX); setCountrySel([]); setFavOnly(false);
   }
-  // ECRÃ DE BLOQUEIO: competição a decorrer → mercado fechado, equipa trancada.
-  if (competicaoADecorrer) {
+  // ECRÃ DE BLOQUEIO: competição a decorrer E SEM próxima com mercado aberto para
+  // preparar. (Se houver próxima aberta, o `montarProxima` deixa passar e mostra
+  // o mercado da próxima, com o banner "monta para a próxima" mais abaixo.)
+  if (competicaoADecorrer && !montarProxima) {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "12px 14px" }}>
@@ -370,6 +435,8 @@ function MercadoInner() {
       // (o botão bloqueia acima dos 4 por género, por isso 8 = 4M+4F).
       track("athlete_added", { athlete: a.id, gender: a.gender, price: a.priceJc, competicao: COMPETICAO });
       if (team.length + 1 === 8) track("team_completed", { competicao: COMPETICAO });
+      // FASE I: primeiro atleta montado para a PRÓXIMA, durante a janela (competição a decorrer).
+      if (montarProxima && team.length === 0) track("next_competition_team_started", { competicao: COMPETICAO });
       const g = a.gender;
       const newCount = (g === "M" ? countM : countF) + 1;
       if (newCount >= 4) {
@@ -399,6 +466,14 @@ function MercadoInner() {
   const voltarPara = montar
   ? "/meu-time?montar=1"
   : team.length === 8 && !!captain ? "/meu-time" : "/criar-equipa";
+  // FASE I — nota dos inscritos da PRÓXIMA: perto do início (≤48h) diz "últimos
+  // confirmados"; senão avisa que ainda podem mudar. Base: hora de início do alvo.
+  const txtJanela = JANELA[lingua] ?? JANELA.pt;
+  const inicioAlvo = focoAgora.estadoAlvo?.inicio ?? null;
+  const msAteInicioAlvo = inicioAlvo ? inicioAlvo.getTime() - Date.now() : null;
+  const notaInscritos = (msAteInicioAlvo != null && msAteInicioAlvo > 0 && msAteInicioAlvo <= 48 * 60 * 60 * 1000)
+    ? txtJanela.inscritosPerto
+    : txtJanela.inscritosCedo;
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
     <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none} @keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite}`}</style>
@@ -419,6 +494,18 @@ function MercadoInner() {
     <span className={jcGlow ? "glow" : undefined} style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "6px 11px", fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 15 }}>JC {fmt(jcLeft)}</span>
     </div>
     </div>
+    {montarProxima && competicaoADecorrer && (
+        <div style={{ background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: "3px solid #d9a441", borderRadius: 10, padding: "9px 12px", marginBottom: 9 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+        <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a", flexShrink: 0 }} />
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83" }}>{txtJanela.etiqueta} · {nomeCompeticao(competicaoADecorrer)}</span>
+        </div>
+        <div style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45 }}>
+        {txtJanela.trancado} {txtJanela.jaPodes} <strong style={{ color: "#f1ede2" }}>{nomeCompeticao(focoAgora.alvo)}</strong> — {textoFecho(focoAgora.alvo, t)}.
+        </div>
+        <div style={{ fontSize: 11.5, color: "#93a39a", lineHeight: 1.4, marginTop: 5 }}>{notaInscritos}</div>
+        </div>
+      )}
     {aoVivoIds.size > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#2a1f1c", border: "1px solid #5a3a36", borderRadius: 10, padding: "7px 11px", marginBottom: 9 }}>
         <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a", flexShrink: 0 }} />
