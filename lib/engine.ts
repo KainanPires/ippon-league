@@ -96,14 +96,29 @@ export function scoreAthlete(actions: ActionType[], isCaptain = false): number {
 export const MIN_PRICE = 2;
 
 /**
- * Preço MÁXIMO de um atleta. O documento mestre define a elite mundial em
- * "15 a 20 JC" — 20 é o topo da escala, e nada o deve ultrapassar.
- *
- * Faltava, e o mercado explodiu: numa só rodada apareceram 18 atletas acima
- * disto, um deles a 61,8 JC. Com um orçamento de 100 JC para OITO atletas, um
- * único a 61,8 torna impossível montar equipa.
+ * Topo da escala INICIAL. O documento mestre define a elite mundial em
+ * "15 a 20 JC": 20 é onde um atleta de elite COMEÇA o ano (via precoDeExpectativa
+ * em lib/forma). NÃO é um teto de valorização — ao longo do ano, um atleta que
+ * supere sempre a sua expectativa PODE ultrapassar os 20 (ver TETO_PRECO).
  */
 export const MAX_PRICE = 20;
+
+/**
+ * Teto ABSOLUTO de valorização — rede de segurança, NÃO muro de jogo.
+ *
+ * Decisão (com o Kainan): os 20 JC deixam de ser um muro. Um atleta valoriza
+ * enquanto superar a própria expectativa — e como a expectativa SOBE a cada boa
+ * competição, cada repetição rende metade da anterior (fez 40: +10, depois +5,
+ * depois +2,5…). O atleta aproxima-se de um teto SOZINHO, sem muro. É isto que
+ * dá "finança" ao jogo e premeia quem aposta cedo num atleta em ascensão.
+ *
+ * Este número só existe como rede contra dados corrompidos (um preço a fugir
+ * para o infinito seria património real a inflar por engano). 50 JC = metade do
+ * orçamento de 100 para 8 atletas: acima disto um atleta é quase impossível de
+ * encaixar numa equipa, por isso a procura auto-limita-se muito antes. Para dar
+ * ainda mais corda às estrelas, sobe só este número.
+ */
+export const TETO_PRECO = 50;
 
 /**
  * Quanto um preço pode mexer numa ÚNICA rodada, em percentagem.
@@ -186,8 +201,11 @@ export function computeNewPrice(
   //    denominador produzia variações de centenas por cento.
   appliedVariationPct = Math.max(-MAX_VARIACAO_PCT, Math.min(MAX_VARIACAO_PCT, appliedVariationPct));
   let newPrice = currentPrice * (1 + appliedVariationPct / 100);
-  // 3) Limites absolutos da escala: 2 a 20 JC.
-  newPrice = round1(Math.min(MAX_PRICE, Math.max(MIN_PRICE, newPrice)));
+  // 3) Limites absolutos: nunca abaixo de 2 JC, nunca acima do TETO_PRECO (rede
+  //    de segurança, não muro de jogo — ver TETO_PRECO). O teto REAL é natural:
+  //    a expectativa sobe a cada boa rodada, por isso a valorização diminui
+  //    sozinha e o preço estabiliza muito antes deste limite.
+  newPrice = round1(Math.min(TETO_PRECO, Math.max(MIN_PRICE, newPrice)));
   return {
     oldPrice: currentPrice,
     newPrice,
