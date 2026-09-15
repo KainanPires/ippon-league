@@ -197,8 +197,13 @@ async function pontuarAtletasDaCompeticao(
     // Remove os campos a zero para o jsonb ficar compacto (o popup só mostra o que existe).
     const acoes: Record<string, number> = {};
     for (const [k, v] of Object.entries(acc)) if (v > 0) acoes[k] = v;
-    // Expectativa: calcularForma sobre TODO o histórico (reaproveita a busca).
-    const forma = calcularForma(lutas, id);
+    // Expectativa: a forma do atleta ANTES desta competição. A competição que
+    // está a ser avaliada NÃO entra na própria expectativa — senão o atleta
+    // media-se contra o próprio resultado (a expectativa fica igual ao que ele
+    // acabou de fazer) e a valorização dá sempre ~0. Excluímos as lutas desta
+    // competição do cálculo. (Reaproveita a mesma busca; só filtra.)
+    const lutasAntes = (lutas || []).filter((f) => String(f.id_competition) !== idComp);
+    const forma = calcularForma(lutasAntes, id);
     const expectativa = forma.expectativa;
     // Preço anterior: do central (precos_atletas) OU, se atleta novo, o inicial
     // do Modelo A (calcularForma já dá um preço de partida do histórico).
