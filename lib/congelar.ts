@@ -101,11 +101,20 @@ async function pontuarAtletasDaCompeticao(
   if (inscritos.length === 0) {
     return { processados: 0, faltam: -1, semInscritos: true };
   }
-  // Quais já estão congelados (para retomar sem repetir).
+  // Quais já estão REALMENTE congelados (para retomar sem repetir).
+  //
+  // CUIDADO (bug corrigido): os crons da chave ao vivo (chave-viva / chave-maestro)
+  // escrevem nesta MESMA tabela durante a competição — com os pontos, mas SEM os
+  // preços/valorização. Se contássemos qualquer linha como "já feito", o
+  // congelamento saltava todos os atletas que a chave ao vivo já tinha inserido,
+  // e a valorização (variacao_jc) nunca era calculada — ficava tudo a +0 JC, e o
+  // património dos jogadores não mexia. Por isso só contam como feitos os que têm
+  // `congelado_em` preenchido — a marca que SÓ o congelamento põe.
   const { data: jaFeitos } = await supabaseAdmin
   .from("resultados_atletas")
   .select("id_person")
-  .eq("id_competicao", idComp);
+  .eq("id_competicao", idComp)
+  .not("congelado_em", "is", null);
   const feitos = new Set((jaFeitos || []).map((r) => String(r.id_person)));
 
   // Quantos falharam A GRAVAR. Não é o mesmo que "faltam por processar": estes
