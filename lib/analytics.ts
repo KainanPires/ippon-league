@@ -21,6 +21,7 @@
 // Identificador = user_id do Supabase (pseudónimo). NUNCA email/nome/telefone.
 
 import posthog from "posthog-js";
+import { lerAtribuicaoGuardada, type Toque } from "@/lib/atribuicao";
 
 // -------------------------------------------------------------------------
 // TAXONOMIA — a lista fechada de eventos do negócio (todas as fases da sprint).
@@ -45,6 +46,8 @@ export const EVENTOS = [
   // Mercado fechado / próxima competição
   "market_closed_experience_viewed", "next_competition_cta_clicked",
   "next_competition_team_started", "next_competition_team_saved",
+  // Notificações push (camada de contacto)
+  "push_prompted", "push_enabled", "push_denied", "push_disabled", "push_prompt_dismissed",
 ] as const;
 
 export type EventName = (typeof EVENTOS)[number];
@@ -76,6 +79,9 @@ const filaConsentimento: Array<() => void> = [];
 function dispararConsentimentoPronto(): void {
   if (consentePronto) return;
   consentePronto = true;
+  // Espelha a origem (utm_*/referrer) para o PostHog ANTES de correr os eventos
+  // de entrada, para que o landing_viewed / signup_started já levem o canal.
+  sincronizarAtribuicao();
   while (filaConsentimento.length) {
     const cb = filaConsentimento.shift();
     if (cb) { try { cb(); } catch {} }
@@ -174,6 +180,53 @@ function limpar(props?: EventProps): EventProps {
 }
 
 // -------------------------------------------------------------------------
+// ATRIBUIÇÃO NO POSTHOG — leva a origem já capturada (lib/atribuicao) para o
+// PostHog, para PODERES PARTIR OS FUNIS POR CANAL lá dentro.
+//
+// Porquê aqui e não confiar no automático do PostHog: com o consentimento a
+// arrancar OPTED-OUT, a landing com os utm no URL costuma passar sem captura —
+// quando a pessoa aceita, o URL já mudou e a origem perder-se-ia. O
+// lib/atribuicao guarda first/last no aparelho e sobrevive a esse intervalo;
+// aqui só o espelhamos. Só envia campos com valor (uma visita direta não apaga
+// a campanha anterior). Nunca rebenta a app.
+//   • Super properties (register): o canal da ÚLTIMA campanha entra em TODOS os
+//     eventos -> nos funis do PostHog, "Breakdown by" utm_source / utm_campaign.
+//   • Person properties: first-touch imutável (set_once) e last-touch (set).
+// -------------------------------------------------------------------------
+const CAMPOS_UTM: Array<keyof Toque> = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
+
+export function sincronizarAtribuicao(): void {
+  if (!KEY) return;
+  try {
+    const { first, last } = lerAtribuicaoGuardada();
+
+    // Super properties: última campanha em todos os eventos (só quando há mesmo
+    // uma campanha guardada — last só existe quando houve utm/ref).
+    if (last) {
+      const canal: EventProps = {};
+      for (const c of CAMPOS_UTM) { const v = last[c]; if (v) canal[c] = v; }
+      if (Object.keys(canal).length) posthog.register(canal);
+    }
+
+    // Person properties: last-touch (set) e first-touch (set_once).
+    const setProps: EventProps = {};
+    if (last) {
+      for (const c of CAMPOS_UTM) { const v = last[c]; if (v) setProps[`last_${c}`] = v; }
+      if (last.referrer) setProps.last_referrer = last.referrer;
+    }
+    const setOnce: EventProps = {};
+    if (first) {
+      for (const c of CAMPOS_UTM) { const v = first[c]; if (v) setOnce[`first_${c}`] = v; }
+      if (first.referrer) setOnce.first_referrer = first.referrer;
+      if (first.ts) setOnce.first_seen_at = first.ts;
+    }
+    if (Object.keys(setProps).length || Object.keys(setOnce).length) {
+      posthog.setPersonProperties(setProps, setOnce);
+    }
+  } catch { /* atribuição nunca rebenta a app */ }
+}
+
+// -------------------------------------------------------------------------
 // A API que a app usa.
 // -------------------------------------------------------------------------
 export function track(event: EventName, props?: EventProps): void {
@@ -190,7 +243,11 @@ export function trackPageview(url?: string): void {
 /** Liga a jornada anónima ao utilizador real (user_id do Supabase). */
 export function identify(userId: string, props?: EventProps): void {
   if (!KEY || !userId) return;
-  try { posthog.identify(userId, limpar(props)); } catch {}
+  try {
+    posthog.identify(userId, limpar(props));
+    // Reforça a origem na pessoa já identificada (o last-touch pode ter mudado).
+    sincronizarAtribuicao();
+  } catch {}
 }
 
 /** No logout: corta a identidade para o próximo não herdar a sessão. */
