@@ -4,12 +4,23 @@ import { Mascot } from "@/components/Mascot";
 import { PRECO } from "@/lib/precos";
 import { supabase } from "@/lib/supabase";
 import { NotaMoeda } from "@/components/NotaMoeda";
-import { useT } from "@/lib/i18n";
+import { useT, useLingua, type Lingua } from "@/lib/i18n";
 import { track, aoTerConsentimento } from "@/lib/analytics";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-const MAX = "#7fb8f5"; // tom do Pro Max, para o distinguir do Pro (dourado)
+const MAX = "#7fb8f5"; // tom do Pro Max
+
+// Texto do consentimento no checkout — mapa por língua (mesmo padrão do resto
+// da app para conteúdo multilíngue que não vive no dicionário global).
+type TextoTermo = { antes: string; link: string; depois: string; erro: string };
+const TERMO: Record<Lingua, TextoTermo> = {
+  pt: { antes: "Li e aceito o ", link: "Termo de Entrega e Consentimento", depois: " do Ippon Pro.", erro: "Para continuares, marca que leste e aceitas o termo." },
+  en: { antes: "I have read and accept the ", link: "Delivery and Consent Terms", depois: " of Ippon Pro.", erro: "To continue, please tick that you have read and accept the terms." },
+  es: { antes: "He leído y acepto los ", link: "Términos de Entrega y Consentimiento", depois: " de Ippon Pro.", erro: "Para continuar, marca que has leído y aceptas los términos." },
+  fr: { antes: "J'ai lu et j'accepte les ", link: "Conditions de livraison et de consentement", depois: " d'Ippon Pro.", erro: "Pour continuer, cochez que vous avez lu et accepté les conditions." },
+  de: { antes: "Ich habe die ", link: "Liefer- und Einwilligungsbedingungen", depois: " von Ippon Pro gelesen und akzeptiere sie.", erro: "Um fortzufahren, bestätige, dass du die Bedingungen gelesen und akzeptiert hast." },
+};, para o distinguir do Pro (dourado)
 // O que cada nível dá. Princípio: só informação e ferramentas — nunca decidir o
 // time pela pessoa, nunca prometer resultado. (Fase de testes: sem prémios.)
 //
@@ -50,8 +61,10 @@ const MAX_EXTRA: string[] = [
 ];
 export default function IpponPro() {
   const t = useT();
+  const { lingua } = useLingua();
   const [aEnviar, setAEnviar] = useState<"pro" | "promax" | null>(null);
   const [erro, setErro] = useState("");
+  const [aceito, setAceito] = useState(false); // consentimento obrigatório
 
   // Analytics: viu a oferta. Espera pelo consentimento (como os eventos de
   // entrada) e conta uma vez só por montagem.
@@ -66,6 +79,7 @@ export default function IpponPro() {
   // levar a pessoa ao ecrã de pagamento.
   async function contratar(alvo: "pro" | "promax") {
     setErro("");
+    if (!aceito) { setErro(TERMO[lingua].erro); return; } // sem aceitar, não avança
     setAEnviar(alvo);
     track("plan_selected", { plano: alvo }); // escolheu um plano
     try {
@@ -166,6 +180,11 @@ export default function IpponPro() {
     {/* Um aviso só, por baixo dos dois cartões: a Stripe converte no checkout
         (Adaptive Pricing), por isso quem está fora da zona euro lê euros aqui
         e vê a sua moeda ao pagar. */}
+    {/* CONSENTIMENTO obrigatório antes de assinar (aplica-se aos dois planos). */}
+    <label style={{ display: "flex", gap: 9, alignItems: "flex-start", cursor: "pointer", margin: "0 0 14px", fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.5 }}>
+    <input type="checkbox" checked={aceito} onChange={(e) => { setAceito(e.target.checked); if (e.target.checked) setErro(""); }} style={{ marginTop: 2, width: 16, height: 16, accentColor: GOLD, flexShrink: 0 }} />
+    <span>{TERMO[lingua].antes}<a href="/termos-pro" target="_blank" rel="noopener noreferrer" style={{ color: GOLD, textDecoration: "underline" }}>{TERMO[lingua].link}</a>{TERMO[lingua].depois}</span>
+    </label>
     <NotaMoeda style={{ marginBottom: 16 }} />
     {/* Nota honesta: o que o Pro NÃO faz */}
     <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px", marginBottom: 16 }}>
