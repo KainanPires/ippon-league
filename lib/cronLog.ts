@@ -126,15 +126,14 @@ async function minutosDesdeUltima(job: string): Promise<number> {
  */
 export async function vigiarCronsAoVivo(comp: string | null): Promise<void> {
   const maestro = await minutosDesdeUltima("maestro");
-  const viva = await minutosDesdeUltima("chave-viva");
   const cap = (n: number) => (Number.isFinite(n) ? Math.round(n) : 999);
   await registarCorrida({
     job: "vigia",
     ctx: { aoVivo: true },
     comp,
     observados: {
+      // Só a Chave Maestro é vigiada ao vivo (a Chave Viva foi reformada).
       "maestro.intervalo_min": cap(maestro),
-      "chaveviva.intervalo_min": cap(viva),
     },
   });
 }
