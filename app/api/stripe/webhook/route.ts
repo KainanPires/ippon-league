@@ -68,6 +68,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { nivelDoPreco, stripeFetch, verificarAssinatura, fimDoPeriodo, PRECOS, type Nivel } from "@/lib/stripe";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { sincronizarLigasOficiais } from "@/lib/ligasOficiais";
+import { trackServer } from "@/lib/analytics.server";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 interface Assinatura {
@@ -203,6 +204,8 @@ export async function POST(req: Request) {
                 });
               await supabaseAdmin.from("users").update({ is_pro_max: true }).eq("id", uid);
               await sincronizarLigasOficiais(uid);
+              // Analytics (espelho da Stripe): subida para Pro Max concluída.
+              await trackServer(uid, "checkout_completed", { nivel: "promax", acao: "subida" });
             }
           }
           break;
@@ -212,6 +215,13 @@ export async function POST(req: Request) {
         if (sessao.subscription) {
           const sub = await stripeFetch<Assinatura>(`subscriptions/${sessao.subscription}`);
           await aplicarSubscricao(sub);
+          // Analytics (espelho da Stripe): checkout concluído + subscrição
+          // iniciada. distinctId = user_id do Supabase; nunca dados pessoais.
+          const nivelNovo = nivelDoPreco(sub.items?.data?.[0]?.price?.id);
+          const emTrial = sub.status === "trialing";
+          await trackServer(uid, "checkout_completed", { nivel: nivelNovo, trial: emTrial });
+          await trackServer(uid, "subscription_started", { nivel: nivelNovo, trial: emTrial, estado: sub.status });
+          if (emTrial) await trackServer(uid, "trial_started", { nivel: nivelNovo });
           try {
             const promax = nivelDoPreco(sub.items?.data?.[0]?.price?.id) === "promax";
             await criarNotificacaoServidor({
@@ -230,15 +240,29 @@ export async function POST(req: Request) {
       // --- Mudou alguma coisa: nível, cancelamento agendado, renovação ---
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        await aplicarSubscricao(obj as unknown as Assinatura);
+        const sub = obj as unknown as Assinatura;
+        await aplicarSubscricao(sub);
+        // Analytics: só o cancelamento DEFINITIVO (deleted) conta como churn.
+        // O "updated" (ex.: cancelamento agendado) não tira acesso ainda.
+        if (evento.type === "customer.subscription.deleted") {
+          const uidC = await acharUtilizador(sub.customer, sub.metadata?.user_id);
+          if (uidC) await trackServer(uidC, "subscription_cancelled", { nivel: nivelDoPreco(sub.items?.data?.[0]?.price?.id) });
+        }
         break;
       }
       // --- Renovou e pagou: estende o acesso ---
       case "invoice.payment_succeeded": {
-        const fatura = obj as { subscription?: string };
+        const fatura = obj as { subscription?: string; billing_reason?: string };
         if (fatura.subscription) {
           const sub = await stripeFetch<Assinatura>(`subscriptions/${fatura.subscription}`);
           await aplicarSubscricao(sub);
+          // Analytics: renovação = cobrança recorrente. A PRIMEIRA fatura da
+          // subscrição (billing_reason "subscription_create") não é renovação —
+          // essa já entrou como subscription_started no checkout.
+          if (fatura.billing_reason && fatura.billing_reason !== "subscription_create") {
+            const uidR = await acharUtilizador(sub.customer, sub.metadata?.user_id);
+            if (uidR) await trackServer(uidR, "subscription_renewed", { nivel: nivelDoPreco(sub.items?.data?.[0]?.price?.id) });
+          }
         }
         break;
       }
