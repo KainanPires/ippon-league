@@ -48,6 +48,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, contestActions } from "@/lib/ijf";
 import { focoMercado } from "@/lib/calendario";
 import { lerLutasManuais, indexarManuaisPorAtleta, aplicarManuaisAoVivo } from "@/lib/lutasManuais";
+import { registarCorrida } from "@/lib/cronLog";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60; // fôlego para as chamadas (Vercel Pro; no hobby é 10s)
@@ -250,10 +251,24 @@ export async function GET(req: Request) {
         .from("resultados_atletas")
         .upsert(linhas, { onConflict: "id_competicao,id_person" });
       if (error) {
+        try {
+          await registarCorrida({
+            job: "chave-viva", ms: Date.now() - t0, iniciadoMs: t0, comp, ctx: { aoVivo: true },
+            observados: { "chaveviva.duracao_ms": Date.now() - t0 },
+            erro: "Falha ao gravar: " + error.message,
+          });
+        } catch { /* observabilidade nunca bloqueia */ }
         return NextResponse.json({ ok: false, comp, erro: "Falha ao gravar: " + error.message, atletas: ids.length }, { status: 500 });
       }
       atualizados = linhas.length;
     } catch (e) {
+      try {
+        await registarCorrida({
+          job: "chave-viva", ms: Date.now() - t0, iniciadoMs: t0, comp, ctx: { aoVivo: true },
+          observados: { "chaveviva.duracao_ms": Date.now() - t0 },
+          erro: "Exceção ao gravar.",
+        });
+      } catch { /* observabilidade nunca bloqueia */ }
       return NextResponse.json({ ok: false, comp, erro: "Exceção ao gravar." }, { status: 500 });
     }
   }
@@ -275,6 +290,23 @@ export async function GET(req: Request) {
       );
     } catch { /* o cursor é uma otimização: se falhar, recomeça do princípio */ }
   }
+
+  // OBSERVABILIDADE (modelo de exame): regista a corrida e alerta se 🔴.
+  try {
+    const msViva = Date.now() - t0;
+    await registarCorrida({
+      job: "chave-viva",
+      ms: msViva,
+      iniciadoMs: t0,
+      comp,
+      ctx: { aoVivo: true },
+      observados: {
+        "chaveviva.duracao_ms": msViva,
+        "chaveviva.falhas_judobase": falhas,
+      },
+      resumo: { comp, feitas, atualizados, falhas },
+    });
+  } catch { /* observabilidade nunca bloqueia o cron */ }
 
   return NextResponse.json({
     ok: true, comp,
