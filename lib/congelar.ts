@@ -52,6 +52,10 @@ export interface ResultadoCongelamento {
   utilizadores: number;
   completa: boolean;
   nota?: string;
+  // Atletas que a base de dados RECUSOU gravar (não é o mesmo que "faltam por
+  // processar"). Sobe até ao cron como sinal 🔴 do exame. Opcional: só vem
+  // preenchido quando houve erros de escrita; nos outros casos vale 0.
+  erros?: number;
 }
 // --------------------------------------------------------------------------
 // 1) PONTUAR ATLETAS — por competitor.contests, com valorização (Modelo B).
@@ -452,7 +456,7 @@ if (faltam > 0) {
 if (erros && erros > 0) {
   return {
     comp: idComp, jaCongelada: false, atletasProcessados: processados,
-    atletasEmFalta: erros, utilizadores: 0, completa: false,
+    atletasEmFalta: erros, utilizadores: 0, completa: false, erros,
     nota: `${erros} atleta(s) não gravaram. Retoma na próxima execução.`,
   };
 }
