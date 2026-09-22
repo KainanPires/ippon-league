@@ -23,12 +23,12 @@
 // ---------------------------------------------------------------------------
 
 export const PRECOS = {
-  /** Ippon Pro — 7,99 EUR/mês, IVA incluído. */
-  pro: "price_1U1pPOL7BDFsSLZGkewypShE",
-  /** Ippon Pro Max — 11,99 EUR/mês, IVA incluído. */
-  promax: "price_1U25ygL7BDFsSLZGzZDgaxzj",
-  /** Subida para Pro Max fora dos 7 dias — 4,99 EUR, cobrança única. */
-  subida: "price_1U260fL7BDFsSLZGxrbJLeiv",
+  /** Ippon Pro — 8,99 EUR/mês, IVA incluído. */
+  pro: "price_1UIRmvL7BDFsSLZG9fa6lWXA",
+  /** Ippon Pro Max — 9,99 EUR/mês, IVA incluído. */
+  promax: "price_1UIS5bL7BDFsSLZGJqpct4Tb",
+  /** Subida para Pro Max fora dos 7 dias — 0,99 EUR, cobrança única. */
+  subida: "price_1UIS7nL7BDFsSLZGcwwYzzv3",
 } as const;
 
 /** Dias de teste grátis para quem nunca subscreveu. */
@@ -52,7 +52,7 @@ export const DIAS_TESTE = 7;
  */
 export const CUPOES = {
   pro: "lancamento-pro",
-  promax: "lancamento-promax",
+  promax: "lancamento-promax-v2",
 } as const;
 
 export type Nivel = "pro" | "promax";
