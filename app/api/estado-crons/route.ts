@@ -31,7 +31,7 @@ interface JobDef {
 const JOBS: JobDef[] = [
   { job: "cron", rotulo: "Cron principal", refFrescura: "cron.intervalo_min", soAoVivo: false },
   { job: "maestro", rotulo: "Chave-maestro (ao vivo)", refFrescura: "maestro.intervalo_min", soAoVivo: true },
-  { job: "chave-viva", rotulo: "Chave-viva (ao vivo)", refFrescura: "chaveviva.intervalo_min", soAoVivo: true },
+  // A Chave Viva foi substituída pela Chave Maestro (reformada) — fora do painel.
 ];
 
 interface EstadoJob {
