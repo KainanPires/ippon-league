@@ -9,7 +9,7 @@ import { track, aoTerConsentimento } from "@/lib/analytics";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-const MAX = "#7fb8f5"; // tom do Pro Max
+const MAX = "#7fb8f5"; // tom do Pro Max, para o distinguir do Pro (dourado)
 
 // Texto do consentimento no checkout — mapa por língua (mesmo padrão do resto
 // da app para conteúdo multilíngue que não vive no dicionário global).
@@ -20,7 +20,7 @@ const TERMO: Record<Lingua, TextoTermo> = {
   es: { antes: "He leído y acepto los ", link: "Términos de Entrega y Consentimiento", depois: " de Ippon Pro.", erro: "Para continuar, marca que has leído y aceptas los términos." },
   fr: { antes: "J'ai lu et j'accepte les ", link: "Conditions de livraison et de consentement", depois: " d'Ippon Pro.", erro: "Pour continuer, cochez que vous avez lu et accepté les conditions." },
   de: { antes: "Ich habe die ", link: "Liefer- und Einwilligungsbedingungen", depois: " von Ippon Pro gelesen und akzeptiere sie.", erro: "Um fortzufahren, bestätige, dass du die Bedingungen gelesen und akzeptiert hast." },
-};, para o distinguir do Pro (dourado)
+};
 // O que cada nível dá. Princípio: só informação e ferramentas — nunca decidir o
 // time pela pessoa, nunca prometer resultado. (Fase de testes: sem prémios.)
 //
