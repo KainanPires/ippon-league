@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { competicaoDaSemana, competicaoFechada, focoMercado, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
 import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes } from "@/lib/ijf";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -1067,7 +1067,15 @@ export async function GET(req: Request) {
   // =========================================================================
   // CORRIDA NORMAL — pela ordem de importância. O que dá pontos vem primeiro;
   // os preços ficam para o fim, com o tempo que sobrar.
+  //
+  // FIRE-AND-FORGET: respondemos ao agendador NUM INSTANTE e fazemos o trabalho
+  // pesado em segundo plano (after). O cron-job.org corta aos 30s; o trabalho
+  // real pode levar até ao maxDuration (300s). Assim NUNCA dá timeout — e nunca
+  // corre o risco de o agendador desativar o job (foi o que matou a Chave Viva).
+  // A verdade do que correu fica no painel (cron_runs), não nesta resposta.
   // =========================================================================
+  after(async () => {
+   try {
   // (A) Atualiza a lista de "a competir agora" (para o aviso no Mercado).
   let aoVivo: { ao_vivo: string | null; atletas_ao_vivo: number } = { ao_vivo: null, atletas_ao_vivo: 0 };
   try {
@@ -1381,4 +1389,10 @@ export async function GET(req: Request) {
       ms_total: Date.now() - t0,
       passos,
     });
+   } catch (erroFundo) {
+     console.error("[cron] corrida em segundo plano falhou:", erroFundo);
+   }
+  });
+  // Resposta imediata ao agendador (o trabalho corre no after acima).
+  return NextResponse.json({ ok: true, agendado: true, iniciado_em: new Date().toISOString() });
 }
