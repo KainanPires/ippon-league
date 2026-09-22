@@ -1,10 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { PRECO } from "@/lib/precos";
 import { supabase } from "@/lib/supabase";
 import { NotaMoeda } from "@/components/NotaMoeda";
 import { useT } from "@/lib/i18n";
+import { track, aoTerConsentimento } from "@/lib/analytics";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -51,12 +52,22 @@ export default function IpponPro() {
   const t = useT();
   const [aEnviar, setAEnviar] = useState<"pro" | "promax" | null>(null);
   const [erro, setErro] = useState("");
+
+  // Analytics: viu a oferta. Espera pelo consentimento (como os eventos de
+  // entrada) e conta uma vez só por montagem.
+  const paywallContado = useRef(false);
+  useEffect(() => {
+    if (paywallContado.current) return;
+    paywallContado.current = true;
+    aoTerConsentimento(() => track("paywall_viewed", { pagina: "ippon-pro" }));
+  }, []);
   // Abre o pagamento. O acesso NÃO é dado aqui nem no regresso: quem o dá é o
   // webhook, quando a Stripe confirmar que o dinheiro entrou. Isto limita-se a
   // levar a pessoa ao ecrã de pagamento.
   async function contratar(alvo: "pro" | "promax") {
     setErro("");
     setAEnviar(alvo);
+    track("plan_selected", { plano: alvo }); // escolheu um plano
     try {
       const { data: sess } = await supabase.auth.getSession();
       const tok = sess.session?.access_token;
@@ -71,7 +82,7 @@ export default function IpponPro() {
           body: JSON.stringify({ alvo }),
         });
       const j = await res.json();
-      if (j?.ok && j.url) { window.location.href = j.url; return; }
+      if (j?.ok && j.url) { track("checkout_started", { plano: alvo }); window.location.href = j.url; return; }
       setErro(j?.erro || t("pro.erroAbrirPagamento"));
     } catch {
       setErro(t("dd.falhaLigacao"));
