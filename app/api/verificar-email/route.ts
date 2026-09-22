@@ -31,7 +31,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { renderNotif, type LinguaNotif } from "@/lib/dicionarioNotif";
+import { type LinguaNotif } from "@/lib/dicionarioNotif";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -46,6 +46,66 @@ function normLingua(v: unknown): LinguaNotif {
   const s = String(v || "").toLowerCase();
   return (["pt", "en", "es", "fr", "de"].includes(s) ? s : "pt") as LinguaNotif;
 }
+
+// Texto do email de confirmação, com tom caloroso, por língua. Mapa local (mesmo
+// padrão do resto da app) para não depender do dicionário global. {nome} já vem
+// escapado; a frase inclui <strong>Ippon League</strong> (HTML de confiança).
+type TxtEmail = {
+  assunto: string;
+  saud: (nome: string) => string;
+  frase: string;
+  botao: string;
+  validade: (horas: number) => string;
+  ignora: string;
+  naoResponder: string;
+};
+const EMAIL: Record<LinguaNotif, TxtEmail> = {
+  pt: {
+    assunto: "Confirma o teu email — Ippon League",
+    saud: (nome) => (nome ? `Olá, ${nome}! Que bom ter-te connosco.` : "Olá! Que bom ter-te connosco."),
+    frase: "Estamos muito felizes por te ter na <strong>Ippon League</strong>, o jogo oficial dos fãs de judo. Confirma o teu email para garantires a tua conta e não perderes nada das próximas competições.",
+    botao: "Confirmar email",
+    validade: (h) => `Esta ligação é válida durante ${h} horas.`,
+    ignora: "Se não foste tu a criar esta conta, é só ignorar este email.",
+    naoResponder: "Este email é automático — não precisas de responder.",
+  },
+  en: {
+    assunto: "Confirm your email — Ippon League",
+    saud: (nome) => (nome ? `Hi ${nome}! Great to have you with us.` : "Hi! Great to have you with us."),
+    frase: "We're really happy to have you at <strong>Ippon League</strong>, the official game for judo fans. Confirm your email to secure your account and never miss a thing in the upcoming competitions.",
+    botao: "Confirm email",
+    validade: (h) => `This link is valid for ${h} hours.`,
+    ignora: "If you didn't create this account, just ignore this email.",
+    naoResponder: "This is an automated email — no need to reply.",
+  },
+  es: {
+    assunto: "Confirma tu email — Ippon League",
+    saud: (nome) => (nome ? `¡Hola, ${nome}! Qué bueno tenerte con nosotros.` : "¡Hola! Qué bueno tenerte con nosotros."),
+    frase: "Estamos muy contentos de tenerte en <strong>Ippon League</strong>, el juego oficial de los aficionados al judo. Confirma tu email para asegurar tu cuenta y no perderte nada de las próximas competiciones.",
+    botao: "Confirmar email",
+    validade: (h) => `Este enlace es válido durante ${h} horas.`,
+    ignora: "Si no fuiste tú quien creó esta cuenta, simplemente ignora este email.",
+    naoResponder: "Este email es automático — no necesitas responder.",
+  },
+  fr: {
+    assunto: "Confirme ton email — Ippon League",
+    saud: (nome) => (nome ? `Salut ${nome} ! Ravis de t'avoir avec nous.` : "Salut ! Ravis de t'avoir avec nous."),
+    frase: "Nous sommes très heureux de t'accueillir sur <strong>Ippon League</strong>, le jeu officiel des fans de judo. Confirme ton email pour sécuriser ton compte et ne rien manquer des prochaines compétitions.",
+    botao: "Confirmer l'email",
+    validade: (h) => `Ce lien est valable pendant ${h} heures.`,
+    ignora: "Si tu n'es pas à l'origine de ce compte, ignore simplement cet email.",
+    naoResponder: "Cet email est automatique — pas besoin d'y répondre.",
+  },
+  de: {
+    assunto: "Bestätige deine E-Mail — Ippon League",
+    saud: (nome) => (nome ? `Hallo ${nome}! Schön, dass du dabei bist.` : "Hallo! Schön, dass du dabei bist."),
+    frase: "Wir freuen uns sehr, dich bei <strong>Ippon League</strong> zu haben, dem offiziellen Spiel für Judo-Fans. Bestätige deine E-Mail, um dein Konto zu sichern und bei den nächsten Wettkämpfen nichts zu verpassen.",
+    botao: "E-Mail bestätigen",
+    validade: (h) => `Dieser Link ist ${h} Stunden gültig.`,
+    ignora: "Falls du dieses Konto nicht erstellt hast, ignoriere diese E-Mail einfach.",
+    naoResponder: "Diese E-Mail ist automatisch — du musst nicht antworten.",
+  },
+};
 
 function novoToken(): string {
   // 32 caracteres hexadecimais: impossível de adivinhar, e passa bem num URL.
@@ -103,35 +163,48 @@ async function enviarLigacao(uid: string, email: string, nome: string, base: str
   if (!apiKey || !email) return false;
 
   const link = `${base}/api/verificar-email?token=${token}`;
-  const primeiroNome = (nome || "").trim().split(" ")[0] || renderNotif(lingua, "email.confirmarFallbackNome");
+  const primeiroNome = esc((nome || "").trim().split(" ")[0]);
 
-  // Textos na língua da pessoa. {marca} = "Ippon League" a negrito (HTML de
-  // confiança, não escapado); {nome} = primeiro nome já escapado.
-  const saudacao = renderNotif(lingua, "email.confirmarSaudacao", { nome: esc(primeiroNome) });
-  const frase = renderNotif(lingua, "email.confirmarFrase", { marca: "<strong>Ippon League</strong>" });
-  const rotuloBotao = renderNotif(lingua, "email.confirmarBotao");
-  const validade = renderNotif(lingua, "email.confirmarValidade", { horas: VALIDADE_HORAS });
-  const ignora = renderNotif(lingua, "email.confirmarIgnora");
-  const assunto = renderNotif(lingua, "email.confirmarAssunto");
+  // Textos do email na língua da pessoa (mapa EMAIL, no topo do ficheiro).
+  const txt = EMAIL[lingua];
+  const saudacao = txt.saud(primeiroNome);
+  const frase = txt.frase;
+  const rotuloBotao = txt.botao;
+  const validade = txt.validade(VALIDADE_HORAS);
+  const ignora = txt.ignora;
+  const naoResponder = txt.naoResponder;
+  const assunto = txt.assunto;
 
+  // Email com a cara da Ippon League. Layout em tabelas + estilos inline (é o que
+  // os clientes de email — sobretudo o Outlook — renderizam de forma fiável). A
+  // imagem do topo vem de um endereço público (o ícone da app). Os textos
+  // (${...}) continuam a vir do dicionário, na língua da pessoa.
   const html = `
-    <div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.6;color:#111;max-width:520px">
-      <p style="margin:0 0 14px">${saudacao}</p>
-      <p style="margin:0 0 14px">
-        ${frase}
-      </p>
-      <p style="margin:0 0 20px">
-        <a href="${link}" style="display:inline-block;background:#d9a441;color:#1b211e;text-decoration:none;font-weight:700;padding:13px 26px;border-radius:10px">
-          ${rotuloBotao}
-        </a>
-      </p>
-      <p style="margin:0 0 14px;color:#666;font-size:13px">
-        ${validade}
-      </p>
-      <p style="margin:0;color:#666;font-size:13px">
-        ${ignora}
-      </p>
-    </div>`;
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f1ea;margin:0;padding:24px 0">
+    <tr><td align="center">
+      <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e6e1d5">
+        <tr><td align="center" style="background:#0c0e0d;padding:24px">
+          <img src="https://www.ipponleague.com/icon-192.png" width="54" height="54" alt="Ippon League" style="display:block;border-radius:12px;margin:0 auto 10px">
+          <div style="font-family:'IBM Plex Mono',Menlo,Consolas,monospace;font-size:17px;font-weight:700;letter-spacing:3px;color:#d9a441">IPPON LEAGUE</div>
+        </td></tr>
+        <tr><td style="padding:28px 28px 8px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;color:#1b211e">
+          <p style="margin:0 0 14px">${saudacao}</p>
+          <p style="margin:0 0 24px">${frase}</p>
+          <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto 24px">
+            <tr><td align="center" bgcolor="#d9a441" style="border-radius:10px">
+              <a href="${link}" style="display:inline-block;padding:14px 34px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;font-weight:700;color:#1b211e;text-decoration:none;border-radius:10px">${rotuloBotao}</a>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 12px;color:#6c766d;font-size:13px">${validade}</p>
+          <p style="margin:0 0 12px;color:#6c766d;font-size:13px">${ignora}</p>
+          <p style="margin:0;color:#9aa39a;font-size:12px">${naoResponder}</p>
+        </td></tr>
+        <tr><td style="padding:18px 28px 24px;border-top:1px solid #eee;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:11px;line-height:1.5;color:#9aa39a">
+          Ippon League 🥋
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>`;
 
   try {
     await fetch("https://api.resend.com/emails", {
