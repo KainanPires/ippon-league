@@ -230,14 +230,30 @@ function MercadoInner() {
       }
       let draft: { ids: string[]; captain: string | null } = { ids: [], captain: null };
       try {
-        // Com a marca "montar" (veio do lixo), o mercado parte do VAZIO: a equipa
-        // antiga não deve reaparecer no rascunho. Esvaziamos o rascunho desta
-        // competição uma vez, no arranque.
+        // A marca "montar" (?montar=1) vem do lixo do Meu Time e serve para
+        // COMEÇAR uma equipa nova do vazio. Mas o ciclo mercado->dojo->mercado
+        // reentra sempre com ?montar=1 — e esvaziar em CADA entrada apagava os
+        // atletas que a pessoa já tinha escolhido (era o bug). Solução: esvaziar
+        // UMA vez por ciclo (marca em sessionStorage) e, nas reentradas, RETOMAR
+        // o rascunho. Fora do montar, limpa-se a marca e carrega-se o rascunho.
+        const K_CICLO = `ippon_montar_wipe_${COMPETICAO}`;
         if (montar) {
-          saveDraftFor(COMPETICAO, { ids: [], captain: null });
-          setTeam([]);
-          setCaptain(null);
+          let jaLimpou = false;
+          try { jaLimpou = sessionStorage.getItem(K_CICLO) === "1"; } catch {}
+          if (jaLimpou) {
+            // Já dentro do ciclo (voltou do Dojo para completar): retoma o que já montou.
+            draft = loadDraftFor(COMPETICAO);
+            setTeam(draft.ids);
+            setCaptain(draft.captain);
+          } else {
+            // Primeira entrada do ciclo: parte do vazio, uma só vez.
+            saveDraftFor(COMPETICAO, { ids: [], captain: null });
+            setTeam([]);
+            setCaptain(null);
+            try { sessionStorage.setItem(K_CICLO, "1"); } catch {}
+          }
         } else {
+          try { sessionStorage.removeItem(K_CICLO); } catch {}
           draft = loadDraftFor(COMPETICAO);
           setTeam(draft.ids);
           setCaptain(draft.captain);
