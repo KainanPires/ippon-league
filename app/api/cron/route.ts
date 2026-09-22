@@ -7,6 +7,7 @@ import { competicaoPorId } from "@/lib/copa";
 import { notificarMercado } from "@/lib/notificarMercado";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { mensagensModaisDeHoje } from "@/lib/mensagensEspeciais";
+import { registarCorrida, vigiarCronsAoVivo } from "@/lib/cronLog";
 // CRON — o motor automático da Ippon League.
 //
 // DESENHO (mudou: ler antes de mexer)
@@ -281,7 +282,7 @@ async function atualizarAoVivo(hoje: Date): Promise<{ ao_vivo: string | null; at
 // ORÇAMENTO: não começa uma competição nova sem MS_MARGEM_COMPETICAO de folga.
 // Se parar a meio, `parouPorTempo` fica true e a corrida seguinte apanha o resto
 // (a competição continua na janela dos 21 dias, e o motor retoma onde ficou).
-type ResumoCongelamento = { comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean };
+type ResumoCongelamento = { comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean; erros?: number };
 async function congelarRecentes(hoje: Date, t0: number): Promise<{ feitos: ResumoCongelamento[]; parouPorTempo: boolean }> {
   const agora = hoje.getTime();
   const janelaMs = JANELA_DIAS * 24 * 60 * 60 * 1000;
@@ -298,7 +299,7 @@ async function congelarRecentes(hoje: Date, t0: number): Promise<{ feitos: Resum
     const anoEpoca = parseInt(s.de.slice(0, 4), 10);
     try {
       const r = await congelarCompeticao(s.idCompeticao, mes, anoEpoca);
-      feitos.push({ comp: s.idCompeticao, nome: s.nome, processados: r.atletasProcessados, faltam: r.atletasEmFalta, utilizadores: r.utilizadores, completa: r.completa });
+      feitos.push({ comp: s.idCompeticao, nome: s.nome, processados: r.atletasProcessados, faltam: r.atletasEmFalta, utilizadores: r.utilizadores, completa: r.completa, erros: r.erros ?? 0 });
     } catch {
       feitos.push({ comp: s.idCompeticao, nome: s.nome, processados: 0, faltam: -1, utilizadores: 0, completa: false });
     }
@@ -1312,6 +1313,36 @@ export async function GET(req: Request) {
   if (!forcarPrecos) await gravarCursorPrecos(comp, diaHoje, i);
   const totalAtualizados = passos.reduce((s, p) => s + (p.atualizados || 0), 0);
   const ok = passos.filter((p) => p.ok).length;
+
+  // -------------------------------------------------------------------------
+  // OBSERVABILIDADE (modelo de exame). Regista esta corrida em cron_runs com as
+  // leituras observado/esperado/limite e, se acender 🔴, manda email. Durante
+  // uma competição, vigia também o maestro e o chave-viva (apanha um cron ao
+  // vivo que PAROU de ser chamado). Nunca deixa a observabilidade partir o cron.
+  // -------------------------------------------------------------------------
+  try {
+    const msTotal = Date.now() - t0;
+    const errosCongelar = congelamentos.reduce((s, c) => s + (c.erros ?? 0), 0);
+    const precosFalhadas = passos.filter((p) => !p.ok).length;
+    const aoVivoAgora = !!aoVivo.ao_vivo && !aoVivo.ao_vivo.startsWith("erro");
+    await registarCorrida({
+      job: "cron",
+      ms: msTotal,
+      iniciadoMs: t0,
+      comp,
+      ctx: { aoVivo: aoVivoAgora },
+      observados: {
+        "cron.duracao_ms": msTotal,
+        "cron.congelar_erros": errosCongelar,
+        "cron.marcas_falhadas": marcasFalhadas.length,
+        "cron.precos_categorias_falhadas": precosFalhadas,
+        "cron.congelamento_parou_por_tempo": congelamentoParou ? 1 : 0,
+      },
+      resumo: { comp, congelamentos, marcas_falhadas: marcasFalhadas, precos_ok: `${ok}/${passos.length}` },
+    });
+    if (aoVivoAgora) await vigiarCronsAoVivo(comp);
+  } catch { /* observabilidade nunca bloqueia o cron */ }
+
   return NextResponse.json({
       feito: true,
       comp,
