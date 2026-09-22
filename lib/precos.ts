@@ -68,10 +68,10 @@
 // A solucao completa seria a montra pedir os precos convertidos a Stripe. Fica
 // para quando houver gente fora da zona euro que justifique a chamada extra.
 // ---------------------------------------------------------------------------
-const PRO_PROMO = "4,99€";
-const PRO_CHEIO = "7,99€";
-const MAX_PROMO = "7,99€";
-const MAX_CHEIO = "11,99€";
+const PRO_PROMO = "5,99€";
+const PRO_CHEIO = "8,99€";
+const MAX_PROMO = "6,99€";
+const MAX_CHEIO = "9,99€";
 const PERIODO = "/mês";
 /** Meses de desconto por pessoa, a contar da subscrição. */
 const MESES_DESCONTO = 6;
@@ -103,19 +103,19 @@ export const PRECO = {
   get maxAtualComPeriodo(): string { return (this.emPromocao ? MAX_PROMO : MAX_CHEIO) + PERIODO; },
   // --- Subir de Pro para Pro Max ---
   // A DIFERENÇA mensal entre os dois níveis: é o que passa a pagar a mais por
-  // mês quem sobe. Promoção: 7,99 - 4,99. Cheio: 11,99 - 7,99.
-  upgradePromo: "+3,00€",
-  upgradeNormal: "+4,00€",
-  upgradePromoComPeriodo: "+3,00€" + PERIODO,
-  get upgradeAtual(): string { return this.emPromocao ? "+3,00€" : "+4,00€"; },
-  get upgradeAtualComPeriodo(): string { return (this.emPromocao ? "+3,00€" : "+4,00€") + PERIODO; },
+  // mês quem sobe. Promoção: 6,99 - 5,99 = 1,00. Cheio: 9,99 - 8,99 = 1,00.
+  upgradePromo: "+1,00€",
+  upgradeNormal: "+1,00€",
+  upgradePromoComPeriodo: "+1,00€" + PERIODO,
+  get upgradeAtual(): string { return this.emPromocao ? "+1,00€" : "+1,00€"; },
+  get upgradeAtualComPeriodo(): string { return (this.emPromocao ? "+1,00€" : "+1,00€") + PERIODO; },
   /**
   * A taxa ÚNICA de quem sobe depois dos 7 dias de teste.
   *
   * Não é mensal e não se soma à mensalidade: paga-se uma vez, e a partir daí a
   * pessoa paga o Pro Max normal, igual a quem o comprou direto.
   */
-  subidaTaxa: "4,99€",
+  subidaTaxa: "0,99€",
   /**
   * Aviso da moeda, para pôr por baixo de qualquer preço.
   *
