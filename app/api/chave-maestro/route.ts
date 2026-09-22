@@ -26,6 +26,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, contestActions } from "@/lib/ijf";
 import { focoMercado } from "@/lib/calendario";
 import { lerLutasManuais, indexarManuaisPorAtleta, aplicarManuaisAoVivo } from "@/lib/lutasManuais";
+import { registarCorrida } from "@/lib/cronLog";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -194,6 +195,27 @@ export async function GET(req: Request) {
     { id: 1, comp, cursor: i, atualizado_em: new Date().toISOString() },
     { onConflict: "id" }
   );
+
+  // OBSERVABILIDADE (modelo de exame): regista esta corrida e alerta se 🔴.
+  // aoVivo: o maestro só chega aqui quando há competição com molduras.
+  try {
+    const msMaestro = Date.now() - t0;
+    const catFalhas = resumos.filter((r) => !!(r as { erro?: unknown }).erro).length;
+    const atletaFalhas = resumos.reduce((s, r) => s + (Number((r as { falhas?: unknown }).falhas) || 0), 0);
+    await registarCorrida({
+      job: "maestro",
+      ms: msMaestro,
+      iniciadoMs: t0,
+      comp,
+      ctx: { aoVivo: true },
+      observados: {
+        "maestro.duracao_ms": msMaestro,
+        "maestro.categorias_falhadas": catFalhas,
+        "maestro.atletas_falhas": atletaFalhas,
+      },
+      resumo: { comp, processadas: feitas, resumos },
+    });
+  } catch { /* observabilidade nunca bloqueia o cron */ }
 
   return NextResponse.json({
     ok: true,
