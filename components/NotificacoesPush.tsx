@@ -6,9 +6,10 @@
 //    permissão com justificação. Só aparece se ainda estiver por ativar e não
 //    tiver sido dispensado.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { suportaPush, estadoPush, ativarPush, desativarPush, type EstadoPush } from "@/lib/push";
 import { useT } from "@/lib/i18n";
+import { track } from "@/lib/analytics";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -68,11 +69,13 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
     if (r.ok) {
       setSubscritoAgora(true);
       setErro(false);
+      track("push_enabled", { origem: "perfil" });
       // Diagnóstico útil: mostra a conta para onde foi registado, para se confirmar
       // que é a conta certa (resolve casos de conta trocada no mesmo aparelho).
       setMsg(t("push.ativadas", { conta: userId.slice(0, 8) }));
     } else {
       setErro(true);
+      if (estadoPush() === "negado") track("push_denied", { origem: "perfil" });
       setMsg(r.erro || t("push.naoAtivar"));
     }
   }
@@ -82,6 +85,7 @@ export function BotaoNotificacoes({ userId }: { userId: string }) {
     setAFazer(false);
     setEstado(estadoPush());
     setSubscritoAgora(false); // <- chave: o botão volta a "Ativar", não fica preso
+    track("push_disabled", { origem: "perfil" });
     setMsg(t("push.desativadas"));
   }
 
@@ -141,22 +145,30 @@ export function LembreteNotificacoes({ userId }: { userId: string }) {
   const t = useT();
   const [mostrar, setMostrar] = useState(false);
   const [aFazer, setAFazer] = useState(false);
+  const contouPrompt = useRef(false);
 
   useEffect(() => {
     if (!suportaPush()) return;
     if (estadoPush() !== "pendente") return;
     try { if (localStorage.getItem("ippon_push_lembrete_dispensado") === "1") return; } catch {}
     setMostrar(true);
+    if (!contouPrompt.current) {
+      contouPrompt.current = true;
+      track("push_prompted", { origem: "dashboard" }); // o banner foi mostrado
+    }
   }, []);
 
   async function ativar() {
     setAFazer(true);
-    await ativarPush(userId);
+    const r = await ativarPush(userId);
     setAFazer(false);
+    if (r.ok) track("push_enabled", { origem: "dashboard" });
+    else if (estadoPush() === "negado") track("push_denied", { origem: "dashboard" });
     setMostrar(false);
   }
   function agoraNao() {
     try { localStorage.setItem("ippon_push_lembrete_dispensado", "1"); } catch {}
+    track("push_prompt_dismissed", { origem: "dashboard" }); // "agora não"
     setMostrar(false);
   }
 
