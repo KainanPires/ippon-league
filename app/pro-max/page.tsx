@@ -1,11 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { PRECO } from "@/lib/precos";
 import { supabase } from "@/lib/supabase";
 import { useNivel } from "@/lib/useNivel";
 import { NotaMoeda } from "@/components/NotaMoeda";
 import { useT } from "@/lib/i18n";
+import { track, aoTerConsentimento } from "@/lib/analytics";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const MAX = "#7fb8f5"; // tom do Pro Max
@@ -30,6 +31,14 @@ export default function ProMax() {
   const [aEnviar, setAEnviar] = useState(false);
   const [erro, setErro] = useState("");
   const { ehPro, ehProMax } = useNivel();
+
+  // Analytics: viu a oferta de subida. Espera pelo consentimento; uma vez só.
+  const paywallContado = useRef(false);
+  useEffect(() => {
+    if (paywallContado.current) return;
+    paywallContado.current = true;
+    aoTerConsentimento(() => track("paywall_viewed", { pagina: "pro-max" }));
+  }, []);
   // A SUBIDA PARA PRO MAX.
   //
   // A rota decide sozinha o que fazer, porque só ela sabe o estado real da
@@ -47,6 +56,7 @@ export default function ProMax() {
   async function subir() {
     setErro("");
     setAEnviar(true);
+    track("plan_selected", { plano: "promax", acao: "subida" }); // escolheu subir
     try {
       const { data: sess } = await supabase.auth.getSession();
       const tok = sess.session?.access_token;
@@ -57,9 +67,11 @@ export default function ProMax() {
           body: JSON.stringify({ alvo: "subida" }),
         });
       const j = await res.json();
-      // Subida imediata, sem cobrança: recarrega para o nível novo aparecer.
-      if (j?.ok && j.imediato) { window.location.href = "/perfil?pagamento=ok"; return; }
-      if (j?.ok && j.url) { window.location.href = j.url; return; }
+      // Subida imediata, sem cobrança (dentro do teste): não passa pela Stripe,
+      // por isso o servidor não a vê. Marca-se aqui para a subida não ficar
+      // invisível no funil de conversão para Max.
+      if (j?.ok && j.imediato) { track("checkout_completed", { plano: "promax", acao: "subida", imediato: true }); window.location.href = "/perfil?pagamento=ok"; return; }
+      if (j?.ok && j.url) { track("checkout_started", { plano: "promax", acao: "subida" }); window.location.href = j.url; return; }
       setErro(j?.erro || t("pro.erroAbrirPagamento"));
     } catch {
       setErro(t("dd.falhaLigacao"));
