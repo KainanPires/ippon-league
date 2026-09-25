@@ -54,6 +54,9 @@ export default function PaginaOficial() {
   const [geralCarregado, setGeralCarregado] = useState(false);
   const [nomeContinente, setNomeContinente] = useState<string | null>(null);
   const [meuId, setMeuId] = useState<string | null>(null);
+  // Mercado ainda aberto? Vem do endpoint (portão anti-espreitadela). Enquanto
+  // aberto, os pontos da rodada mostram-se como "—" (ainda não há pontuação).
+  const [mercadoAberto, setMercadoAberto] = useState(false);
   // O NÍVEL VEM DO useNivel (tabela `users`), NÃO DO user_metadata.
   //
   // O `souPro` decide entre mostrar o cartão com a MINHA posição no ranking
@@ -115,6 +118,7 @@ useEffect(() => {
           const res = await fetch(`/api/liga/oficial?${p.toString()}`);
           const j = await res.json();
           if (!vivo) return;
+          setMercadoAberto(!!j.mercado_aberto);
           if (j.semContinente) { setEstado("sem_continente"); return; }
           if (j.ok) {
             setMembros(Array.isArray(j.membros) ? j.membros : []);
@@ -297,7 +301,7 @@ return (
                   <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>
                   {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
                   </div>
-                  <div style={{ fontSize: 11, color: "#93a39a" }}>{m.escalou ? <span style={{ color: "#7fd1a3" }}>+{m.pontos_rodada} nesta rodada</span> : t("pl.semEscalacao")}</div>
+                  <div style={{ fontSize: 11, color: "#93a39a" }}>{m.escalou ? (mercadoAberto ? <span style={{ color: "#7fd1a3" }}>Escalou</span> : <span style={{ color: "#7fd1a3" }}>+{m.pontos_rodada} nesta rodada</span>) : t("pl.semEscalacao")}</div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: GOLD }}>{m.pontos_geral}</div>
@@ -331,10 +335,10 @@ return (
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           {membrosVisiveis.map((m) => {
                 const euMesmo = m.user_id === meuId;
-                const ouro = m.posicao === 1 && m.escalou;
+                const ouro = !mercadoAberto && m.posicao === 1 && m.escalou;
                 return (
                   <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : (ouro ? GOLD : "#243029")}`, borderRadius: 12, padding: "11px 12px" }}>
-                  <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: ouro ? GOLD : "#7c8a82" }}>{m.escalou ? m.posicao : "—"}</div>
+                  <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: ouro ? GOLD : "#7c8a82" }}>{mercadoAberto ? "—" : (m.escalou ? m.posicao : "—")}</div>
                   <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
@@ -345,7 +349,7 @@ return (
                   <div style={{ fontSize: 11, color: m.escalou ? "#7fd1a3" : "#e0894f" }}>{m.escalou ? "Escalou" : t("pl.naoEscalou")}</div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: "#f1ede2" }}>{m.escalou ? (m.pontos >= 0 ? "+" : "") + m.pontos : "—"}</div>
+                  <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: "#f1ede2" }}>{mercadoAberto ? "—" : (m.escalou ? (m.pontos >= 0 ? "+" : "") + m.pontos : "—")}</div>
                   <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>{t("comum.pts")}</div>
                   </div>
                   </div>
