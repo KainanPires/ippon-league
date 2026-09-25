@@ -632,3 +632,156 @@ export function gerarRondaSeguinteComRepescagem(
   }
   return novos;
 }
+// ===========================================================================
+// FASE 2 — CADEIA DE REPESCAGEM PARA CHAVES DE 16/32 (NOVA)
+// ===========================================================================
+// O gerarRondaSeguinteComRepescagem acima resolve ate 8. Para 16/32, a cadeia
+// de repescagem (cada semifinalista puxa, EM CADEIA, quem venceu antes da semi)
+// precisa de VARIAS rondas e do HISTORICO COMPLETO. Estas funcoes fazem isso.
+// Validado por ~18k simulacoes (16 e 32, com e sem byes).
+//
+// Estrutura (N = tamanho da chave, L = log2(N), M = L-1 semis, C = L-2 vitimas/sf):
+//   rondas 1..M-1  : eliminacao principal
+//   ronda  M       : semis + cadeia-ronda-1 (v0 x v1 de cada sf)
+//   M+1..M+C-2     : cadeia-ronda-2.. (vencedor x proxima vitima)
+//   ronda  M+C-1   : MERGE (repCima = repA x repB; repBaixo = repC x repD)
+//   ronda  M+C     : BLOCO FINAL (final + 2 bronzes cruzados)
+
+const log2Chave = (n: number): number => Math.round(Math.log2(n));
+
+// N a partir da 1a ronda: os lugares (N/2) estao todos preenchidos (byes incl.).
+function tamanhoDaChaveCopa(todos: ConfrontoRonda[]): number {
+  const r1 = todos.filter((c) => c.ronda === 1).length;
+  return r1 > 0 ? r1 * 2 : 0;
+}
+function perdedorDeC(c: ConfrontoRonda): string | null {
+  return c.jogador_b == null ? null : (c.vencedor === c.jogador_a ? c.jogador_b : c.jogador_a);
+}
+function normaisDaRondaC(todos: ConfrontoRonda[], r: number): ConfrontoRonda[] {
+  return todos.filter((c) => c.ronda === r && c.fase === "normal").sort((a, b) => a.ordem - b.ordem);
+}
+// Vitimas REAIS de um semifinalista nas rondas antes da semi (byes nao contam).
+function caminhoDeSf(sf: string, todos: ConfrontoRonda[], M: number): string[] {
+  const vics: string[] = [];
+  for (let r = 1; r <= M - 1; r++) {
+    const c = todos.find((x) => x.ronda === r && x.fase === "normal" && x.vencedor === sf && (x.jogador_a === sf || x.jogador_b === sf));
+    if (c) { const p = perdedorDeC(c); if (p) vics.push(p); }
+  }
+  return vics;
+}
+// O confronto de repescagem de um sf numa ronda (por pertenca ao caminho dele).
+function repDeSf(sf: string, caminho: Record<string, string[]>, todos: ConfrontoRonda[], r: number): ConfrontoRonda | undefined {
+  const set = new Set(caminho[sf]);
+  return todos.find((x) => x.ronda === r && x.fase === "repescagem" &&
+    ((x.jogador_a != null && set.has(x.jogador_a)) || (x.jogador_b != null && set.has(x.jogador_b)) || (x.vencedor != null && set.has(x.vencedor))));
+}
+function proximaRondaCadeia(todos: ConfrontoRonda[], N: number, idProx: string): ConfrontoNovoRep[] {
+  const L = log2Chave(N), M = L - 1, C = L - 2;
+  const rondaAtual = Math.max(...todos.map((c) => c.ronda));
+  const next = rondaAtual + 1;
+  const mk = (ordem: number, fase: ConfrontoNovoRep["fase"], a: string, b: string | null, metade: "cima" | "baixo" | null): ConfrontoNovoRep =>
+    ({ ronda: next, ordem, fase, jogador_a: a, jogador_b: b, id_competicao: idProx, estado: "pendente", metade });
+
+  if (next <= M - 1) {
+    const ns = normaisDaRondaC(todos, rondaAtual);
+    const out: ConfrontoNovoRep[] = [];
+    for (let i = 0; i < ns.length; i += 2) out.push(mk(i / 2, "normal", ns[i].vencedor!, ns[i + 1] ? ns[i + 1].vencedor : null, ns[i].metade ?? null));
+    return out;
+  }
+  const semifinalistas = (): { id: string; metade: "cima" | "baixo" | null }[] =>
+    normaisDaRondaC(todos, M - 1).map((c) => ({ id: c.vencedor!, metade: c.metade ?? null }));
+  const caminhoTodos = (): Record<string, string[]> => {
+    const cam: Record<string, string[]> = {};
+    for (const sf of semifinalistas()) cam[sf.id] = caminhoDeSf(sf.id, todos, M);
+    return cam;
+  };
+  if (next === M) {
+    const q = normaisDaRondaC(todos, M - 1);
+    const cima = q.filter((c) => c.metade === "cima").map((c) => c.vencedor!);
+    const baixo = q.filter((c) => c.metade === "baixo").map((c) => c.vencedor!);
+    const out: ConfrontoNovoRep[] = [];
+    let ordem = 0;
+    out.push(mk(ordem++, "normal", cima[0], cima[1] ?? null, "cima"));
+    out.push(mk(ordem++, "normal", baixo[0], baixo[1] ?? null, "baixo"));
+    const cam = caminhoTodos();
+    for (const sf of semifinalistas()) {
+      const vics = cam[sf.id];
+      const a = vics[0] ?? null, b = vics[1] ?? null;
+      if (a == null && b == null) continue;
+      out.push(mk(ordem++, "repescagem", (a ?? b)!, (a != null && b != null) ? b : null, sf.metade));
+    }
+    return out;
+  }
+  if (next >= M + 1 && next <= M + C - 2) {
+    const k = next - M + 1;
+    const cam = caminhoTodos();
+    const out: ConfrontoNovoRep[] = [];
+    let ordem = 0;
+    for (const sf of semifinalistas()) {
+      const vics = cam[sf.id];
+      const prev = repDeSf(sf.id, cam, todos, next - 1);
+      const atual = prev ? prev.vencedor : (vics[0] ?? null);
+      const opp = vics[k] ?? null;
+      if (atual == null && opp == null) continue;
+      out.push(mk(ordem++, "repescagem", (atual ?? opp)!, (atual != null && opp != null) ? opp : null, sf.metade));
+    }
+    return out;
+  }
+  if (next === M + C - 1) {
+    const cam = caminhoTodos();
+    const ultimaCadeia = (C - 1 >= 1) ? (M + C - 2) : null;
+    const champs: Record<string, string | null> = {};
+    for (const sf of semifinalistas()) {
+      const vics = cam[sf.id];
+      if (vics.length === 0) { champs[sf.id] = null; continue; }
+      const c = ultimaCadeia != null ? repDeSf(sf.id, cam, todos, ultimaCadeia) : undefined;
+      champs[sf.id] = c ? c.vencedor : (vics[0] ?? null);
+    }
+    const sfs = semifinalistas();
+    const cima = sfs.filter((s) => s.metade === "cima").map((s) => champs[s.id]);
+    const baixo = sfs.filter((s) => s.metade === "baixo").map((s) => champs[s.id]);
+    const out: ConfrontoNovoRep[] = [];
+    let ordem = 0;
+    const merge = (arr: (string | null)[], metade: "cima" | "baixo") => {
+      const a = arr[0] ?? null, b = arr[1] ?? null;
+      if (a == null && b == null) return;
+      out.push(mk(ordem++, "repescagem", (a ?? b)!, (a != null && b != null) ? b : null, metade));
+    };
+    merge(cima, "cima");
+    merge(baixo, "baixo");
+    return out;
+  }
+  if (next === M + C) {
+    const semis = normaisDaRondaC(todos, M);
+    const scima = semis.find((c) => c.metade === "cima");
+    const sbaixo = semis.find((c) => c.metade === "baixo");
+    const finalCima = scima?.vencedor ?? null;
+    const finalBaixo = sbaixo?.vencedor ?? null;
+    const perdCima = scima ? perdedorDeC(scima) : null;
+    const perdBaixo = sbaixo ? perdedorDeC(sbaixo) : null;
+    const mergeR = todos.filter((x) => x.ronda === M + C - 1 && x.fase === "repescagem");
+    const repCima = mergeR.find((c) => c.metade === "cima")?.vencedor ?? null;
+    const repBaixo = mergeR.find((c) => c.metade === "baixo")?.vencedor ?? null;
+    const out: ConfrontoNovoRep[] = [];
+    let ordem = 0;
+    out.push(mk(ordem++, "final", (finalCima ?? finalBaixo)!, (finalCima != null && finalBaixo != null) ? finalBaixo : null, null));
+    const b1a = repCima ?? null, b1b = perdBaixo ?? null;
+    if (b1a || b1b) out.push(mk(ordem++, "bronze", (b1a ?? b1b)!, (b1a && b1b) ? b1b : null, null));
+    const b2a = repBaixo ?? null, b2b = perdCima ?? null;
+    if (b2a || b2b) out.push(mk(ordem++, "bronze", (b2a ?? b2b)!, (b2a && b2b) ? b2b : null, null));
+    return out;
+  }
+  return [];
+}
+// DISPATCHER: <=8 usa o motor validado antigo; >=16 usa a cadeia. Recebe o
+// historico COMPLETO da copa (todas as rondas) e a competicao da proxima ronda.
+export function gerarRondaSeguinteCopa(todos: ConfrontoRonda[], idCompProxima: string): ConfrontoNovoRep[] {
+  if (todos.length === 0) return [];
+  const N = tamanhoDaChaveCopa(todos);
+  if (N <= 8) {
+    const rmax = Math.max(...todos.map((c) => c.ronda));
+    const atual = todos.filter((c) => c.ronda === rmax);
+    return gerarRondaSeguinteComRepescagem(atual, idCompProxima);
+  }
+  return proximaRondaCadeia(todos, N, idCompProxima);
+}
