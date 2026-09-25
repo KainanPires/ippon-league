@@ -183,6 +183,9 @@ export default function PaginaLiga() {
   const [vista, setVista] = useState<VistaLiga>("geral");
   const [geral, setGeral] = useState<MembroGeral[]>([]);
   const [geralCarregado, setGeralCarregado] = useState(false);
+  // Mercado ainda aberto na rodada atual? Vem do endpoint (portão
+  // anti-espreitadela). Enquanto aberto, os pontos da rodada mostram-se como "—".
+  const [mercadoAberto, setMercadoAberto] = useState(false);
   // Painel do dono: pedidos pendentes.
   const [souDono, setSouDono] = useState(false);
   const [copaEstado, setCopaEstado] = useState<string | null>(null); // estado da copa, atualizável
@@ -315,6 +318,7 @@ export default function PaginaLiga() {
           const res = await fetch(`/api/liga?id=${liga!.id}&comp=${idComp}`);
           const j = await res.json();
           if (!vivo) return;
+          setMercadoAberto(!!j.mercado_aberto);
           if (Array.isArray(j.membros)) setMembros(j.membros);
           setHoraTick(new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
         } catch {
@@ -747,10 +751,13 @@ export default function PaginaLiga() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                   {membrosVista.map((m) => {
                         const euMesmo = m.user_id === meuId;
-                        const medal = m.posicao === 1 && m.escalou ? GOLD : "#243029";
+                        // Só se esconde a rodada ATUAL com o mercado aberto; as rodadas passadas mostram sempre.
+                        const esconderR = rodadaEhAtual && mercadoAberto;
+                        const ouroR = !esconderR && m.posicao === 1 && m.escalou;
+                        const medal = ouroR ? GOLD : "#243029";
                         return (
                           <button key={m.user_id} onClick={() => verDojo(m)} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : medal}`, borderRadius: 12, padding: "11px 12px", cursor: "pointer", textAlign: "left", fontFamily: FB }}>
-                          <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: m.posicao === 1 && m.escalou ? GOLD : "#7c8a82" }}>{m.escalou ? m.posicao : "—"}</div>
+                          <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: ouroR ? GOLD : "#7c8a82" }}>{esconderR ? "—" : (m.escalou ? m.posicao : "—")}</div>
                           <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
@@ -761,7 +768,7 @@ export default function PaginaLiga() {
                           <div style={{ fontSize: 11, color: m.escalou ? "#7fd1a3" : "#e0894f" }}>{m.escalou ? "Escalou" : t("pl.naoEscalou")}</div>
                           </div>
                           <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: "#f1ede2" }}>{m.escalou ? (m.pontos >= 0 ? "+" : "") + m.pontos : "—"}</div>
+                          <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: "#f1ede2" }}>{esconderR ? "—" : (m.escalou ? (m.pontos >= 0 ? "+" : "") + m.pontos : "—")}</div>
                           <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>{t("comum.pts")}</div>
                           </div>
                           </button>
@@ -791,7 +798,7 @@ export default function PaginaLiga() {
                           {m.is_pro && <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>}
                           {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
                           </div>
-                          <div style={{ fontSize: 11, color: "#93a39a" }}>{m.escalou ? <span style={{ color: "#7fd1a3" }}>+{m.pontos_rodada} nesta rodada</span> : t("pl.semEscalacao")}</div>
+                          <div style={{ fontSize: 11, color: "#93a39a" }}>{m.escalou ? (mercadoAberto ? <span style={{ color: "#7fd1a3" }}>Escalou</span> : <span style={{ color: "#7fd1a3" }}>+{m.pontos_rodada} nesta rodada</span>) : t("pl.semEscalacao")}</div>
                           </div>
                           <div style={{ textAlign: "right", flexShrink: 0 }}>
                           <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: GOLD }}>{m.pontos_geral}</div>
