@@ -98,6 +98,28 @@ export const COLORS: string[] = [
   "#7a4fa3", "#141110", "#efeadd", "#2a9d8f", "#e67e22", "#c9b037", "#3f8f5a",
 ];
 
+// ---------------------------------------------------------------------------
+// GRÁTIS vs. PRO — a personalização do escudo é uma vantagem do Ippon Pro.
+// Esta é a FONTE ÚNICA do que é grátis; o construtor (app/escudo) lê isto para
+// pôr cadeados e bloquear a seleção a quem não é Pro. É cosmético, por isso a
+// tranca é no frontend. Escudos já gravados com opções Pro continuam a
+// desenhar-se na mesma — a tranca é só para NOVAS escolhas de quem não é Pro.
+// Para mudar o que é grátis, edita só estas quatro listas.
+//
+// NOTA: as cores por defeito do escudo (DEFAULT_IDENTITY) têm de estar todas em
+// FREE_COLORS, senão um utilizador grátis começaria com um escudo "trancado".
+// ---------------------------------------------------------------------------
+export const FREE_SHAPES: ShapeId[] = ["classic", "round"];
+export const FREE_PATTERNS: PatternId[] = ["solido", "metade", "listras-v"];
+export const FREE_SYMBOLS: SymbolId[] = ["none", "estrela", "kimono", "faixa", "ippon"];
+export const FREE_COLORS: string[] = ["#1c3a2e", "#2a4d3e", "#d9a441", "#efeadd", "#141110", "#c0392b"];
+
+const normCor = (c: string) => (c || "").trim().toLowerCase();
+export function shapeIsFree(s: ShapeId): boolean { return FREE_SHAPES.includes(s); }
+export function patternIsFree(p: PatternId): boolean { return FREE_PATTERNS.includes(p); }
+export function symbolIsFree(s: SymbolId): boolean { return FREE_SYMBOLS.includes(s); }
+export function colorIsFree(c: string): boolean { return FREE_COLORS.some((f) => normCor(f) === normCor(c)); }
+
 function shapeNode(shape: ShapeId, props: Record<string, unknown>) {
   switch (shape) {
     case "circle": return <circle cx={28} cy={32} r={26} {...props} />;
