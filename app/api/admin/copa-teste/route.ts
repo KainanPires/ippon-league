@@ -248,6 +248,49 @@ export async function GET(req: Request) {
   const admin = await adminDoPedido(req);
   if (!admin) return NextResponse.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
 
+  // ESPREITAR (só-leitura): ?debug=confrontos devolve a chave gravada da última
+  // COPA TESTE (mesmo terminada) — ronda, ordem, fase, metade e quem lutou. É o
+  // que precisamos para ver se a repescagem chegou a ser criada e se a `metade`
+  // ficou gravada nos quartos.
+  const debug = (new URL(req.url).searchParams.get("debug") || "").trim();
+  if (debug === "confrontos") {
+    const { data: ligaQualquer } = await supabaseAdmin
+      .from("leagues")
+      .select("id, invite_code, copa_estado")
+      .eq("name", NOME_LIGA)
+      .eq("formato", "copa")
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!ligaQualquer) {
+      return NextResponse.json({ ok: true, semLiga: true, nota: "Não há nenhuma COPA TESTE ainda." });
+    }
+    const { data: confrontos } = await supabaseAdmin
+      .from("copa_confrontos")
+      .select("ronda, ordem, fase, metade, jogador_a, jogador_b, vencedor, decidido_por, estado, id_competicao")
+      .eq("league_id", ligaQualquer.id)
+      .order("ronda", { ascending: true })
+      .order("ordem", { ascending: true });
+    // Resumo por ronda: quantos de cada fase e quantos têm metade definida.
+    const porRonda: Record<string, { total: number; fases: Record<string, number>; comMetade: number }> = {};
+    for (const c of confrontos || []) {
+      const r = String(c.ronda);
+      if (!porRonda[r]) porRonda[r] = { total: 0, fases: {}, comMetade: 0 };
+      porRonda[r].total++;
+      const f = String(c.fase || "?");
+      porRonda[r].fases[f] = (porRonda[r].fases[f] || 0) + 1;
+      if (c.metade === "cima" || c.metade === "baixo") porRonda[r].comMetade++;
+    }
+    return NextResponse.json({
+      ok: true,
+      league_id: ligaQualquer.id,
+      invite_code: ligaQualquer.invite_code,
+      copa_estado: ligaQualquer.copa_estado,
+      resumo_por_ronda: porRonda,
+      confrontos: confrontos || [],
+    });
+  }
+
   const { data: pros } = await supabaseAdmin
     .from("users")
     .select("id")
