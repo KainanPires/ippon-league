@@ -41,7 +41,7 @@ interface RespostaChave {
   nNaChave?: number; // quantos saíram no sorteio (pode ser < nInscritos)
   nParticiparam: number;
   totalRondas: number;
-  podio: { campeao?: string; vice?: string; terceiro?: string };
+  podio: { campeao?: string; vice?: string; terceiro?: string; terceiros?: string[] };
 }
 // Ordem cronológica de uma competição (semana do calendário). 0 se desconhecida.
 function ordemComp(id: string): number {
@@ -191,7 +191,7 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
   return (
     <>
     {/* Pódio (no topo) quando a copa terminou. */}
-    {terminada && (podio.campeao || podio.vice || podio.terceiro) && (
+    {terminada && (podio.campeao || podio.vice || podio.terceiro || (podio.terceiros?.length ?? 0) > 0) && (
         <Podio podio={podio} nome={nome} escudoDe={escudoDe} meuId={meuId} nomeCopa={liga.name} nParticipantes={nParticiparam} />
       )}
     {/* Cabeçalho da liga + nº de equipas na chave. */}
@@ -250,7 +250,9 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
           const principais = confrontos.filter((c) => c.fase === "normal" || c.fase === "final");
           const laterais = confrontos.filter((c) => c.fase === "repescagem" || c.fase === "bronze");
           const b1 = montar(principais, totalRondas);
-          const b2 = laterais.length > 0 ? montar(laterais, 0) : null;
+          // A repescagem/bronze NAO e uma arvore binaria: os bronzes cruzam com
+          // os perdedores das meias (que vivem no outro bloco), por isso o
+          // montar() sai vazio. Desenham-se como lista, agrupados por fase.
           // A caixa: escudo, nome e pontos. O resto vive no cartão que abre ao toque.
           const ladoDe = (uid: string | null, pts: number | null, venceu: boolean): LadoCaixa => {
             if (!uid) return { titulo: "—", vazio: true };
@@ -298,15 +300,28 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
             renderCaixa={(no) => <Caixa no={no} />}
             textoVazio="A chave aparece quando o sorteio correr."
             />
-            {b2 && (
-                <BlocoChave
-                titulo="Repescagem e bronzes"
-                arvores={b2.arvores}
-                arestas={b2.arestas}
-                destaque={proximo}
-                renderCaixa={(no) => <Caixa no={no} />}
-                />
-              )}
+            {laterais.length > 0 && (() => {
+                  const grupo = (tit: string, itens: ConfrontoAPI[]) =>
+                    itens.length === 0 ? null : (
+                      <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, color: "#8b9a92", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 7 }}>{tit}</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                      {itens.map((c) => (
+                          <div key={c.id} style={{ width: 184, maxWidth: "100%" }}>
+                          <Caixa no={{ tipo: (!c.jogador_b && c.decidido_por === "bye") ? "bye" : "luta", key: c.id, dados: c, filhos: [] }} />
+                          </div>
+                        ))}
+                      </div>
+                      </div>
+                    );
+                  return (
+                    <div style={{ marginTop: 16 }}>
+                    <div style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#c0c0c0", margin: "0 0 10px" }}>Repescagem e bronzes</div>
+                    {grupo("Repescagem", laterais.filter((c) => c.fase === "repescagem"))}
+                    {grupo("Bronzes", laterais.filter((c) => c.fase === "bronze"))}
+                    </div>
+                  );
+                })()}
             </>
           );
         })()}
@@ -471,7 +486,7 @@ function LinhaJogador({ uid, pontos, venceu, perdeu, trancado, nome, escudoDe, o
   );
 }
 function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
-    podio: { campeao?: string; vice?: string; terceiro?: string };
+    podio: { campeao?: string; vice?: string; terceiro?: string; terceiros?: string[] };
     nome: (uid: string | null) => string;
     escudoDe: (uid: string | null) => Identity;
     meuId: string | null;
@@ -480,12 +495,12 @@ function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
   }) {
   const t = useT();
   // Certificado aberto (a posição que o utilizador clicou para partilhar).
-  const [certificado, setCertificado] = useState<PosicaoPodio | null>(null);
+  const [certificado, setCertificado] = useState<{ pos: PosicaoPodio; uid: string } | null>(null);
   const linha = (uid: string | undefined, medalha: string, label: string, cor: string, pos: PosicaoPodio) => {
     if (!uid) return null;
     const souEu = !!meuId && uid === meuId;
     return (
-      <div style={{ background: "#121815", border: `1px solid ${cor}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+      <div key={uid} style={{ background: "#121815", border: `1px solid ${cor}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
       <span style={{ fontSize: 22, flexShrink: 0 }}>{medalha}</span>
       <div style={{ flexShrink: 0 }}><Escudo config={escudoDe(uid)} size={32} /></div>
@@ -496,7 +511,7 @@ function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
       </div>
       {/* Só o próprio (cada um do pódio) vê o botão de partilhar o SEU título. */}
       {souEu && (
-          <button onClick={() => setCertificado(pos)} style={{ width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: cor, color: pos === "vice" ? "#14181a" : "#1b1208", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+          <button onClick={() => setCertificado({ pos, uid })} style={{ width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 9, border: "none", background: cor, color: pos === "vice" ? "#14181a" : "#1b1208", fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
           Partilhar o meu título
           </button>
@@ -509,18 +524,18 @@ function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
     const base = escudoDe(uid ?? null);
     return { ...base, name: nome(uid ?? null) };
   };
-  const uidDaPos = (pos: PosicaoPodio): string | undefined =>
-  pos === "campeao" ? podio.campeao : pos === "vice" ? podio.vice : podio.terceiro;
+  // O certificado usa o uid guardado no estado (por causa dos DOIS bronzes: o
+  // "3o lugar" repete-se, por isso a posicao sozinha nao chega para saber quem).
   return (
     <div style={{ background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "16px 15px", marginBottom: 16 }}>
     <div style={{ textAlign: "center", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: GOLD, marginBottom: 12 }}>🏆 Pódio da Copa</div>
     {linha(podio.campeao, "🥇", t("ck.campeao"), GOLD, "campeao")}
     {linha(podio.vice, "🥈", t("ck.vice"), "#c0c0c0", "vice")}
-    {linha(podio.terceiro, "🥉", "3º lugar", "#c87f43", "terceiro")}
+    {(podio.terceiros && podio.terceiros.length ? podio.terceiros : podio.terceiro ? [podio.terceiro] : []).map((uid) => linha(uid, "🥉", "3º lugar", "#c87f43", "terceiro"))}
     {certificado && (
         <CartaoCertificado
-        posicao={certificado}
-        identity={idDe(uidDaPos(certificado))}
+        posicao={certificado.pos}
+        identity={idDe(certificado.uid)}
         nomeCopa={nomeCopa}
         nParticipantes={nParticipantes}
         onClose={() => setCertificado(null)}
