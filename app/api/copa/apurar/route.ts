@@ -7,8 +7,10 @@
 // atual ainda tem competição a decorrer, ou já está decidida e a seguinte já
 // existe, não duplica nada.
 //
-// MOTOR (Fase 2+3): usa gerarRondaSeguinteComRepescagem (lib/copa) — eliminação +
-// repescagem em paralelo com as semis + bloco final com 2 bronzes cruzados. A
+// MOTOR: usa gerarRondaSeguinteCopa (lib/copa), um dispatcher — ate 8 jogadores
+// usa o motor validado (repescagem em paralelo com as semis + bloco final com 2
+// bronzes cruzados); de 16/32 usa a CADEIA de repescagem (cada semifinalista
+// puxa em cadeia quem venceu antes da semi, cruzamento diagonal, 2 bronzes). A
 // escalação de cada confronto é decidida pela cascata (pontos -> capitão ->
   // sorteio) e os pontos vêm de resultados_atletas (CONGELADO pelo motor
   // lib/congelar). A `metade` (lado da chave) é lida e propagada para a
@@ -60,7 +62,7 @@
 // Devolve: { ok, apurou, ronda, decididos, gerouProxima, terminada, finalAEsperar }
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { decidirConfronto, gerarRondaSeguinteComRepescagem, idCompeticaoSeguinte, type PontosJogador, type ConfrontoRonda } from "@/lib/copa";
+import { decidirConfronto, gerarRondaSeguinteCopa, idCompeticaoSeguinte, type PontosJogador, type ConfrontoRonda } from "@/lib/copa";
 import { numeroDaRodada } from "@/lib/calendario";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 export const dynamic = "force-dynamic";
@@ -405,7 +407,16 @@ if (todaDecidida) {
   } else {
     const idProxima = idCompeticaoSeguinte(comp);
     if (idProxima) {
-      const novos = gerarRondaSeguinteComRepescagem(rondaFinal as ConfrontoRonda[], idProxima);
+      // O motor da copa precisa do HISTORICO COMPLETO e fresco (todas as rondas
+      // ja decididas), nao so a ronda atual: a cadeia de repescagem de 16/32 le
+      // quem cada semifinalista venceu em rondas anteriores. Ate 8 jogadores o
+      // dispatcher usa o motor antigo na mesma. Relemos tudo para apanhar as
+      // decisoes acabadas de gravar nesta chamada.
+      const { data: histFresco } = await supabaseAdmin
+        .from("copa_confrontos")
+        .select("ronda, ordem, fase, jogador_a, jogador_b, vencedor, estado, metade")
+        .eq("league_id", league_id);
+      const novos = gerarRondaSeguinteCopa((histFresco || []) as ConfrontoRonda[], idProxima);
       if (novos.length > 0) {
         const linhas = novos.map((n) => ({
               league_id,
