@@ -163,57 +163,63 @@ export interface PriceResult {
 /**
  * Calcula o novo preço de um atleta depois de uma competição.
  *
- * Lógica (documento mestre):
- *   - valoriza se o desempenho real superou a expectativa, desvaloriza se ficou abaixo
- *   - variação aplicada = METADE da variação calculada (amortecedor de inflação)
- *   - nunca abaixo de MIN_PRICE
+ * MODELO v2 — "PONTOS − PREÇO" (decidido com o Kainan, época = ano civil):
+ *   D = pontos − preço atual
+ *   novo preço = preço + 50% × D
  *
- * Exemplos validados:
- *   preço 10, esperado 10, real 15  ->  +50% bruto -> +25% aplicado -> 12,5 JC
- *   preço 10, esperado 10, real 17  ->  +70% bruto -> +35% aplicado -> 13,5 JC
- *   preço 10, esperado 10, real  6  ->  -40% bruto -> -20% aplicado ->  8,0 JC
+ * Ou seja: o atleta VALORIZA quando faz mais pontos do que o seu preço em JC, e
+ * DESVALORIZA quando faz menos. É simples de explicar ao jogador ("faz mais
+ * pontos do que custas") e não depende da expectativa 70/30.
+ *
+ * A expectativa 70/30 deixou de mover o preço DURANTE a época: agora só decide
+ *   (a) o preço INICIAL de um atleta novo (via lib/forma -> calcularForma), e
+ *   (b) o re-preço no início de cada ano (re-ancoragem na escala 2–20 JC).
+ * Por isso o parâmetro `expected` é aceite por compatibilidade mas já NÃO entra
+ * no cálculo do movimento. Os chamadores podem continuar a passá-lo.
+ *
+ * Sem MURO superior na época — só a rede de segurança TETO_PRECO (ver a nota
+ * dessa constante). Piso sempre em MIN_PRICE (2 JC).
+ *
+ * Exemplos validados (spec da Economia v2):
+ *   preço 15, real 35  ->  D=20  -> 15 + 10 = 25,0 JC   (delta +10)
+ *   preço 25, real 45  ->  D=20  -> 25 + 10 = 35,0 JC   (delta +10, passou dos 20)
+ *   preço 35, real  5  ->  D=-30 -> 35 - 15 = 20,0 JC   (delta -15)
+ *   preço 20, real 44  ->  D=24  -> 20 + 12 = 32,0 JC   (delta +12)
+ *
+ * NOTA sobre o património de quem escala: o que se grava aqui em `delta` é a
+ * variação REAL de preço do atleta (o que o mercado mostra). O ganho/perda de
+ * património do JOGADOR é ASSIMÉTRICO (ganha metade da subida, perde a descida
+ * inteira) e é aplicado em lib/congelar (pontuarUtilizadoresDaCompeticao), não
+ * aqui — para o motor de preço ficar puro e sem saber de equipas.
  *
  * @param currentPrice Preço atual em JC
- * @param expected     Expectativa (use expectedPerformance())
- * @param actual       Pontuação real obtida nesta competição
+ * @param expected     (compat) Expectativa 70/30 — já não usada no movimento
+ * @param actual       Pontuação real (SIMPLES) obtida nesta competição
  */
 export function computeNewPrice(
   currentPrice: number,
   expected: number,
   actual: number
 ): PriceResult {
-  // Sem histórico fiável (atleta novo): não mexe no preço por desempenho.
-  if (expected <= 0.5) {
-    const safe = round1(Math.max(MIN_PRICE, currentPrice));
-    return {
-      oldPrice: currentPrice,
-      newPrice: safe,
-      rawVariationPct: 0,
-      appliedVariationPct: 0,
-      delta: round1(safe - currentPrice),
-    };
-  }
-  const rawVariationPct = ((actual - expected) / expected) * 100;
-  // 1) Amortecedor: só metade do que o desempenho sugere.
-  let appliedVariationPct = rawVariationPct / 2;
-  // 2) Teto por rodada: mesmo assim, ninguém salta mais do que isto de uma vez.
-  //    É esta linha que faltava — sem ela, uma expectativa pequena no
-  //    denominador produzia variações de centenas por cento.
-  appliedVariationPct = Math.max(-MAX_VARIACAO_PCT, Math.min(MAX_VARIACAO_PCT, appliedVariationPct));
-  let newPrice = currentPrice * (1 + appliedVariationPct / 100);
-  // 3) Limites absolutos: nunca abaixo de 2 JC, nunca acima do TETO_PRECO (rede
-  //    de segurança, não muro de jogo — ver TETO_PRECO). O teto REAL é natural:
-  //    a expectativa sobe a cada boa rodada, por isso a valorização diminui
-  //    sozinha e o preço estabiliza muito antes deste limite.
+  // v2: a expectativa já não move o preço na época (só o preço inicial / reset).
+  void expected;
+
+  // D = pontos − preço. Metade de D é o movimento do preço.
+  const D = actual - currentPrice;
+  let newPrice = currentPrice + 0.5 * D;
+
+  // Limites absolutos: nunca abaixo de 2 JC, nunca acima do TETO_PRECO (rede de
+  // segurança contra dados corrompidos, NÃO muro de jogo — ver TETO_PRECO).
   newPrice = round1(Math.min(TETO_PRECO, Math.max(MIN_PRICE, newPrice)));
+
+  // Variação em % do preço, DEPOIS dos limites — é a que o jogador vê no ▲/▼ e
+  // tem de bater certo com a diferença de preço.
+  const pct = currentPrice > 0 ? round1(((newPrice - currentPrice) / currentPrice) * 100) : 0;
   return {
     oldPrice: currentPrice,
     newPrice,
-    rawVariationPct: round1(rawVariationPct),
-    // A variação REAL depois dos limites — é a que o jogador vê, e tem de bater
-    // certo com a diferença de preço. Devolver a teórica faria a app dizer
-    // "+50%" quando o preço subiu 3%.
-    appliedVariationPct: currentPrice > 0 ? round1(((newPrice - currentPrice) / currentPrice) * 100) : 0,
+    rawVariationPct: pct,
+    appliedVariationPct: pct,
     delta: round1(newPrice - currentPrice),
   };
 }
