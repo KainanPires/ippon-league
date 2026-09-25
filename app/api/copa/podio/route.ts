@@ -49,13 +49,17 @@ export async function GET(req: Request) {
   const lista = confrontos || [];
   // O pódio: campeão e vice saem da final; 3º sai do bronze.
   const final = lista.find((c) => c.fase === "final");
-  const bronze = lista.find((c) => c.fase === "bronze");
+  // DOIS bronzes: o motor cruza o repescado de cada metade com o meia-perdedor
+  // do outro lado. Antes usávamos find() e mostrávamos só o primeiro terceiro.
+  const bronzeIds = Array.from(
+    new Set(lista.filter((c) => c.fase === "bronze" && c.vencedor).map((c) => String(c.vencedor)))
+  );
   if (!final || !final.vencedor) {
     return NextResponse.json({ erro: "A copa não tem final decidida." }, { status: 400 });
   }
   const campeaoId = final.vencedor;
   const viceId = final.vencedor === final.jogador_a ? final.jogador_b : final.jogador_a;
-  const terceiroId = bronze?.vencedor ?? null;
+  const terceiroId = bronzeIds[0] ?? null;
   // Nº de participantes (membros da liga).
   const { data: membros } = await supabaseAdmin
   .from("league_members")
@@ -90,7 +94,7 @@ export async function GET(req: Request) {
     }
     return { pontos: Math.round(pontos * 10) / 10, rondas };
   }
-  const ids = [campeaoId, viceId, terceiroId].filter((x): x is string => !!x);
+  const ids = [campeaoId, viceId, ...bronzeIds].filter((x): x is string => !!x);
   const identidades = await identidadesEPro(ids);
   function montar(uid: string | null): DadosPosicao | null {
     if (!uid) return null;
@@ -116,7 +120,10 @@ export async function GET(req: Request) {
       podio: {
         campeao: montar(campeaoId),
         vice: montar(viceId),
+        // Mantido para quem ainda leia o campo antigo (o primeiro terceiro).
         terceiro: montar(terceiroId),
+        // TODOS os medalhistas de bronze — normalmente dois.
+        terceiros: bronzeIds.map((u) => montar(u)).filter((x): x is DadosPosicao => !!x),
       },
     });
 }
