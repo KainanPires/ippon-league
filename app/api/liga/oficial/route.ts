@@ -19,6 +19,8 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, type IjfContest } from "@/lib/ijf";
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
+import { CALENDARIO_2026, estadoMercado } from "@/lib/calendario";
+import { hidratarHorarios } from "@/lib/horarios";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 // Quantos Pro buscar no máximo (proteção; o ranking mostra os melhores).
@@ -44,6 +46,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, erro: "tipo deve ser 'mundial' ou 'continental'." }, { status: 400 });
   }
   if (!comp) return NextResponse.json({ ok: false, erro: "Falta ?comp=<id_competicao>." }, { status: 400 });
+  // PORTÃO ANTI-ESPREITADELA (igual ao /api/resultados e ao /api/liga): com o
+  // mercado ainda ABERTO não devolvemos os pontos da rodada. Nos clássicos as
+  // lutas de 2018/2019 já existem no JudoBase, e o ranking da rodada era uma
+  // porta para as espreitar e ir afinando a equipa até maximizar a pontuação.
+  // Competições fora do calendário passam à frente (não são rodadas geridas aqui).
+  await hidratarHorarios();
+  const semanaComp = CALENDARIO_2026.find((c) => c.idCompeticao === comp);
+  const mercadoAberto = !!semanaComp && estadoMercado(semanaComp).estado === "aberto";
   // 1) Para a continental, descobrir o continente do utilizador que pergunta.
 let continente: Continente | null = null;
 let nomeContinente: string | null = null;
@@ -85,25 +95,30 @@ const idsNecessarios = new Set<string>();
 for (const eq of Array.from(equipaDe.values())) {
   for (const aid of eq.atletas) idsNecessarios.add(aid);
 }
-const pontosPorAtleta = await pontuacaoPorAtletas(Array.from(idsNecessarios), comp);
+// Com o mercado aberto nem sequer vamos ao JudoBase — os pontos ficam escondidos.
+const pontosPorAtleta = mercadoAberto ? {} : await pontuacaoPorAtletas(Array.from(idsNecessarios), comp);
 // 5) Calcula a pontuação de cada participante.
 const linhas: MembroRank[] = userIds.map((uid) => {
     const eq = equipaDe.get(uid);
-    if (!eq || eq.atletas.length === 0) {
-      return { user_id: uid, nome_time: eq?.nome ?? "—", escudo: eq?.escudo ?? null, escalou: false, pontos: 0, posicao: 0, is_pro: true };
-    }
-    let total = 0;
-    for (const aid of eq.atletas) {
-      const p = pontosPorAtleta[aid] ?? 0;
-      total += p;
-      if (eq.capitao && aid === eq.capitao) total += p; // capitão a dobrar
+    const escalou = !!eq && eq.atletas.length > 0;
+    // PORTÃO: com o mercado aberto os pontos ficam a 0 (escondidos) para toda a
+    // gente. O "escalou" mantém-se — saber que alguém já montou não copia nada.
+    let pontos = 0;
+    if (escalou && !mercadoAberto) {
+      let total = 0;
+      for (const aid of eq!.atletas) {
+        const p = pontosPorAtleta[aid] ?? 0;
+        total += p;
+        if (eq!.capitao && aid === eq!.capitao) total += p; // capitão a dobrar
+      }
+      pontos = Math.round(total * 10) / 10;
     }
     return {
       user_id: uid,
-      nome_time: eq.nome,
-      escudo: eq.escudo,
-      escalou: true,
-      pontos: Math.round(total * 10) / 10,
+      nome_time: eq?.nome ?? "—",
+      escudo: eq?.escudo ?? null,
+      escalou,
+      pontos,
       posicao: 0,
       is_pro: true,
     };
@@ -117,7 +132,7 @@ linhas.sort((a, b) => {
 for (const l of linhas) {
   l.posicao = linhas.filter((o) => o.escalou && o.pontos > l.pontos).length + 1;
 }
-return NextResponse.json({ ok: true, tipo, continente, nomeContinente, membros: linhas });
+return NextResponse.json({ ok: true, tipo, continente, nomeContinente, membros: linhas, bloqueado: mercadoAberto, mercado_aberto: mercadoAberto });
 }
 // ---------------------------------------------------------------------------
 // PONTUACAO POR ATLETA
