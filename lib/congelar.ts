@@ -18,15 +18,19 @@
 // IDEMPOTENTE: correr de novo dá o mesmo resultado (upserts + património
   // recalculado do zero). O cron reprocessa a janela recente todos os dias sem inchar.
 //
-// MODELO ECONÓMICO (decidido com o Kainan):
+// MODELO ECONÓMICO v2 (decidido com o Kainan; época = ano civil, fecha 30 dez):
 // - Preço ÚNICO e tabelado (vive em precos_atletas).
-// - Modelo B: valoriza/desvaloriza por cima do preço anterior, comparando os
-// pontos SIMPLES com a expectativa (70% média 12m + 30% últimas 3). Aplica
-// METADE da variação (amortecedor). Nunca abaixo de 2 JC. Sem teto.
-// - Modelo A (calcularForma): preço INICIAL de atleta novo (sem preço anterior).
+// - Preço na época: modelo "PONTOS − PREÇO" (lib/engine -> computeNewPrice).
+//   D = pontos SIMPLES − preço anterior; novo preço = preço + 50%×D. Sem muro
+//   superior na época (só a rede TETO_PRECO); nunca abaixo de 2 JC.
+// - Modelo A (calcularForma, 70/30): preço INICIAL de atleta novo E re-preço no
+//   início de ano. A expectativa 70/30 já NÃO move o preço durante a época.
 // - Capitão pontua x2 para a EQUIPA, mas o preço valoriza por pontos SIMPLES.
-// - Património = 100 + soma das valorizações dos atletas escalados, recalculado
-// do zero por época (sem teto de crescimento). Reinicia a 100 a cada ano.
+// - Património ASSIMÉTRICO: por atleta escalado, o jogador GANHA metade do que o
+//   atleta valorizou, mas PERDE o total do que ele desvalorizou. É o amortecedor
+//   que dá sentido à época e à compra de JC (passe de temporada).
+// - Património = 100 + soma desses ganhos/perdas na época, recalculado do zero.
+//   Reinicia a 100 a cada ano.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   getCompetitionCompetitorsRaw,
@@ -323,8 +327,12 @@ async function pontuarUtilizadoresDaCompeticao(idComp: string, mes: string): Pro
       const base = pontosAtleta.get(aid) ?? 0;
       // Pontos para a equipa: capitão dobra.
       pontosRodada += aid === capitao ? base * 2 : base;
-      // Valorização: pelos pontos SIMPLES (variação já calculada por atleta).
-      ganhoPatrimonio += variacaoAtleta.get(aid) ?? 0;
+      // PATRIMÓNIO (v2, ASSIMÉTRICO): o jogador GANHA metade do que o atleta
+      // valorizou, mas PERDE o total do que ele desvalorizou. (variacao_jc é a
+      // variação REAL de preço do atleta; ver lib/engine -> computeNewPrice.)
+      // Exemplos: atleta +12 -> +6 no património; atleta -5 -> -5 no património.
+      const v = variacaoAtleta.get(aid) ?? 0;
+      ganhoPatrimonio += v > 0 ? round1(v / 2) : v;
       // Melhor/pior pelo desempenho SIMPLES.
       if (base > melhorPts) { melhorPts = base; melhor = aid; }
       if (base < piorPts) { piorPts = base; pior = aid; }
