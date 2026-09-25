@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Escudo, SymbolGlyph, loadIdentity, saveIdentity, SHAPES, PATTERNS, SYMBOLS, COLORS, type Identity, type ShapeId, type PatternId, type SymbolId } from "@/components/Escudo";
+import { Escudo, SymbolGlyph, loadIdentity, saveIdentity, SHAPES, PATTERNS, SYMBOLS, COLORS, FREE_SHAPES, FREE_PATTERNS, FREE_SYMBOLS, colorIsFree, type Identity, type ShapeId, type PatternId, type SymbolId } from "@/components/Escudo";
 import { atualizarIdentidadeCloud, loadIdentityCloudFor } from "@/lib/team";
 import { focoMercado } from "@/lib/calendario";
 import { supabase } from "@/lib/supabase";
-import { useT } from "@/lib/i18n";
+import { useT, useLingua, type Lingua } from "@/lib/i18n";
+import { useNivel } from "@/lib/useNivel";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -28,8 +29,26 @@ const SLOTS_ESTAMPA: { id: Slot; label: string }[] = [
   { id: "stamp2", label: "escudo.estampa2" },
 ];
 
+// Textos do cadeado Pro. Conteúdo pequeno e específico deste ecrã -> mapa local
+// por língua (o mesmo padrão do resto do conteúdo por ecrã; não mexe no
+// dicionário global de i18n).
+const PRO_LOCK: Record<Lingua, { pro: string; titulo: string; texto: string; cta: string }> = {
+  pt: { pro: "Pro", titulo: "Desbloqueia com o Ippon Pro", texto: "Esta opção faz parte do Ippon Pro. Assina para desbloquear todas as formas, estampas, símbolos e cores do teu escudo.", cta: "Conhecer o Ippon Pro" },
+  en: { pro: "Pro", titulo: "Unlock with Ippon Pro", texto: "This option is part of Ippon Pro. Subscribe to unlock every shape, pattern, symbol and colour for your crest.", cta: "Discover Ippon Pro" },
+  es: { pro: "Pro", titulo: "Desbloquea con Ippon Pro", texto: "Esta opción es parte de Ippon Pro. Suscríbete para desbloquear todas las formas, estampados, símbolos y colores de tu escudo.", cta: "Descubrir Ippon Pro" },
+  fr: { pro: "Pro", titulo: "Débloque avec Ippon Pro", texto: "Cette option fait partie d'Ippon Pro. Abonne-toi pour débloquer toutes les formes, motifs, symboles et couleurs de ton blason.", cta: "Découvrir Ippon Pro" },
+  de: { pro: "Pro", titulo: "Mit Ippon Pro freischalten", texto: "Diese Option gehört zu Ippon Pro. Abonniere, um alle Formen, Muster, Symbole und Farben für dein Wappen freizuschalten.", cta: "Ippon Pro entdecken" },
+};
+
 export default function EscudoEditorPage() {
   const t = useT();
+  const { lingua } = useLingua();
+  const { ehPro, pronto: nivelPronto } = useNivel();
+  // Só se tranca depois de sabermos que o utilizador NÃO é Pro — assim o cadeado
+  // nunca pisca a quem já é Pro enquanto o nível carrega.
+  const bloquear = nivelPronto && !ehPro;
+  const L = PRO_LOCK[lingua] ?? PRO_LOCK.pt;
+  const [proAviso, setProAviso] = useState(false);
   const [id, setId] = useState<Identity | null>(null);
   // Lê os parâmetros do URL no cliente (sem useSearchParams, evita Suspense).
   const [voltar, setVoltar] = useState("/inicio");
@@ -114,7 +133,13 @@ export default function EscudoEditorPage() {
   }
   function rnd<T>(a: T[]): T { return a[Math.floor(Math.random() * a.length)]; }
   function sortear() {
-    setId((p) => p ? { ...p, shape: rnd(SHAPES), pattern: rnd(PATTERNS).id, symbol: rnd(SYMBOLS).id, bg1: rnd(COLORS), bg2: rnd(COLORS), stamp1: rnd(COLORS), stamp2: rnd(COLORS), border: rnd(COLORS), icon: rnd(COLORS), iconBorder: rnd(COLORS) } : p);
+    // Para quem não é Pro, o sorteio só usa as opções grátis — nunca gera um
+    // escudo trancado que a pessoa depois não conseguiria repetir à mão.
+    const shapes = bloquear ? SHAPES.filter((s) => FREE_SHAPES.includes(s)) : SHAPES;
+    const patterns = bloquear ? PATTERNS.filter((p) => FREE_PATTERNS.includes(p.id)) : PATTERNS;
+    const symbols = bloquear ? SYMBOLS.filter((s) => FREE_SYMBOLS.includes(s.id)) : SYMBOLS;
+    const colors = bloquear ? COLORS.filter((c) => colorIsFree(c)) : COLORS;
+    setId((p) => p ? { ...p, shape: rnd(shapes), pattern: rnd(patterns).id, symbol: rnd(symbols).id, bg1: rnd(colors), bg2: rnd(colors), stamp1: rnd(colors), stamp2: rnd(colors), border: rnd(colors), icon: rnd(colors), iconBorder: rnd(colors) } : p);
   }
 
   // Aplica uma sugestão clicada: preenche o campo e limpa o aviso.
@@ -258,20 +283,26 @@ export default function EscudoEditorPage() {
 
           <CenterLabel>{t("escudo.escolherForma")}</CenterLabel>
           <ScrollRow>
-            {SHAPES.map((s) => (
-              <Thumb key={s} on={id.shape === s} onClick={() => set("shape", s as ShapeId)}>
-                <Escudo config={{ ...id, shape: s as ShapeId }} size={40} />
-              </Thumb>
-            ))}
+            {SHAPES.map((s) => {
+              const locked = bloquear && !FREE_SHAPES.includes(s);
+              return (
+                <Thumb key={s} on={id.shape === s} locked={locked} onClick={() => (locked ? setProAviso(true) : set("shape", s as ShapeId))}>
+                  <Escudo config={{ ...id, shape: s as ShapeId }} size={40} />
+                </Thumb>
+              );
+            })}
           </ScrollRow>
 
           <CenterLabel>{t("escudo.escolherEstampa")}</CenterLabel>
           <ScrollRow>
-            {PATTERNS.map((p) => (
-              <Thumb key={p.id} on={id.pattern === p.id} onClick={() => set("pattern", p.id as PatternId)}>
-                <Escudo config={{ ...id, shape: "circle", pattern: p.id as PatternId }} size={40} />
-              </Thumb>
-            ))}
+            {PATTERNS.map((p) => {
+              const locked = bloquear && !FREE_PATTERNS.includes(p.id);
+              return (
+                <Thumb key={p.id} on={id.pattern === p.id} locked={locked} onClick={() => (locked ? setProAviso(true) : set("pattern", p.id as PatternId))}>
+                  <Escudo config={{ ...id, shape: "circle", pattern: p.id as PatternId }} size={40} />
+                </Thumb>
+              );
+            })}
           </ScrollRow>
 
           {/* CORES — cada camada do escudo tem o seu controlo. A "Borda do ícone"
@@ -313,17 +344,26 @@ export default function EscudoEditorPage() {
             )}
             {COLORS.map((c) => {
               const on = valorSlot.toLowerCase() === c.toLowerCase();
-              return <button key={c} onClick={() => set(slot, c)} aria-label={c} style={{ width: 34, height: 34, borderRadius: "50%", background: c, border: `2px solid ${on ? "#f1ede2" : "rgba(255,255,255,0.18)"}`, boxShadow: on ? `0 0 0 2px ${GOLD}` : "none", cursor: "pointer" }} />;
+              const locked = bloquear && !colorIsFree(c);
+              return (
+                <button key={c} onClick={() => (locked ? setProAviso(true) : set(slot, c))} aria-label={locked ? `${c} (${L.pro})` : c}
+                  style={{ position: "relative", width: 34, height: 34, borderRadius: "50%", background: c, border: `2px solid ${on ? "#f1ede2" : "rgba(255,255,255,0.18)"}`, boxShadow: on ? `0 0 0 2px ${GOLD}` : "none", cursor: "pointer", opacity: locked ? 0.45 : 1 }}>
+                  {locked && <LockDot />}
+                </button>
+              );
             })}
           </div>
 
           <CenterLabel>{t("escudo.escolherAdorno")}</CenterLabel>
           <ScrollRow>
-            {SYMBOLS.map((s) => (
-              <Thumb key={s.id} on={id.symbol === s.id} onClick={() => set("symbol", s.id as SymbolId)}>
-                {s.id === "none" ? <span style={{ color: "#7c8a82", fontSize: 13 }}>—</span> : <svg viewBox="0 0 24 24" width={22} height={22}><SymbolGlyph id={s.id as SymbolId} color="#f1ede2" /></svg>}
-              </Thumb>
-            ))}
+            {SYMBOLS.map((s) => {
+              const locked = bloquear && !FREE_SYMBOLS.includes(s.id);
+              return (
+                <Thumb key={s.id} on={id.symbol === s.id} locked={locked} onClick={() => (locked ? setProAviso(true) : set("symbol", s.id as SymbolId))}>
+                  {s.id === "none" ? <span style={{ color: "#7c8a82", fontSize: 13 }}>—</span> : <svg viewBox="0 0 24 24" width={22} height={22}><SymbolGlyph id={s.id as SymbolId} color="#f1ede2" /></svg>}
+                </Thumb>
+              );
+            })}
           </ScrollRow>
         </div>
       </div>
@@ -351,6 +391,19 @@ export default function EscudoEditorPage() {
           </div>
         </div>
       )}
+
+      {/* Convite ao Ippon Pro quando um utilizador grátis toca numa opção trancada. */}
+      {proAviso && (
+        <div onClick={() => setProAviso(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(6,8,7,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 320, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 22, textAlign: "center" }}>
+            <div style={{ fontSize: 30, marginBottom: 6 }}>🔒</div>
+            <h2 style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", margin: "0 0 8px" }}>{L.titulo}</h2>
+            <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 18px" }}>{L.texto}</p>
+            <a href="/ippon-pro" style={{ display: "block", width: "100%", boxSizing: "border-box", padding: 13, borderRadius: 12, background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", textDecoration: "none" }}>{L.cta}</a>
+            <button onClick={() => setProAviso(false)} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 13, cursor: "pointer", fontFamily: FB }}>{t("comum.cancelar")}</button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -361,11 +414,20 @@ function Label({ children }: { children: React.ReactNode }) {
 function CenterLabel({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#cfd8d2", textAlign: "center", marginBottom: 12 }}>{children}</div>;
 }
-function Thumb({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+function Thumb({ on, onClick, locked = false, children }: { on: boolean; onClick: () => void; locked?: boolean; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} style={{ flex: "0 0 auto", width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", background: on ? "#16201b" : "#121815", border: `2px solid ${on ? GOLD : "#243029"}`, borderRadius: "50%", cursor: "pointer" }}>
-      {children}
+    <button onClick={onClick} style={{ position: "relative", flex: "0 0 auto", width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", background: on ? "#16201b" : "#121815", border: `2px solid ${on ? GOLD : "#243029"}`, borderRadius: "50%", cursor: "pointer" }}>
+      <span style={{ opacity: locked ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center" }}>{children}</span>
+      {locked && <LockDot />}
     </button>
+  );
+}
+// Selo de cadeado (canto superior direito) para as opções só-Pro.
+function LockDot() {
+  return (
+    <span aria-hidden="true" style={{ position: "absolute", top: -3, right: -3, width: 17, height: 17, borderRadius: "50%", background: GOLD, color: "#1b211e", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+    </span>
   );
 }
 function ScrollRow({ children }: { children: React.ReactNode }) {
