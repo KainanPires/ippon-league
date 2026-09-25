@@ -26,13 +26,15 @@ interface Preview {
   ok: boolean;
   edicoes?: Edicao[];
   proximoNumero?: number;
-  jaHaAberta?: { numero: number; inscricoes_ate: string | null } | null;
+  jaHaAberta?: { numero: number; inscricoes_ate: string | null; inscritos?: number } | null;
 }
 interface Resultado {
   ok: boolean;
   erro?: string;
   detalhe?: string;
   jaAberta?: boolean;
+  substituida?: boolean;
+  inscricoesLimpas?: number;
   edicao?: Edicao;
   nota?: string;
 }
@@ -42,7 +44,8 @@ export default function DodoEdicaoPage() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [numero, setNumero] = useState<string>("1");
   const [ate, setAte] = useState<string>("2026-10-28T12:00");
-  const [forcar, setForcar] = useState(false);
+  const [substituir, setSubstituir] = useState(false);
+  const [limpar, setLimpar] = useState(false);
   const [aCriar, setACriar] = useState(false);
   const [res, setRes] = useState<Resultado | null>(null);
 
@@ -82,7 +85,7 @@ export default function DodoEdicaoPage() {
       const r = await fetch("/api/admin/dodo-edicao", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tk}` },
-        body: JSON.stringify({ inscricoes_ate: ate, numero: Number(numero), forcar }),
+        body: JSON.stringify({ inscricoes_ate: ate, numero: Number(numero), substituir, limparInscricoes: limpar }),
       });
       const j = (await r.json()) as Resultado;
       setRes(j);
@@ -117,9 +120,10 @@ export default function DodoEdicaoPage() {
           <Linha rotulo="Proximo numero sugerido" valor={String(preview.proximoNumero ?? "-")} />
           <Linha rotulo="Edicoes existentes" valor={String((preview.edicoes || []).length)} />
           {preview.jaHaAberta && (
-            <p style={{ color: GOLD, fontSize: 13, margin: "8px 0 0" }}>
-              Ja existe a {preview.jaHaAberta.numero}a edicao com inscricoes abertas (fecha {curta(preview.jaHaAberta.inscricoes_ate)}).
-              Marca &quot;forcar&quot; so se souberes o que estas a fazer.
+            <p style={{ color: GOLD, fontSize: 13, margin: "8px 0 0", lineHeight: 1.5 }}>
+              Ja existe a {preview.jaHaAberta.numero}a edicao com inscricoes abertas (fecha {curta(preview.jaHaAberta.inscricoes_ate)},
+              {" "}{preview.jaHaAberta.inscritos ?? 0} inscritos). Para mudar a data dela para esta,
+              marca &quot;substituir&quot; abaixo em vez de criar outra.
             </p>
           )}
           {(preview.edicoes || []).length > 0 && (
@@ -148,8 +152,12 @@ export default function DodoEdicaoPage() {
           </span>
         </label>
         <label style={{ display: "flex", alignItems: "center", gap: 8, color: "#c8c0b8", fontSize: 14 }}>
-          <input type="checkbox" checked={forcar} onChange={(e) => setForcar(e.target.checked)} />
-          Criar mesmo que ja exista uma edicao aberta (forcar)
+          <input type="checkbox" checked={substituir} onChange={(e) => setSubstituir(e.target.checked)} />
+          Substituir a edicao ja aberta (muda o fecho dela para esta data)
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, color: "#c8c0b8", fontSize: 14 }}>
+          <input type="checkbox" checked={limpar} onChange={(e) => setLimpar(e.target.checked)} disabled={!substituir} />
+          Limpar as inscricoes existentes (arrancar limpa)
         </label>
       </div>
 
@@ -171,10 +179,15 @@ export default function DodoEdicaoPage() {
           )}
           {res.ok && res.edicao && (
             <>
-              <p style={{ color: "#7fd1a3", margin: 0, fontWeight: 700 }}>{res.edicao.numero}a Copa do Dodo aberta!</p>
+              <p style={{ color: "#7fd1a3", margin: 0, fontWeight: 700 }}>
+                {res.substituida ? `${res.edicao.numero}a Copa do Dodo atualizada!` : `${res.edicao.numero}a Copa do Dodo aberta!`}
+              </p>
               <Linha rotulo="Estado" valor={res.edicao.estado} />
               <Linha rotulo="Inscricoes fecham" valor={curta(res.edicao.inscricoes_ate)} />
               <Linha rotulo="Ano" valor={String(res.edicao.ano ?? "-")} />
+              {res.substituida && typeof res.inscricoesLimpas === "number" && (
+                <Linha rotulo="Inscricoes limpas" valor={String(res.inscricoesLimpas)} />
+              )}
               {res.nota && <p style={{ color: "#9a938c", fontSize: 12, marginTop: 8 }}>{res.nota}</p>}
               <a href="/dodo" style={{ display: "inline-block", marginTop: 10, color: GOLD, border: `1px solid ${GOLD}`, borderRadius: 8, padding: "8px 14px", textDecoration: "none", fontWeight: 600, fontSize: 14 }}>
                 Ver a pagina do Dodo
