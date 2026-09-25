@@ -32,6 +32,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, type IjfContest } from "@/lib/ijf";
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import { competicaoPorId } from "@/lib/copa";
+import { CALENDARIO_2026, estadoMercado } from "@/lib/calendario";
+import { hidratarHorarios } from "@/lib/horarios";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 // Teto de participantes nas oficiais (proteção). Amigos não tem teto prático.
@@ -57,6 +59,14 @@ export async function GET(req: Request) {
   const user_id = (searchParams.get("user_id") || "").trim();
   const comp = (searchParams.get("comp") || "").trim();
   if (!comp) return NextResponse.json({ ok: false, erro: "Falta ?comp=<id_competicao>." }, { status: 400 });
+  // PORTÃO ANTI-ESPREITADELA: com o mercado ABERTO, a rodada que decorre NÃO
+  // entra ao vivo no geral (fica 0, escondida para todos). Nos clássicos as lutas
+  // já existem no JudoBase, e somá-las ao acumulado antes do fecho deixava ver a
+  // pontuação e afinar a equipa até maximizar. Só entra depois do fecho; o
+  // histórico congelado (resultados_rodada) não é afetado por isto.
+  await hidratarHorarios();
+  const semanaComp = CALENDARIO_2026.find((c) => c.idCompeticao === comp);
+  const mercadoAberto = !!semanaComp && estadoMercado(semanaComp).estado === "aberto";
   // -------------------------------------------------------------------------
   // 1) Quem são os participantes? Dois modos de alvo.
 // -------------------------------------------------------------------------
@@ -207,7 +217,8 @@ const idsNecessarios = new Set<string>();
   for (const eq of Array.from(equipaDe.values())) {
     for (const aid of eq.atletas) idsNecessarios.add(aid);
   }
-  const pontosPorAtleta = await pontuacaoPorAtletas(Array.from(idsNecessarios), comp);
+  // Com o mercado aberto nem vamos ao JudoBase — a rodada ao vivo fica escondida.
+  const pontosPorAtleta = mercadoAberto ? {} : await pontuacaoPorAtletas(Array.from(idsNecessarios), comp);
 // -------------------------------------------------------------------------
 // 5) Património atual (Judocoins) + nome/escudo de quem não escalou agora.
 // Buscamos users.patrimony_jc e, como recurso para o nome/escudo de quem
@@ -251,10 +262,14 @@ const linhas: MembroGeral[] = userIds.map((uid) => {
     let escalou = false;
     if (eq && eq.atletas.length > 0 && atualNaJanela && contaParaMembro(uid, comp)) {
       escalou = true;
-      for (const aid of eq.atletas) {
-        const p = pontosPorAtleta[aid] ?? 0;
-        pontosRodada += p;
-        if (eq.capitao && aid === eq.capitao) pontosRodada += p; // capitão a dobrar
+      // PORTÃO: só soma a rodada ao vivo DEPOIS de o mercado fechar. Com o
+      // mercado aberto, escalou fica true (já montou) mas os pontos ficam a 0.
+      if (!mercadoAberto) {
+        for (const aid of eq.atletas) {
+          const p = pontosPorAtleta[aid] ?? 0;
+          pontosRodada += p;
+          if (eq.capitao && aid === eq.capitao) pontosRodada += p; // capitão a dobrar
+        }
       }
     }
     pontosRodada = Math.round(pontosRodada * 10) / 10;
@@ -285,7 +300,7 @@ linhas.sort((a, b) => b.pontos_geral - a.pontos_geral);
 for (const l of linhas) {
   l.posicao = linhas.filter((o) => o.pontos_geral > l.pontos_geral).length + 1;
 }
-return NextResponse.json({ ok: true, tipo: tipo || "amigos", continente, nomeContinente, comp, membros: linhas });
+return NextResponse.json({ ok: true, tipo: tipo || "amigos", continente, nomeContinente, comp, membros: linhas, bloqueado: mercadoAberto, mercado_aberto: mercadoAberto });
 }
 // Data (meio-dia, para evitar fronteiras de fuso) da competição no calendário.
 // null se a competição não estiver no calendário ou tiver data inválida.
