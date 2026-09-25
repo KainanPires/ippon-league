@@ -2,10 +2,10 @@
 
 // app/admin/copa-teste/page.tsx
 //
-// Painel de admin (só para o Kainan) para montar uma COPA IPPON de teste com as
-// contas Pro que já existem. Chama /api/admin/copa-teste com o token da sessão.
-// A verdadeira barreira é no servidor (users.is_admin); aqui só escondemos a UI
-// de quem não é admin.
+// Painel de admin (so para o Kainan) para montar uma COPA IPPON de teste com as
+// contas Pro que ja existem. Chama /api/admin/copa-teste com o token da sessao.
+// A verdadeira barreira e no servidor (users.is_admin); aqui so escondemos a UI
+// de quem nao e admin.
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -53,13 +53,33 @@ export default function CopaTestePage() {
   const [res, setRes] = useState<Resultado | null>(null);
   const [aCriar, setACriar] = useState(false);
   const [recriar, setRecriar] = useState(false);
+  const [chave, setChave] = useState<string>("");
+  const [aEspreitar, setAEspreitar] = useState(false);
 
   const token = useCallback(async (): Promise<string> => {
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token || "";
   }, []);
 
-  // 1) Confirma admin e carrega a pré-visualização.
+  async function espreitar() {
+    setAEspreitar(true);
+    setChave("");
+    try {
+      const tk = await token();
+      const r = await fetch("/api/admin/copa-teste?debug=confrontos", {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${tk}` },
+      });
+      const j = await r.json();
+      setChave(JSON.stringify(j, null, 2));
+    } catch (e) {
+      setChave("Falha: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setAEspreitar(false);
+    }
+  }
+
+  // 1) Confirma admin e carrega a pre-visualizacao.
   useEffect(() => {
     let vivo = true;
     (async () => {
@@ -85,7 +105,7 @@ export default function CopaTestePage() {
         const j = await r.json();
         if (vivo && j?.ok) setPreview(j as Preview);
       } catch {
-        /* segue sem pré-visualização */
+        /* segue sem pre-visualizacao */
       }
     })();
     return () => {
@@ -113,13 +133,13 @@ export default function CopaTestePage() {
   }
 
   if (acesso === "...") {
-    return <Moldura><p style={{ color: "#9a938c" }}>A carregar…</p></Moldura>;
+    return <Moldura><p style={{ color: "#9a938c" }}>A carregar...</p></Moldura>;
   }
   if (acesso === "nao") {
     return (
       <Moldura>
         <h1 style={{ color: GOLD, fontSize: 20, margin: 0 }}>Sem acesso</h1>
-        <p style={{ color: "#9a938c" }}>Esta página é só para administradores.</p>
+        <p style={{ color: "#9a938c" }}>Esta pagina e so para administradores.</p>
       </Moldura>
     );
   }
@@ -128,20 +148,20 @@ export default function CopaTestePage() {
     <Moldura>
       <h1 style={{ color: GOLD, fontSize: 22, margin: "0 0 4px" }}>Copa de teste</h1>
       <p style={{ color: "#c8c0b8", marginTop: 0, fontSize: 14, lineHeight: 1.5 }}>
-        Monta uma Copa Ippon completa com as contas Pro que já existem, nos clássicos com dados reais
-        (Osaka → Haia → Montreal). Escreve numa liga <b>COPA TESTE</b> nova, mete essas contas como
-        membros, monta-lhes uma equipa em cada clássico (sem tocar em equipas já guardadas) e faz o
-        sorteio. Depois é só congelar e apurar.
+        Monta uma Copa Ippon completa com as contas Pro que ja existem, nos classicos com dados reais
+        (Osaka &rarr; Haia &rarr; Montreal). Escreve numa liga <b>COPA TESTE</b> nova, mete essas contas como
+        membros, monta-lhes uma equipa em cada classico (sem tocar em equipas ja guardadas) e faz o
+        sorteio. Depois e so congelar e apurar.
       </p>
 
       {preview && (
         <div style={caixa}>
-          <Linha rotulo="Contas Pro encontradas" valor={String(preview.total_pros ?? "—")} />
-          <Linha rotulo="Vão entrar no teste" valor={String(preview.participantes_no_teste ?? "—")} />
-          <Linha rotulo="Clássicos da chave" valor={(preview.comps_da_chave || []).join(" → ") || "—"} />
+          <Linha rotulo="Contas Pro encontradas" valor={String(preview.total_pros ?? "-")} />
+          <Linha rotulo="Vao entrar no teste" valor={String(preview.participantes_no_teste ?? "-")} />
+          <Linha rotulo="Classicos da chave" valor={(preview.comps_da_chave || []).join(" -> ") || "-"} />
           {preview.ligaExistente && (
             <p style={{ color: GOLD, fontSize: 13, margin: "8px 0 0" }}>
-              Já existe uma COPA TESTE por terminar (estado: {preview.ligaExistente.copa_estado}). Marca
+              Ja existe uma COPA TESTE por terminar (estado: {preview.ligaExistente.copa_estado}). Marca
               &quot;recriar&quot; para fazer outra.
             </p>
           )}
@@ -150,7 +170,7 @@ export default function CopaTestePage() {
 
       <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0", color: "#c8c0b8", fontSize: 14 }}>
         <input type="checkbox" checked={recriar} onChange={(e) => setRecriar(e.target.checked)} />
-        Criar uma nova mesmo que já exista uma por terminar (recriar)
+        Criar uma nova mesmo que ja exista uma por terminar (recriar)
       </label>
 
       <button
@@ -167,8 +187,43 @@ export default function CopaTestePage() {
           cursor: aCriar ? "default" : "pointer",
         }}
       >
-        {aCriar ? "A montar a copa…" : "Criar copa de teste"}
+        {aCriar ? "A montar a copa..." : "Criar copa de teste"}
       </button>
+
+      <button
+        onClick={espreitar}
+        disabled={aEspreitar}
+        style={{
+          marginLeft: 10,
+          background: "transparent",
+          color: GOLD,
+          border: `1px solid ${GOLD}`,
+          borderRadius: 10,
+          padding: "12px 18px",
+          fontWeight: 600,
+          fontSize: 15,
+          cursor: aEspreitar ? "default" : "pointer",
+        }}
+      >
+        {aEspreitar ? "A ler..." : "Espreitar chave"}
+      </button>
+
+      {chave && (
+        <pre
+          style={{
+            ...caixa,
+            marginTop: 16,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            fontSize: 11,
+            color: "#c8c0b8",
+            maxHeight: 420,
+            overflow: "auto",
+          }}
+        >
+          {chave}
+        </pre>
+      )}
 
       {res && (
         <div style={{ ...caixa, marginTop: 18, borderColor: res.ok ? "#2f5d3f" : "#6b2f2f" }}>
@@ -180,7 +235,7 @@ export default function CopaTestePage() {
           )}
           {res.ok && res.jaExistia && (
             <>
-              <p style={{ color: GOLD, margin: 0, fontWeight: 700 }}>Já existia uma COPA TESTE.</p>
+              <p style={{ color: GOLD, margin: 0, fontWeight: 700 }}>Ja existia uma COPA TESTE.</p>
               <p style={{ color: "#c8c0b8", fontSize: 13 }}>{res.nota}</p>
               {res.invite_code && <LinkLiga code={res.invite_code} />}
             </>
@@ -189,8 +244,8 @@ export default function CopaTestePage() {
             <>
               <p style={{ color: "#7fd1a3", margin: 0, fontWeight: 700 }}>Copa de teste criada!</p>
               <Linha rotulo="Participantes" valor={`${res.participantes} (de ${res.total_pros} Pro)`} />
-              <Linha rotulo="Confrontos na 1ª ronda" valor={String(res.confrontos ?? "—")} />
-              <Linha rotulo="Clássicos da chave" valor={(res.comps_da_chave || []).join(" → ")} />
+              <Linha rotulo="Confrontos na 1a ronda" valor={String(res.confrontos ?? "-")} />
+              <Linha rotulo="Classicos da chave" valor={(res.comps_da_chave || []).join(" -> ")} />
               {(res.equipas || []).map((e) => (
                 <Linha
                   key={e.comp}
@@ -198,33 +253,33 @@ export default function CopaTestePage() {
                   valor={
                     e.semPlantel
                       ? "sem plantel guardado"
-                      : `${e.criadas} criadas · ${e.jaTinham} já tinham`
+                      : `${e.criadas} criadas  ${e.jaTinham} ja tinham`
                   }
                 />
               ))}
               {res.invite_code && <LinkLiga code={res.invite_code} />}
 
               <div style={{ marginTop: 12, borderTop: `1px solid ${BORDA}`, paddingTop: 12 }}>
-                <p style={{ color: GOLD, fontWeight: 700, margin: "0 0 6px", fontSize: 14 }}>Passos para levar até ao campeão</p>
+                <p style={{ color: GOLD, fontWeight: 700, margin: "0 0 6px", fontSize: 14 }}>Passos para levar ate ao campeao</p>
                 <ol style={{ color: "#c8c0b8", fontSize: 13, lineHeight: 1.6, paddingLeft: 18, margin: 0 }}>
                   <li>
-                    Congela cada clássico da chave (uma vez cada):{" "}
+                    Congela cada classico da chave (uma vez cada):{" "}
                     {(res.comps_da_chave || []).map((c, i) => (
                       <code key={c} style={codigo}>
                         /api/cron?key=SEGREDO&amp;recongelar={c}
-                        {i < (res.comps_da_chave || []).length - 1 ? " · " : ""}
+                        {i < (res.comps_da_chave || []).length - 1 ? "  " : ""}
                       </code>
                     ))}
                   </li>
                   <li>
                     Apura ronda a ronda:{" "}
-                    <code style={codigo}>/api/cron?key=SEGREDO&amp;apurar={res.league_id}</code> — uma
-                    vez por ronda, à medida que cada clássico fica congelado. (Ou abre a página da liga:
+                    <code style={codigo}>/api/cron?key=SEGREDO&amp;apurar={res.league_id}</code> - uma
+                    vez por ronda, a medida que cada classico fica congelado. (Ou abre a pagina da liga:
                     ela apura sozinha ao carregar.)
                   </li>
                 </ol>
                 <p style={{ color: "#9a938c", fontSize: 12, marginTop: 8 }}>
-                  Troca <b>SEGREDO</b> pela tua CRON_SECRET. Os três clássicos são consecutivos, por isso
+                  Troca <b>SEGREDO</b> pela tua CRON_SECRET. Os tres classicos sao consecutivos, por isso
                   a ronda 2 e a 3 prendem-se automaticamente a Haia e Montreal.
                 </p>
               </div>
@@ -252,7 +307,7 @@ function LinkLiga({ code }: { code: string }) {
         fontSize: 14,
       }}
     >
-      Abrir a liga da copa →
+      Abrir a liga da copa &rarr;
     </a>
   );
 }
