@@ -170,15 +170,28 @@ function dataPT(iso: string | null | undefined): string {
 /**
 * Quantas competições dura uma copa de `tamanho` participantes.
 *
-* É o logaritmo de base 2: 32 -> 5, 16 -> 4, 8 -> 3, 4 -> 2, 2 -> 1. As semis
-* correm na mesma competição que a 1ª ronda de repescagem, e a final na mesma
-* que os dois bronzes — por isso não há rondas a mais por causa da repescagem.
+* ATÉ 8: a repescagem corre EM PARALELO com as semis (as semis e a 1ª ronda de
+* repescagem na mesma competição; a final na mesma que os bronzes), por isso a
+* duração é o logaritmo de base 2: 8 -> 3, 4 -> 2, 2 -> 1.
+*
+* DE 16 PARA CIMA: a cadeia de repescagem (motor lib/copa, gerarRondaSeguinteCopa)
+* já NÃO cabe toda em paralelo — acrescenta rondas próprias (as várias rondas de
+* cadeia + o merge). A duração passa a ser M + C = (2·log2 − 3):
+*   16 -> 5   (32-avos? não: 16-avos, quartos, semis+cadeia1, merge, final)
+*   32 -> 7
+*
+* Esta conta TEM de bater certo com o motor: é ela que diz onde começa a copa
+* SEGUINTE. Se der um número a menos, a próxima edição arranca antes de esta
+* acabar e as duas sobrepõem-se.
 */
 function rondasDaCopa(tamanho: number): number {
-  let r = 0;
+  if (tamanho < 2) return 1;
+  let L = 0;
   let p = tamanho;
-  while (p > 1) { p = Math.floor(p / 2); r++; }
-  return Math.max(1, r);
+  while (p > 1) { p = Math.floor(p / 2); L++; } // L = log2(tamanho)
+  // Até 8, repescagem em paralelo (= log2). De 16 para cima, a cadeia acrescenta
+  // rondas: M + C = 2·log2 − 3 (16 -> 5, 32 -> 7).
+  return tamanho <= 8 ? Math.max(1, L) : (2 * L - 3);
 }
 /**
 * A competição em que a copa SEGUINTE vai começar: a primeira depois de esta
