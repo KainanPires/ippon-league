@@ -170,28 +170,15 @@ function dataPT(iso: string | null | undefined): string {
 /**
 * Quantas competições dura uma copa de `tamanho` participantes.
 *
-* ATÉ 8: a repescagem corre EM PARALELO com as semis (as semis e a 1ª ronda de
-* repescagem na mesma competição; a final na mesma que os bronzes), por isso a
-* duração é o logaritmo de base 2: 8 -> 3, 4 -> 2, 2 -> 1.
-*
-* DE 16 PARA CIMA: a cadeia de repescagem (motor lib/copa, gerarRondaSeguinteCopa)
-* já NÃO cabe toda em paralelo — acrescenta rondas próprias (as várias rondas de
-* cadeia + o merge). A duração passa a ser M + C = (2·log2 − 3):
-*   16 -> 5   (32-avos? não: 16-avos, quartos, semis+cadeia1, merge, final)
-*   32 -> 7
-*
-* Esta conta TEM de bater certo com o motor: é ela que diz onde começa a copa
-* SEGUINTE. Se der um número a menos, a próxima edição arranca antes de esta
-* acabar e as duas sobrepõem-se.
+* É o logaritmo de base 2: 32 -> 5, 16 -> 4, 8 -> 3, 4 -> 2, 2 -> 1. As semis
+* correm na mesma competição que a 1ª ronda de repescagem, e a final na mesma
+* que os dois bronzes — por isso não há rondas a mais por causa da repescagem.
 */
 function rondasDaCopa(tamanho: number): number {
-  if (tamanho < 2) return 1;
-  let L = 0;
+  let r = 0;
   let p = tamanho;
-  while (p > 1) { p = Math.floor(p / 2); L++; } // L = log2(tamanho)
-  // Até 8, repescagem em paralelo (= log2). De 16 para cima, a cadeia acrescenta
-  // rondas: M + C = 2·log2 − 3 (16 -> 5, 32 -> 7).
-  return tamanho <= 8 ? Math.max(1, L) : (2 * L - 3);
+  while (p > 1) { p = Math.floor(p / 2); r++; }
+  return Math.max(1, r);
 }
 /**
 * A competição em que a copa SEGUINTE vai começar: a primeira depois de esta
@@ -251,7 +238,19 @@ export async function GET(req: Request) {
     if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
       return NextResponse.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
     }
-    return sortear(searchParams.get("simular") === "1");
+    const simular = searchParams.get("simular") === "1";
+    // Convites da rodada: o cron chama esta rota de hora a hora, por isso é aqui
+    // que verificamos os marcos (7/3/1 dias) e convidamos os Pro que ainda não
+    // se inscreveram. Best-effort e ANTES do sorteio; nunca parte o sorteio.
+    if (!simular) {
+      try {
+        const c = await enviarConvitesPendentes();
+        if (c) console.log(`[dodo] convites: marco ${c.milestone}d, enviados ${c.enviados}`);
+      } catch (e) {
+        console.warn("[dodo] convites falharam (nao bloqueia o sorteio):", e);
+      }
+    }
+    return sortear(simular);
   }
   // --- Estado atual ---
   // NOTA: 'preparada' fica de fora de propósito. Uma edição preparada existe
@@ -400,6 +399,91 @@ export async function GET(req: Request) {
       eu,
     });
 }
+// ---------------------------------------------------------------------------
+// CONVITES DA RODADA (pushes para os Pro se inscreverem)
+//
+// A edição em inscrições tem uma data de fecho. À medida que ela se aproxima,
+// convidamos QUEM É PRO ou PRO MAX e ainda NÃO se inscreveu. Marcos: 7, 3 e 1
+// dias antes do fecho. Cada marco dispara UMA vez por edição.
+//
+// Idempotência: `dodo_edicoes.convites_enviados` (jsonb, lista dos marcos já
+// enviados). MARCAMOS o marco ANTES de enviar — assim, se algo falhar a meio, o
+// cron da hora seguinte NÃO repete o envio a toda a gente (foi esse o bug que
+// mandou dezenas de avisos repetidos numa edição antiga). Quem falhar recebe o
+// marco seguinte na mesma.
+//
+// Marco aplicável = o MENOR marco cuja janela já está ativa (dias <= marco).
+// Assim, se a edição abrir já com poucos dias, não dispara os três de uma vez:
+// arranca no marco certo e segue para os mais próximos.
+// ---------------------------------------------------------------------------
+async function enviarConvitesPendentes(): Promise<{ milestone: number; enviados: number } | null> {
+  if (!supabaseAdmin) return null;
+
+  // 1) A edição a receber inscrições.
+  const { data: ed } = await supabaseAdmin
+    .from("dodo_edicoes")
+    .select("id, numero, inscricoes_ate, convites_enviados")
+    .eq("estado", "inscricoes")
+    .order("numero", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!ed || !ed.inscricoes_ate) return null;
+
+  const ateMs = Date.parse(String(ed.inscricoes_ate));
+  if (!Number.isFinite(ateMs)) return null;
+  const agora = Date.now();
+  if (agora >= ateMs) return null; // já fechou; o sorteio trata disto
+
+  const dias = Math.ceil((ateMs - agora) / 86400000);
+  const MARCOS = [1, 3, 7];
+  const aplicavel = MARCOS.find((d) => dias <= d);
+  if (!aplicavel) return null; // ainda faltam mais de 7 dias
+
+  const jaEnviados: number[] = Array.isArray(ed.convites_enviados)
+    ? (ed.convites_enviados as unknown[]).map((x) => Number(x)).filter((n) => Number.isFinite(n))
+    : [];
+  if (jaEnviados.includes(aplicavel)) return null; // este marco já saiu
+
+  // 2) MARCA PRIMEIRO (trava o reenvio horário mesmo que o envio falhe a meio).
+  const novos = Array.from(new Set([...jaEnviados, aplicavel]));
+  const { error: erroMarca } = await supabaseAdmin
+    .from("dodo_edicoes")
+    .update({ convites_enviados: novos })
+    .eq("id", ed.id);
+  if (erroMarca) return null; // não conseguimos marcar: não arriscamos enviar
+
+  // 3) Destinatários: Pro/Pro Max que ainda não estão inscritos nesta edição.
+  const { data: ins } = await supabaseAdmin
+    .from("dodo_inscricoes")
+    .select("user_id")
+    .eq("edicao_id", ed.id);
+  const inscritos = new Set((ins || []).map((r) => String(r.user_id)));
+
+  const { data: pros } = await supabaseAdmin
+    .from("users")
+    .select("id, is_pro, is_pro_max")
+    .or("is_pro.eq.true,is_pro_max.eq.true")
+    .limit(100000);
+  const alvos = (pros || []).filter((u) => (u.is_pro || u.is_pro_max) && !inscritos.has(String(u.id)));
+
+  // 4) Envia (sino + push), traduzido na língua de cada um. Marco de 1 dia usa a
+  //    mensagem de "último dia" (sem número, para não sair "falta 1 dias").
+  const hoje = aplicavel === 1;
+  let enviados = 0;
+  for (const u of alvos) {
+    const ok = await criarNotificacaoServidor({
+      paraUserId: String(u.id),
+      tipo: "dodo_convite",
+      chaveTitulo: hoje ? "dodo.conviteHojeTitulo" : "dodo.conviteTitulo",
+      chaveCorpo: hoje ? "dodo.conviteHojeCorpo" : "dodo.conviteCorpo",
+      vars: { numero: Number(ed.numero) || 1, dias },
+      link: "/dodo",
+    });
+    if (ok) enviados++;
+  }
+  return { milestone: aplicavel, enviados };
+}
+
 // ---------------------------------------------------------------------------
 // O SORTEIO
 // ---------------------------------------------------------------------------
