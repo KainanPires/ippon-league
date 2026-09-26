@@ -265,4 +265,27 @@ export const REFERENCIAS: Record<string, FonteRef> = {
     direcao: "acima_pior",
     ajuda: "O património é recalculado do zero; se o mesmo número persistir, há algo preso.",
   },
+
+  // --- EXPIRAR (/api/subscricoes/expirar) — corre uma vez por dia -----------
+  // A rede de segurança das subscrições: corta o Pro a quem já não paga. Corre
+  // silenciosa e mexe em dinheiro/acesso, por isso vale a pena vê-la de longe.
+  "expirar.duracao_ms": {
+    rotulo: "Duração da corrida (expirar)",
+    unidade: "ms",
+    // Cada candidato leva um pedido à Stripe; com muitos lapsos de uma vez a
+    // corrida alonga-se. Folgado de propósito — é diária, não ao vivo.
+    esperado: 30_000,
+    limite: 60_000,
+    direcao: "acima_pior",
+    ajuda: "Muitos candidatos ou a Stripe lenta. Se persistir, paginar a leitura de candidatos.",
+  },
+  "expirar.stripe_falhas": {
+    rotulo: "Utilizadores sem resposta da Stripe",
+    esperado: 0,
+    // Uma falha avulsa à Stripe recupera amanhã; um pico significa que os
+    // rebaixamentos pararam — há quem fique com Pro sem pagar.
+    limite: 3,
+    direcao: "acima_pior",
+    ajuda: "Falhas a consultar a Stripe. Um pico = os cortes pararam; confirmar chave/estado da Stripe.",
+  },
 };
