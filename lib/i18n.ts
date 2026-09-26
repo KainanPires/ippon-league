@@ -9411,20 +9411,35 @@ export function linguaGuardadaLocal(): Lingua | null {
   return null;
 }
 
+// Grava a língua na coluna rápida `users.lingua` de forma GARANTIDA, via a rota
+// /api/idioma (chave de serviço, NÃO depende do RLS). É de `users.lingua` que o
+// servidor lê a língua para mandar notificações/push — por isso esta gravação
+// tem de chegar sempre, senão os avisos saem na língua errada. Só para quem tem
+// sessão; falha em silêncio (a cache local e o metadata cobrem a interface).
+async function sincronizarLinguaServidor(l: Lingua): Promise<void> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const tok = data.session?.access_token;
+    if (!tok) return; // visitante: fica só a cache local
+    await fetch("/api/idioma", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+      body: JSON.stringify({ lingua: l }),
+    });
+  } catch {}
+}
+
 export async function gravarLingua(l: Lingua): Promise<void> {
   try { localStorage.setItem(CHAVE_LOCAL, l); } catch {}
   try {
     const { data } = await supabase.auth.getSession();
     if (!data.session) return; // visitante: fica só a cache local
+    // Preferência na conta (metadata) — segue a pessoa entre aparelhos.
     await supabase.auth.updateUser({ data: { lingua: l } });
-    // Espelha a língua na tabela `users` (coluna `lingua`): é de onde o SERVIDOR
-    // a lê depressa, em lote, para mandar notificações/push na língua certa —
-    // sem ter de ir ao metadata da conta um a um. Falha em silêncio: se a coluna
-    // ainda não existir ou o RLS não deixar, a preferência fica no metadata na
-    // mesma, e o backfill/leitura de recurso do servidor cobre o resto.
-    const uid = data.session.user?.id;
-    if (uid) { try { await supabase.from("users").update({ lingua: l }).eq("id", uid); } catch {} }
   } catch {}
+  // Coluna rápida `users.lingua` (a que o servidor lê para as notificações),
+  // gravada pela rota com chave de serviço — sem depender do RLS.
+  await sincronizarLinguaServidor(l);
 }
 
 async function linguaDaConta(): Promise<Lingua | null> {
@@ -9469,8 +9484,8 @@ export function LinguaProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let vivo = true;
     const local = linguaGuardadaLocal();
-    if (local) setLingua(local);
-    else setLingua(linguaDoBrowser());
+    const inicial = local ?? linguaDoBrowser();
+    setLingua(inicial);
 
     // A conta tem a última palavra: é o que segue a pessoa entre aparelhos.
     linguaDaConta().then((l) => {
@@ -9478,6 +9493,16 @@ export function LinguaProvider({ children }: { children: ReactNode }) {
         setLingua(l);
         try { localStorage.setItem(CHAVE_LOCAL, l); } catch {}
       }
+      // SINCRONIZA A COLUNA `users.lingua` COM O QUE A PESSOA VÊ.
+      //
+      // O `gravarLingua` só corre quando a pessoa TROCA de idioma. Quem nunca
+      // troca (fica na língua detetada do aparelho) nunca escrevia nada no
+      // servidor — e as notificações saíam em português por omissão, mesmo com
+      // a interface noutra língua. Aqui, uma vez por arranque, garantimos que a
+      // `users.lingua` fica igual à língua efetiva (metadata > local > browser),
+      // via a rota com chave de serviço. Idempotente e em silêncio.
+      const efetiva = l || inicial;
+      void sincronizarLinguaServidor(efetiva);
     });
     return () => { vivo = false; };
   }, []);
