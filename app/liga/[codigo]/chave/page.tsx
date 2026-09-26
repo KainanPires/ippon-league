@@ -280,8 +280,68 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
             );
           };
           const proximo = confrontos.find((c) => c.estado === "pendente")?.id ?? null;
+          // FASE 2 (visual): quando a chave é grande (>=16 equipas => >=4 rondas),
+          // desenha-se em Pools A/B/C/D como a chave dos atletas. Cada pool é o
+          // "quarto" da árvore cujo vencedor é um semifinalista; as Meias+Final
+          // ficam num bloco à parte. NÃO muda o motor — reagrupa os MESMOS
+          // confrontos noutros blocos. Abaixo de 16, mantém-se a árvore única.
+          const usarPools = totalRondas >= 4;
+          const porRO = new Map<string, ConfrontoAPI>();
+          for (const c of principais) porRO.set(`${c.ronda}:${c.ordem}`, c);
+          // Sub-árvore com raiz em (rootR, rootO), afunilando até `minRonda`
+          // (exclusive): para nas semis quando desenhamos o bloco Meias+Final, e
+          // vai até à ronda 1 quando desenhamos cada pool.
+          const montarSub = (rootR: number, rootO: number, minRonda: number): { arvores: NoChave[]; arestas: Aresta[] } => {
+            const arestas: Aresta[] = [];
+            const no = (r: number, o: number): NoChave => {
+              const e = porRO.get(`${r}:${o}`);
+              const key = e ? e.id : `vazio:${r}:${o}`;
+              if (e && !e.jogador_b && e.decidido_por === "bye") return { tipo: "bye", key, dados: e };
+              const filhos: NoChave[] = [];
+              if (r > minRonda) {
+                for (const oi of [o * 2, o * 2 + 1]) {
+                  const f = no(r - 1, oi);
+                  filhos.push(f);
+                  arestas.push({ de: f.key, para: key });
+                }
+              }
+              return { tipo: "luta", key, dados: e ?? null, filhos };
+            };
+            return { arvores: [no(rootR, rootO)], arestas };
+          };
+          // 4 pools = os 4 quartos (raiz em ronda totalRondas-2). Meias+Final = o
+          // topo, parando nas semis (que já mostram os vencedores de cada pool).
+          const pools = usarPools
+            ? (["A", "B", "C", "D"] as const).map((rot, k) => ({ rot, sub: montarSub(totalRondas - 2, k, 1) }))
+            : [];
+          const meiasFinal = usarPools ? montarSub(totalRondas, 0, totalRondas - 1) : null;
           return (
             <>
+            {usarPools ? (
+              <>
+              {pools.map(({ rot, sub }) => (
+                  <BlocoChave
+                  key={`pool-${rot}`}
+                  titulo={`Pool ${rot}`}
+                  arvores={sub.arvores}
+                  arestas={sub.arestas}
+                  destaque={proximo}
+                  renderCaixa={(no) => <Caixa no={no} />}
+                  textoVazio="A chave aparece quando o sorteio correr."
+                  />
+                ))}
+              {meiasFinal && (
+                  <BlocoChave
+                  titulo={t("ck.meiasFinal")}
+                  arvores={meiasFinal.arvores}
+                  arestas={meiasFinal.arestas}
+                  destaque={proximo}
+                  renderCaixa={(no) => <Caixa no={no} />}
+                  textoVazio="A chave aparece quando o sorteio correr."
+                  />
+                )}
+              </>
+            ) : (
             <BlocoChave
             titulo={
               // O nome da ronda mais adiantada que ainda está por decidir — é o
@@ -300,6 +360,7 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
             renderCaixa={(no) => <Caixa no={no} />}
             textoVazio="A chave aparece quando o sorteio correr."
             />
+            )}
             {laterais.length > 0 && (() => {
                   const grupo = (tit: string, itens: ConfrontoAPI[]) =>
                     itens.length === 0 ? null : (
