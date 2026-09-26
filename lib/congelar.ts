@@ -43,7 +43,12 @@ import { calcularForma } from "@/lib/forma";
 import { computeNewPrice } from "@/lib/engine";
 import { notificarFimDeCompeticao } from "@/lib/notificarCompeticao";
 import { lerLutasManuais, indexarManuaisPorAtleta, aplicarManuaisNoCongelamento } from "@/lib/lutasManuais";
+import { jcCompradosValidosEmLote } from "@/lib/carteira";
 const round1 = (n: number): number => Math.round(n * 10) / 10;
+// Folga de arredondamento na verificação de orçamento. Os preços vivem a 1 casa
+// (round1), por isso 0.05 JC nunca marca uma equipa como acima do orçamento por
+// um resto de arredondamento — só uma diferença REAL conta.
+const FOLGA_ORCAMENTO = 0.05;
 // Orçamento de tempo por execução do congelamento de UMA competição. Deixa
 // folga dentro do maxDuration do cron (300s). Se estourar, para e retoma na
 // próxima execução (os atletas já feitos ficam em resultados_atletas).
@@ -305,25 +310,73 @@ async function pontuarUtilizadoresDaCompeticao(idComp: string, mes: string): Pro
     pontosAtleta.set(String(a.id_person), Number(a.pontos));
     variacaoAtleta.set(String(a.id_person), Number(a.variacao_jc));
   }
-  // Equipas que escalaram para esta competição.
+  // Equipas que escalaram para esta competição. Além dos atletas/capitão,
+  // trazemos o orçamento com que a equipa foi VALIDADA à gravação (Fase A2):
+  //   precos              -> preço de compra por atleta (soma = valor da equipa)
+  //   orcamento           -> orçamento total validado (património + JC comprados)
+  //   orcamento_comprado  -> a parte desse orçamento vinda de JC comprados
   const { data: equipas } = await supabaseAdmin
   .from("equipas")
-  .select("user_id, atletas, capitao")
+  .select("user_id, atletas, capitao, precos, orcamento, orcamento_comprado")
   .eq("id_competicao", idComp);
   const lista = equipas || [];
   if (lista.length === 0) return 0;
+  // JC comprados VÁLIDOS agora (uma consulta para todos). Reflete reembolsos: se
+  // alguém foi reembolsado, o seu saldo comprado já não conta aqui.
+  const compradosAgora = await jcCompradosValidosEmLote(
+    lista.map((e) => String(e.user_id)),
+  );
   const linhasRodada: Record<string, unknown>[] = [];
   const linhasPontuacoes: Record<string, unknown>[] = [];
   for (const e of lista) {
     const ids = Array.isArray(e.atletas) ? (e.atletas as string[]).map(String) : [];
     const capitao = e.capitao ? String(e.capitao) : null;
+
+    // ORÇAMENTO (Fase A2): a equipa guardada ainda cabe no orçamento?
+    //
+    // A verificação SÓ marca inativo quando há a certeza de que a equipa está
+    // acima do orçamento com que foi validada. Em qualquer dúvida (linha antiga
+    // sem orçamento gravado, preços em falta), pontua-se NORMALMENTE — nunca se
+    // penaliza por falta de dados.
+    //
+    // Como o cliente já bloqueia gravar acima do orçamento (Fase A1) e o
+    // carry-over não grava sozinho, a única forma de uma equipa guardada passar
+    // a estar acima do orçamento é o orçamento ENCOLHER depois da gravação — ou
+    // seja, um REEMBOLSO de JC comprados. Por isso o veredito é:
+    //   orçamento efetivo = orcamento − orcamento_comprado + comprados_agora
+    // (a parte de património é estável; a parte comprada segue o saldo atual, que
+    //  já desconta reembolsos). Se o valor da equipa exceder isto, fica inativa:
+    //  0 pontos, sem ganho nem perda de património — como quem não escalou.
+    let inativaPorOrcamento = false;
+    const precos = (e as { precos?: unknown }).precos;
+    const orcamento = (e as { orcamento?: unknown }).orcamento;
+    const orcamentoComprado = (e as { orcamento_comprado?: unknown }).orcamento_comprado;
+    if (
+      orcamento != null && Number.isFinite(Number(orcamento)) &&
+      orcamentoComprado != null && Number.isFinite(Number(orcamentoComprado)) &&
+      precos && typeof precos === "object"
+    ) {
+      const mapaPrecos = precos as Record<string, unknown>;
+      // Só verificamos se TEMOS o preço de compra de todos os atletas da equipa.
+      const temTodos = ids.length > 0 && ids.every((aid) => Number.isFinite(Number(mapaPrecos[aid])));
+      if (temTodos) {
+        const valorEquipa = round1(ids.reduce((s, aid) => s + Number(mapaPrecos[aid]), 0));
+        const compradoAgora = compradosAgora.get(String(e.user_id)) ?? 0;
+        const orcamentoEfetivo = round1(Number(orcamento) - Number(orcamentoComprado) + compradoAgora);
+        if (valorEquipa > orcamentoEfetivo + FOLGA_ORCAMENTO) inativaPorOrcamento = true;
+      }
+    }
+
     let pontosRodada = 0;
     let ganhoPatrimonio = 0;
     let melhor: string | null = null;
     let pior: string | null = null;
     let melhorPts = -Infinity;
     let piorPts = Infinity;
-    for (const aid of ids) {
+    // Equipa acima do orçamento: fica INATIVA. Não soma pontos nem mexe no
+    // património (nem ganha, nem perde) — e não tem melhor/pior atleta. Salta o
+    // ciclo de pontuação; as linhas ficam a zero, tal como quem não escalou.
+    if (!inativaPorOrcamento) for (const aid of ids) {
       const base = pontosAtleta.get(aid) ?? 0;
       // Pontos para a equipa: capitão dobra.
       pontosRodada += aid === capitao ? base * 2 : base;
@@ -347,6 +400,10 @@ async function pontuarUtilizadoresDaCompeticao(idComp: string, mes: string): Pro
         patrimonio_acumulado: 100, // recalculado depois (recalcularPatrimonios)
         melhor_atleta: melhor,
         pior_atleta: pior,
+        // Marca a rodada como inativa por orçamento (equipa acima do orçamento no
+        // fecho). Serve para a UI/notificações explicarem o 0 a 0. A coluna TEM de
+        // existir (ver sql/equipas_orcamento.sql — correr ANTES do deploy).
+        inativa: inativaPorOrcamento,
         congelado_em: new Date().toISOString(),
       });
     linhasPontuacoes.push({
