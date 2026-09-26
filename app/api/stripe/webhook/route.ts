@@ -68,7 +68,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { nivelDoPreco, stripeFetch, verificarAssinatura, fimDoPeriodo, PRECOS, type Nivel } from "@/lib/stripe";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { sincronizarLigasOficiais } from "@/lib/ligasOficiais";
-import { creditarJudocoins } from "@/lib/carteira";
+import { creditarJudocoins, estornarJudocoinsPorPaymentIntent } from "@/lib/carteira";
 import { trackServer } from "@/lib/analytics.server";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -178,6 +178,7 @@ export async function POST(req: Request) {
           mode?: string;
           customer?: string;
           subscription?: string;
+          payment_intent?: string;
           amount_total?: number;
           client_reference_id?: string;
           metadata?: Record<string, string>;
@@ -202,6 +203,7 @@ export async function POST(req: Request) {
               stripeSessionId: sessionId,
               jc,
               eurosCent: typeof sessao.amount_total === "number" ? sessao.amount_total : null,
+              stripePaymentIntent: sessao.payment_intent || null,
             });
             if (r.ok) {
               // Espelho de analytics. O aviso ao utilizador é o toast da /loja
@@ -258,6 +260,22 @@ export async function POST(req: Request) {
                 link: "/perfil",
               });
           } catch { /* o acesso está dado; o aviso é um extra */ }
+        }
+        break;
+      }
+      // --- Um pagamento foi REEMBOLSADO (ou virou disputa/chargeback) ---
+      // Se era uma compra de Judocoins, anula esses JC do saldo: quem recebe o
+      // dinheiro de volta não fica com as moedas. Idempotente e sem alvo (uma
+      // subscrição reembolsada não tem linha na carteira) é inofensivo.
+      case "charge.refunded":
+      case "charge.dispute.created": {
+        const o = obj as { payment_intent?: string; charge?: string };
+        const pi = o.payment_intent || "";
+        if (pi) {
+          const r = await estornarJudocoinsPorPaymentIntent(pi);
+          if (r.ok && r.linhas > 0) {
+            console.warn(`[webhook] reembolso/disputa: anulados JC de ${r.linhas} compra(s) do pagamento ${pi}`);
+          }
         }
         break;
       }
