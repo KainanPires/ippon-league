@@ -120,8 +120,8 @@ export async function GET(req: Request) {
         await criarNotificacaoServidor({
             paraUserId: uid,
             tipo: "subscricao_terminou",
-            titulo: "A tua subscrição terminou",
-            corpo: "O acesso às funcionalidades Pro acabou. A tua conta, a tua equipa e o teu histórico ficam todos guardados — se voltares, está tudo onde deixaste.",
+            chaveTitulo: "subscricao.terminouTitulo",
+            chaveCorpo: "subscricao.terminouCorpo",
             link: "/ippon-pro",
           });
       } catch { /* o rebaixamento está feito; o aviso é um extra */ }
