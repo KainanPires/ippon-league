@@ -102,6 +102,41 @@ export async function estornarJudocoinsPorPaymentIntent(
 }
 
 /**
+ * Saldo comprado VÁLIDO (não expirado), em JC, para VÁRIOS utilizadores de uma
+ * só vez. Devolve um Map { user_id -> jc }; quem não tiver compras não aparece
+ * (o chamador trata a ausência como 0). Uma consulta em vez de N — para o motor
+ * de congelamento poder verificar o orçamento de todas as equipas sem inchar.
+ * Em caso de dúvida devolve um Map vazio (0 para todos) — errar para menos
+ * orçamento é preferível a dar de graça.
+ */
+export async function jcCompradosValidosEmLote(
+  userIds: string[],
+): Promise<Map<string, number>> {
+  const fora = new Map<string, number>();
+  if (!supabaseAdmin || userIds.length === 0) return fora;
+  const unicos = Array.from(new Set(userIds.filter(Boolean).map(String)));
+  if (unicos.length === 0) return fora;
+  try {
+    const agora = new Date().toISOString();
+    const { data, error } = await supabaseAdmin
+      .from("compras_judocoins")
+      .select("user_id, jc")
+      .in("user_id", unicos)
+      .eq("estado", "creditado")
+      .gt("expira_em", agora);
+    if (error || !data) return fora;
+    for (const linha of data) {
+      const u = String((linha as { user_id: string }).user_id);
+      const jc = Number((linha as { jc: number }).jc) || 0;
+      fora.set(u, (fora.get(u) ?? 0) + jc);
+    }
+    return fora;
+  } catch {
+    return fora;
+  }
+}
+
+/**
  * Saldo comprado VÁLIDO (não expirado) de um utilizador, em JC. Em caso de
  * dúvida devolve 0 — errar para menos orçamento é preferível a dar de graça.
  */
