@@ -368,6 +368,31 @@ export async function commitSavedCloudFor(idComp: string, t: TeamState, identity
       precos: pricesOf(t), // preço de compra de cada atleta, para o património
       atualizado_em: new Date().toISOString(),
     };
+    // ORÇAMENTO VALIDADO (economia Fase A2): guarda o orçamento com que esta
+    // equipa foi montada AGORA — a fonte única é /api/orcamento (património atual
+    // + JC comprados válidos). O motor de congelamento usa-o para decidir, no
+    // fecho, se a equipa ainda cabe no orçamento (e para reagir a reembolsos de
+    // JC). Guardamos o total (`orcamento`) e a parte comprada (`orcamento_comprado`).
+    // Se a chamada falhar, deixamos ambos de fora: o motor, na dúvida, pontua
+    // normalmente — nunca penaliza por falta deste dado.
+    try {
+      const token = sessionData.session?.access_token;
+      if (token) {
+        const resp = await fetch("/api/orcamento", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        if (resp.ok) {
+          const orc = await resp.json();
+          if (orc?.ok && Number.isFinite(Number(orc.base))) {
+            payload.orcamento = Number(orc.base);
+            payload.orcamento_comprado = Number.isFinite(Number(orc.comprados)) ? Number(orc.comprados) : 0;
+          }
+        }
+      }
+    } catch {
+      /* na dúvida, grava sem orçamento -> o motor pontua normalmente */
+    }
     // IDENTIDADE: nunca gravar o nome por omissão POR CIMA do nome real. Se o
     // que temos em memória não é um nome próprio (aparelho novo, cache limpa),
     // vamos buscar o nome verdadeiro à CONTA antes de gravar. Só escrevemos o
