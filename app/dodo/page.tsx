@@ -47,11 +47,23 @@ import {
   type Aresta,
   type LadoCaixa,
 } from "@/components/Chave";
-import { useT } from "@/lib/i18n";
+import { useT, useLingua } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const VERDE = "#3f8f5a";
+
+// Tranquilizador junto ao botão de inscrição: muita gente hesita em inscrever-se
+// por achar que "compromete" ou gasta algo. Não gasta. É só entrar no sorteio.
+// Mapa local (5 línguas) para a alteração ficar contida nesta página, sem mexer
+// no i18n global — mesmo padrão já usado noutras peças.
+const TRANQUILIZA: Record<string, { titulo: string; corpo: string }> = {
+  pt: { titulo: "A inscrição é só um sorteio", corpo: "Entrar não gasta Judocoins nem afeta as tuas outras ligas ou o teu ranking. É um sorteio de vagas por continente — inscreveres-te hoje ou no último dia dá exatamente a mesma hipótese." },
+  en: { titulo: "Entering is just a draw", corpo: "Entering costs no Judocoins and doesn't affect your other leagues or your ranking. It's a draw for spots by continent — entering today or on the last day gives you exactly the same chance." },
+  es: { titulo: "Inscribirse es solo un sorteo", corpo: "Entrar no gasta Judocoins ni afecta a tus otras ligas ni a tu ranking. Es un sorteo de plazas por continente — inscribirte hoy o el último día te da exactamente la misma oportunidad." },
+  fr: { titulo: "L'inscription n'est qu'un tirage", corpo: "S'inscrire ne coûte aucun Judocoin et n'affecte pas tes autres ligues ni ton classement. C'est un tirage de places par continent — t'inscrire aujourd'hui ou le dernier jour te donne exactement la même chance." },
+  de: { titulo: "Die Anmeldung ist nur eine Auslosung", corpo: "Die Teilnahme kostet keine Judocoins und beeinflusst deine anderen Ligen oder dein Ranking nicht. Es ist eine Auslosung der Plätze nach Kontinent — ob du dich heute oder am letzten Tag anmeldest, gibt dir genau dieselbe Chance." },
+};
 interface EuEstado {
   inscrito: boolean;
   sorteada: boolean | null;
@@ -126,6 +138,7 @@ async function tokenDaSessao(): Promise<string | null> {
 }
 export default function Dodo() {
   const t = useT();
+  const { lingua } = useLingua();
   const [dados, setDados] = useState<Resposta | null>(null);
   const [aCarregar, setACarregar] = useState(true);
   const [aEnviar, setAEnviar] = useState(false);
@@ -395,6 +408,15 @@ export default function Dodo() {
             </span>
         )}
         </div>
+        {insc && aberta && !eu?.inscrito && (() => {
+            const tr = TRANQUILIZA[lingua] ?? TRANQUILIZA.pt;
+            return (
+              <div style={{ background: "#101915", border: "1px solid #24352c", borderRadius: 12, padding: "11px 14px", marginTop: 12 }}>
+              <div style={{ fontFamily: FD, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: VERDE, marginBottom: 5 }}>{tr.titulo}</div>
+              <p style={{ fontSize: 12.5, color: "#a9b7ae", lineHeight: 1.55, margin: 0 }}>{tr.corpo}</p>
+              </div>
+            );
+          })()}
         <ChaveDaCopa leagueId={jogo.league_id} numero={jogo.numero} />
         </>
     )}
