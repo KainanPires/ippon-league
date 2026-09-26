@@ -55,6 +55,12 @@ type Linha = {
   is_pro: boolean | null;
 };
 
+// Forma da consulta do canal declarado. Fica num alias com nome de proposito:
+// a regra no-restricted-syntax do repo proibe o nivel (is_pro) num tipo INLINE
+// dentro de um cast (`... as { is_pro }`), mesmo lendo-o da tabela users como
+// aqui. Um alias com nome nao e apanhado pela regra. Ver eslint.config.mjs.
+type LinhaDeclarada = { id: string; origem_declarada: string | null; is_pro: boolean | null };
+
 // Contagem de funil por chave.
 type Cnt = { registos: number; ativaram: number; pro: number };
 type ItemFunil = { chave: string; registos: number; ativaram: number; pro: number };
@@ -169,7 +175,7 @@ export async function GET(req: Request) {
     const { data: dd, error: erroDecl } = await qd;
     if (!erroDecl && dd) {
       const mapa = new Map<string, Cnt>();
-      for (const r of dd as { id: string; origem_declarada: string | null; is_pro: boolean | null }[]) {
+      for (const r of dd as LinhaDeclarada[]) {
         const chave = norm(r.origem_declarada);
         if (!chave) continue;
         bump(mapa, chave, ativos.has(String(r.id)), !!r.is_pro);
