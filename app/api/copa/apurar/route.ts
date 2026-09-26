@@ -70,6 +70,9 @@ export const runtime = "nodejs";
 // Ordem CRONOLÓGICA de uma competição (a sua semana no calendário). É o que
 // permite dizer "esta rodada é anterior àquela" sem depender do id (os
   // clássicos têm ids baixos mas podem estar no fim do ano). -1 = desconhecida.
+// Forma da consulta ao nível (alias com nome: a regra no-restricted-syntax do
+// repo proíbe `is_pro` num tipo inline dentro de um cast). Ver eslint.config.mjs.
+type LinhaNivel = { id: string; is_pro: boolean | null; is_pro_max: boolean | null };
 function ordemDaComp(idComp: string): number {
   const n = numeroDaRodada(String(idComp));
   return n ?? -1;
@@ -170,6 +173,37 @@ if (pendentes.length === 0) {
   const fecho = await fecharEdicaoDoDodo(league_id);
   return NextResponse.json({ ok: true, apurou: false, semPendentes: true, estado: liga.copa_estado, fecho });
 }
+// PEÇA 4 — quem já NÃO está na Copa conta como ELIMINADO (o adversário avança,
+// mesmo com 0). Dôdo (type "oficial", só-Pro): fora = já não é Pro. Copa de
+// amigos: fora = já não é membro (saiu, ex.: não a escolheu ao descer de nível).
+// Ver claude/backlog-proximos-passos.md (secção K).
+const participantesCopa = new Set<string>();
+for (const c of confrontos) {
+  if (c.jogador_a) participantesCopa.add(String(c.jogador_a));
+  if (c.jogador_b) participantesCopa.add(String(c.jogador_b));
+}
+const foraDaCopa = new Set<string>();
+{
+  const idsPart = Array.from(participantesCopa);
+  if (idsPart.length > 0) {
+    if (String(liga.type) === "oficial") {
+      const { data: us } = await supabaseAdmin.from("users").select("id, is_pro, is_pro_max").in("id", idsPart);
+      const comPro = new Set(((us || []) as LinhaNivel[]).filter((u) => u.is_pro || u.is_pro_max).map((u) => String(u.id)));
+      for (const p of idsPart) if (!comPro.has(p)) foraDaCopa.add(p);
+    } else {
+      const { data: mem } = await supabaseAdmin.from("league_members").select("user_id").eq("league_id", league_id);
+      const membros = new Set((mem || []).map((m) => String(m.user_id)));
+      for (const p of idsPart) if (!membros.has(p)) foraDaCopa.add(p);
+    }
+  }
+}
+// Sentinela: quem está fora perde por pontos para quem está presente (e, se
+// ambos estiverem fora, o desempate normal decide — na mesma, alguém avança).
+function marcarForaDaCopa(mapa: Record<string, PontosJogador>) {
+  for (const uid of Object.keys(mapa)) {
+    if (foraDaCopa.has(uid)) mapa[uid] = { total: -1, capitao: -1, escalou: false };
+  }
+}
 const rondaAtual = Math.min(...pendentes.map((c) => c.ronda));
 const confrontosRonda = confrontos.filter((c) => c.ronda === rondaAtual);
 const pendentesRonda = confrontosRonda.filter((c) => c.estado === "pendente");
@@ -194,6 +228,7 @@ for (const c of pendentesRonda) {
   if (c.jogador_b) jogadores.add(c.jogador_b);
 }
 const pontosJogador = await pontosPorJogador(Array.from(jogadores), comp, pontosAtleta);
+marcarForaDaCopa(pontosJogador); // quem saiu / perdeu o Pro perde o confronto
 // Separa a(s) FINAL(is) do resto: a final é sempre a última a decidir-se.
 const pendentesFinal = pendentesRonda.filter((c) => String(c.fase) === "final");
 const pendentesOutros = pendentesRonda.filter((c) => String(c.fase) !== "final");
@@ -379,6 +414,7 @@ if (pendentesFinal.length > 0) {
     if (!janelaCompleta) {
       finalAEsperar = true;
     } else {
+      marcarForaDaCopa(acum); // um finalista que saiu / perdeu o Pro perde a final
       for (const c of pendentesFinal) {
         const pa = acum[c.jogador_a] ?? { total: 0, capitao: 0, escalou: false };
         const pb = c.jogador_b ? (acum[c.jogador_b] ?? { total: 0, capitao: 0, escalou: false }) : { total: 0, capitao: 0, escalou: false };
