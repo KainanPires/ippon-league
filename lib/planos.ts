@@ -60,6 +60,18 @@ export const PACOTES_JC = [
 
 export type PacoteJC = (typeof PACOTES_JC)[number];
 
+// PACOTE DE TESTE (€0,50 / 1 JC). NÃO entra no PACOTES_JC de propósito: não deve
+// aparecer na loja nem ser comprável por utilizadores normais. Serve só para o
+// admin validar a compra real ponta-a-ponta (Stripe -> webhook -> carteira ->
+// orçamento) antes de abrir a loja a sério. O checkout só o aceita a quem tem
+// users.is_admin; o produto correspondente na Stripe tem a lookup key `jc_teste`.
+export const PACOTE_TESTE = { jc: 1, euros: 0.5, lookupKey: "jc_teste" } as const;
+
+/** O pacote de teste (admin). Existe à parte do catálogo público. */
+export function pacoteDeTeste(): typeof PACOTE_TESTE {
+  return PACOTE_TESTE;
+}
+
 /** Um pacote pela quantidade de JC (ex.: 50). undefined se não existir. */
 export function pacotePorJc(jc: number): PacoteJC | undefined {
   return PACOTES_JC.find((p) => p.jc === jc);
