@@ -68,6 +68,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { nivelDoPreco, stripeFetch, verificarAssinatura, fimDoPeriodo, PRECOS, type Nivel } from "@/lib/stripe";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { sincronizarLigasOficiais } from "@/lib/ligasOficiais";
+import { creditarJudocoins } from "@/lib/carteira";
 import { trackServer } from "@/lib/analytics.server";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -173,9 +174,11 @@ export async function POST(req: Request) {
       // --- Alguém acabou de pagar no ecrã da Stripe ---
       case "checkout.session.completed": {
         const sessao = obj as {
+          id?: string;
           mode?: string;
           customer?: string;
           subscription?: string;
+          amount_total?: number;
           client_reference_id?: string;
           metadata?: Record<string, string>;
         };
@@ -186,6 +189,27 @@ export async function POST(req: Request) {
         if (sessao.customer) {
           await supabaseAdmin.from("users")
           .update({ stripe_customer_id: sessao.customer }).eq("id", uid);
+        }
+        // COMPRA DE JUDOCOINS: pagamento avulso de um pacote. Credita a carteira
+        // (orçamento extra da temporada). Idempotente pela sessão — se o webhook
+        // repetir, não credita duas vezes. Distingue-se pelo metadata `tipo`.
+        if (sessao.mode === "payment" && sessao.metadata?.tipo === "judocoins") {
+          const jc = parseInt(sessao.metadata?.jc || "0", 10);
+          const sessionId = String(sessao.id || "");
+          if (jc > 0 && sessionId) {
+            const r = await creditarJudocoins({
+              userId: uid,
+              stripeSessionId: sessionId,
+              jc,
+              eurosCent: typeof sessao.amount_total === "number" ? sessao.amount_total : null,
+            });
+            if (r.ok) {
+              // Espelho de analytics. O aviso ao utilizador é o toast da /loja
+              // (já em 5 línguas); uma notificação traduzida fica para depois.
+              try { await trackServer(uid, "checkout_completed", { tipo: "judocoins", jc }); } catch { /* extra */ }
+            }
+          }
+          break;
         }
         // SUBIDA PARA PRO MAX: pagou os 4,99. Agora troca-se o preço da
         // subscrição. Sem proporcionalidade — a diferença já foi paga aqui, e
