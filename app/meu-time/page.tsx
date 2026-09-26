@@ -17,8 +17,16 @@ import { useNivel } from "@/lib/useNivel";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
 import { useTatame } from "@/components/TatameProvider";
-import { useT, useRotuloFaixa } from "@/lib/i18n";
+import { useT, useRotuloFaixa, useLingua, type Lingua } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
+// Fase A (economia) — aviso de "equipa acima do orçamento" (5 línguas). {x} = JC a mais.
+const ORC_ACIMA: Record<Lingua, { chip: string; frase: string }> = {
+  pt: { chip: "Acima do orçamento", frase: "A tua equipa vale {x} JC mais do que o teu património. Vende alguém no mercado até equilibrares — senão ficas inativo nesta rodada." },
+  en: { chip: "Over budget", frase: "Your team is worth {x} JC more than your wealth. Sell someone in the market until it balances — otherwise you'll be inactive this round." },
+  es: { chip: "Por encima del presupuesto", frase: "Tu equipo vale {x} JC más que tu patrimonio. Vende a alguien en el mercado hasta equilibrar — si no, quedas inactivo esta ronda." },
+  fr: { chip: "Au-dessus du budget", frase: "Ton équipe vaut {x} JC de plus que ton patrimoine. Vends quelqu'un au marché jusqu'à l'équilibre — sinon tu seras inactif cette manche." },
+  de: { chip: "Über dem Budget", frase: "Dein Team ist {x} JC mehr wert als dein Vermögen. Verkaufe jemanden im Markt, bis es ausgeglichen ist — sonst bist du in dieser Runde inaktiv." },
+};
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 // FAIXA: vem do useFaixa() — a faixa REAL do jogador, a mesma em toda a app.
@@ -473,6 +481,7 @@ function MeuTimeInner() {
   // cartão de partilha. Substitui os antigos BELT/BELT_HEX fixos.
   const { faixa: faixaKey, cor: corFaixa, nome: nomeFaixa } = useFaixa();
   const rotuloFaixa = useRotuloFaixa();
+  const { lingua } = useLingua();
   // Marca "montar" (?montar=1): ativada pelo lixo. Enquanto está no ciclo
   // mercado<->meu-time, o meu-time mostra VAZIO (ignora a equipa salva) para a
   // pessoa montar uma nova. Sair do ciclo (link sem o param) restaura a antiga;
@@ -556,13 +565,15 @@ function MeuTimeInner() {
             const uid = (data.session as { user?: { id?: string } } | null)?.user?.id;
             if (uid) {
               setUserId(uid);
-              // Património real, da mesma fonte que o /inicio.
-              supabase.from("users").select("patrimony_jc").eq("id", uid).maybeSingle()
-              .then(({ data: row }) => {
-                  if (!active) return;
-                  const p = Number((row as { patrimony_jc?: unknown } | null)?.patrimony_jc);
-                  if (Number.isFinite(p)) setPatrimonio(p);
-                });
+              // Orçamento = património real + JC comprados (Fase A). Mesma fonte
+              // que o mercado e o Dojo, para o número ser o mesmo em todo o lado.
+              const tok = (data.session as { access_token?: string } | null)?.access_token;
+              if (tok) {
+                fetch("/api/orcamento", { headers: { Authorization: `Bearer ${tok}` }, cache: "no-store" })
+                .then((r) => r.json())
+                .then((j) => { if (active && j?.ok && typeof j.base === "number") setPatrimonio(j.base); })
+                .catch(() => {});
+              }
             }
           } catch {}
           // O nível vem do useNivel() (tabela `users`), não do metadata.
@@ -727,7 +738,9 @@ function MeuTimeInner() {
   // ecrã chamava-lhe património, o que fazia parecer que este nunca oscilava.
   // Património = quanto vale ao todo (equipa + saldo). Evolui a cada rodada.
   // Saldo = quanto sobra para gastar agora.
-  const saldo = jcLeft(team);
+  const saldo = jcLeft(team, patrimonio ?? 100);
+  const acimaDoOrcamento = saldo < 0;
+  const txtOrc = ORC_ACIMA[lingua] ?? ORC_ACIMA.pt;
   const scoreOf = (a: Athlete) => {
     const base = pontos[a.id] ?? 0;
     return a.id === team.captain ? base * 2 : base;
@@ -895,10 +908,17 @@ function MeuTimeInner() {
         {patrimonio !== null ? `JC ${fmt(patrimonio)}` : "—"}
         </div>
         {/* O saldo também interessa aqui: é com ele que se compra. */}
-        <div style={{ fontSize: 10, color: "#7c8a82", marginTop: 2 }}>{t("mt.saldoJC", { v: fmt(saldo) })}</div>
+        <div style={{ fontSize: 10, color: acimaDoOrcamento ? "#ef8d83" : "#7c8a82", marginTop: 2 }}>{t("mt.saldoJC", { v: fmt(saldo) })}</div>
         </div>
         </div>
         </div>
+        {/* FASE A: equipa acima do orçamento — o património não paga a equipa toda. */}
+        {acimaDoOrcamento && (
+            <div style={{ background: "#2a1f1c", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "10px 13px", margin: "0 0 12px" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83", marginBottom: 4 }}>{txtOrc.chip}</div>
+            <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5 }}>{txtOrc.frase.replace("{x}", fmt(Math.abs(saldo)))}</div>
+            </div>
+          )}
         {/* AVISO de atletas indisponíveis: a equipa tem ids que já não estão
           na competição (saíram dos inscritos). Mostramo-los em baixo para
           a equipa não parecer mais pequena, e explicamos o que fazer. */}
@@ -1033,7 +1053,7 @@ function MeuTimeInner() {
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#0f1411", borderTop: "1px solid #243029", padding: "10px 14px", zIndex: 60 }}>
         <div style={{ maxWidth: 460, margin: "0 auto", display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ flex: 1, fontSize: 12, color: "#cfd8d2" }}>{t("mt.porGuardar")}</div>
-        <button onClick={() => salvar()} disabled={savingCloud} className={!savingCloud ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, cursor: savingCloud ? "default" : "pointer", opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? t("mt.aGuardar") : t("mt.salvarEquipa")}</button>
+        <button onClick={() => salvar()} disabled={savingCloud || acimaDoOrcamento} className={!savingCloud && !acimaDoOrcamento ? "ilsave" : undefined} style={{ background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 20px", borderRadius: 10, cursor: (savingCloud || acimaDoOrcamento) ? "default" : "pointer", opacity: (savingCloud || acimaDoOrcamento) ? 0.7 : 1 }}>{savingCloud ? t("mt.aGuardar") : t("mt.salvarEquipa")}</button>
         </div>
         </div>
       )}
@@ -1099,7 +1119,7 @@ function MeuTimeInner() {
         <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
         <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: GOLD }}>{t("mt.cuidadoAlteracoes")}</h2>
         <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.5, margin: "0 0 20px" }}>{t("mt.cuidadoSub")}</p>
-        <button onClick={() => salvar(leaveTo)} disabled={savingCloud} style={{ ...primaryBtn, opacity: savingCloud ? 0.7 : 1 }}>{savingCloud ? t("mt.aGuardar") : t("mt.salvarAlteracoes")}</button>
+        <button onClick={() => salvar(leaveTo)} disabled={savingCloud || acimaDoOrcamento} style={{ ...primaryBtn, opacity: (savingCloud || acimaDoOrcamento) ? 0.7 : 1 }}>{savingCloud ? t("mt.aGuardar") : t("mt.salvarAlteracoes")}</button>
         <button onClick={() => { setModal(null); setLeaveTo(null); }} style={ghostBtn}>{t("comum.fechar")}</button>
         </div>
         </div>
