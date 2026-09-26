@@ -16,7 +16,7 @@ import { useFaixa } from "@/lib/useFaixa";
 import { useNivel } from "@/lib/useNivel";
 import { supabase } from "@/lib/supabase";
 import { PRECO } from "@/lib/precos";
-import { useT } from "@/lib/i18n";
+import { useT, useLingua, type Lingua } from "@/lib/i18n";
 // Fase E (Ativação) — SÓ medição. Nenhuma destas chamadas altera comportamento:
 // track() é no-op sem consentimento. Nomes vêm do tipo fechado EventName.
 import { track, aoTerConsentimento } from "@/lib/analytics";
@@ -30,6 +30,14 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
+// Fase A (economia) — aviso de "equipa acima do orçamento" (5 línguas). {x} = JC a mais.
+const ORC_ACIMA: Record<Lingua, { chip: string; frase: string; titulo: string; corpo: string }> = {
+  pt: { chip: "Acima do orçamento", frase: "Estás {x} JC acima do orçamento. Vende atletas até equilibrares.", titulo: "Equipa acima do orçamento", corpo: "A tua equipa vale {x} JC mais do que o teu património. Vende alguém para caber — senão, se o mercado fechar assim, ficas inativo nesta rodada (zero pontos)." },
+  en: { chip: "Over budget", frase: "You're {x} JC over budget. Sell athletes until it balances.", titulo: "Team over budget", corpo: "Your team is worth {x} JC more than your wealth. Sell someone to fit — otherwise, if the market closes like this, you'll be inactive this round (zero points)." },
+  es: { chip: "Por encima del presupuesto", frase: "Estás {x} JC por encima del presupuesto. Vende atletas hasta equilibrar.", titulo: "Equipo por encima del presupuesto", corpo: "Tu equipo vale {x} JC más que tu patrimonio. Vende a alguien para que quepa — si no, si el mercado cierra así, quedas inactivo esta ronda (cero puntos)." },
+  fr: { chip: "Au-dessus du budget", frase: "Tu es à {x} JC au-dessus du budget. Vends des athlètes jusqu'à l'équilibre.", titulo: "Équipe au-dessus du budget", corpo: "Ton équipe vaut {x} JC de plus que ton patrimoine. Vends quelqu'un pour rentrer — sinon, si le marché ferme ainsi, tu seras inactif cette manche (zéro point)." },
+  de: { chip: "Über dem Budget", frase: "Du bist {x} JC über dem Budget. Verkaufe Athleten, bis es ausgeglichen ist.", titulo: "Team über dem Budget", corpo: "Dein Team ist {x} JC mehr wert als dein Vermögen. Verkaufe jemanden — sonst bist du, wenn der Markt so schließt, in dieser Runde inaktiv (null Punkte)." },
+};
 // Competição vinda do Calendário Oficial. A "atual" é a da semana; se o mercado dela
 // já fechou (início - 1h), escala-se para a "próxima". Ver focoMercado em lib/calendario.
 //
@@ -49,7 +57,7 @@ function juntarIdentidade(prev: Identity, idc: { name?: string; escudo?: Record<
   };
 }
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
-type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" | "leave" | "precisaNome" } | { kind: "athlete"; a: Athlete } | null;
+type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" | "leave" | "precisaNome" | "acima" } | { kind: "athlete"; a: Athlete } | null;
 // Resultado do carry-over para mostrar no banner "Reescala o teu time".
 type Carry = { dropped: string[]; captainDropped: boolean } | null;
 function sameTeam(a: TeamState, b: TeamState): boolean {
@@ -74,6 +82,24 @@ export default function CriarEquipa() {
   const { ehPro: isPro } = useNivel();
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const router = useRouter();
+  const { lingua } = useLingua();
+  // FASE A (economia): o orçamento com que se monta = património + JC comprados
+  // (/api/orcamento). Por defeito 100 (novo utilizador / sem sessão).
+  const [orcamentoBase, setOrcamentoBase] = useState<number>(100);
+  useEffect(() => {
+      let vivo = true;
+      (async () => {
+        try {
+          const { data: sess } = await supabase.auth.getSession();
+          const tok = sess.session?.access_token;
+          if (!tok) return;
+          const r = await fetch("/api/orcamento", { headers: { Authorization: `Bearer ${tok}` }, cache: "no-store" });
+          const j = await r.json();
+          if (vivo && j?.ok && typeof j.base === "number") setOrcamentoBase(j.base);
+        } catch { /* fica nos 100 */ }
+      })();
+      return () => { vivo = false; };
+    }, []);
   // Guardas de disparo único (Strict Mode corre o efeito 2x em dev). Só medição.
   const contouInicio = useRef(false);
   // Faixa REAL do jogador (cor para o Dôdo, nome para o cartão de partilha).
@@ -250,6 +276,8 @@ export default function CriarEquipa() {
   async function save() {
     if (!(await temSessao())) { setModal({ kind: "login" }); return; }
     if (!isComplete(draft)) { setModal({ kind: "missing" }); return; }
+    // FASE A: não se guarda uma equipa acima do orçamento — tem de vender alguém.
+    if (jcLeft(draft, orcamentoBase) < 0) { setModal({ kind: "acima" }); return; }
     setSavingCloud(true);
     // Antes de gravar: se a identidade em memória ainda é a por omissão, vai
     // confirmar à CONTA. Evita gravar "A minha equipa" por cima do nome real e
@@ -311,7 +339,8 @@ export default function CriarEquipa() {
   const males = all.filter((a) => a.gender === "M");
   const females = all.filter((a) => a.gender === "F");
   const total = all.length;
-  const left = jcLeft(draft);
+  const left = jcLeft(draft, orcamentoBase);
+  const txtOrc = ORC_ACIMA[lingua] ?? ORC_ACIMA.pt;
   const firstEmpty = males.length < 4 ? { row: "M", i: males.length } : females.length < 4 ? { row: "F", i: females.length } : null;
   function renderRow(list: Athlete[], row: "M" | "F") {
     return Array.from({ length: 4 }).map((_, i) => {
@@ -392,6 +421,13 @@ export default function CriarEquipa() {
     </div>
     <span style={{ background: "#1b211e", color: GOLD, fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "4px 9px", borderRadius: 7, whiteSpace: "nowrap", flexShrink: 0 }}>{alvo.nivel}</span>
     </div>
+    {/* FASE A: equipa acima do orçamento — o património não paga a equipa toda. */}
+    {left < 0 && (
+        <div style={{ background: "#2a1f1c", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "10px 13px", marginBottom: 14 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83", marginBottom: 4 }}>{txtOrc.chip}</div>
+        <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5 }}>{txtOrc.frase.replace("{x}", fmt(Math.abs(left)))}</div>
+        </div>
+      )}
     <div style={{ background: "#2f6fb3", border: "2px solid #25588f", borderRadius: 16, padding: 10 }}>
     <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
     <SectionLabel>{t("mt.masculino")}</SectionLabel>
@@ -486,6 +522,17 @@ export default function CriarEquipa() {
               </div>
             ))}
         </div>
+        <button onClick={() => setModal(null)} style={primaryBtn}>{t("mt.continuarMontar")}</button>
+        </div>
+        </div>
+      )}
+    {/* FASE A: tentou guardar acima do orçamento — tem de vender alguém. */}
+    {modal?.kind === "acima" && (
+        <div style={overlayBg}>
+        <div style={cardBox}>
+        <div style={{ width: 84, height: 84, margin: "0 auto 4px" }}><Mascot belt={corFaixa} expression="determinado" /></div>
+        <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px", color: "#ef8d83" }}>{txtOrc.titulo}</h2>
+        <p style={{ fontSize: 13, color: "#c7d0c9", margin: "0 0 16px", lineHeight: 1.55 }}>{txtOrc.corpo.replace("{x}", fmt(Math.abs(left)))}</p>
         <button onClick={() => setModal(null)} style={primaryBtn}>{t("mt.continuarMontar")}</button>
         </div>
         </div>
