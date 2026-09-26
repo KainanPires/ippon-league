@@ -44,6 +44,7 @@ import {
 } from "@/lib/copa";
 import { estadoMercado } from "@/lib/calendario";
 import type { Athlete } from "@/lib/athletes";
+import { registarAdminLog } from "@/lib/adminLog";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -64,7 +65,7 @@ const NOME_LIGA = "COPA TESTE";
 // ---------------------------------------------------------------------------
 // AUTORIZACAO - so admin (igual ao /api/admin/nivel).
 // ---------------------------------------------------------------------------
-async function adminDoPedido(req: Request): Promise<{ uid: string } | null> {
+async function adminDoPedido(req: Request): Promise<{ uid: string; email: string | null } | null> {
   try {
     const auth = req.headers.get("authorization") || "";
     const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
@@ -84,7 +85,7 @@ async function adminDoPedido(req: Request): Promise<{ uid: string } | null> {
       .select("is_admin")
       .eq("id", uid)
       .maybeSingle();
-    return row?.is_admin ? { uid } : null;
+    return row?.is_admin ? { uid, email: data.user?.email ?? null } : null;
   } catch {
     return null;
   }
@@ -502,6 +503,14 @@ export async function POST(req: Request) {
     );
   }
   await supabaseAdmin.from("leagues").update({ copa_estado: "sorteada" }).eq("id", liga.id);
+
+  // AUDITORIA: quem criou, quando, e o que ficou criado.
+  await registarAdminLog({
+    uid: admin.uid,
+    email: admin.email,
+    acao: "copa_teste_criada",
+    detalhe: { league_id: liga.id, invite_code: liga.invite_code, participantes: participantes.length, comps },
+  });
 
   return NextResponse.json({
     ok: true,
