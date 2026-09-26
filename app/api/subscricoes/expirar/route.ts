@@ -49,6 +49,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { stripeFetch, nivelDoPreco, fimDoPeriodo } from "@/lib/stripe";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { sincronizarLigasOficiais } from "@/lib/ligasOficiais";
+import { registarCorrida } from "@/lib/cronLog";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 /** Dias de folga depois da data de expiração antes de sequer olhar para a conta. */
@@ -69,18 +70,33 @@ export async function GET(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
   }
+  // Medido para a observabilidade (modelo de exame). t0 arranca depois dos
+  // guardas de auth/config — esses não são falhas de saúde do cron.
+  const t0 = Date.now();
+  let rebaixados = 0;
+  let renovados = 0;
+  let semSubscricao = 0;
+  // Utilizadores para quem a Stripe não respondeu nesta corrida. Antes era só
+  // um console.error engolido; agora conta-se, porque um pico aqui significa
+  // que os rebaixamentos pararam — alguém fica com Pro sem pagar.
+  let falhasStripe = 0;
+
+  // Toda a corrida vai dentro de um try: se a leitura de candidatos rebentar
+  // (ou qualquer outra coisa de fundo), regista-se 🔴 e alerta-se, em vez de
+  // devolver 200 como se estivesse tudo bem.
+  try {
   const limite = new Date(Date.now() - FOLGA_DIAS * 24 * 60 * 60 * 1000).toISOString();
   // Quem tem acesso na base de dados mas cuja data já passou há mais de dois dias.
-  const { data: candidatos } = await supabaseAdmin
+  const { data: candidatos, error: erroQuery } = await supabaseAdmin
   .from("users")
   .select("id, name, is_pro, is_pro_max, stripe_subscription_id, pro_expira_em")
   .or("is_pro.eq.true,is_pro_max.eq.true")
   .not("pro_expira_em", "is", null)
   .lt("pro_expira_em", limite);
+  // Uma leitura falhada é grave: sem a lista, a corrida "termina bem" sem cortar
+  // ninguém. Trata-se como erro de fundo (cai no catch, regista 🔴, devolve 500).
+  if (erroQuery) throw new Error(`ler candidatos: ${erroQuery.message}`);
   const lista = (candidatos || []) as Record<string, unknown>[];
-  let rebaixados = 0;
-  let renovados = 0;
-  let semSubscricao = 0;
   for (const u of lista) {
     const uid = String(u.id);
     const subId = u.stripe_subscription_id ? String(u.stripe_subscription_id) : "";
@@ -128,15 +144,55 @@ export async function GET(req: Request) {
     } catch (e) {
       // Falha a falar com a Stripe: NÃO se rebaixa. Sem resposta dela não há
       // como saber se a pessoa pagou, e na dúvida fica com acesso. A rota corre
-      // outra vez amanhã.
+      // outra vez amanhã. Conta-se para a observabilidade apanhar um pico.
+      falhasStripe++;
       console.error("[expirar]", uid, e);
     }
   }
+
+  // OBSERVABILIDADE — regista a corrida (observado/esperado/limite) e, se algum
+  // sinal acender 🔴, alerta. Best-effort: nunca pode bloquear ou partir o cron.
+  try {
+    const msTotal = Date.now() - t0;
+    await registarCorrida({
+      job: "expirar",
+      ms: msTotal,
+      iniciadoMs: t0,
+      observados: {
+        "expirar.duracao_ms": msTotal,
+        "expirar.stripe_falhas": falhasStripe,
+      },
+      resumo: { analisados: lista.length, rebaixados, renovados, semSubscricao, falhasStripe },
+    });
+  } catch { /* observabilidade nunca bloqueia o cron */ }
+
   return NextResponse.json({
       ok: true,
       analisados: lista.length,
       rebaixados,
       renovados,
       semSubscricao,
+      falhas_stripe: falhasStripe,
     });
+  } catch (e) {
+    // Erro de fundo: a leitura de candidatos rebentou, ou algo fora do loop.
+    // Regista 🔴 (o campo `erro` força alarme) e alerta, depois devolve 500 para
+    // o agendador (cron-job.org) também ver que a corrida falhou.
+    try {
+      const msTotal = Date.now() - t0;
+      await registarCorrida({
+        job: "expirar",
+        ms: msTotal,
+        iniciadoMs: t0,
+        observados: {
+          "expirar.duracao_ms": msTotal,
+          "expirar.stripe_falhas": falhasStripe,
+        },
+        erro: String(e),
+        resumo: { rebaixados, renovados, semSubscricao, falhasStripe },
+      });
+    } catch { /* observabilidade nunca bloqueia o cron */ }
+    console.error("[expirar] corrida falhou:", e);
+    return NextResponse.json({ ok: false, erro: "Falha na corrida." }, { status: 500 });
+  }
 }
