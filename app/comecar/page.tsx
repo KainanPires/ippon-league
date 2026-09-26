@@ -45,8 +45,28 @@ type Form = {
   dialIso: string;
   belt: string;
   countryIso: string;
+  origem: string;
 };
-const EMPTY: Form = { name: "", email: "", senha: "", dataNasc: "", contact: "", dialIso: "PT", belt: "", countryIso: "" };
+const EMPTY: Form = { name: "", email: "", senha: "", dataNasc: "", contact: "", dialIso: "PT", belt: "", countryIso: "", origem: "" };
+
+// "Como nos conheceste?" — pergunta OPCIONAL no registo. Apanha o boca-a-boca,
+// eventos e offline que não trazem link UTM (ver painel /admin/utm).
+//
+// O VALOR gravado é sempre o slug estável (amigo/treinador/...), nunca o texto
+// traduzido — assim o painel agrupa igual em qualquer língua, tal como a faixa
+// guarda "Branca" e não "White". Só as ETIQUETAS mudam de língua.
+//
+// Tradução local (mapa aqui, não no i18n global) para a alteração ficar contida
+// num só ficheiro — mesmo padrão já usado noutras peças.
+const ORIGENS = ["amigo", "treinador", "evento", "social", "google", "outro"] as const;
+type BlocoOrigem = { label: string; placeholder: string; opcoes: Record<string, string> };
+const COMO_CONHECESTE: Record<string, BlocoOrigem> = {
+  pt: { label: "Como nos conheceste? (opcional)", placeholder: "Seleciona uma opção", opcoes: { amigo: "Amigo ou indicação", treinador: "Treinador ou clube", evento: "Evento ou competição", social: "Redes sociais", google: "Pesquisa no Google", outro: "Outro" } },
+  en: { label: "How did you hear about us? (optional)", placeholder: "Select an option", opcoes: { amigo: "Friend or referral", treinador: "Coach or club", evento: "Event or competition", social: "Social media", google: "Google search", outro: "Other" } },
+  es: { label: "¿Cómo nos conociste? (opcional)", placeholder: "Selecciona una opción", opcoes: { amigo: "Amigo o recomendación", treinador: "Entrenador o club", evento: "Evento o competición", social: "Redes sociales", google: "Búsqueda en Google", outro: "Otro" } },
+  fr: { label: "Comment nous as-tu connus ? (optionnel)", placeholder: "Choisis une option", opcoes: { amigo: "Ami ou recommandation", treinador: "Entraîneur ou club", evento: "Événement ou compétition", social: "Réseaux sociaux", google: "Recherche Google", outro: "Autre" } },
+  de: { label: "Wie hast du von uns erfahren? (optional)", placeholder: "Wähle eine Option", opcoes: { amigo: "Freund oder Empfehlung", treinador: "Trainer oder Verein", evento: "Event oder Wettkampf", social: "Soziale Medien", google: "Google-Suche", outro: "Sonstiges" } },
+};
 export default function Comecar() {
   // A PORTA DE ENTRADA. O seletor de bandeiras fica no topo, antes de tudo:
   // quem não percebe a língua do ecrã tem de a poder trocar sem ler nada.
@@ -170,6 +190,19 @@ export default function Comecar() {
         });
       }
     } catch { /* sem token/atribuição: segue na mesma */ }
+    // Canal declarado ("Como nos conheceste?"): opcional. Só se a pessoa
+    // respondeu. Fire-and-forget, gravado no servidor (o cliente não escreve
+    // na users por causa do RLS) — igual à atribuição, não bloqueia a entrada.
+    try {
+      const tk2 = data.session?.access_token;
+      if (tk2 && form.origem) {
+        void fetch("/api/origem-declarada", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tk2}` },
+          body: JSON.stringify({ origem: form.origem }),
+        });
+      }
+    } catch { /* sem origem declarada: segue na mesma */ }
     if (data.session) {
       window.location.href = "/inicio";
     } else {
@@ -291,6 +324,19 @@ export default function Comecar() {
     <Field label={t("comecar.pais")} error={errors.countryIso}>
     <CountryPicker value={form.countryIso} hasError={!!errors.countryIso} onChange={(iso) => update("countryIso", iso)} />
     </Field>
+    {(() => {
+        const bloco = COMO_CONHECESTE[lingua] ?? COMO_CONHECESTE.pt;
+        return (
+          <Field label={bloco.label}>
+          <select style={{ ...inputStyle(false), appearance: "none" }} value={form.origem} onChange={(e) => update("origem", e.target.value)}>
+          <option value="">{bloco.placeholder}</option>
+          {ORIGENS.map((o) => (
+                <option key={o} value={o}>{bloco.opcoes[o]}</option>
+              ))}
+          </select>
+          </Field>
+        );
+      })()}
     <button onClick={abrirDeclaracao} disabled={saving} style={{ width: "100%", marginTop: 8, padding: "14px", borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
     {t("comecar.comecarJogar")}
     </button>
