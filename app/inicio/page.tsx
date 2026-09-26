@@ -20,6 +20,7 @@ import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
 // sessão, e desde que o trigger deixou de sincronizar o nível, essa cópia podia
 // estar desatualizada: alguém marcado como Pro na tabela via "Sê Pro" na app.
 import { useNivel } from "@/lib/useNivel";
+import { LIMITES } from "@/lib/planos";
 import { CartaoInstalarApp } from "@/components/InstalarApp";
 import { LembreteNotificacoes } from "@/components/NotificacoesPush";
 import { reconciliarPush } from "@/lib/push";
@@ -71,6 +72,7 @@ function targetForStep(step: number): TutTarget {
 interface LigaBruta {
   id: string;
   name: string;
+  type?: string;
   membros?: number;
   formato?: string;
   estado?: string | null;
@@ -111,7 +113,20 @@ export default function Inicio() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   // ehPro é verdadeiro para Pro E para Pro Max (os níveis são cumulativos).
-  const { ehPro: isPro, ehProMax: isProMax } = useNivel();
+  const { ehPro: isPro, ehProMax: isProMax, pronto: nivelPronto } = useNivel();
+  // Contagem de ligas de AMIGOS ativas (para o gate do downgrade). null = ainda não sei.
+  const [contagemAmigos, setContagemAmigos] = useState<{ pontos: number; copa: number } | null>(null);
+  // GATE do downgrade: se ficou acima do limite de ligas de amigos do nível atual,
+  // tem de resolver antes de continuar (ecrã /resolver-ligas). Voltar ao Pro faz o
+  // limite subir e este redirecionamento deixa de disparar.
+  useEffect(() => {
+    if (!nivelPronto || !contagemAmigos) return;
+    const nivel = isProMax ? "promax" : isPro ? "pro" : "gratis";
+    const lim = LIMITES[nivel];
+    if (contagemAmigos.pontos > lim.pontos || contagemAmigos.copa > lim.copa) {
+      window.location.href = "/resolver-ligas";
+    }
+  }, [nivelPronto, contagemAmigos, isPro, isProMax]);
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
   // PATRIMÓNIO REAL, de users.patrimony_jc. Não se calcula no ecrã: é o valor
   // que o motor de congelamento escreve a cada rodada, com as valorizações e
@@ -193,6 +208,14 @@ export default function Inicio() {
                 // /ligas → Resultados, com o pódio e o certificado.
                 const ativas = ligas.filter((l) => !ligaTerminada(l));
                 setMinhasLigas(ativas.map((l) => ({ id: l.id, name: l.name, membros: l.membros ?? 1 })));
+                // Gate do downgrade: conta as ligas de AMIGOS ativas por formato
+                // (oficiais não contam para o limite). O redirecionamento decide-se
+                // no efeito abaixo, quando o nível já estiver carregado.
+                const amigas = ativas.filter((l) => String(l.type) === "amigos");
+                setContagemAmigos({
+                    pontos: amigas.filter((l) => String(l.formato) !== "copa").length,
+                    copa: amigas.filter((l) => String(l.formato) === "copa").length,
+                  });
               })
             .catch(() => { if (active) setMinhasLigas([]); });
           }
