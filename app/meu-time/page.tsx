@@ -3,7 +3,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
+import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, loadIdentityCloudFor, loadPrecosCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { computeNewPrice } from "@/lib/engine";
 import { supabase } from "@/lib/supabase";
@@ -42,12 +42,12 @@ const LOJA_MT: Record<Lingua, { atalho: string; ouCompra: string }> = {
 // mostra-se a variação de preço (JC) e, por baixo do tatame, a variação de
 // PATRIMÓNIO do jogador (assimétrica: ganha metade da subida, perde a descida
 // inteira — igual ao congelamento). "Parcial" porque só fecha no fim.
-const VALOR_MT: Record<Lingua, { patTitulo: string; parcial: string }> = {
-  pt: { patTitulo: "Património nesta rodada", parcial: "parcial · fecha no fim da competição" },
-  en: { patTitulo: "Wealth this round", parcial: "partial · settles when the event ends" },
-  es: { patTitulo: "Patrimonio en esta ronda", parcial: "parcial · se cierra al final" },
-  fr: { patTitulo: "Patrimoine cette manche", parcial: "partiel · définitif à la fin" },
-  de: { patTitulo: "Vermögen diese Runde", parcial: "vorläufig · endgültig am Ende" },
+const VALOR_MT: Record<Lingua, { patTitulo: string; parcial: string; custo: string; sobra: string }> = {
+  pt: { patTitulo: "Património nesta rodada", parcial: "parcial · fecha no fim da competição", custo: "Custo da equipa", sobra: "Sobra" },
+  en: { patTitulo: "Wealth this round", parcial: "partial · settles when the event ends", custo: "Team cost", sobra: "Left" },
+  es: { patTitulo: "Patrimonio en esta ronda", parcial: "parcial · se cierra al final", custo: "Coste del equipo", sobra: "Resto" },
+  fr: { patTitulo: "Patrimoine cette manche", parcial: "partiel · définitif à la fin", custo: "Coût de l'équipe", sobra: "Reste" },
+  de: { patTitulo: "Vermögen diese Runde", parcial: "vorläufig · endgültig am Ende", custo: "Teamkosten", sobra: "Rest" },
 };
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -522,6 +522,15 @@ function MeuTimeInner() {
   // PATRIMÓNIO REAL (users.patrimony_jc): o que a equipa vale ao todo, com as
   // valorizações já aplicadas pelo motor de congelamento. Não se calcula aqui.
   const [patrimonio, setPatrimonio] = useState<number | null>(null);
+  // PREÇOS DE COMPRA (o que se pagou por cada atleta ao contratar) — guardados
+  // na equipa (tabela `equipas.precos`). Servem para mostrar no topo o CUSTO da
+  // equipa e a SOBRA de património (património − custo). Ver loadPrecosCloudFor.
+  const [precosCompra, setPrecosCompra] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let vivo = true;
+    loadPrecosCloudFor(idComp).then((p) => { if (vivo) setPrecosCompra(p || {}); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [idComp]);
   // LEMBRETE "esqueceste de salvar o teu time" — hook reutilizável. Observa a
   // saída do ecrã e agenda/cancela conforme há (ou não) rascunho por salvar para
   // esta competição. A lógica (rascunho vs guardado) vive no hook, partilhada com
@@ -762,6 +771,12 @@ function MeuTimeInner() {
   // Saldo = quanto sobra para gastar agora.
   const saldo = jcLeft(team, patrimonio ?? 100);
   const acimaDoOrcamento = saldo < 0;
+  // CUSTO DE COMPRA da equipa (o que se pagou ao contratar) e SOBRA de património
+  // (património − custo). Só se mostra quando temos o preço de compra de TODOS os
+  // atletas da equipa — na dúvida não mostramos, para não somar um custo parcial.
+  const temCustoCompra = team.ids.length > 0 && team.ids.every((id) => Number.isFinite(Number(precosCompra[id])));
+  const custoCompra = Math.round(team.ids.reduce((s, id) => s + (Number(precosCompra[id]) || 0), 0) * 10) / 10;
+  const sobraPatrimonio = Math.round(((patrimonio ?? 100) - custoCompra) * 10) / 10;
   const txtOrc = ORC_ACIMA[lingua] ?? ORC_ACIMA.pt;
   const txtLojaMt = LOJA_MT[lingua] ?? LOJA_MT.pt;
   const scoreOf = (a: Athlete) => {
@@ -946,6 +961,14 @@ function MeuTimeInner() {
             negativo" aqui confundia (ver a nota do banner abaixo). */}
         {editavel && (
           <div style={{ fontSize: 10, color: acimaDoOrcamento ? "#ef8d83" : "#7c8a82", marginTop: 2 }}>{t("mt.saldoJC", { v: fmt(saldo) })}</div>
+        )}
+        {/* Com a competição a decorrer, mostra o CUSTO da equipa (o que se pagou a
+            contratar) e a SOBRA de património (património − custo). */}
+        {emCompeticao && temCustoCompra && (
+          <>
+          <div style={{ fontSize: 10, color: "#7c8a82", marginTop: 3 }}>{txtValor.custo}: <span style={{ color: "#cfd8d2", fontFamily: FD, fontWeight: 700 }}>JC {fmt(custoCompra)}</span></div>
+          <div style={{ fontSize: 10, color: "#7c8a82", marginTop: 1 }}>{txtValor.sobra}: <span style={{ color: sobraPatrimonio < 0 ? "#ef8d83" : "#7fd1a3", fontFamily: FD, fontWeight: 700 }}>JC {fmt(sobraPatrimonio)}</span></div>
+          </>
         )}
         </div>
         </div>
