@@ -24,11 +24,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { registarAdminLog, alertaAdmin } from "@/lib/adminLog";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-async function adminDoPedido(req: Request): Promise<{ uid: string } | null> {
+async function adminDoPedido(req: Request): Promise<{ uid: string; email: string | null } | null> {
   try {
     const auth = req.headers.get("authorization") || "";
     const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
@@ -44,7 +45,7 @@ async function adminDoPedido(req: Request): Promise<{ uid: string } | null> {
     const uid = data?.user?.id;
     if (error || !uid) return null;
     const { data: row } = await supabaseAdmin.from("users").select("is_admin").eq("id", uid).maybeSingle();
-    return row?.is_admin ? { uid } : null;
+    return row?.is_admin ? { uid, email: data.user?.email ?? null } : null;
   } catch {
     return null;
   }
@@ -137,6 +138,14 @@ export async function POST(req: Request) {
       inscricoesLimpas = (ins || []).length;
       if (inscricoesLimpas > 0) await supabaseAdmin.from("dodo_inscricoes").delete().eq("edicao_id", aberta.id);
     }
+    await registarAdminLog({
+      uid: admin.uid, email: admin.email, acao: "dodo_edicao_substituida",
+      detalhe: { edicao_id: aberta.id, numero: aberta.numero, inscricoes_ate: inscricoesAteIso, inscricoesLimpas },
+    });
+    await alertaAdmin(
+      `[Ippon] Edicao do Dodo alterada (${aberta.numero}a)`,
+      `A ${aberta.numero}a Copa do Dodo teve o fecho alterado para ${inscricoesAteIso} por ${admin.email || admin.uid}. Inscricoes limpas: ${inscricoesLimpas}.`
+    );
     return NextResponse.json({
       ok: true,
       substituida: true,
@@ -178,6 +187,15 @@ export async function POST(req: Request) {
   if (error || !nova) {
     return NextResponse.json({ ok: false, erro: "Nao foi possivel criar a edicao.", detalhe: error?.message }, { status: 500 });
   }
+
+  await registarAdminLog({
+    uid: admin.uid, email: admin.email, acao: "dodo_edicao_aberta",
+    detalhe: { edicao_id: nova.id, numero: nova.numero, ano: nova.ano, inscricoes_ate: nova.inscricoes_ate },
+  });
+  await alertaAdmin(
+    `[Ippon] Edicao do Dodo aberta (${nova.numero}a)`,
+    `A ${nova.numero}a Copa do Dodo foi aberta por ${admin.email || admin.uid}. Inscricoes fecham em ${nova.inscricoes_ate}.`
+  );
 
   return NextResponse.json({
     ok: true,
