@@ -205,6 +205,14 @@ export default function Inicio() {
   const nomeADecorrer = aDecorrer ? nomeCompeticao(aDecorrer) : null;
   const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
   const temEquipaCompleta = !!savedTeam && savedTeam.ids.length === 8 && !!savedTeam.captain;
+  // LOJA DE JUDOCOINS (Fase B): a propaganda só faz sentido nos momentos de
+  // MONTAR/decidir — mercado aberto (competição não a decorrer), ou ainda sem
+  // equipa (vais montar para a próxima) — ou quando estás ACIMA do orçamento.
+  // Se já tens equipa dentro do orçamento e a competição está a decorrer (só a
+  // ver a pontuação), não se mostra. (Pedido do Kainan: JC nos momentos cruciais,
+  // não quando só se está a ver o time.)
+  const acimaOrcamentoInicio = !!teamInfo && Number(teamInfo.value) > (patrimonio ?? 100);
+  const mostrarLojaInicio = !visitante && (!teamInfo || !emAndamento || acimaOrcamentoInicio);
   const destinoEscalar = temEquipaCompleta ? "/meu-time" : "/criar-equipa";
   const nomeMostrado = visitante ? t("inicio.campeao") : name;
   useEffect(() => {
@@ -602,8 +610,10 @@ export default function Inicio() {
         <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>{t("inicio.assinar")}</span>
         </a>
       )}
-    {/* FASE B: atalho para a Loja de Judocoins (orçamento extra da temporada). */}
-    {!visitante && (
+    {/* FASE B: atalho para a Loja de Judocoins (orçamento extra da temporada).
+        Só nos momentos de montar/decidir ou acima do orçamento — não quando só
+        se está a ver a pontuação com a equipa já feita. */}
+    {mostrarLojaInicio && (
         <a href="/loja" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "11px 14px", marginBottom: 14, textDecoration: "none" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ width: 30, height: 30, borderRadius: "50%", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>JC</span>
