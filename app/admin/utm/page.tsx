@@ -1,125 +1,252 @@
-// app/api/admin/aquisicao/route.ts
-//
-// FERRAMENTA DE ADMIN (so admin): "de onde vem" -- agrega a aquisicao das contas
-// a partir das colunas de UTM/referral que a app ja grava na tabela users
-// (first_utm_source/medium/campaign/content, first_referrer, referred_by,
-// first_seen_at). So-leitura: nao escreve nada.
-//
-// GET /api/admin/aquisicao?dias=30   -> agregados (por fonte, campanha, etc.)
-//   dias omitido ou 0 = desde sempre.
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+"use client";
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
+// app/admin/utm/page.tsx
+//
+// Painel de admin (so admin): construtor de links UTM + "de onde vem".
+// A verdadeira barreira e no servidor; aqui so escondemos a UI.
 
-async function ehAdmin(req: Request): Promise<boolean> {
-  try {
-    const auth = req.headers.get("authorization") || "";
-    const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
-    if (!token) return false;
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
-    if (!url || !pub || !supabaseAdmin) return false;
-    const sb = createClient(url, pub, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { data, error } = await sb.auth.getUser();
-    const uid = data?.user?.id;
-    if (error || !uid) return false;
-    const { data: row } = await supabaseAdmin.from("users").select("is_admin").eq("id", uid).maybeSingle();
-    return !!row?.is_admin;
-  } catch {
-    return false;
-  }
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
+
+const GOLD = "#d9a441";
+const FUNDO = "#141110";
+const CARTAO = "#1e1a17";
+const BORDA = "#2c2622";
+const BASE = "https://www.ipponleague.com";
+
+const FONTES = ["instagram", "tiktok", "youtube", "x", "facebook", "whatsapp", "google", "blog", "email", "push", "influenciador", "atleta", "federacao", "clube", "outro"];
+const MEIOS = ["social", "video", "story", "bio", "post", "ads", "dm", "referral", "email", "push", "organico"];
+
+interface Item { chave: string; total: number }
+interface Aquisicao {
+  ok: boolean;
+  erro?: string;
+  detalhe?: string;
+  dica?: string;
+  total?: number;
+  resumo?: { diretos: number; comReferrer: number; comReferral: number };
+  porFonte?: Item[];
+  porCampanha?: Item[];
+  porFonteCampanha?: Item[];
+  porConteudo?: Item[];
 }
 
-type Linha = {
-  first_utm_source: string | null;
-  first_utm_medium: string | null;
-  first_utm_campaign: string | null;
-  first_utm_content: string | null;
-  first_referrer: string | null;
-  referred_by: string | null;
-  first_seen_at: string | null;
-};
-
-function topN(mapa: Map<string, number>, n = 50): { chave: string; total: number }[] {
-  return Array.from(mapa.entries())
-    .map(([chave, total]) => ({ chave, total }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, n);
+// minusculas + so letras/numeros, palavras separadas por hifen (convencao para
+// dados limpos). Acentos/espacos/simbolos viram hifen -- os utm tags devem ser
+// simples de qualquer forma.
+function limpa(s: string): string {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-export async function GET(req: Request) {
-  if (!supabaseAdmin) return NextResponse.json({ ok: false, erro: "Servidor sem ligacao." }, { status: 500 });
-  if (!(await ehAdmin(req))) return NextResponse.json({ ok: false, erro: "Nao autorizado." }, { status: 401 });
+export default function UtmPage() {
+  const [acesso, setAcesso] = useState<"..." | "sim" | "nao">("...");
+  const [fonte, setFonte] = useState("instagram");
+  const [meio, setMeio] = useState("social");
+  const [campanha, setCampanha] = useState("copa-dodo-1");
+  const [conteudo, setConteudo] = useState("");
+  const [destino, setDestino] = useState("/");
+  const [copiado, setCopiado] = useState(false);
 
-  const { searchParams } = new URL(req.url);
-  const dias = Math.max(0, Math.floor(Number(searchParams.get("dias") || "0")) || 0);
-  const desde = dias > 0 ? new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString() : null;
+  const [dias, setDias] = useState(30);
+  const [aq, setAq] = useState<Aquisicao | null>(null);
+  const [aCarregar, setACarregar] = useState(false);
 
-  // Le as colunas de aquisicao. Se alguma nao existir na tabela, a consulta
-  // falha -- nesse caso devolvemos um aviso claro em vez de rebentar.
-  let q = supabaseAdmin
-    .from("users")
-    .select("first_utm_source, first_utm_medium, first_utm_campaign, first_utm_content, first_referrer, referred_by, first_seen_at")
-    .limit(100000);
-  if (desde) q = q.gte("first_seen_at", desde);
-  const { data, error } = await q;
-  if (error) {
-    return NextResponse.json({
-      ok: false,
-      erro: "Nao consegui ler as colunas de aquisicao da tabela users.",
-      detalhe: error.message,
-      dica: "Confirma que existem as colunas first_utm_source/medium/campaign/content, first_referrer, referred_by, first_seen_at.",
-    }, { status: 500 });
-  }
+  const token = useCallback(async (): Promise<string> => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || "";
+  }, []);
 
-  const linhas = (data || []) as Linha[];
-  const total = linhas.length;
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const uid = data.session?.user?.id;
+      if (!uid) { if (vivo) setAcesso("nao"); return; }
+      const { data: u } = await supabase.from("users").select("is_admin").eq("id", uid).maybeSingle();
+      if (!vivo) return;
+      setAcesso(u?.is_admin ? "sim" : "nao");
+    })();
+    return () => { vivo = false; };
+  }, []);
 
-  const porFonte = new Map<string, number>();
-  const porCampanha = new Map<string, number>();
-  const porFonteCampanha = new Map<string, number>();
-  const porConteudo = new Map<string, number>();
-  let diretos = 0;       // sem utm_source nem referrer
-  let comReferral = 0;   // referred_by preenchido
-  let comReferrer = 0;   // veio de um site externo (referrer) sem utm
-
-  const norm = (v: string | null): string => (v && String(v).trim() ? String(v).trim().toLowerCase() : "");
-
-  for (const l of linhas) {
-    const src = norm(l.first_utm_source);
-    const camp = norm(l.first_utm_campaign);
-    const cont = norm(l.first_utm_content);
-    const ref = norm(l.first_referrer);
-
-    if (l.referred_by) comReferral++;
-
-    if (src) {
-      porFonte.set(src, (porFonte.get(src) ?? 0) + 1);
-      if (camp) porFonteCampanha.set(`${src} / ${camp}`, (porFonteCampanha.get(`${src} / ${camp}`) ?? 0) + 1);
-      if (cont) porConteudo.set(`${src} / ${cont}`, (porConteudo.get(`${src} / ${cont}`) ?? 0) + 1);
-      if (camp) porCampanha.set(camp, (porCampanha.get(camp) ?? 0) + 1);
-    } else if (ref) {
-      comReferrer++;
-      porFonte.set(`(referrer) ${ref}`, (porFonte.get(`(referrer) ${ref}`) ?? 0) + 1);
-    } else {
-      diretos++;
+  const carregarAquisicao = useCallback(async (d: number) => {
+    setACarregar(true);
+    try {
+      const tk = await token();
+      const r = await fetch(`/api/admin/aquisicao?dias=${d}`, { cache: "no-store", headers: { Authorization: `Bearer ${tk}` } });
+      const j = await r.json();
+      setAq(j as Aquisicao);
+    } catch (e) {
+      setAq({ ok: false, erro: "Falha de rede.", detalhe: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setACarregar(false);
     }
+  }, [token]);
+
+  useEffect(() => {
+    if (acesso === "sim") void carregarAquisicao(dias);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acesso]);
+
+  const link = useMemo(() => {
+    const path = destino.startsWith("/") ? destino : `/${destino}`;
+    const p = new URLSearchParams();
+    if (fonte) p.set("utm_source", limpa(fonte));
+    if (meio) p.set("utm_medium", limpa(meio));
+    if (campanha) p.set("utm_campaign", limpa(campanha));
+    if (conteudo) p.set("utm_content", limpa(conteudo));
+    const qs = p.toString();
+    return `${BASE}${path === "/" ? "/" : path}${qs ? `?${qs}` : ""}`;
+  }, [fonte, meio, campanha, conteudo, destino]);
+
+  async function copiar() {
+    try { await navigator.clipboard.writeText(link); setCopiado(true); setTimeout(() => setCopiado(false), 1500); } catch { /* sem clipboard */ }
   }
 
-  return NextResponse.json({
-    ok: true,
-    dias: dias || null,
-    total,
-    resumo: { diretos, comReferrer, comReferral },
-    porFonte: topN(porFonte),
-    porCampanha: topN(porCampanha),
-    porFonteCampanha: topN(porFonteCampanha),
-    porConteudo: topN(porConteudo),
-  });
+  if (acesso === "...") return <Moldura><p style={{ color: "#9a938c" }}>A carregar...</p></Moldura>;
+  if (acesso === "nao") {
+    return <Moldura><h1 style={{ color: GOLD, fontSize: 20, margin: 0 }}>Sem acesso</h1><p style={{ color: "#9a938c" }}>Esta pagina e so para administradores.</p></Moldura>;
+  }
+
+  return (
+    <Moldura>
+      <h1 style={{ color: GOLD, fontSize: 22, margin: "0 0 4px" }}>Links de marketing (UTM)</h1>
+      <p style={{ color: "#c8c0b8", marginTop: 0, fontSize: 14, lineHeight: 1.5 }}>
+        Cria um link etiquetado por cada acao de marketing. Quando alguem cria conta a partir dele, a app
+        grava de onde veio -- e depois ves aqui em baixo quantas contas vieram de cada fonte/campanha.
+      </p>
+
+      {/* ---- Construtor ---- */}
+      <div style={caixa}>
+        <div style={titulo}>Construtor de links</div>
+        <div style={{ display: "grid", gap: 12 }}>
+          <Campo rot="Canal (utm_source)">
+            <select value={fonte} onChange={(e) => setFonte(e.target.value)} style={input}>
+              {FONTES.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </Campo>
+          <Campo rot="Meio (utm_medium)">
+            <select value={meio} onChange={(e) => setMeio(e.target.value)} style={input}>
+              {MEIOS.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </Campo>
+          <Campo rot="Campanha (utm_campaign) -- ex.: copa-dodo-1, lancamento">
+            <input value={campanha} onChange={(e) => setCampanha(e.target.value)} style={input} />
+          </Campo>
+          <Campo rot="Mensagem/formato (utm_content) -- ex.: video-explica, dica-1">
+            <input value={conteudo} onChange={(e) => setConteudo(e.target.value)} style={input} />
+          </Campo>
+          <Campo rot="Destino (para onde o link leva)">
+            <select value={destino} onChange={(e) => setDestino(e.target.value)} style={input}>
+              <option value="/">Inicio (/)</option>
+              <option value="/dodo">Copa do Dodo (/dodo)</option>
+              <option value="/comecar">Comecar (/comecar)</option>
+              <option value="/ippon-pro">Ippon Pro (/ippon-pro)</option>
+            </select>
+          </Campo>
+        </div>
+
+        <div style={{ marginTop: 14, background: "#0e0c0b", border: `1px solid ${BORDA}`, borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "#c8c0b8", wordBreak: "break-all" }}>
+          {link}
+        </div>
+        <button onClick={copiar} style={{ marginTop: 10, background: GOLD, color: "#141110", border: "none", borderRadius: 10, padding: "11px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+          {copiado ? "Copiado!" : "Copiar link"}
+        </button>
+        <p style={{ fontSize: 11.5, color: "#8b8079", marginTop: 10, lineHeight: 1.5 }}>
+          Convencao (para os dados nao virem sujos): tudo em minusculas, sem acentos nem espacos, palavras
+          separadas por hifen. O construtor ja limpa isso por ti. Usa o mesmo <b>utm_campaign</b> para a mesma
+          campanha em todas as redes, e muda o <b>utm_source</b> por rede e o <b>utm_content</b> por mensagem.
+        </p>
+      </div>
+
+      {/* ---- De onde vem ---- */}
+      <div style={{ ...caixa, marginTop: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div style={titulo}>De onde vem (contas registadas)</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[7, 30, 0].map((d) => (
+              <button key={d} onClick={() => { setDias(d); void carregarAquisicao(d); }}
+                style={{ background: dias === d ? GOLD : "transparent", color: dias === d ? "#141110" : GOLD, border: `1px solid ${GOLD}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                {d === 0 ? "Sempre" : `${d}d`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {aCarregar && <p style={{ color: "#9a938c", fontSize: 13 }}>A carregar...</p>}
+        {aq && !aq.ok && (
+          <div style={{ marginTop: 10 }}>
+            <p style={{ color: "#ef8d83", margin: 0, fontWeight: 700 }}>{aq.erro}</p>
+            {aq.detalhe && <p style={{ color: "#9a938c", fontSize: 12 }}>{aq.detalhe}</p>}
+            {aq.dica && <p style={{ color: "#9a938c", fontSize: 12 }}>{aq.dica}</p>}
+          </div>
+        )}
+        {aq && aq.ok && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 12 }}>
+              <Stat rot="Contas" val={String(aq.total ?? 0)} />
+              <Stat rot="Diretas" val={String(aq.resumo?.diretos ?? 0)} />
+              <Stat rot="Por referrer" val={String(aq.resumo?.comReferrer ?? 0)} />
+              <Stat rot="Por indicacao" val={String(aq.resumo?.comReferral ?? 0)} />
+            </div>
+            <Tabela titulo="Por fonte (utm_source)" itens={aq.porFonte || []} total={aq.total || 0} />
+            <Tabela titulo="Por campanha (utm_campaign)" itens={aq.porCampanha || []} total={aq.total || 0} />
+            <Tabela titulo="Por fonte + campanha" itens={aq.porFonteCampanha || []} total={aq.total || 0} />
+            <Tabela titulo="Por mensagem (fonte + utm_content)" itens={aq.porConteudo || []} total={aq.total || 0} />
+          </div>
+        )}
+      </div>
+    </Moldura>
+  );
 }
+
+function Tabela({ titulo, itens, total }: { titulo: string; itens: Item[]; total: number }) {
+  if (itens.length === 0) return null;
+  const max = Math.max(1, ...itens.map((i) => i.total));
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 12, color: "#8b9a92", fontFamily: "var(--font-geist-mono), monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 7 }}>{titulo}</div>
+      <div style={{ display: "grid", gap: 5 }}>
+        {itens.map((i) => (
+          <div key={i.chave} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, color: "#efeadd", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{i.chave}</div>
+              <div style={{ height: 5, background: "#0e0c0b", borderRadius: 3, marginTop: 3, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${Math.round((i.total / max) * 100)}%`, background: GOLD }} />
+              </div>
+            </div>
+            <div style={{ fontSize: 13, color: "#efeadd", fontWeight: 700, textAlign: "right" }}>
+              {i.total}<span style={{ color: "#8b8079", fontWeight: 400, fontSize: 11 }}> ({total > 0 ? Math.round((i.total / total) * 100) : 0}%)</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function Stat({ rot, val }: { rot: string; val: string }) {
+  return (
+    <div style={{ background: "#0e0c0b", border: `1px solid ${BORDA}`, borderRadius: 10, padding: "8px 12px", minWidth: 78 }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: "#efeadd" }}>{val}</div>
+      <div style={{ fontSize: 11, color: "#8b8079" }}>{rot}</div>
+    </div>
+  );
+}
+function Campo({ rot, children }: { rot: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column" }}>
+      <span style={{ fontSize: 12.5, color: "#9a938c", marginBottom: 5 }}>{rot}</span>
+      {children}
+    </label>
+  );
+}
+function Moldura({ children }: { children: React.ReactNode }) {
+  return (
+    <main style={{ minHeight: "100vh", background: FUNDO, padding: "28px 16px" }}>
+      <div style={{ maxWidth: 640, margin: "0 auto" }}>{children}</div>
+    </main>
+  );
+}
+const caixa: React.CSSProperties = { background: CARTAO, border: `1px solid ${BORDA}`, borderRadius: 12, padding: 16, marginTop: 14 };
+const titulo: React.CSSProperties = { fontFamily: "var(--font-geist-mono), monospace", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: GOLD, marginBottom: 12 };
+const input: React.CSSProperties = { background: "#0e0c0b", border: `1px solid ${BORDA}`, borderRadius: 8, padding: "10px 12px", color: "#efeadd", fontSize: 15, width: "100%" };
