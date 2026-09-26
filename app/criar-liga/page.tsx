@@ -205,9 +205,8 @@ export default function CriarLiga() {
       }
       const res = await fetch("/api/liga/criar", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess.session?.access_token || ""}` },
           body: JSON.stringify({
-              user_id,
               nome: name.trim(),
               descricao: descricao.trim(),
               formato: format,
