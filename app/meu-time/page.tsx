@@ -931,8 +931,11 @@ function MeuTimeInner() {
             <a href="/loja" style={{ display: "inline-block", marginTop: 9, background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.03em", padding: "7px 13px", borderRadius: 9, textDecoration: "none" }}>{txtLojaMt.ouCompra}</a>
             </div>
           )}
-        {/* FASE B: atalho discreto para a Loja de Judocoins (sempre visível). */}
-        {!acimaDoOrcamento && (
+        {/* FASE B: atalho discreto para a Loja de Judocoins. Só quando o mercado
+            está aberto (editavel) — nos momentos de montar/ajustar. Com a
+            competição a decorrer (só a ver a pontuação) não se mostra. O CTA do
+            "acima do orçamento" acima trata do caso crucial. */}
+        {!acimaDoOrcamento && editavel && (
             <a href="/loja" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#141a17", border: "1px solid #2a4d3e", borderRadius: 12, padding: "9px 13px", margin: "0 0 12px", textDecoration: "none" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <span style={{ width: 26, height: 26, borderRadius: "50%", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>JC</span>
