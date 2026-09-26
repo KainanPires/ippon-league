@@ -420,7 +420,13 @@ export default function PaginaLiga() {
       let vivo = true;
       (async () => {
           try {
-            const res = await fetch(`/api/liga/pedidos?league_id=${liga.id}&user_id=${meuId}`);
+            // Identidade pelo token: a rota descobre o dono pela sessão, não pelo user_id da query.
+            const { data: sess } = await supabase.auth.getSession();
+            const tk = sess.session?.access_token;
+            if (!tk) { if (vivo) setSouDono(false); return; }
+            const res = await fetch(`/api/liga/pedidos?league_id=${liga.id}`, {
+              headers: { Authorization: `Bearer ${tk}` },
+            });
             const j = await res.json();
             if (!vivo) return;
             if (j.ok && Array.isArray(j.pedidos)) {
@@ -468,10 +474,14 @@ export default function PaginaLiga() {
     if (aDecidir || !meuId) return;
     setADecidir(p.request_id);
     try {
+      // Identidade pelo token: a rota confirma que és o dono pela sessão, não pelo user_id do corpo.
+      const { data: sess } = await supabase.auth.getSession();
+      const tk = sess.session?.access_token;
+      if (!tk) { setADecidir(null); return; }
       const res = await fetch("/api/liga/decidir", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: meuId, request_id: p.request_id, acao }),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tk}` },
+          body: JSON.stringify({ request_id: p.request_id, acao }),
       });
       const j = await res.json();
       if (j.ok) {
