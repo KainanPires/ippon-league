@@ -24,11 +24,22 @@ import { marcarAreaProVista } from "@/components/BarraInferior";
 import { TutorialBoasVindas } from "@/components/TutorialBoasVindas";
 import { deveMostrarTutorial } from "@/lib/tutorials";
 import { useFaixa } from "@/lib/useFaixa";
-import { useT } from "@/lib/i18n";
+import { useT, useLingua, type Lingua } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const MAX = "#7fb8f5";
 const VERDE_WA = "#25D366"; // verde do WhatsApp
+const JC_GOLD = "#d9a441"; // dourado do JC (consistente com o resto da app)
+// Propaganda da Loja de Judocoins na central (economia Fase B). Os JC são
+// orçamento da temporada, NÃO um benefício do Pro Max — à venda para todos e
+// sem vantagem competitiva. Mapa local por língua.
+const LOJA_CENTRAL: Record<Lingua, { titulo: string; corpo: string; botao: string }> = {
+  pt: { titulo: "Loja de Judocoins", corpo: "Orçamento extra para montares a equipa que quiseres. À venda para todos — não dá pontos nem vantagem, só te deixa contratar quem quiseres.", botao: "Abrir loja" },
+  en: { titulo: "Judocoins Store", corpo: "Extra budget to build the team you want. On sale to everyone — no points, no advantage, it just lets you sign who you want.", botao: "Open store" },
+  es: { titulo: "Tienda de Judocoins", corpo: "Presupuesto extra para montar el equipo que quieras. A la venta para todos — no da puntos ni ventaja, solo te deja fichar a quien quieras.", botao: "Abrir tienda" },
+  fr: { titulo: "Boutique de Judocoins", corpo: "Du budget en plus pour composer l'équipe que tu veux. En vente pour tous — ni points ni avantage, juste de quoi recruter qui tu veux.", botao: "Ouvrir la boutique" },
+  de: { titulo: "Judocoins-Shop", corpo: "Extra-Budget, um dein Wunschteam zu bauen. Für alle erhältlich — keine Punkte, kein Vorteil, du kannst nur verpflichten, wen du willst.", botao: "Shop öffnen" },
+};
 
 // O link da comunidade vem de uma variável de ambiente da Vercel, não do
 // código: trocá-lo (spam, reset do grupo, mudança de plataforma) não deve
@@ -47,6 +58,8 @@ const VANTAGENS: string[] = [
 export default function ProMaxCentral() {
   const router = useRouter();
   const t = useT();
+  const { lingua } = useLingua();
+  const txtLojaCentral = LOJA_CENTRAL[lingua] ?? LOJA_CENTRAL.pt;
   const [estado, setEstado] = useState<"carregando" | "ok">("carregando");
   const [nome, setNome] = useState(t("pro.campeao"));
 
@@ -209,6 +222,17 @@ export default function ProMaxCentral() {
     <SeletorJudoguiCentral />
     {/* SCOUT do time — o mesmo componente da /pro, aqui dentro (sem sair). */}
     <ScoutDoTime />
+
+    {/* LOJA DE JUDOCOINS (Fase B) — propaganda na central: orçamento, NÃO é o
+        Pro Max nem dá vantagem. À venda para todos. */}
+    <a href="/loja" style={{ display: "flex", alignItems: "flex-start", gap: 12, textDecoration: "none", background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${JC_GOLD}`, borderRadius: 14, padding: "13px 14px", marginTop: 18, color: "#f1ede2" }}>
+    <span style={{ width: 30, height: 30, borderRadius: "50%", background: JC_GOLD, color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>JC</span>
+    <span style={{ flex: 1, minWidth: 0 }}>
+    <span style={{ display: "block", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: JC_GOLD }}>{txtLojaCentral.titulo}</span>
+    <span style={{ display: "block", fontSize: 12, color: "#c9b878", marginTop: 3, lineHeight: 1.45 }}>{txtLojaCentral.corpo}</span>
+    <span style={{ display: "inline-block", marginTop: 8, color: JC_GOLD, fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>{txtLojaCentral.botao} ›</span>
+    </span>
+    </a>
 
     {/* REVER AS BOAS-VINDAS — ver a nota na central Pro. */}
     <button
