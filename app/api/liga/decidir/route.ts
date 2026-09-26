@@ -8,7 +8,14 @@
 //   - aprovar  → marca o pedido "aprovado" e mete a pessoa em league_members
 //   - recusar  → marca o pedido "recusado"
 // Devolve: { ok:true, acao } ou { ok:false, erro }
+//
+// SEGURANÇA (identidade pelo token, não pelo corpo): quem decide é o DONO da
+// liga. Antes, o "dono" era o user_id que vinha NO CORPO — falsificável: com o
+// id de outro dono, qualquer pessoa aprovava/recusava pedidos na liga dele.
+// Agora o uid vem do TOKEN da sessão (padrão do /api/reivindicar) e o corpo já
+// não traz user_id. Ver claude/seguranca-auditoria-rotas.md (Lote 1a).
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { focoMercado } from "@/lib/calendario";
@@ -17,20 +24,42 @@ import { focoMercado } from "@/lib/calendario";
 import { bloqueioPorLimite } from "@/lib/limitesLiga";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+/** Quem está a pedir, a partir do token da sessão. null = sem sessão válida. */
+async function uidDoPedido(req: Request): Promise<string | null> {
+  try {
+    const auth = req.headers.get("authorization") || "";
+    const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+    if (!token) return null;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+    if (!url || !pub) return null;
+    const sb = createClient(url, pub, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await sb.auth.getUser();
+    if (error) return null;
+    return data?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 export async function POST(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
   }
-  let corpo: { user_id?: string; request_id?: string; acao?: string };
+  // Identidade pelo token (nunca pelo corpo).
+  const user_id = await uidDoPedido(req);
+  if (!user_id) return NextResponse.json({ ok: false, erro: "Entra na tua conta." }, { status: 401 });
+  let corpo: { request_id?: string; acao?: string };
   try {
     corpo = await req.json();
   } catch {
     return NextResponse.json({ ok: false, erro: "Pedido inválido." }, { status: 400 });
   }
-  const user_id = (corpo.user_id || "").trim();
   const request_id = (corpo.request_id || "").trim();
   const acao = (corpo.acao || "").trim();
-  if (!user_id || !request_id) return NextResponse.json({ ok: false, erro: "Faltam parâmetros." }, { status: 400 });
+  if (!request_id) return NextResponse.json({ ok: false, erro: "Faltam parâmetros." }, { status: 400 });
   if (acao !== "aprovar" && acao !== "recusar") {
     return NextResponse.json({ ok: false, erro: "Ação inválida." }, { status: 400 });
   }
