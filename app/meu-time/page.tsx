@@ -27,6 +27,16 @@ const ORC_ACIMA: Record<Lingua, { chip: string; frase: string }> = {
   fr: { chip: "Au-dessus du budget", frase: "Ton équipe vaut {x} JC de plus que ton patrimoine. Vends quelqu'un au marché jusqu'à l'équilibre — sinon tu seras inactif cette manche." },
   de: { chip: "Über dem Budget", frase: "Dein Team ist {x} JC mehr wert als dein Vermögen. Verkaufe jemanden im Markt, bis es ausgeglichen ist — sonst bist du in dieser Runde inaktiv." },
 };
+// Loja de Judocoins (economia Fase B). No Meu Time serve de atalho e, quando a
+// equipa está acima do orçamento, de alternativa a vender: comprar JC aumenta o
+// orçamento e a mesma equipa passa a caber. Mapa local por língua.
+const LOJA_MT: Record<Lingua, { atalho: string; ouCompra: string }> = {
+  pt: { atalho: "Loja de Judocoins", ouCompra: "ou compra Judocoins" },
+  en: { atalho: "Judocoins Store", ouCompra: "or buy Judocoins" },
+  es: { atalho: "Tienda de Judocoins", ouCompra: "o compra Judocoins" },
+  fr: { atalho: "Boutique de Judocoins", ouCompra: "ou achète des Judocoins" },
+  de: { atalho: "Judocoins-Shop", ouCompra: "oder kaufe Judocoins" },
+};
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 // FAIXA: vem do useFaixa() — a faixa REAL do jogador, a mesma em toda a app.
@@ -741,6 +751,7 @@ function MeuTimeInner() {
   const saldo = jcLeft(team, patrimonio ?? 100);
   const acimaDoOrcamento = saldo < 0;
   const txtOrc = ORC_ACIMA[lingua] ?? ORC_ACIMA.pt;
+  const txtLojaMt = LOJA_MT[lingua] ?? LOJA_MT.pt;
   const scoreOf = (a: Athlete) => {
     const base = pontos[a.id] ?? 0;
     return a.id === team.captain ? base * 2 : base;
@@ -917,7 +928,18 @@ function MeuTimeInner() {
             <div style={{ background: "#2a1f1c", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "10px 13px", margin: "0 0 12px" }}>
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83", marginBottom: 4 }}>{txtOrc.chip}</div>
             <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5 }}>{txtOrc.frase.replace("{x}", fmt(Math.abs(saldo)))}</div>
+            <a href="/loja" style={{ display: "inline-block", marginTop: 9, background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.03em", padding: "7px 13px", borderRadius: 9, textDecoration: "none" }}>{txtLojaMt.ouCompra}</a>
             </div>
+          )}
+        {/* FASE B: atalho discreto para a Loja de Judocoins (sempre visível). */}
+        {!acimaDoOrcamento && (
+            <a href="/loja" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#141a17", border: "1px solid #2a4d3e", borderRadius: 12, padding: "9px 13px", margin: "0 0 12px", textDecoration: "none" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <span style={{ width: 26, height: 26, borderRadius: "50%", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>JC</span>
+            <span style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, color: "#f1ede2", textTransform: "uppercase" }}>{txtLojaMt.atalho}</span>
+            </span>
+            <span style={{ color: GOLD, fontSize: 18, lineHeight: 1 }} aria-hidden="true">›</span>
+            </a>
           )}
         {/* AVISO de atletas indisponíveis: a equipa tem ids que já não estão
           na competição (saíram dos inscritos). Mostramo-los em baixo para
