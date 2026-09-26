@@ -45,6 +45,15 @@ const ORC_INICIO: Record<Lingua, { titulo: string; corpo: string; botao: string 
   fr: { titulo: "Ton équipe dépasse le budget", corpo: "Elle vaut plus que ton patrimoine. Vends quelqu'un au marché — sinon tu seras inactif cette manche.", botao: "Aller au marché" },
   de: { titulo: "Dein Team ist über dem Budget", corpo: "Es ist mehr wert als dein Vermögen. Verkaufe jemanden im Markt — sonst bist du diese Runde inaktiv.", botao: "Zum Markt" },
 };
+// Atalho para a Loja de Judocoins (economia Fase B). Orçamento extra da
+// temporada — mapa local por língua, mesmo padrão do ORC_INICIO.
+const LOJA_ATALHO: Record<Lingua, { titulo: string; sub: string; botao: string }> = {
+  pt: { titulo: "Loja de Judocoins", sub: "Orçamento extra para montares a equipa que quiseres.", botao: "Abrir" },
+  en: { titulo: "Judocoins Store", sub: "Extra budget to build the team you want.", botao: "Open" },
+  es: { titulo: "Tienda de Judocoins", sub: "Presupuesto extra para montar el equipo que quieras.", botao: "Abrir" },
+  fr: { titulo: "Boutique de Judocoins", sub: "Du budget en plus pour composer l'équipe que tu veux.", botao: "Ouvrir" },
+  de: { titulo: "Judocoins-Shop", sub: "Extra-Budget, um dein Wunschteam zu bauen.", botao: "Öffnen" },
+};
 // CHAVES, não texto. Um array fora do componente é avaliado uma vez, no
 // arranque do módulo — não tem acesso ao `t`, que vive no contexto do React.
 // Guardando as chaves, o texto é resolvido no render, na língua da altura.
@@ -142,6 +151,7 @@ export default function Inicio() {
   const [patrimonio, setPatrimonio] = useState<number | null>(null);
   const { lingua } = useLingua();
   const txtOrcInicio = ORC_INICIO[lingua] ?? ORC_INICIO.pt;
+  const txtLojaAtalho = LOJA_ATALHO[lingua] ?? LOJA_ATALHO.pt;
   // FASE A: o património mostrado = orçamento unificado (patrimony_jc + JC
   // comprados), a mesma fonte do mercado. Sobrepõe o valor cru vindo do `users`.
   useEffect(() => {
@@ -590,6 +600,19 @@ export default function Inicio() {
         <div style={{ fontSize: 11, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
         </div>
         <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>{t("inicio.assinar")}</span>
+        </a>
+      )}
+    {/* FASE B: atalho para a Loja de Judocoins (orçamento extra da temporada). */}
+    {!visitante && (
+        <a href="/loja" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "11px 14px", marginBottom: 14, textDecoration: "none" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ width: 30, height: 30, borderRadius: "50%", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>JC</span>
+        <div>
+        <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, color: "#f1ede2", textTransform: "uppercase" }}>{txtLojaAtalho.titulo}</div>
+        <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{txtLojaAtalho.sub}</div>
+        </div>
+        </div>
+        <span style={{ background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap", textTransform: "uppercase" }}>{txtLojaAtalho.botao}</span>
         </a>
       )}
     <div ref={teamRef} className={glow("team")}>
