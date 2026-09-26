@@ -153,6 +153,30 @@ function LojaConteudo() {
     setAComprar(null);
   }
 
+  // COMPRA DE TESTE (admin): abre o checkout do pacote €0,50 / 1 JC. O botão só
+  // aparece com ?teste=1 no endereço, e o servidor só a autoriza a quem é admin.
+  // Serve para validar a compra real ponta-a-ponta antes de abrir a loja.
+  async function comprarTeste() {
+    setErro("");
+    setAComprar(-1); // -1 = marcador do botão de teste
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const tok = sess.session?.access_token;
+      if (!tok) { window.location.href = "/entrar?voltar=/loja?teste=1"; return; }
+      const r = await fetch("/api/judocoins/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+          body: JSON.stringify({ teste: true }),
+        });
+      const j = await r.json();
+      if (j?.ok && j.url) { window.location.href = j.url; return; }
+      setErro(j?.erro || txt.erro);
+    } catch {
+      setErro(txt.erro);
+    }
+    setAComprar(null);
+  }
+
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "12px 14px 40px" }}>
@@ -204,6 +228,18 @@ function LojaConteudo() {
     <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#8b9a92", marginBottom: 7 }}>{txt.transpTitulo}</div>
     <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.6, margin: 0 }}>{txt.transp}</p>
     </div>
+
+    {/* BOTÃO DE TESTE (admin) — só com ?teste=1 no endereço. O servidor confirma
+        que é admin; uma conta normal que chegue aqui leva "Não autorizado". */}
+    {params.get("teste") === "1" && (
+      <button
+      onClick={comprarTeste}
+      disabled={aComprar !== null}
+      style={{ display: "block", width: "100%", marginTop: 16, background: "transparent", border: "1px dashed #5a3a36", color: "#c9b878", fontFamily: FD, fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.04em", padding: "11px 0", borderRadius: 10, cursor: aComprar !== null ? "default" : "pointer", opacity: aComprar !== null && aComprar !== -1 ? 0.5 : 1 }}
+      >
+      {aComprar === -1 ? txt.aAbrir : "Teste admin · €0,50 → 1 JC"}
+      </button>
+    )}
     </div>
     </main>
   );
