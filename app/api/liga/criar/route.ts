@@ -17,6 +17,7 @@
 // Devolve:
 //   { ok, liga: { id, invite_code, ... } }  ou  { ok:false, erro }
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 // Limites num sítio só (ver lib/limitesLiga). Criar conta como participar — o
 // criador é sempre membro —, por isso não há um limite separado para criação.
@@ -31,6 +32,27 @@ function novoCodigo(): string {
   let s = "";
   for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return s;
+}
+// SEGURANCA (Lote 1b): identidade pelo token, nunca pelo corpo. Ver
+// claude/seguranca-auditoria-rotas.md.
+async function uidDoPedido(req: Request): Promise<string | null> {
+  try {
+    const auth = req.headers.get("authorization") || "";
+    const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+    if (!token) return null;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+    if (!url || !pub) return null;
+    const sb = createClient(url, pub, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await sb.auth.getUser();
+    if (error) return null;
+    return data?.user?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 export async function POST(req: Request) {
   if (!supabaseAdmin) {
@@ -53,7 +75,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, erro: "Pedido inválido." }, { status: 400 });
   }
-  const user_id = (corpo.user_id || "").trim();
+  const user_id = (await uidDoPedido(req)) || "";
   const nome = (corpo.nome || "").trim();
   const descricao = (corpo.descricao || "").trim();
   const formato = (corpo.formato || "pontos").trim();
