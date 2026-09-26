@@ -16,6 +16,15 @@ import { useT, useLingua, type Lingua } from "@/lib/i18n";
 // do tipo fechado EventName em lib/analytics.
 import { track, aoTerConsentimento } from "@/lib/analytics";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
+// Fase A (economia) — aviso de "equipa acima do orçamento". Texto local por
+// língua (mesmo padrão da janela). {x} = quantos JC a mais.
+const ORC_ACIMA: Record<Lingua, { chip: string; frase: string }> = {
+  pt: { chip: "Acima do orçamento", frase: "Estás {x} JC acima do orçamento. Vende atletas até equilibrares — senão a tua equipa não pontua nesta rodada." },
+  en: { chip: "Over budget", frase: "You're {x} JC over budget. Sell athletes until it balances — otherwise your team won't score this round." },
+  es: { chip: "Por encima del presupuesto", frase: "Estás {x} JC por encima del presupuesto. Vende atletas hasta equilibrar — si no, tu equipo no puntúa esta ronda." },
+  fr: { chip: "Au-dessus du budget", frase: "Tu es à {x} JC au-dessus du budget. Vends des athlètes jusqu'à l'équilibre — sinon ton équipe ne marque pas cette manche." },
+  de: { chip: "Über dem Budget", frase: "Du bist {x} JC über dem Budget. Verkaufe Athleten, bis es ausgeglichen ist — sonst punktet dein Team in dieser Runde nicht." },
+};
 // Fase I — textos da experiência "monta para a próxima" (janela entre competições).
 // Guardados LOCALMENTE por língua (padrão já usado na FAQ/legal/consentimento),
 // para não inflar o lib/i18n.ts. Termos de produto (nomes de competição) entram
@@ -167,6 +176,23 @@ function MercadoInner() {
   // Quem sou eu — para o lembrete "esqueceste de salvar" (hook). Guardado quando
   // a sessão é confirmada (mesma leitura que decide o is_pro).
   const [userId, setUserId] = useState<string | null>(null);
+  // FASE A (economia): o orçamento com que se monta = património + JC comprados,
+  // vindo de /api/orcamento. Por defeito 100 (novo utilizador / sem sessão).
+  const [orcamentoBase, setOrcamentoBase] = useState<number>(START_JC);
+  useEffect(() => {
+      let vivo = true;
+      (async () => {
+        try {
+          const { data: sess } = await supabase.auth.getSession();
+          const tok = sess.session?.access_token;
+          if (!tok) return;
+          const r = await fetch("/api/orcamento", { headers: { Authorization: `Bearer ${tok}` }, cache: "no-store" });
+          const j = await r.json();
+          if (vivo && j?.ok && typeof j.base === "number") setOrcamentoBase(j.base);
+        } catch { /* fica nos 100 */ }
+      })();
+      return () => { vivo = false; };
+    }, [userId]);
   // FASE I (afinação): a janela "monta para a próxima" só é para quem NÃO tem
   // equipa neste ciclo. null = ainda a verificar (não se pisca o bloqueio).
   const [temEquipaCiclo, setTemEquipaCiclo] = useState<boolean | null>(null);
@@ -437,7 +463,9 @@ function MercadoInner() {
   }
   const byId = new Map(pool.map((a) => [a.id, a]));
   const teamAthletes = team.map((id) => byId.get(id)).filter(Boolean) as Athlete[];
-  const jcLeft = Math.round((START_JC - teamAthletes.reduce((s, a) => s + a.priceJc, 0)) * 10) / 10;
+  const jcLeft = Math.round((orcamentoBase - teamAthletes.reduce((s, a) => s + a.priceJc, 0)) * 10) / 10;
+  const acimaDoOrcamento = jcLeft < 0;
+  const txtOrc = ORC_ACIMA[lingua] ?? ORC_ACIMA.pt;
   const countM = teamAthletes.filter((a) => a.gender === "M").length;
   const countF = teamAthletes.filter((a) => a.gender === "F").length;
   const takenM = new Set(teamAthletes.filter((a) => a.gender === "M").map((a) => a.category));
@@ -542,9 +570,17 @@ function MercadoInner() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
     </button>
     <button onClick={() => setGuide(0)} aria-label="Como funciona" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", fontWeight: 700, cursor: "pointer" }}>?</button>
-    <span className={jcGlow ? "glow" : undefined} style={{ background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "6px 11px", fontFamily: FD, fontWeight: 700, color: GOLD, fontSize: 15 }}>JC {fmt(jcLeft)}</span>
+    <span className={jcGlow ? "glow" : undefined} style={{ background: "#141a17", border: `1px solid ${acimaDoOrcamento ? "#5a3a36" : "#243029"}`, borderRadius: 10, padding: "6px 11px", fontFamily: FD, fontWeight: 700, color: acimaDoOrcamento ? "#ef8d83" : GOLD, fontSize: 15 }}>JC {fmt(jcLeft)}</span>
     </div>
     </div>
+    {/* FASE A: equipa acima do orçamento (o património caiu abaixo do valor da
+      equipa que ficou guardada). Tem de vender alguém até equilibrar. */}
+    {acimaDoOrcamento && (
+        <div style={{ background: "#2a1f1c", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 10, padding: "9px 12px", marginBottom: 9 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83", marginBottom: 4 }}>{txtOrc.chip}</div>
+        <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5 }}>{txtOrc.frase.replace("{x}", fmt(Math.abs(jcLeft)))}</div>
+        </div>
+      )}
     {montarProxima && competicaoADecorrer && (
         <div style={{ background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: "3px solid #d9a441", borderRadius: 10, padding: "9px 12px", marginBottom: 9 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
