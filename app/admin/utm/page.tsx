@@ -17,18 +17,19 @@ const BASE = "https://www.ipponleague.com";
 const FONTES = ["instagram", "tiktok", "youtube", "x", "facebook", "whatsapp", "google", "blog", "email", "push", "influenciador", "atleta", "federacao", "clube", "outro"];
 const MEIOS = ["social", "video", "story", "bio", "post", "ads", "dm", "referral", "email", "push", "organico"];
 
-interface Item { chave: string; total: number }
+interface Item { chave: string; registos: number; ativaram: number; pro: number }
 interface Aquisicao {
   ok: boolean;
   erro?: string;
   detalhe?: string;
   dica?: string;
   total?: number;
-  resumo?: { diretos: number; comReferrer: number; comReferral: number };
+  resumo?: { diretos: number; comReferrer: number; comReferral: number; ativaram?: number; pro?: number; ativarPct?: number; proPct?: number };
   porFonte?: Item[];
   porCampanha?: Item[];
   porFonteCampanha?: Item[];
   porConteudo?: Item[];
+  porDeclarada?: Item[] | null;
 }
 
 // minusculas + so letras/numeros, palavras separadas por hifen (convencao para
@@ -162,7 +163,7 @@ export default function UtmPage() {
       {/* ---- De onde vem ---- */}
       <div style={{ ...caixa, marginTop: 18 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-          <div style={titulo}>De onde vem (contas registadas)</div>
+          <div style={titulo}>Funil por origem (registo &rarr; ativou &rarr; pro)</div>
           <div style={{ display: "flex", gap: 6 }}>
             {[7, 30, 0].map((d) => (
               <button key={d} onClick={() => { setDias(d); void carregarAquisicao(d); }}
@@ -183,16 +184,23 @@ export default function UtmPage() {
         )}
         {aq && aq.ok && (
           <div style={{ marginTop: 10 }}>
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 12 }}>
-              <Stat rot="Contas" val={String(aq.total ?? 0)} />
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+              <Stat rot="Registos" val={String(aq.total ?? 0)} />
+              <Stat rot="Ativaram" val={String(aq.resumo?.ativaram ?? 0)} sub={`${aq.resumo?.ativarPct ?? 0}%`} />
+              <Stat rot="Pro" val={String(aq.resumo?.pro ?? 0)} sub={`${aq.resumo?.proPct ?? 0}%`} />
               <Stat rot="Diretas" val={String(aq.resumo?.diretos ?? 0)} />
-              <Stat rot="Por referrer" val={String(aq.resumo?.comReferrer ?? 0)} />
-              <Stat rot="Por indicacao" val={String(aq.resumo?.comReferral ?? 0)} />
+              <Stat rot="Indicacao" val={String(aq.resumo?.comReferral ?? 0)} />
             </div>
-            <Tabela titulo="Por fonte (utm_source)" itens={aq.porFonte || []} total={aq.total || 0} />
-            <Tabela titulo="Por campanha (utm_campaign)" itens={aq.porCampanha || []} total={aq.total || 0} />
-            <Tabela titulo="Por fonte + campanha" itens={aq.porFonteCampanha || []} total={aq.total || 0} />
-            <Tabela titulo="Por mensagem (fonte + utm_content)" itens={aq.porConteudo || []} total={aq.total || 0} />
+            <p style={{ fontSize: 11, color: "#8b8079", margin: "0 0 4px", lineHeight: 1.5 }}>
+              Cada linha: <b style={{ color: "#efeadd" }}>R</b> registos &rarr; <b style={{ color: "#8bd4b0" }}>A</b> ativaram (montaram equipa) &rarr; <b style={{ color: GOLD }}>P</b> pro. A % e sobre os registos dessa origem.
+            </p>
+            <Tabela titulo="Por fonte (utm_source)" itens={aq.porFonte || []} />
+            <Tabela titulo="Por campanha (utm_campaign)" itens={aq.porCampanha || []} />
+            <Tabela titulo="Por fonte + campanha" itens={aq.porFonteCampanha || []} />
+            <Tabela titulo="Por mensagem (fonte + utm_content)" itens={aq.porConteudo || []} />
+            {aq.porDeclarada && aq.porDeclarada.length > 0 && (
+              <Tabela titulo="Canal declarado (como nos conheceste)" itens={aq.porDeclarada} />
+            )}
           </div>
         )}
       </div>
@@ -200,34 +208,50 @@ export default function UtmPage() {
   );
 }
 
-function Tabela({ titulo, itens, total }: { titulo: string; itens: Item[]; total: number }) {
+const VERDE = "#8bd4b0";
+function Tabela({ titulo, itens }: { titulo: string; itens: Item[] }) {
   if (itens.length === 0) return null;
-  const max = Math.max(1, ...itens.map((i) => i.total));
+  const max = Math.max(1, ...itens.map((i) => i.registos));
   return (
-    <div style={{ marginTop: 12 }}>
+    <div style={{ marginTop: 14 }}>
       <div style={{ fontSize: 12, color: "#8b9a92", fontFamily: "var(--font-geist-mono), monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 7 }}>{titulo}</div>
-      <div style={{ display: "grid", gap: 5 }}>
-        {itens.map((i) => (
-          <div key={i.chave} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, color: "#efeadd", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{i.chave}</div>
-              <div style={{ height: 5, background: "#0e0c0b", borderRadius: 3, marginTop: 3, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.round((i.total / max) * 100)}%`, background: GOLD }} />
+      <div style={{ display: "grid", gap: 8 }}>
+        {itens.map((i) => {
+          const pa = i.registos > 0 ? Math.round((i.ativaram / i.registos) * 100) : 0;
+          const pp = i.registos > 0 ? Math.round((i.pro / i.registos) * 100) : 0;
+          return (
+            <div key={i.chave}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "baseline" }}>
+                <div style={{ fontSize: 12.5, color: "#efeadd", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{i.chave}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  <span style={{ color: "#efeadd" }}>{i.registos}R</span>
+                  <span style={{ color: "#5f5850", fontWeight: 400 }}> &middot; </span>
+                  <span style={{ color: VERDE }}>{i.ativaram}A</span>
+                  <span style={{ color: "#6b7d73", fontWeight: 400, fontSize: 11 }}>({pa}%)</span>
+                  <span style={{ color: "#5f5850", fontWeight: 400 }}> &middot; </span>
+                  <span style={{ color: GOLD }}>{i.pro}P</span>
+                  <span style={{ color: "#8b7a52", fontWeight: 400, fontSize: 11 }}>({pp}%)</span>
+                </div>
+              </div>
+              {/* Barra empilhada: registos (base) com ativaram e pro por cima. */}
+              <div style={{ position: "relative", height: 6, background: "#0e0c0b", borderRadius: 3, marginTop: 4, overflow: "hidden", width: `${Math.max(6, Math.round((i.registos / max) * 100))}%` }}>
+                <div style={{ position: "absolute", inset: 0, background: "#2c2622" }} />
+                <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${pa}%`, background: VERDE, opacity: 0.55 }} />
+                <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${pp}%`, background: GOLD }} />
               </div>
             </div>
-            <div style={{ fontSize: 13, color: "#efeadd", fontWeight: 700, textAlign: "right" }}>
-              {i.total}<span style={{ color: "#8b8079", fontWeight: 400, fontSize: 11 }}> ({total > 0 ? Math.round((i.total / total) * 100) : 0}%)</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
-function Stat({ rot, val }: { rot: string; val: string }) {
+function Stat({ rot, val, sub }: { rot: string; val: string; sub?: string }) {
   return (
-    <div style={{ background: "#0e0c0b", border: `1px solid ${BORDA}`, borderRadius: 10, padding: "8px 12px", minWidth: 78 }}>
-      <div style={{ fontSize: 18, fontWeight: 700, color: "#efeadd" }}>{val}</div>
+    <div style={{ background: "#0e0c0b", border: `1px solid ${BORDA}`, borderRadius: 10, padding: "8px 12px", minWidth: 72 }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: "#efeadd" }}>
+        {val}{sub ? <span style={{ fontSize: 12, color: "#8b8079", fontWeight: 400 }}> {sub}</span> : null}
+      </div>
       <div style={{ fontSize: 11, color: "#8b8079" }}>{rot}</div>
     </div>
   );
