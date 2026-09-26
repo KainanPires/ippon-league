@@ -248,8 +248,8 @@ export default function Ligas() {
       if (!uid) { window.location.href = `/entrar?voltar=/ligas`; return; }
       const res = await fetch("/api/liga/entrar", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: uid, codigo: c, confirmar }),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess.session?.access_token || ""}` },
+          body: JSON.stringify({ codigo: c, confirmar }),
         });
       const j = await res.json();
       // A liga já começou: pede confirmação antes de entrar (começa com 0 pontos).
@@ -293,8 +293,8 @@ export default function Ligas() {
       if (!uid) { window.location.href = `/entrar?voltar=/ligas`; return; }
       const res = await fetch("/api/liga/pedir", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: uid, codigo: liga.invite_code, confirmar }),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess.session?.access_token || ""}` },
+          body: JSON.stringify({ codigo: liga.invite_code, confirmar }),
         });
       const j = await res.json();
       // Liga aberta já começada: pede confirmação antes de entrar.
