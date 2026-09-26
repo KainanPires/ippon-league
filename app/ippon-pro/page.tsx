@@ -21,6 +21,15 @@ const TERMO: Record<Lingua, TextoTermo> = {
   fr: { antes: "J'ai lu et j'accepte les ", link: "Conditions de livraison et de consentement", depois: " d'Ippon Pro.", erro: "Pour continuer, cochez que vous avez lu et accepté les conditions." },
   de: { antes: "Ich habe die ", link: "Liefer- und Einwilligungsbedingungen", depois: " von Ippon Pro gelesen und akzeptiere sie.", erro: "Um fortzufahren, bestätige, dass du die Bedingungen gelesen und akzeptiert hast." },
 };
+// Honestidade no momento de subscrever: o que acontece se um dia parares. Mapa
+// local por língua (mesmo padrão do TERMO).
+const AO_PARAR: Record<Lingua, { titulo: string; corpo: string }> = {
+  pt: { titulo: "Enquanto Pro — e se um dia parares", corpo: "Enquanto és Pro, acumulas pontos nas ligas Mundial e Continental e podes disputar a Copa do Dôdo. Se deixares de ser Pro, essa pontuação zera e sais dessas ligas, sais da Copa em curso, e se tiveres mais ligas de amigos do que o limite gratuito terás de escolher quais manter. A tua conta, equipa e histórico ficam sempre guardados." },
+  en: { titulo: "While Pro — and if you ever stop", corpo: "While you're Pro, you build up points in the World and Continental leagues and can play the Copa do Dôdo. If you stop being Pro, those points reset and you leave those leagues, you're out of any ongoing Copa, and if you have more friend leagues than the free limit you'll choose which to keep. Your account, team and history are always kept." },
+  es: { titulo: "Mientras eres Pro — y si un día paras", corpo: "Mientras eres Pro, acumulas puntos en las ligas Mundial y Continental y puedes disputar la Copa do Dôdo. Si dejas de ser Pro, esa puntuación se pone a cero y sales de esas ligas, sales de la Copa en curso, y si tienes más ligas de amigos que el límite gratuito tendrás que elegir cuáles mantener. Tu cuenta, equipo e historial quedan siempre guardados." },
+  fr: { titulo: "En tant que Pro — et si un jour tu arrêtes", corpo: "Tant que tu es Pro, tu accumules des points dans les ligues Mondiale et Continentale et tu peux disputer la Copa do Dôdo. Si tu cesses d'être Pro, ces points sont remis à zéro et tu sors de ces ligues, tu sors de la Copa en cours, et si tu as plus de ligues d'amis que la limite gratuite tu devras choisir lesquelles garder. Ton compte, ton équipe et ton historique sont toujours conservés." },
+  de: { titulo: "Als Pro — und falls du irgendwann aufhörst", corpo: "Solange du Pro bist, sammelst du Punkte in der Welt- und Kontinentalliga und kannst die Copa do Dôdo spielen. Hörst du auf, Pro zu sein, werden diese Punkte auf null gesetzt und du verlässt diese Ligen, du bist raus aus einer laufenden Copa, und wenn du mehr Freundesligen als das Gratis-Limit hast, wählst du, welche du behältst. Dein Konto, Team und Verlauf bleiben immer erhalten." },
+};
 // O que cada nível dá. Princípio: só informação e ferramentas — nunca decidir o
 // time pela pessoa, nunca prometer resultado. (Fase de testes: sem prémios.)
 //
@@ -180,6 +189,11 @@ export default function IpponPro() {
     {/* Um aviso só, por baixo dos dois cartões: a Stripe converte no checkout
         (Adaptive Pricing), por isso quem está fora da zona euro lê euros aqui
         e vê a sua moeda ao pagar. */}
+    {/* Honestidade: o que acontece se um dia parares (ligas oficiais, Copa, ligas de amigos). */}
+    <div style={{ background: "#0f1411", border: "1px solid #243029", borderRadius: 14, padding: "13px 14px", marginBottom: 16 }}>
+    <div style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#a9b4ac", marginBottom: 6 }}>{AO_PARAR[lingua].titulo}</div>
+    <div style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.55 }}>{AO_PARAR[lingua].corpo}</div>
+    </div>
     {/* CONSENTIMENTO obrigatório antes de assinar (aplica-se aos dois planos). */}
     <label style={{ display: "flex", gap: 9, alignItems: "flex-start", cursor: "pointer", margin: "0 0 14px", fontSize: 12.5, color: "#a9b4ac", lineHeight: 1.5 }}>
     <input type="checkbox" checked={aceito} onChange={(e) => { setAceito(e.target.checked); if (e.target.checked) setErro(""); }} style={{ marginTop: 2, width: 16, height: 16, accentColor: GOLD, flexShrink: 0 }} />
