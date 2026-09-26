@@ -744,27 +744,97 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
       />
     );
   }
+  // FASE 2 (visual): chave grande (>=16 equipas => >=4 rondas) desenha-se em
+  // Pools A/B/C/D como a chave dos atletas. Cada pool é o "quarto" da árvore
+  // cujo vencedor é um semifinalista; as Meias+Final ficam num bloco à parte.
+  // NÃO muda o motor — reagrupa os MESMOS confrontos. Abaixo de 16, mantém-se
+  // a árvore única (bloco1/bloco2), tal como estava.
+  const usarPools = totalRondas >= 4;
+  // Para as pools, o mapa inclui a final (que o `principais` acima deixa de fora).
+  const comFinal = confrontos.filter((c) => c.fase === "normal" || c.fase === "final");
+  const repBronze = confrontos.filter((c) => c.fase === "repescagem" || c.fase === "bronze");
+  const porROpool = new Map<string, ConfrontoChave>();
+  for (const c of comFinal) porROpool.set(`${c.ronda}:${c.ordem}`, c);
+  const montarSub = (rootR: number, rootO: number, minRonda: number): { arvores: NoChave[]; arestas: Aresta[] } => {
+    const arestas: Aresta[] = [];
+    const no = (r: number, o: number): NoChave => {
+      const e = porROpool.get(`${r}:${o}`);
+      const key = e ? e.id : `vazio:${r}:${o}`;
+      if (e && !e.jogador_b && e.decidido_por === "bye") return { tipo: "bye", key, dados: e };
+      const filhos: NoChave[] = [];
+      if (r > minRonda) {
+        for (const oi of [o * 2, o * 2 + 1]) {
+          const f = no(r - 1, oi);
+          filhos.push(f);
+          arestas.push({ de: f.key, para: key });
+        }
+      }
+      return { tipo: "luta", key, dados: e ?? null, filhos };
+    };
+    return { arvores: [no(rootR, rootO)], arestas };
+  };
+  const pools = usarPools
+    ? (["A", "B", "C", "D"] as const).map((rot, k) => ({ rot, sub: montarSub(totalRondas - 2, k, 1) }))
+    : [];
+  const meiasFinal = usarPools ? montarSub(totalRondas, 0, totalRondas - 1) : null;
+  const blocoRep = usarPools && repBronze.length > 0 ? montar(repBronze, 0) : null;
   return (
     <div style={{ marginTop: 22 }}>
     <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: GOLD }}>
     {numero}ª Copa do Dôdo · {t("dd.aChave")}
     </div>
-    <BlocoChave
-    titulo={t("chave.principal")}
-    arvores={bloco1.arvores}
-    arestas={bloco1.arestas}
-    destaque={proximo}
-    renderCaixa={(no) => <Caixa no={no} />}
-    textoVazio={t("dd.chaveSorteadaQuando")}
-    />
-    {bloco2 && (
-        <BlocoChave
-        titulo={t("chave.repescagem")}
-        arvores={bloco2.arvores}
-        arestas={bloco2.arestas}
-        destaque={proximo}
-        renderCaixa={(no) => <Caixa no={no} />}
-        />
+    {usarPools ? (
+      <>
+      {pools.map(({ rot, sub }) => (
+          <BlocoChave
+          key={`pool-${rot}`}
+          titulo={`Pool ${rot}`}
+          arvores={sub.arvores}
+          arestas={sub.arestas}
+          destaque={proximo}
+          renderCaixa={(no) => <Caixa no={no} />}
+          textoVazio={t("dd.chaveSorteadaQuando")}
+          />
+        ))}
+      {meiasFinal && (
+          <BlocoChave
+          titulo={t("ck.meiasFinal")}
+          arvores={meiasFinal.arvores}
+          arestas={meiasFinal.arestas}
+          destaque={proximo}
+          renderCaixa={(no) => <Caixa no={no} />}
+          />
+        )}
+      {blocoRep && (
+          <BlocoChave
+          titulo={t("chave.repescagem")}
+          arvores={blocoRep.arvores}
+          arestas={blocoRep.arestas}
+          destaque={proximo}
+          renderCaixa={(no) => <Caixa no={no} />}
+          />
+        )}
+      </>
+    ) : (
+      <>
+      <BlocoChave
+      titulo={t("chave.principal")}
+      arvores={bloco1.arvores}
+      arestas={bloco1.arestas}
+      destaque={proximo}
+      renderCaixa={(no) => <Caixa no={no} />}
+      textoVazio={t("dd.chaveSorteadaQuando")}
+      />
+      {bloco2 && (
+          <BlocoChave
+          titulo={t("chave.repescagem")}
+          arvores={bloco2.arvores}
+          arestas={bloco2.arestas}
+          destaque={proximo}
+          renderCaixa={(no) => <Caixa no={no} />}
+          />
+      )}
+      </>
     )}
     </div>
   );
