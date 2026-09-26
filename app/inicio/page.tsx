@@ -38,13 +38,6 @@ const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 // Fase A (economia) — alerta na tela inicial de "equipa acima do orçamento" (5 línguas).
-const ORC_INICIO: Record<Lingua, { titulo: string; corpo: string; botao: string }> = {
-  pt: { titulo: "A tua equipa está acima do orçamento", corpo: "Vale mais do que o teu património. Vende alguém no mercado — senão ficas inativo nesta rodada.", botao: "Ir ao mercado" },
-  en: { titulo: "Your team is over budget", corpo: "It's worth more than your wealth. Sell someone in the market — otherwise you'll be inactive this round.", botao: "Go to market" },
-  es: { titulo: "Tu equipo está por encima del presupuesto", corpo: "Vale más que tu patrimonio. Vende a alguien en el mercado — si no, quedas inactivo esta ronda.", botao: "Ir al mercado" },
-  fr: { titulo: "Ton équipe dépasse le budget", corpo: "Elle vaut plus que ton patrimoine. Vends quelqu'un au marché — sinon tu seras inactif cette manche.", botao: "Aller au marché" },
-  de: { titulo: "Dein Team ist über dem Budget", corpo: "Es ist mehr wert als dein Vermögen. Verkaufe jemanden im Markt — sonst bist du diese Runde inaktiv.", botao: "Zum Markt" },
-};
 // Atalho para a Loja de Judocoins (economia Fase B). Orçamento extra da
 // temporada — mapa local por língua, mesmo padrão do ORC_INICIO.
 const LOJA_ATALHO: Record<Lingua, { titulo: string; sub: string; botao: string }> = {
@@ -150,7 +143,6 @@ export default function Inicio() {
   // desvalorizações já aplicadas. Ver a nota em TeamBuilt.
   const [patrimonio, setPatrimonio] = useState<number | null>(null);
   const { lingua } = useLingua();
-  const txtOrcInicio = ORC_INICIO[lingua] ?? ORC_INICIO.pt;
   const txtLojaAtalho = LOJA_ATALHO[lingua] ?? LOJA_ATALHO.pt;
   // FASE A: o património mostrado = orçamento unificado (patrimony_jc + JC
   // comprados), a mesma fonte do mercado. Sobrepõe o valor cru vindo do `users`.
@@ -627,16 +619,9 @@ export default function Inicio() {
       )}
     <div ref={teamRef} className={glow("team")}>
     {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo, t)} faixa={faixaJogo} patrimonio={patrimonio} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} />}
-    {/* FASE A: equipa acima do orçamento — o património não paga a equipa toda.
-        Só com o mercado aberto (competição não a decorrer): é aí que ainda dá
-        para reequilibrar. A decorrer, a equipa está trancada e avisar confundia. */}
-    {!visitante && !emAndamento && teamInfo && Number(teamInfo.value) > (patrimonio ?? 100) && (
-        <div style={{ background: "#2a1f1c", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 14, padding: "12px 14px", marginTop: 12 }}>
-        <div style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "#ef8d83", marginBottom: 5 }}>{txtOrcInicio.titulo}</div>
-        <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5, marginBottom: 10 }}>{txtOrcInicio.corpo}</div>
-        <a href="/mercado" style={{ display: "inline-block", background: "#e2655a", color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.03em", padding: "8px 14px", borderRadius: 9, textDecoration: "none" }}>{txtOrcInicio.botao}</a>
-        </div>
-      )}
+    {/* NOTA: o aviso "equipa acima do orçamento" NÃO vive mais aqui (pedido do
+        Kainan — na página inicial era demasiado). Fica no Meu Time (dojo), no
+        Mercado, e nas notificações (push/sino). */}
     </div>
     {/* Lembrete de notificações: aparece depois de ter equipa montada. */}
     {!visitante && teamInfo && userIdState && <LembreteNotificacoes userId={userIdState} />}
