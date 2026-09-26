@@ -36,6 +36,9 @@ export async function creditarJudocoins(args: {
   stripeSessionId: string;
   jc: number;
   eurosCent?: number | null;
+  // O pagamento por trás da sessão. Guarda-se para o reembolso saber que compra
+  // anular — o evento de reembolso traz o payment_intent, não o id da sessão.
+  stripePaymentIntent?: string | null;
 }): Promise<{ ok: boolean }> {
   if (!supabaseAdmin) return { ok: false };
   const { userId, stripeSessionId, jc } = args;
@@ -47,6 +50,7 @@ export async function creditarJudocoins(args: {
         {
           user_id: userId,
           stripe_session_id: stripeSessionId,
+          stripe_payment_intent: args.stripePaymentIntent ?? null,
           jc,
           euros_cent: args.eurosCent ?? null,
           expira_em: fimDaEpocaISO(),
@@ -62,6 +66,38 @@ export async function creditarJudocoins(args: {
   } catch (e) {
     console.error("[carteira] creditar (exceção):", e);
     return { ok: false };
+  }
+}
+
+/**
+ * ANULA os JC de um pagamento reembolsado (ou objeto de disputa/chargeback).
+ * Marca as compras desse payment_intent como `reembolsado` — o que as TIRA do
+ * saldo, porque `jcCompradosValidos` só soma as que estão `creditado`.
+ *
+ * Idempotente: só toca em linhas que ainda estão `creditado`, por isso um
+ * segundo evento de reembolso não faz nada. Regra do Kainan: quem é reembolsado
+ * não fica com o saldo. (Nota: se os JC já foram usados numa rodada JÁ
+ * congelada, essa rodada não se desfaz — só se impede o uso futuro.)
+ */
+export async function estornarJudocoinsPorPaymentIntent(
+  paymentIntent: string,
+): Promise<{ ok: boolean; linhas: number }> {
+  if (!supabaseAdmin || !paymentIntent) return { ok: false, linhas: 0 };
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("compras_judocoins")
+      .update({ estado: "reembolsado" })
+      .eq("stripe_payment_intent", paymentIntent)
+      .eq("estado", "creditado")
+      .select("id");
+    if (error) {
+      console.error("[carteira] estornar:", error.message);
+      return { ok: false, linhas: 0 };
+    }
+    return { ok: true, linhas: data?.length ?? 0 };
+  } catch (e) {
+    console.error("[carteira] estornar (exceção):", e);
+    return { ok: false, linhas: 0 };
   }
 }
 
