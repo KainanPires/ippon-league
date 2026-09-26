@@ -246,7 +246,21 @@ export async function POST(req: Request) {
         // O "updated" (ex.: cancelamento agendado) não tira acesso ainda.
         if (evento.type === "customer.subscription.deleted") {
           const uidC = await acharUtilizador(sub.customer, sub.metadata?.user_id);
-          if (uidC) await trackServer(uidC, "subscription_cancelled", { nivel: nivelDoPreco(sub.items?.data?.[0]?.price?.id) });
+          if (uidC) {
+            await trackServer(uidC, "subscription_cancelled", { nivel: nivelDoPreco(sub.items?.data?.[0]?.price?.id) });
+            // O acesso saiu agora (aplicarSubscricao rebaixou). Avisa com as
+            // consequências reais — o mesmo texto rico do /api/subscricoes/expirar,
+            // para quem perde o Pro por aqui não ficar sem aviso.
+            try {
+              await criarNotificacaoServidor({
+                paraUserId: uidC,
+                tipo: "subscricao_terminou",
+                chaveTitulo: "subscricao.terminouTitulo",
+                chaveCorpo: "subscricao.terminouCorpo",
+                link: "/ippon-pro",
+              });
+            } catch { /* o acesso já saiu; o aviso é um extra */ }
+          }
         }
         break;
       }
@@ -281,8 +295,8 @@ export async function POST(req: Request) {
             await criarNotificacaoServidor({
                 paraUserId: uid,
                 tipo: "pagamento_falhou",
-                titulo: "Não conseguimos cobrar a tua subscrição",
-                corpo: "O pagamento não passou. Continuas com acesso e vamos tentar outra vez nos próximos dias. Se o cartão mudou, podes atualizá-lo no teu perfil.",
+                chaveTitulo: "subscricao.pagamentoFalhouTitulo",
+                chaveCorpo: "subscricao.pagamentoFalhouCorpo",
                 link: "/perfil",
               });
           } catch { /* idem */ }
