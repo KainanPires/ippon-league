@@ -627,8 +627,10 @@ export default function Inicio() {
       )}
     <div ref={teamRef} className={glow("team")}>
     {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo, t)} faixa={faixaJogo} patrimonio={patrimonio} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} />}
-    {/* FASE A: equipa acima do orçamento — o património não paga a equipa toda. */}
-    {!visitante && teamInfo && Number(teamInfo.value) > (patrimonio ?? 100) && (
+    {/* FASE A: equipa acima do orçamento — o património não paga a equipa toda.
+        Só com o mercado aberto (competição não a decorrer): é aí que ainda dá
+        para reequilibrar. A decorrer, a equipa está trancada e avisar confundia. */}
+    {!visitante && !emAndamento && teamInfo && Number(teamInfo.value) > (patrimonio ?? 100) && (
         <div style={{ background: "#2a1f1c", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 14, padding: "12px 14px", marginTop: 12 }}>
         <div style={{ fontFamily: FD, fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "#ef8d83", marginBottom: 5 }}>{txtOrcInicio.titulo}</div>
         <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5, marginBottom: 10 }}>{txtOrcInicio.corpo}</div>
