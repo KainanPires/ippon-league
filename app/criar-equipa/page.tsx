@@ -88,6 +88,35 @@ export default function CriarEquipa() {
   // Nomes a MOSTRAR (cidade escondida nos clássicos com mercado aberto).
   const nomeAlvo = nomeCompeticao(alvo);
   const nomeAtual = nomeCompeticao(atual);
+  // FASE I (afinação): durante uma competição a decorrer, o Dojo (montar para a
+  // próxima) é só para quem AINDA não tem equipa neste ciclo. Quem já montou (na
+  // que decorre ou na próxima) só analisa — é reencaminhado para o mercado, que
+  // mostra o ecrã "trancado durante a rodada". null = ainda a verificar. Fora de
+  // uma competição a decorrer, montar é sempre livre (não há nada a decidir).
+  const [temEquipaCiclo, setTemEquipaCiclo] = useState<boolean | null>(null);
+  const idDecorrer = foco.aDecorrer?.idCompeticao ?? null;
+  const idAlvoCiclo = alvo.idCompeticao;
+  useEffect(() => {
+      if (!emAndamento || !idDecorrer) { setTemEquipaCiclo(false); return; }
+      let vivo = true;
+      (async () => {
+        // Servidor (tabela `equipas`) é a verdade; se não responder, cai no local.
+        const [decCloud, alvoCloud] = await Promise.all([
+          loadSavedCloudFor(idDecorrer),
+          loadSavedCloudFor(idAlvoCiclo),
+        ]);
+        const temDec = (decCloud?.ids.length ?? 0) > 0 || loadSavedFor(idDecorrer).ids.length > 0;
+        const temAlvo = (alvoCloud?.ids.length ?? 0) > 0 || loadSavedFor(idAlvoCiclo).ids.length > 0;
+        if (vivo) setTemEquipaCiclo(temDec || temAlvo);
+      })();
+      return () => { vivo = false; };
+      // Deps são IDs (primitivos) e não os objetos do calendário (novos a cada render).
+    }, [emAndamento, idDecorrer, idAlvoCiclo]);
+  useEffect(() => {
+      // Já tem equipa e há competição a decorrer: o lugar é o mercado (ecrã de
+      // "trancado / só analisar"), não o Dojo. replace para não deixar histórico.
+      if (emAndamento && temEquipaCiclo === true) router.replace("/mercado");
+    }, [emAndamento, temEquipaCiclo, router]);
   useEffect(() => {
       let active = true;
       const idAlvo = alvo.idCompeticao;
@@ -292,6 +321,13 @@ export default function CriarEquipa() {
         ? <FilledSlot key={row + i} a={a} isCaptain={draft.captain === a.id} onClick={() => { track("athlete_viewed", { athlete: a.id, country: a.countryIso, gender: a.gender }); setModal({ kind: "athlete", a }); }} />
         : <EmptySlot key={row + i} highlight={highlight} />;
       });
+  }
+  // FASE I (afinação): enquanto se verifica o ciclo (temEquipaCiclo === null) ou
+  // já se decidiu reencaminhar quem tem equipa (=== true), não se mostra o
+  // construtor — evita piscar o Dojo antes do salto para o mercado. Só quem NÃO
+  // tem equipa (=== false), ou quem não está numa competição a decorrer, passa.
+  if (emAndamento && temEquipaCiclo !== false) {
+    return <main aria-busy="true" style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
   }
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
