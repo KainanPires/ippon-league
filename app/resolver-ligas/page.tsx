@@ -69,6 +69,16 @@ const TXT: Record<Lingua, Txt> = {
   },
 };
 
+// Definido FORA do componente (a regra react-hooks/static-components proíbe
+// criar componentes durante o render — foi o que travou o build).
+function Moldura({ children }: { children: React.ReactNode }) {
+  return (
+    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "28px 16px" }}>
+      <div style={{ width: "100%", maxWidth: 460 }}>{children}</div>
+    </main>
+  );
+}
+
 export default function ResolverLigas() {
   const { lingua } = useLingua();
   const { ehPro, ehProMax, pronto: nivelPronto } = useNivel();
@@ -147,12 +157,6 @@ export default function ResolverLigas() {
       setErro(tx.erro); setAGuardar(false);
     }
   }
-
-  const Moldura = ({ children }: { children: React.ReactNode }) => (
-    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "28px 16px" }}>
-      <div style={{ width: "100%", maxWidth: 460 }}>{children}</div>
-    </main>
-  );
 
   if (!nivelPronto || ligas === null) {
     return <Moldura><p style={{ color: "#93a39a" }}>…</p></Moldura>;
