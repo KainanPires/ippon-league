@@ -177,9 +177,14 @@ export function resolveRich(ids: string[]): SlotResolvido[] {
     return a ? { ausente: false as const, atleta: a } : { ausente: true as const, id };
   });
 }
-export function jcLeft(t: TeamState): number {
+// Saldo por gastar = orçamento − custo da equipa. O `base` é o orçamento com que
+// se monta AGORA: por defeito os 100 da época, mas os ecrãs passam o património
+// real (+ JC comprados) vindo de /api/orcamento (economia Fase A). Fica negativo
+// quando a equipa (que valorizou) passou a valer mais do que o património — é o
+// sinal de que é preciso vender alguém para reequilibrar.
+export function jcLeft(t: TeamState, base: number = START_JC): number {
   const a = resolve(t.ids);
-  return Math.round((START_JC - a.reduce((s, x) => s + x.priceJc, 0)) * 10) / 10;
+  return Math.round((base - a.reduce((s, x) => s + x.priceJc, 0)) * 10) / 10;
 }
 export function counts(t: TeamState) {
   const a = resolve(t.ids);
