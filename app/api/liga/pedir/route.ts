@@ -26,6 +26,7 @@
 // e alguém podia pedir/entrar numa liga já encerrada. Agora barra-se qualquer
 // liga terminada, dos dois formatos. O histórico vive em /ligas → Resultados.
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 // A regra dos limites vive em lib/limitesLiga — um sítio só para os quatro
 // caminhos de entrada (criar, entrar, pedir, decidir). Ver o cabeçalho de lá.
@@ -53,6 +54,27 @@ function copaInscricoesFechadas(liga: { formato?: unknown; copa_estado?: unknown
 }
 
 
+// SEGURANCA (Lote 1b): identidade pelo token, nunca pelo corpo. Ver
+// claude/seguranca-auditoria-rotas.md.
+async function uidDoPedido(req: Request): Promise<string | null> {
+  try {
+    const auth = req.headers.get("authorization") || "";
+    const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+    if (!token) return null;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+    if (!url || !pub) return null;
+    const sb = createClient(url, pub, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await sb.auth.getUser();
+    if (error) return null;
+    return data?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 export async function POST(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação à base de dados." }, { status: 500 });
@@ -65,7 +87,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, erro: "Pedido inválido." }, { status: 400 });
   }
 
-  const user_id = (corpo.user_id || "").trim();
+  const user_id = (await uidDoPedido(req)) || "";
   const codigo = (corpo.codigo || "").trim().toUpperCase();
   const confirmar = corpo.confirmar === true;
   if (!user_id) return NextResponse.json({ ok: false, erro: "Entra para te juntares a uma liga." }, { status: 401 });
