@@ -14,11 +14,33 @@
 // O objeto `liga` tem a MESMA forma do que o /api/liga/entrar devolve, para a
 // página poder usar os dois sem traduzir nada.
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Identidade pelo token (opcional aqui: a pré-visualização é pública; o token
+// só serve para dizer se ESTA pessoa já é membro). Ver seguranca-auditoria-rotas.
+async function uidDoPedido(req: Request): Promise<string | null> {
+  try {
+    const auth = req.headers.get("authorization") || "";
+    const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+    if (!token) return null;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+    if (!url || !pub) return null;
+    const sb = createClient(url, pub, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await sb.auth.getUser();
+    if (error) return null;
+    return data?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 export async function GET(req: Request) {
   if (!supabaseAdmin) {
     return NextResponse.json({ ok: false, erro: "Servidor sem ligação à base de dados." }, { status: 500 });
@@ -26,7 +48,7 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const codigo = (searchParams.get("codigo") || "").trim().toUpperCase();
-  const user_id = (searchParams.get("user_id") || "").trim();
+  const user_id = (await uidDoPedido(req)) || "";
   if (codigo.length < 4) {
     return NextResponse.json({ ok: false, erro: "Código inválido." }, { status: 400 });
   }
