@@ -16,7 +16,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { stripeFetch } from "@/lib/stripe";
-import { pacotePorJc } from "@/lib/planos";
+import { pacotePorJc, pacoteDeTeste } from "@/lib/planos";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const SITE = "https://www.ipponleague.com";
@@ -48,11 +48,28 @@ export async function POST(req: Request) {
   const uid = await uidDoPedido(req);
   if (!uid) return NextResponse.json({ ok: false, erro: "Entra na tua conta." }, { status: 401 });
 
-  let corpo: { jc?: number };
+  let corpo: { jc?: number; teste?: boolean };
   try { corpo = await req.json(); } catch {
     return NextResponse.json({ ok: false, erro: "Pedido inválido." }, { status: 400 });
   }
-  const pacote = pacotePorJc(Number(corpo.jc));
+
+  // PACOTE DE TESTE (€0,50 / 1 JC): só para o admin validar a compra real antes
+  // de abrir a loja. Fica à parte do catálogo e exige users.is_admin — uma conta
+  // normal que tente `{ teste: true }` leva 401, mesmo sabendo o caminho.
+  let pacote: { jc: number; lookupKey: string } | undefined;
+  if (corpo.teste === true) {
+    const { data: adminRow } = await supabaseAdmin
+      .from("users")
+      .select("is_admin")
+      .eq("id", uid)
+      .maybeSingle();
+    if (!adminRow?.is_admin) {
+      return NextResponse.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
+    }
+    pacote = pacoteDeTeste();
+  } else {
+    pacote = pacotePorJc(Number(corpo.jc));
+  }
   if (!pacote) {
     return NextResponse.json({ ok: false, erro: "Pacote desconhecido." }, { status: 400 });
   }
