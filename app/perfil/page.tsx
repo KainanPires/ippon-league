@@ -10,7 +10,7 @@ import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import { PRECO } from "@/lib/precos";
 import { limparCacheNivel } from "@/lib/useNivel";
 import { SeletorLingua } from "@/components/SeletorLingua";
-import { useRotuloFaixa, useT, useDataPorExtenso } from "@/lib/i18n";
+import { useRotuloFaixa, useT, useDataPorExtenso, useLingua } from "@/lib/i18n";
 import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -50,8 +50,18 @@ type Conta = {
   faixaJudo: string;
   isPro: boolean;
 };
+// O que a pessoa perde quando o acesso terminar (mostrado na confirmação de
+// cancelamento). Mapa local por língua — o texto não vive no dicionário global.
+const CANCEL_PERDE: Record<string, string> = {
+  pt: "Quando o acesso terminar: a tua pontuação nas ligas Mundial e Continental zera e sais delas, sais de qualquer Copa do Dôdo em curso, e se tiveres mais ligas de amigos do que o limite gratuito terás de escolher quais manter.",
+  en: "When your access ends: your points in the World and Continental leagues reset and you leave them, you're out of any ongoing Copa do Dôdo, and if you have more friend leagues than the free limit you'll choose which to keep.",
+  es: "Cuando el acceso termine: tu puntuación en las ligas Mundial y Continental se pone a cero y sales de ellas, sales de cualquier Copa do Dôdo en curso, y si tienes más ligas de amigos que el límite gratuito tendrás que elegir cuáles mantener.",
+  fr: "Quand ton accès prendra fin : tes points dans les ligues Mondiale et Continentale sont remis à zéro et tu en sors, tu sors de toute Copa do Dôdo en cours, et si tu as plus de ligues d'amis que la limite gratuite tu devras choisir lesquelles garder.",
+  de: "Wenn dein Zugang endet: deine Punkte in der Welt- und Kontinentalliga werden auf null gesetzt und du verlässt sie, du bist raus aus einer laufenden Copa do Dôdo, und wenn du mehr Freundesligen als das Gratis-Limit hast, wählst du, welche du behältst.",
+};
 export default function Perfil() {
   const t = useT();
+  const { lingua } = useLingua();
   const dataExt = useDataPorExtenso();
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [conta, setConta] = useState<Conta | null>(null);
@@ -409,9 +419,14 @@ export default function Perfil() {
         <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, textAlign: "center", margin: "0 0 8px" }}>
         {t("perfil.cancelarCorpo1", { data: sub?.expiraEm ? dataExt(sub.expiraEm) : "—" })}
         </p>
-        <p style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.5, textAlign: "center", margin: "0 0 16px" }}>
+        <p style={{ fontSize: 12, color: "#7c8a82", lineHeight: 1.5, textAlign: "center", margin: "0 0 12px" }}>
         {t("perfil.cancelarCorpo2")}
         </p>
+        <div style={{ background: "#241614", border: "1px solid #5c332c", borderRadius: 10, padding: "10px 12px", marginBottom: 16 }}>
+        <p style={{ fontSize: 12, color: "#d6b3ad", lineHeight: 1.5, margin: 0 }}>
+        {CANCEL_PERDE[lingua] ?? CANCEL_PERDE.pt}
+        </p>
+        </div>
         <div style={{ display: "flex", gap: 9 }}>
         <button onClick={() => setConfirmarCancelar(false)} style={{ flex: 1, background: "transparent", border: "1px solid #2a3a33", color: "#cfd8d2", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>{t("dd.ficar")}</button>
         <button onClick={() => { setConfirmarCancelar(false); gerirSubscricao("cancelar"); }} style={{ flex: 1, background: "#4a2420", border: "1px solid #6d3630", color: "#ef8d83", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", fontSize: 12, padding: "11px 0", borderRadius: 10, cursor: "pointer" }}>{t("comum.cancelar")}</button>
