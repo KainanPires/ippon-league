@@ -25,6 +25,15 @@ const ORC_ACIMA: Record<Lingua, { chip: string; frase: string }> = {
   fr: { chip: "Au-dessus du budget", frase: "Tu es à {x} JC au-dessus du budget. Vends des athlètes jusqu'à l'équilibre — sinon ton équipe ne marque pas cette manche." },
   de: { chip: "Über dem Budget", frase: "Du bist {x} JC über dem Budget. Verkaufe Athleten, bis es ausgeglichen ist — sonst punktet dein Team in dieser Runde nicht." },
 };
+// Loja de Judocoins (economia Fase B) — quando falta orçamento para contratar.
+// Comprar JC aumenta o orçamento da temporada. Mapa local por língua.
+const LOJA_MK: Record<Lingua, { curto: string; falta: string }> = {
+  pt: { curto: "Comprar Judocoins", falta: "Pouco orçamento para contratar? Compra Judocoins." },
+  en: { curto: "Buy Judocoins", falta: "Short on budget to sign athletes? Buy Judocoins." },
+  es: { curto: "Comprar Judocoins", falta: "¿Poco presupuesto para fichar? Compra Judocoins." },
+  fr: { curto: "Acheter des Judocoins", falta: "Peu de budget pour recruter ? Achète des Judocoins." },
+  de: { curto: "Judocoins kaufen", falta: "Wenig Budget für Verpflichtungen? Kaufe Judocoins." },
+};
 // Fase I — textos da experiência "monta para a próxima" (janela entre competições).
 // Guardados LOCALMENTE por língua (padrão já usado na FAQ/legal/consentimento),
 // para não inflar o lib/i18n.ts. Termos de produto (nomes de competição) entram
@@ -466,6 +475,7 @@ function MercadoInner() {
   const jcLeft = Math.round((orcamentoBase - teamAthletes.reduce((s, a) => s + a.priceJc, 0)) * 10) / 10;
   const acimaDoOrcamento = jcLeft < 0;
   const txtOrc = ORC_ACIMA[lingua] ?? ORC_ACIMA.pt;
+  const txtLojaMk = LOJA_MK[lingua] ?? LOJA_MK.pt;
   const countM = teamAthletes.filter((a) => a.gender === "M").length;
   const countF = teamAthletes.filter((a) => a.gender === "F").length;
   const takenM = new Set(teamAthletes.filter((a) => a.gender === "M").map((a) => a.category));
@@ -579,7 +589,18 @@ function MercadoInner() {
         <div style={{ background: "#2a1f1c", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 10, padding: "9px 12px", marginBottom: 9 }}>
         <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83", marginBottom: 4 }}>{txtOrc.chip}</div>
         <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5 }}>{txtOrc.frase.replace("{x}", fmt(Math.abs(jcLeft)))}</div>
+        <a href="/loja" style={{ display: "inline-block", marginTop: 8, background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.03em", padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>{txtLojaMk.curto}</a>
         </div>
+      )}
+    {/* FASE B: pouco orçamento (mas não acima) — oferece comprar JC ali mesmo. */}
+    {!acimaDoOrcamento && jcLeft < 5 && (
+        <a href="/loja" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#141a17", border: `1px solid ${GOLD}`, borderRadius: 10, padding: "9px 12px", marginBottom: 9, textDecoration: "none" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+        <span style={{ width: 24, height: 24, borderRadius: "50%", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 9.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>JC</span>
+        <span style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.4 }}>{txtLojaMk.falta}</span>
+        </span>
+        <span style={{ color: GOLD, fontSize: 18, lineHeight: 1, flexShrink: 0 }} aria-hidden="true">›</span>
+        </a>
       )}
     {montarProxima && competicaoADecorrer && (
         <div style={{ background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: "3px solid #d9a441", borderRadius: 10, padding: "9px 12px", marginBottom: 9 }}>
