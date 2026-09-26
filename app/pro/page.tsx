@@ -10,12 +10,22 @@ import { marcarAreaProVista } from "@/components/BarraInferior";
 import { TutorialBoasVindas } from "@/components/TutorialBoasVindas";
 import { deveMostrarTutorial } from "@/lib/tutorials";
 import { useFaixa } from "@/lib/useFaixa";
-import { useT } from "@/lib/i18n";
+import { useT, useLingua, type Lingua } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 const MAX = "#7fb8f5"; // tom do Pro Max
+// Propaganda da Loja de Judocoins na central (economia Fase B). Os JC são
+// orçamento da temporada, NÃO um benefício do Pro — à venda para todos e sem
+// vantagem competitiva. Mapa local por língua (mesmo padrão do resto da app).
+const LOJA_CENTRAL: Record<Lingua, { titulo: string; corpo: string; botao: string }> = {
+  pt: { titulo: "Loja de Judocoins", corpo: "Orçamento extra para montares a equipa que quiseres. À venda para todos — não dá pontos nem vantagem, só te deixa contratar quem quiseres.", botao: "Abrir loja" },
+  en: { titulo: "Judocoins Store", corpo: "Extra budget to build the team you want. On sale to everyone — no points, no advantage, it just lets you sign who you want.", botao: "Open store" },
+  es: { titulo: "Tienda de Judocoins", corpo: "Presupuesto extra para montar el equipo que quieras. A la venta para todos — no da puntos ni ventaja, solo te deja fichar a quien quieras.", botao: "Abrir tienda" },
+  fr: { titulo: "Boutique de Judocoins", corpo: "Du budget en plus pour composer l'équipe que tu veux. En vente pour tous — ni points ni avantage, juste de quoi recruter qui tu veux.", botao: "Ouvrir la boutique" },
+  de: { titulo: "Judocoins-Shop", corpo: "Extra-Budget, um dein Wunschteam zu bauen. Für alle erhältlich — keine Punkte, kein Vorteil, du kannst nur verpflichten, wen du willst.", botao: "Shop öffnen" },
+};
 // NOTA: o cartão da comunidade NÃO vive aqui. Esta é a central do Pro
 // simples — um Pro Max nunca chega a esta página, porque o /pro-central o
 // encaminha para /pro-max-central. O grupo é um benefício exclusivo do Pro
@@ -24,6 +34,8 @@ const MAX = "#7fb8f5"; // tom do Pro Max
 export default function DashboardPro() {
   const router = useRouter();
   const t = useT();
+  const { lingua } = useLingua();
+  const txtLojaCentral = LOJA_CENTRAL[lingua] ?? LOJA_CENTRAL.pt;
   const [estado, setEstado] = useState<"carregando" | "pro">("carregando");
   const [nome, setNome] = useState(t("pro.campeao"));
   const [verBoasVindas, setVerBoasVindas] = useState(true); // caixa de boas-vindas fechável
@@ -213,6 +225,17 @@ export default function DashboardPro() {
 
         {/* SCOUT — componente partilhado (também usado na central Pro Max). */}
         <ScoutDoTime />
+
+        {/* LOJA DE JUDOCOINS (Fase B) — propaganda na central: orçamento, NÃO
+            é o Pro nem dá vantagem. À venda para todos. */}
+        <a href="/loja" style={{ display: "flex", alignItems: "flex-start", gap: 12, textDecoration: "none", background: "linear-gradient(160deg,#2a2410,#15110a)", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "13px 14px", marginTop: 18, color: "#f1ede2" }}>
+          <span style={{ width: 30, height: 30, borderRadius: "50%", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>JC</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{txtLojaCentral.titulo}</span>
+            <span style={{ display: "block", fontSize: 12, color: "#c9b878", marginTop: 3, lineHeight: 1.45 }}>{txtLojaCentral.corpo}</span>
+            <span style={{ display: "inline-block", marginTop: 8, color: GOLD, fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>{txtLojaCentral.botao} ›</span>
+          </span>
+        </a>
 
         {/* REVER AS BOAS-VINDAS. Quem saltou por engano, ou quem quer relembrar
             o que o plano lhe dá, não tinha como voltar — todos os tutoriais da
