@@ -5,6 +5,7 @@ import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
+import { computeNewPrice } from "@/lib/engine";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, numeroDaRodada, nomeCompeticao, pontosVisiveisPorId, CALENDARIO_2026 } from "@/lib/calendario";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
@@ -36,6 +37,17 @@ const LOJA_MT: Record<Lingua, { atalho: string; ouCompra: string }> = {
   es: { atalho: "Tienda de Judocoins", ouCompra: "o compra Judocoins" },
   fr: { atalho: "Boutique de Judocoins", ouCompra: "ou achète des Judocoins" },
   de: { atalho: "Judocoins-Shop", ouCompra: "oder kaufe Judocoins" },
+};
+// Valorização AO VIVO (parcial) durante a competição a decorrer. Por atleta
+// mostra-se a variação de preço (JC) e, por baixo do tatame, a variação de
+// PATRIMÓNIO do jogador (assimétrica: ganha metade da subida, perde a descida
+// inteira — igual ao congelamento). "Parcial" porque só fecha no fim.
+const VALOR_MT: Record<Lingua, { patTitulo: string; parcial: string }> = {
+  pt: { patTitulo: "Património nesta rodada", parcial: "parcial · fecha no fim da competição" },
+  en: { patTitulo: "Wealth this round", parcial: "partial · settles when the event ends" },
+  es: { patTitulo: "Patrimonio en esta ronda", parcial: "parcial · se cierra al final" },
+  fr: { patTitulo: "Patrimoine cette manche", parcial: "partiel · définitif à la fin" },
+  de: { patTitulo: "Vermögen diese Runde", parcial: "vorläufig · endgültig am Ende" },
 };
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -757,7 +769,18 @@ function MeuTimeInner() {
     return a.id === team.captain ? base * 2 : base;
   };
   const totalPts = Math.round(athletes.reduce((s, a) => s + scoreOf(a), 0) * 10) / 10;
+  const txtValor = VALOR_MT[lingua] ?? VALOR_MT.pt;
+  // VALORIZAÇÃO AO VIVO (parcial). O preço valoriza pelos pontos SIMPLES do
+  // atleta (o x2 do capitão é só para os pontos da equipa, não para o preço) —
+  // exatamente como o congelamento. `a.priceJc` durante a competição é o preço
+  // PRÉ-rodada (só congela no fim), por isso bate certo com o valor final.
+  const deltaAtletaJc = (a: Athlete) => computeNewPrice(a.priceJc, 0, pontos[a.id] ?? 0).delta;
   const emCompeticao = emAndamento && idComp === atual.idCompeticao && hasTeam;
+  // Variação de PATRIMÓNIO do jogador nesta rodada (assimétrica: ganha metade da
+  // subida de cada atleta, perde a descida inteira). Só faz sentido a decorrer.
+  const patrimonioDelta = emCompeticao
+    ? Math.round(athletes.reduce((s, a) => { const d = deltaAtletaJc(a); return s + (d > 0 ? d / 2 : d); }, 0) * 10) / 10
+    : 0;
   const marketPhase: MarketPhase = emCompeticao ? "ao-vivo" : "aberto";
   // EDITÁVEL só quando NÃO está em competição (mercado aberto).
   const editavel = !emCompeticao;
@@ -918,13 +941,20 @@ function MeuTimeInner() {
         <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, color: GOLD }}>
         {patrimonio !== null ? `JC ${fmt(patrimonio)}` : "—"}
         </div>
-        {/* O saldo também interessa aqui: é com ele que se compra. */}
-        <div style={{ fontSize: 10, color: acimaDoOrcamento ? "#ef8d83" : "#7c8a82", marginTop: 2 }}>{t("mt.saldoJC", { v: fmt(saldo) })}</div>
+        {/* O saldo (quanto sobra para comprar) só interessa com o MERCADO ABERTO.
+            Com a competição a decorrer a equipa está trancada — mostrar "saldo
+            negativo" aqui confundia (ver a nota do banner abaixo). */}
+        {editavel && (
+          <div style={{ fontSize: 10, color: acimaDoOrcamento ? "#ef8d83" : "#7c8a82", marginTop: 2 }}>{t("mt.saldoJC", { v: fmt(saldo) })}</div>
+        )}
         </div>
         </div>
         </div>
-        {/* FASE A: equipa acima do orçamento — o património não paga a equipa toda. */}
-        {acimaDoOrcamento && (
+        {/* FASE A: equipa acima do orçamento — o património não paga a equipa toda.
+            SÓ com o mercado aberto (editavel): é aí que ainda dá para vender/ajustar
+            para a próxima rodada. Com a competição a decorrer a equipa está trancada
+            e a valorização ainda nem aconteceu, por isso avisar aqui só confundia. */}
+        {acimaDoOrcamento && editavel && (
             <div style={{ background: "#2a1f1c", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "10px 13px", margin: "0 0 12px" }}>
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83", marginBottom: 4 }}>{txtOrc.chip}</div>
             <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5 }}>{txtOrc.frase.replace("{x}", fmt(Math.abs(saldo)))}</div>
@@ -969,12 +999,12 @@ function MeuTimeInner() {
         <div style={{ background: tema.dentroBg, border: `2px solid ${tema.dentroBorda}`, borderRadius: 10, padding: "12px 10px" }}>
         <SectionLabel>{t("mt.masculino")}</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
-        {males.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
+        {males.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} deltaJc={marketPhase === "ao-vivo" ? deltaAtletaJc(a) : null} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
         {editavel && Array.from({ length: vagasM }).map((_, i) => <EmptyCell key={"vm" + i} montar={montar} />)}
         </div>
         <SectionLabel>{t("mt.feminino")}</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-        {females.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
+        {females.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} deltaJc={marketPhase === "ao-vivo" ? deltaAtletaJc(a) : null} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
         {editavel && Array.from({ length: vagasF }).map((_, i) => <EmptyCell key={"vf" + i} montar={montar} />)}
         </div>
         </div>
@@ -1040,6 +1070,17 @@ function MeuTimeInner() {
         </div>
         {emCompeticao ? (
             <>
+            {/* VARIAÇÃO DE PATRIMÓNIO AO VIVO (parcial). Ganha metade da subida de
+                cada atleta, perde a descida inteira — igual ao congelamento. */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12, padding: "11px 14px", background: "#141a17", border: `1px solid ${patrimonioDelta > 0 ? "#2a4d3e" : patrimonioDelta < 0 ? "#5a3a36" : "#243029"}`, borderRadius: 12 }}>
+            <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: FD, fontWeight: 700 }}>{txtValor.patTitulo}</div>
+            <div style={{ fontSize: 10.5, color: "#7c8a82", marginTop: 2 }}>{txtValor.parcial}</div>
+            </div>
+            <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, whiteSpace: "nowrap", color: patrimonioDelta > 0 ? "#7fd1a3" : patrimonioDelta < 0 ? "#ef8d83" : "#cfd8d2" }}>
+            {patrimonioDelta > 0 ? "▲ +" : patrimonioDelta < 0 ? "▼ " : ""}{patrimonioDelta.toFixed(1)} JC
+            </div>
+            </div>
             <div style={{ marginTop: 12, padding: "11px 14px", background: "#16201b", border: "1px solid #2a4d3e", borderRadius: 12, fontSize: 12.5, color: "#aee9c9", textAlign: "center" }}>
             {t("mt.equipaEmCompeticao")}
             {horaTick && (
@@ -1478,7 +1519,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-function Cell({ a, captain, score, phase, onClick }: { a: Athlete; captain: boolean; score: number; phase: MarketPhase; onClick: () => void }) {
+function Cell({ a, captain, score, deltaJc, phase, onClick }: { a: Athlete; captain: boolean; score: number; deltaJc?: number | null; phase: MarketPhase; onClick: () => void }) {
   const surname = a.name.split(" ").slice(-1)[0];
   let value: React.ReactNode;
   if (phase === "aberto") {
@@ -1488,6 +1529,12 @@ function Cell({ a, captain, score, phase, onClick }: { a: Athlete; captain: bool
   } else {
     value = <span style={{ background: "#1d3a2b", color: "#9be3bd", fontFamily: FD, fontWeight: 700, fontSize: 11, padding: "2px 9px", borderRadius: 999 }}>{score >= 0 ? "+" : ""}{score} pts</span>;
   }
+  // Variação de PREÇO do atleta (JC) ao vivo — quanto valorizou/desvalorizou com
+  // o rendimento nesta competição. Só na fase "ao-vivo"; parcial até ao fim.
+  const mostraDelta = phase === "ao-vivo" && deltaJc != null;
+  const sobe = (deltaJc ?? 0) > 0;
+  const desce = (deltaJc ?? 0) < 0;
+  const corDelta = sobe ? "#7fd1a3" : desce ? "#ef8d83" : "#7c8a82";
   return (
     <button onClick={onClick} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "8px 3px", borderRadius: 12, border: `1.5px solid ${captain ? "#FF8F00" : "#2f4a3c"}`, background: "rgba(12,14,13,0.80)", cursor: "pointer", fontFamily: FB }}>
     {captain && <div style={{ position: "absolute", top: -8, right: -5, background: "#FF8F00", border: "1px solid #c2410c", color: "#1b1208", fontFamily: FD, fontWeight: 700, fontSize: 11, padding: "1px 6px", borderRadius: 5, lineHeight: 1.3 }}>C</div>}
@@ -1497,6 +1544,11 @@ function Cell({ a, captain, score, phase, onClick }: { a: Athlete; captain: bool
     <div style={{ fontSize: 10, fontWeight: 700, width: "100%", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#fff" }}>{surname}</div>
     <div style={{ fontSize: 9, color: "#b6c0b9" }}>{a.category}kg</div>
     <div style={{ marginTop: 1, minHeight: 18, display: "flex", alignItems: "center" }}>{value}</div>
+    {mostraDelta && (
+      <div style={{ fontFamily: FD, fontSize: 9.5, fontWeight: 700, color: corDelta, whiteSpace: "nowrap" }}>
+      {sobe ? "▲" : desce ? "▼" : "•"} {(deltaJc ?? 0) > 0 ? "+" : ""}{(deltaJc ?? 0).toFixed(1)} JC
+      </div>
+    )}
     </button>
   );
 }
