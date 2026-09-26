@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
-import { loadDraftFor, saveDraftFor, setAthletePool } from "@/lib/team";
+import { loadDraftFor, saveDraftFor, setAthletePool, loadSavedCloudFor, loadSavedFor } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
 import { focoMercado, nomeCompeticao, textoFecho } from "@/lib/calendario";
@@ -167,6 +167,9 @@ function MercadoInner() {
   // Quem sou eu — para o lembrete "esqueceste de salvar" (hook). Guardado quando
   // a sessão é confirmada (mesma leitura que decide o is_pro).
   const [userId, setUserId] = useState<string | null>(null);
+  // FASE I (afinação): a janela "monta para a próxima" só é para quem NÃO tem
+  // equipa neste ciclo. null = ainda a verificar (não se pisca o bloqueio).
+  const [temEquipaCiclo, setTemEquipaCiclo] = useState<boolean | null>(null);
   // Faixa REAL do jogador — a cor do Dôdo em todos os modais desta página.
   // Declarado com os outros hooks, ANTES de qualquer return condicional (o ecrã
     // de "mercado fechado" faz um return cedo; hooks têm de correr sempre).
@@ -209,7 +212,36 @@ function MercadoInner() {
   // ABERTO, em vez de bater no muro deixamos montar para ela (a equipa da que
   // decorre continua trancada — é OUTRA linha em `equipas`, por competição).
   const mercadoProximaAberto = focoAgora.estadoAlvo?.estado === "aberto";
-  const montarProxima = !!competicaoADecorrer && mercadoProximaAberto;
+  // FASE I (afinação). A janela EXISTE, pelo calendário, quando há uma competição
+  // a decorrer e a próxima já tem mercado aberto. Mas montar para a próxima é uma
+  // CORTESIA para quem ainda não jogou este ciclo: quem já tem equipa (na que
+  // decorre OU na próxima) só analisa durante a rodada — cai no ecrã "trancado".
+  const janelaProxima = !!competicaoADecorrer && mercadoProximaAberto;
+  const montarProxima = janelaProxima && temEquipaCiclo === false;
+  // Enquanto ainda não sabemos se tem equipa (só quando há janela), não se mostra
+  // nem o bloqueio nem a próxima — evita piscar o ecrã errado antes do servidor.
+  const aVerificarCiclo = janelaProxima && temEquipaCiclo === null;
+  // Verifica, uma vez por ciclo, se o utilizador já tem equipa na competição a
+  // decorrer OU na próxima. Servidor (tabela `equipas`) é a verdade; se não
+  // responder, cai no rascunho salvo local. Deps são IDs (primitivos) e não os
+  // objetos do calendário — estes são novos a cada render e dariam um ciclo.
+  const idDecorrer = competicaoADecorrer?.idCompeticao ?? null;
+  const idAlvo = focoAgora.alvo?.idCompeticao ?? null;
+  useEffect(() => {
+      // Sem janela (mercado normal, ou próxima fechada) não há nada a decidir.
+      if (!idDecorrer || !mercadoProximaAberto || !idAlvo) { setTemEquipaCiclo(false); return; }
+      let vivo = true;
+      (async () => {
+        const [decCloud, alvoCloud] = await Promise.all([
+          loadSavedCloudFor(idDecorrer),
+          loadSavedCloudFor(idAlvo),
+        ]);
+        const temDec = (decCloud?.ids.length ?? 0) > 0 || loadSavedFor(idDecorrer).ids.length > 0;
+        const temAlvo = (alvoCloud?.ids.length ?? 0) > 0 || loadSavedFor(idAlvo).ids.length > 0;
+        if (vivo) setTemEquipaCiclo(temDec || temAlvo);
+      })();
+      return () => { vivo = false; };
+    }, [idDecorrer, idAlvo, mercadoProximaAberto]);
   useEffect(() => {
       let active = true;
       // FASE I (medição): viu a experiência de mercado fechado / próxima competição.
@@ -221,8 +253,10 @@ function MercadoInner() {
           competicao_a_decorrer: idDec, proxima: COMPETICAO, proxima_aberta: mercadoProximaAberto,
         }));
       }
-      // Só bloqueia (não carrega nada) se NÃO houver próxima com mercado aberto.
-      if (competicaoADecorrer && !montarProxima) { setLoading(false); return; }
+      // Só bloqueia (não carrega nada) quando já é certo que não se monta a
+      // próxima. Enquanto se verifica o ciclo, deixa carregar os atletas para
+      // quem vier a poder montar não esperar por um segundo carregamento.
+      if (competicaoADecorrer && !montarProxima && !aVerificarCiclo) { setLoading(false); return; }
       // ATIVAÇÃO: viu o mercado (aberto). Espera pelo consentimento e conta uma vez.
       if (!contouMercado.current) {
         contouMercado.current = true;
@@ -367,10 +401,11 @@ function MercadoInner() {
   function clearFilters() {
     setPriceMin(PRICE_MIN); setPriceMax(PRICE_MAX); setCountrySel([]); setFavOnly(false);
   }
-  // ECRÃ DE BLOQUEIO: competição a decorrer E SEM próxima com mercado aberto para
-  // preparar. (Se houver próxima aberta, o `montarProxima` deixa passar e mostra
-  // o mercado da próxima, com o banner "monta para a próxima" mais abaixo.)
-  if (competicaoADecorrer && !montarProxima) {
+  // ECRÃ DE BLOQUEIO: competição a decorrer e não se monta a próxima — ou porque
+  // a próxima ainda não abriu, ou porque o utilizador JÁ tem equipa neste ciclo
+  // (Fase I: quem já jogou só analisa durante a rodada). Enquanto se verifica o
+  // ciclo (aVerificarCiclo) não se bloqueia, para não piscar o ecrã errado.
+  if (competicaoADecorrer && !montarProxima && !aVerificarCiclo) {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "12px 14px" }}>
