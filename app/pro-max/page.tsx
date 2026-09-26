@@ -21,6 +21,16 @@ const TERMO: Record<Lingua, TextoTermo> = {
   fr: { antes: "J'ai lu et j'accepte les ", link: "Conditions de livraison et de consentement", depois: " d'Ippon Pro.", erro: "Pour continuer, cochez que vous avez lu et accepté les conditions." },
   de: { antes: "Ich habe die ", link: "Liefer- und Einwilligungsbedingungen", depois: " von Ippon Pro gelesen und akzeptiere sie.", erro: "Um fortzufahren, bestätige, dass du die Bedingungen gelesen und akzeptiert hast." },
 };
+// JC dourado (consistente com o resto da app) só para o selo da loja.
+const JC_GOLD = "#d9a441";
+// Loja de Judocoins — orçamento, NÃO é o Pro Max. Mapa local por língua.
+const LOJA_PMX: Record<Lingua, { titulo: string; corpo: string; botao: string }> = {
+  pt: { titulo: "Judocoins não são o Pro", corpo: "Os Judocoins são orçamento para montares a equipa — à venda para toda a gente. Não dão pontos nem vantagem.", botao: "Ir à loja" },
+  en: { titulo: "Judocoins aren't Pro", corpo: "Judocoins are budget to build your team — on sale to everyone. They give no points and no advantage.", botao: "Go to store" },
+  es: { titulo: "Los Judocoins no son el Pro", corpo: "Los Judocoins son presupuesto para montar tu equipo — a la venta para todos. No dan puntos ni ventaja.", botao: "Ir a la tienda" },
+  fr: { titulo: "Les Judocoins ne sont pas le Pro", corpo: "Les Judocoins sont du budget pour composer ton équipe — en vente pour tous. Ni points ni avantage.", botao: "Aller à la boutique" },
+  de: { titulo: "Judocoins sind nicht Pro", corpo: "Judocoins sind Budget, um dein Team zu bauen — für alle erhältlich. Keine Punkte, kein Vorteil.", botao: "Zum Shop" },
+};
 // Página dedicada SÓ ao Pro Max. Quem chega aqui já é Pro (vem da central /pro),
 // por isso falamos só do upgrade — não repetimos o cartão do Pro. Mostra o preço
 // de UPGRADE (parte Max), que para quem já é Pro é +2,90€/mês em promoção.
@@ -176,6 +186,15 @@ export default function ProMax() {
         </div>
       )}
     <a href="/pro" style={{ display: "block", textAlign: "center", marginTop: 8, color: "#93a39a", fontSize: 12, textDecoration: "none", fontFamily: FB }}>{t("pro.mxAgoraNao")}</a>
+    {/* Loja de Judocoins — orçamento, NÃO é o Pro Max (sem vantagem). */}
+    <a href="/loja" style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "#0f1411", border: `1px solid ${JC_GOLD}`, borderRadius: 14, padding: "13px 14px", marginTop: 16, textDecoration: "none" }}>
+    <span style={{ width: 30, height: 30, borderRadius: "50%", background: JC_GOLD, color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>JC</span>
+    <span style={{ flex: 1, minWidth: 0 }}>
+    <span style={{ display: "block", fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#f1ede2", textTransform: "uppercase" }}>{LOJA_PMX[lingua]?.titulo ?? LOJA_PMX.pt.titulo}</span>
+    <span style={{ display: "block", fontSize: 12, color: "#a9b4ac", lineHeight: 1.55, marginTop: 4 }}>{LOJA_PMX[lingua]?.corpo ?? LOJA_PMX.pt.corpo}</span>
+    <span style={{ display: "inline-block", marginTop: 9, color: JC_GOLD, fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>{LOJA_PMX[lingua]?.botao ?? LOJA_PMX.pt.botao} ›</span>
+    </span>
+    </a>
     </div>
     </div>
     </main>
