@@ -224,9 +224,10 @@ export default function PaginaLiga() {
           if (!vivo) return;
           setMeuId(uid);
           try {
-            const params = new URLSearchParams({ codigo });
-            if (uid) params.set("user_id", uid);
-            const res = await fetch(`/api/liga/espreitar?${params.toString()}`);
+            // Identidade pelo token: a pré-visualização é pública; o token só diz se já sou membro.
+            const tk = sess.session?.access_token;
+            const res = await fetch(`/api/liga/espreitar?codigo=${encodeURIComponent(codigo)}`,
+              tk ? { headers: { Authorization: `Bearer ${tk}` } } : undefined);
             const j = await res.json();
             if (!vivo) return;
             if (!j.ok) {
@@ -268,10 +269,13 @@ export default function PaginaLiga() {
     }
     setAEntrar(true);
     try {
+      const { data: sess } = await supabase.auth.getSession();
+      const tk = sess.session?.access_token;
+      if (!tk) { window.location.href = `/entrar?voltar=/liga/${codigo}`; return; }
       const res = await fetch("/api/liga/entrar", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: meuId, codigo, confirmar }),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tk}` },
+          body: JSON.stringify({ codigo, confirmar }),
       });
       const j = await res.json();
       if (!j.ok) {
@@ -537,10 +541,13 @@ export default function PaginaLiga() {
     setASair(true);
     setErroSair("");
     try {
+      const { data: sess } = await supabase.auth.getSession();
+      const tk = sess.session?.access_token;
+      if (!tk) { setErroSair(t("pl.erroSairLiga")); setASair(false); return; }
       const r = await fetch("/api/liga/sair", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: meuId, league_id: liga.id }),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tk}` },
+          body: JSON.stringify({ league_id: liga.id }),
       });
       const j = await r.json();
       if (!j?.ok) {
