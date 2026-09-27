@@ -13,6 +13,13 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { enviarPushPara } from "@/lib/pushServer";
 import { focoMercado, estadoMercado, formatarContagem } from "@/lib/calendario";
 import { renderNotif, agruparPorLingua, type LinguaNotif } from "@/lib/i18nServidor";
+import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
+import { jcCompradosValidosEmLote } from "@/lib/carteira";
+
+const round1 = (n: number): number => Math.round(n * 10) / 10;
+// Folga de arredondamento na verificação de orçamento — igual à da A2
+// (lib/congelar): 0.05 JC nunca marca "acima" por um resto de arredondamento.
+const FOLGA_ORCAMENTO = 0.05;
 
 // Janela do lembrete de véspera: dispara quando falta ISTO ou menos para o
 // fecho (e ainda há tempo > 0). 28h (e não 24h) dá folga: como o cron corre
@@ -43,6 +50,48 @@ async function quemMontou(idComp: string): Promise<string[]> {
   if (!supabaseAdmin) return [];
   const { data } = await supabaseAdmin.from("equipas").select("user_id").eq("id_competicao", idComp);
   return [...new Set((data || []).map((e) => String(e.user_id)).filter(Boolean))];
+}
+
+// Quem tem a equipa guardada ACIMA do orçamento efetivo para uma competição —
+// devolve um mapa user_id -> quanto está acima (JC). MESMO critério da A2
+// (lib/congelar -> pontuarUtilizadoresDaCompeticao): a equipa fica inativa no
+// fecho se o valor de compra exceder o orçamento efetivo
+// (orcamento − orcamento_comprado + comprados_agora). Só entra quem TEM o
+// orçamento e os preços de compra de todos os atletas gravados — na dúvida NÃO
+// se avisa (e no fecho também não se penaliza). Como o cliente bloqueia guardar
+// acima e o carry-over não grava sozinho, na prática isto só apanha o caso do
+// REEMBOLSO de JC comprados — que é exatamente quem arrisca ficar inativo.
+async function quemAcimaDoOrcamento(idComp: string): Promise<Map<string, number>> {
+  const fora = new Map<string, number>();
+  if (!supabaseAdmin) return fora;
+  const { data } = await supabaseAdmin
+    .from("equipas")
+    .select("user_id, atletas, precos, orcamento, orcamento_comprado")
+    .eq("id_competicao", idComp);
+  const lista = data || [];
+  if (lista.length === 0) return fora;
+  const compradosAgora = await jcCompradosValidosEmLote(lista.map((e) => String(e.user_id)));
+  for (const e of lista) {
+    const orcamento = (e as { orcamento?: unknown }).orcamento;
+    const orcamentoComprado = (e as { orcamento_comprado?: unknown }).orcamento_comprado;
+    const precos = (e as { precos?: unknown }).precos;
+    if (orcamento == null || !Number.isFinite(Number(orcamento))) continue;
+    if (orcamentoComprado == null || !Number.isFinite(Number(orcamentoComprado))) continue;
+    if (!precos || typeof precos !== "object") continue;
+    const ids = Array.isArray((e as { atletas?: unknown }).atletas)
+      ? ((e as { atletas: unknown[] }).atletas as unknown[]).map(String)
+      : [];
+    if (ids.length === 0) continue;
+    const mapa = precos as Record<string, unknown>;
+    if (!ids.every((id) => Number.isFinite(Number(mapa[id])))) continue;
+    const valorEquipa = round1(ids.reduce((s, id) => s + Number(mapa[id]), 0));
+    const compradoAgora = compradosAgora.get(String(e.user_id)) ?? 0;
+    const orcamentoEfetivo = round1(Number(orcamento) - Number(orcamentoComprado) + compradoAgora);
+    if (valorEquipa > orcamentoEfetivo + FOLGA_ORCAMENTO) {
+      fora.set(String(e.user_id), round1(valorEquipa - orcamentoEfetivo));
+    }
+  }
+  return fora;
 }
 
 // Notifica muitos utilizadores de uma vez (sino em massa + push em massa).
@@ -165,13 +214,33 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
       const montaram = await quemMontou(foco.alvo.idCompeticao);
       if (montaram.length > 0) {
         const restante = formatarContagem(msAteFecho); // ex.: "23h 10min" ou "1d 0h"
-        await notificarMuitos(montaram, {
-          tipo: "mercado",
-          chaveTitulo: "mercado.ajustarTitulo",
-          chaveCorpo: "mercado.ajustarCorpo",
-          vars: { comp: foco.alvo.nome, tempo: restante },
-          link: "/meu-time",
-        });
+        // ACIMA DO ORÇAMENTO: quem tem a equipa guardada a valer mais do que o
+        // orçamento (ver A2) recebe um aviso ESPECÍFICO — arrisca ficar inativo
+        // se não vender antes do fecho. Os restantes recebem o lembrete normal.
+        const acima = await quemAcimaDoOrcamento(foco.alvo.idCompeticao);
+        const resto = montaram.filter((id) => !acima.has(id));
+        if (resto.length > 0) {
+          await notificarMuitos(resto, {
+            tipo: "mercado",
+            chaveTitulo: "mercado.ajustarTitulo",
+            chaveCorpo: "mercado.ajustarCorpo",
+            vars: { comp: foco.alvo.nome, tempo: restante },
+            link: "/meu-time",
+          });
+        }
+        // Aviso de orçamento por utilizador (o {jc} acima é diferente para cada
+        // um). O conjunto é pequeno (na prática, só reembolsos), por isso um a um
+        // é seguro. `criarNotificacaoServidor` traduz na língua de cada um.
+        for (const [uid, jcAcima] of acima) {
+          await criarNotificacaoServidor({
+            paraUserId: uid,
+            tipo: "mercado",
+            chaveTitulo: "mercado.orcamentoTitulo",
+            chaveCorpo: "mercado.orcamentoCorpo",
+            vars: { comp: foco.alvo.nome, tempo: restante, jc: jcAcima },
+            link: "/meu-time",
+          });
+        }
       }
       vespera = foco.alvo.idCompeticao;
     }
