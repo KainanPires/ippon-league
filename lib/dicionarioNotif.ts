@@ -635,6 +635,44 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Si ce n'est pas toi qui t'es inscrit, ignore cet e-mail — sans confirmation, rien ne se passe.",
     de: "Wenn du dich nicht registriert hast, ignoriere diese E-Mail einfach — ohne Bestätigung passiert nichts.",
   },
+  // Linha final comum a todos os emails ("é automático, não respondas").
+  "email.naoResponder": {
+    pt: "Este email é automático — não precisas de responder.",
+    en: "This is an automated email — no need to reply.",
+    es: "Este correo es automático — no necesitas responder.",
+    fr: "Cet e-mail est automatique — pas besoin de répondre.",
+    de: "Diese E-Mail ist automatisch — du musst nicht antworten.",
+  },
+  // REENGAJAMENTO (email de véspera do fecho, a quem ainda não montou equipa).
+  // {comp} = nome da competição; {tempo} = quanto falta para o fecho.
+  "email.reengajarAssunto": {
+    pt: "O mercado do {comp} fecha em breve — monta a tua equipa! 🥋",
+    en: "The {comp} market closes soon — build your team! 🥋",
+    es: "El mercado del {comp} cierra pronto — ¡monta tu equipo! 🥋",
+    fr: "Le marché du {comp} ferme bientôt — compose ton équipe ! 🥋",
+    de: "Der {comp}-Markt schließt bald — stell dein Team auf! 🥋",
+  },
+  "email.reengajarIntro": {
+    pt: "O mercado do {comp} fecha em {tempo} e ainda não montaste a tua equipa. Monta os teus 8 atletas, escolhe o capitão e entra na competição — se não montares, ficas de fora desta rodada.",
+    en: "The {comp} market closes in {tempo} and you haven't built your team yet. Pick your 8 athletes, choose your captain and get in the competition — if you don't, you'll miss this round.",
+    es: "El mercado del {comp} cierra en {tempo} y aún no has montado tu equipo. Monta tus 8 atletas, elige a tu capitán y entra en la competición — si no lo haces, te quedas fuera de esta ronda.",
+    fr: "Le marché du {comp} ferme dans {tempo} et tu n'as pas encore composé ton équipe. Choisis tes 8 athlètes et ton capitaine et entre dans la compétition — sinon, tu manques cette manche.",
+    de: "Der {comp}-Markt schließt in {tempo} und du hast dein Team noch nicht aufgestellt. Wähle deine 8 Athleten und deinen Kapitän und sei dabei — sonst verpasst du diese Runde.",
+  },
+  "email.reengajarBotao": {
+    pt: "Montar a minha equipa",
+    en: "Build my team",
+    es: "Montar mi equipo",
+    fr: "Composer mon équipe",
+    de: "Mein Team aufstellen",
+  },
+  "email.reengajarRodape": {
+    pt: "Recebes este email porque tens conta na Ippon League. Cada competição começa com a equipa em branco — é só montar.",
+    en: "You're getting this email because you have an Ippon League account. Every competition starts with an empty team — just build it.",
+    es: "Recibes este correo porque tienes cuenta en la Ippon League. Cada competición empieza con el equipo en blanco — solo tienes que montarlo.",
+    fr: "Tu reçois cet e-mail parce que tu as un compte Ippon League. Chaque compétition commence avec une équipe vide — il suffit de la composer.",
+    de: "Du erhältst diese E-Mail, weil du ein Ippon-League-Konto hast. Jeder Wettkampf beginnt mit einem leeren Team — stell es einfach auf.",
+  },
 
   // --- CONTAS INATIVAS (app/api/contas-inativas) — email + sino ---
   // {dias} = quantos dias faltam; {time} = " <strong>NomeTime</strong>" ou "".
