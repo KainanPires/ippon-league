@@ -5,11 +5,12 @@
 //
 // Quem CREDITA os JC é o webhook, quando a Stripe confirma o pagamento. Esta
 // página só leva a pessoa ao ecrã de pagamento e mostra o saldo já creditado.
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { PACOTES_JC } from "@/lib/planos";
 import { useLingua, type Lingua } from "@/lib/i18n";
+import { track, aoTerConsentimento } from "@/lib/analytics";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -108,6 +109,15 @@ function LojaConteudo() {
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState<string | null>(null);
 
+  // FUNIL DE MONETIZAÇÃO (Judocoins): topo do funil = viu a loja. Espera pelo
+  // consentimento e conta uma vez por montagem (igual ao paywall do Pro).
+  const lojaVista = useRef(false);
+  useEffect(() => {
+    if (lojaVista.current) return;
+    lojaVista.current = true;
+    aoTerConsentimento(() => track("paywall_viewed", { pagina: "loja" }));
+  }, []);
+
   useEffect(() => {
     const c = params.get("compra");
     if (c === "ok") setAviso(txt.sucesso);
@@ -145,7 +155,7 @@ function LojaConteudo() {
           body: JSON.stringify({ jc }),
         });
       const j = await r.json();
-      if (j?.ok && j.url) { window.location.href = j.url; return; }
+      if (j?.ok && j.url) { track("checkout_started", { tipo: "judocoins", jc }); window.location.href = j.url; return; }
       setErro(j?.erro || txt.erro);
     } catch {
       setErro(txt.erro);
@@ -169,7 +179,7 @@ function LojaConteudo() {
           body: JSON.stringify({ teste: true }),
         });
       const j = await r.json();
-      if (j?.ok && j.url) { window.location.href = j.url; return; }
+      if (j?.ok && j.url) { track("checkout_started", { tipo: "judocoins", jc: 1, teste: true }); window.location.href = j.url; return; }
       setErro(j?.erro || txt.erro);
     } catch {
       setErro(txt.erro);
