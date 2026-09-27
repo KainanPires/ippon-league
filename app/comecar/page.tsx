@@ -203,6 +203,20 @@ export default function Comecar() {
         });
       }
     } catch { /* sem origem declarada: segue na mesma */ }
+    // EMAIL DE BOAS-VINDAS (+ verificação) — dispara já no registo, para o
+    // primeiro email ser imediato e caloroso (não esperar pelo lembrete diário
+    // do cron). Fire-and-forget: se falhar (ex.: a linha em `users` ainda não
+    // estar pronta), o cron manda-o na mesma dentro de um dia — e como ainda
+    // nunca se enviou, sai como boas-vindas. Não bloqueia a entrada no jogo.
+    try {
+      const tk3 = data.session?.access_token;
+      if (tk3) {
+        void fetch("/api/verificar-email", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${tk3}` },
+        });
+      }
+    } catch { /* sem token: o cron trata do envio */ }
     if (data.session) {
       window.location.href = "/inicio";
     } else {
