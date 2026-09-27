@@ -1,11 +1,12 @@
 // lib/analytics.server.ts
 //
 // CAMADA DE ANALYTICS DO SERVIDOR — só para eventos que têm de ser VERDADE de
-// estado/financeira, disparados no servidor (ex.: no webhook da Stripe):
-// subscription_started / _renewed / _cancelled.
+// estado/financeira, disparados no servidor: subscrições (webhook da Stripe) e
+// AGORA também o ciclo de vida dos e-mails (webhook do Resend).
 //
-// A Stripe continua a ser a FONTE OFICIAL dos pagamentos. Isto é só espelhar o
-// comportamento no analytics — nunca substituir a lógica financeira da Stripe.
+// A Stripe continua a ser a FONTE OFICIAL dos pagamentos e o Resend a fonte
+// oficial da entrega dos e-mails. Isto é só espelhar o comportamento no
+// analytics — nunca substituir a lógica de nenhum dos dois.
 //
 // Usa posthog-node. Em serverless, capturamos e damos flush imediato.
 
@@ -29,15 +30,23 @@ function ph(): PostHog | null {
 // Nomes de evento do servidor (subconjunto da taxonomia — mantê-los alinhados
 // com lib/analytics.ts EVENTOS).
 export type ServerEventName =
+  // Subscrições (Stripe)
   | "subscription_started"
   | "subscription_renewed"
   | "subscription_cancelled"
   | "trial_started"
-  | "checkout_completed";
+  | "checkout_completed"
+  // Ciclo de vida dos e-mails (Resend) — medição delivered/opened/clicked
+  | "email_sent"
+  | "email_delivered"
+  | "email_opened"
+  | "email_clicked"
+  | "email_bounced"
+  | "email_complained";
 
 /**
  * Regista um evento no servidor, associado ao user_id do Supabase (distinctId).
- * NUNCA passar dados pessoais em `props` — só ids/planos/valores.
+ * NUNCA passar dados pessoais em `props` — só ids/planos/valores/tipos.
  */
 export async function trackServer(
   userId: string,
@@ -49,5 +58,5 @@ export async function trackServer(
   try {
     c.capture({ distinctId: userId, event, properties: props });
     await c.flush();
-  } catch { /* o pagamento nunca falha por causa do analytics */ }
+  } catch { /* o pagamento/e-mail nunca falha por causa do analytics */ }
 }
