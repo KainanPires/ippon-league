@@ -217,6 +217,18 @@ export default function Comecar() {
         });
       }
     } catch { /* sem token: o cron trata do envio */ }
+    // PROMOÇÃO DE LANÇAMENTO (Mundial) — dá Pro Max grátis a quem entra na
+    // janela (28/09–31/10). Fire-and-forget: se falhar, a pessoa entra na mesma
+    // e não fica bloqueada; a rota é idempotente e valida a janela no servidor.
+    try {
+      const tk4 = data.session?.access_token;
+      if (tk4) {
+        void fetch("/api/promo/aderir", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${tk4}` },
+        });
+      }
+    } catch { /* sem token: segue na mesma */ }
     if (data.session) {
       window.location.href = "/inicio";
     } else {
