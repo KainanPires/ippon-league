@@ -678,14 +678,14 @@ function MercadoInner() {
               <Avatar code={code3(a.countryIso)} />
               <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {a.name}{inTeam && <span style={{ color: "#7fd1a3", fontSize: 11 }}> ✓ na equipa</span>}
+              {a.name}{inTeam && <span style={{ color: "#7fd1a3", fontSize: 11 }}> ✓ {t("mk.naEquipa")}</span>}
               </div>
               <div style={{ fontSize: 11.5, color: "#93a39a", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden" }}>
               {code3(a.countryIso)} · {a.category}kg
               </div>
               </div>
               <span style={{ background: STATUS_COLORS[a.status][0], color: STATUS_COLORS[a.status][1], fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>{t(CHAVE_ESTADO[a.status] ?? a.status)}</span>
-              <button onClick={() => toggleFav(a)} aria-label={isFav ? t("mk.removerFavoritos") : "Adicionar aos favoritos"} style={{ background: "transparent", border: "none", cursor: "pointer", color: isFav ? GOLD : "#3c463f", fontSize: 20, lineHeight: 1, padding: 2, flexShrink: 0 }}>★</button>
+              <button onClick={() => toggleFav(a)} aria-label={isFav ? t("mk.removerFavoritos") : t("mk.adicionarFavoritos")} style={{ background: "transparent", border: "none", cursor: "pointer", color: isFav ? GOLD : "#3c463f", fontSize: 20, lineHeight: 1, padding: 2, flexShrink: 0 }}>★</button>
               </div>
               <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 10 }}>
               <div>
@@ -694,11 +694,11 @@ function MercadoInner() {
               <span style={{ fontSize: 12, color: vUp ? "#7fd1a3" : "#ef8d83", fontWeight: 700 }}>{vUp ? "▲" : "▼"} {Math.abs(a.variation)}%</span>
               </span>
               <div className={idx === 0 && focus === "scout" ? "glow" : undefined} style={{ fontSize: 11, color: "#7c8a82", marginTop: 2, display: "inline-block", padding: "2px 4px" }}>
-              Média {a.avg.toFixed(1)} · Última {a.last}
+              {t("mk.mediaUltima", { media: a.avg.toFixed(1), ultima: a.last })}
               </div>
               {isProMax && (
                   <div style={{ fontSize: 11, color: MAX, marginTop: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
-                  <LockIcon /> Valoriza a partir de {expEsperada(a)} pts
+                  <LockIcon /> {t("mk.valorizaAPartir", { pts: expEsperada(a) })}
                   </div>
                 )}
               </div>
