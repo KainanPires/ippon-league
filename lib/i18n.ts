@@ -1056,6 +1056,10 @@ const PT: Dicionario = {
 
   // --- mercado ---
   "mk.mercado": "Mercado",
+  "mk.mediaUltima": "Média {media} · Última {ultima}",
+  "mk.valorizaAPartir": "Valoriza a partir de {pts} pts",
+  "mk.naEquipa": "na equipa",
+  "mk.adicionarFavoritos": "Adicionar aos favoritos",
   "mk.competicaoADecorrer": "Competição a decorrer",
   "mk.aCarregarAtletas": "A carregar atletas reais…",
   "mk.aCompetirAgora": "A competir agora · preço pode mudar",
@@ -2917,6 +2921,10 @@ const EN: Dicionario = {
   "estadoDesc.aposta": "Cheap and risky — could surprise.",
 
   "mk.mercado": "Market",
+  "mk.mediaUltima": "Avg {media} · Last {ultima}",
+  "mk.valorizaAPartir": "Gains value from {pts} pts",
+  "mk.naEquipa": "in your team",
+  "mk.adicionarFavoritos": "Add to favourites",
   "mk.competicaoADecorrer": "Competition under way",
   "mk.aCarregarAtletas": "Loading real athletes…",
   "mk.aCompetirAgora": "Competing now · price may change",
@@ -4771,6 +4779,10 @@ const ES: Dicionario = {
   "estadoDesc.aposta": "Barato y arriesgado — puede sorprender.",
 
   "mk.mercado": "Mercado",
+  "mk.mediaUltima": "Media {media} · Última {ultima}",
+  "mk.valorizaAPartir": "Se valoriza a partir de {pts} pts",
+  "mk.naEquipa": "en tu equipo",
+  "mk.adicionarFavoritos": "Añadir a favoritos",
   "mk.competicaoADecorrer": "Competición en marcha",
   "mk.aCarregarAtletas": "Cargando atletas reales…",
   "mk.aCompetirAgora": "Compitiendo ahora · el precio puede cambiar",
@@ -6625,6 +6637,10 @@ const FR: Dicionario = {
   "estadoDesc.aposta": "Pas cher et risqué — peut surprendre.",
 
   "mk.mercado": "Marché",
+  "mk.mediaUltima": "Moyenne {media} · Dernière {ultima}",
+  "mk.valorizaAPartir": "Prend de la valeur à partir de {pts} pts",
+  "mk.naEquipa": "dans ton équipe",
+  "mk.adicionarFavoritos": "Ajouter aux favoris",
   "mk.competicaoADecorrer": "Compétition en cours",
   "mk.aCarregarAtletas": "Chargement des athlètes réels…",
   "mk.aCompetirAgora": "En compétition · le prix peut changer",
@@ -8489,6 +8505,10 @@ const DE: Dicionario = {
   "estadoDesc.aposta": "Günstig und riskant — kann überraschen.",
 
   "mk.mercado": "Markt",
+  "mk.mediaUltima": "Schnitt {media} · Letzte {ultima}",
+  "mk.valorizaAPartir": "Steigt ab {pts} Pkt.",
+  "mk.naEquipa": "in deinem Team",
+  "mk.adicionarFavoritos": "Zu Favoriten hinzufügen",
   "mk.competicaoADecorrer": "Wettkampf läuft",
   "mk.aCarregarAtletas": "Echte Athleten werden geladen…",
   "mk.aCompetirAgora": "Kämpft gerade · Preis kann sich ändern",
