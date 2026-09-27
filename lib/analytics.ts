@@ -48,6 +48,8 @@ export const EVENTOS = [
   "next_competition_team_started", "next_competition_team_saved",
   // Notificações push (camada de contacto)
   "push_prompted", "push_enabled", "push_denied", "push_disabled", "push_prompt_dismissed",
+  // E-mails (disparados no SERVIDOR pelo webhook do Resend — lib/analytics.server.ts)
+  "email_sent", "email_delivered", "email_opened", "email_clicked", "email_bounced", "email_complained",
 ] as const;
 
 export type EventName = (typeof EVENTOS)[number];
