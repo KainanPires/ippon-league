@@ -323,6 +323,20 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Le marché du {comp} ferme dans {tempo}. Tu peux encore changer d'athlètes ou de capitaine — vérifie ton équipe avant la fermeture !",
     de: "Der Markt für {comp} schließt in {tempo}. Du kannst noch Athleten oder den Kapitän tauschen — prüfe dein Team, bevor er schließt!",
   },
+  "mercado.orcamentoTitulo": {
+    pt: "⚠️ Equipa acima do orçamento: {comp}",
+    en: "⚠️ Team over budget: {comp}",
+    es: "⚠️ Equipo por encima del presupuesto: {comp}",
+    fr: "⚠️ Équipe au-dessus du budget : {comp}",
+    de: "⚠️ Team über dem Budget: {comp}",
+  },
+  "mercado.orcamentoCorpo": {
+    pt: "O mercado do {comp} fecha em {tempo} e a tua equipa vale {jc} JC mais do que o teu orçamento. Vende alguém antes do fecho — senão ficas inativo nesta rodada (0 pontos).",
+    en: "The market for {comp} closes in {tempo} and your team is worth {jc} JC more than your budget. Sell someone before it closes — otherwise you'll be inactive this round (0 points).",
+    es: "El mercado del {comp} cierra en {tempo} y tu equipo vale {jc} JC más que tu presupuesto. Vende a alguien antes del cierre — si no, quedas inactivo esta ronda (0 puntos).",
+    fr: "Le marché du {comp} ferme dans {tempo} et ton équipe vaut {jc} JC de plus que ton budget. Vends quelqu'un avant la fermeture — sinon tu seras inactif cette manche (0 point).",
+    de: "Der Markt für {comp} schließt in {tempo} und dein Team ist {jc} JC mehr wert als dein Budget. Verkaufe jemanden vor Schluss — sonst bist du diese Runde inaktiv (0 Punkte).",
+  },
   "mercado.fechadoJogoTitulo": {
     pt: "Mercado fechado: {comp} vai começar",
     en: "Market closed: {comp} is about to start",
