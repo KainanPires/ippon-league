@@ -32,6 +32,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { type LinguaNotif } from "@/lib/dicionarioNotif";
+import { emailHtmlBase } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -175,36 +176,17 @@ async function enviarLigacao(uid: string, email: string, nome: string, base: str
   const naoResponder = txt.naoResponder;
   const assunto = txt.assunto;
 
-  // Email com a cara da Ippon League. Layout em tabelas + estilos inline (é o que
-  // os clientes de email — sobretudo o Outlook — renderizam de forma fiável). A
-  // imagem do topo vem de um endereço público (o ícone da app). Os textos
-  // (${...}) continuam a vir do dicionário, na língua da pessoa.
-  const html = `
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f1ea;margin:0;padding:24px 0">
-    <tr><td align="center">
-      <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e6e1d5">
-        <tr><td align="center" style="background:#0c0e0d;padding:24px">
-          <img src="https://www.ipponleague.com/icon-192.png" width="54" height="54" alt="Ippon League" style="display:block;border-radius:12px;margin:0 auto 10px">
-          <div style="font-family:'IBM Plex Mono',Menlo,Consolas,monospace;font-size:17px;font-weight:700;letter-spacing:3px;color:#d9a441">IPPON LEAGUE</div>
-        </td></tr>
-        <tr><td style="padding:28px 28px 8px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;color:#1b211e">
-          <p style="margin:0 0 14px">${saudacao}</p>
-          <p style="margin:0 0 24px">${frase}</p>
-          <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto 24px">
-            <tr><td align="center" bgcolor="#d9a441" style="border-radius:10px">
-              <a href="${link}" style="display:inline-block;padding:14px 34px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;font-weight:700;color:#1b211e;text-decoration:none;border-radius:10px">${rotuloBotao}</a>
-            </td></tr>
-          </table>
-          <p style="margin:0 0 12px;color:#6c766d;font-size:13px">${validade}</p>
-          <p style="margin:0 0 12px;color:#6c766d;font-size:13px">${ignora}</p>
-          <p style="margin:0;color:#9aa39a;font-size:12px">${naoResponder}</p>
-        </td></tr>
-        <tr><td style="padding:18px 28px 24px;border-top:1px solid #eee;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:11px;line-height:1.5;color:#9aa39a">
-          Ippon League 🥋
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>`;
+  // Molde ÚNICO partilhado (lib/email -> emailHtmlBase): topo preto com o Dodo
+  // (maior) + "IPPON LEAGUE", botão dourado centrado, notas e barra final. Assim
+  // este email e todos os outros (reengajamento, etc.) ficam iguais.
+  const html = emailHtmlBase({
+    saudacao,
+    corpo: frase,
+    botaoTexto: rotuloBotao,
+    botaoLink: link,
+    notas: [validade, ignora],
+    naoResponder,
+  });
 
   try {
     await fetch("https://api.resend.com/emails", {
