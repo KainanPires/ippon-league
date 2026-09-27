@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { type Athlete } from "@/lib/athletes";
-import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, setAthletePool, carryOver, loadLatestSavedCloudExcept, temNomeProprio, loadIdentityCloudFor, type TeamState } from "@/lib/team";
+import { loadDraftFor, saveDraftFor, loadSavedFor, commitSavedFor, resolve, jcLeft, counts, isComplete, missing, loadSavedCloudFor, commitSavedCloudFor, setAthletePool, temNomeProprio, loadIdentityCloudFor, type TeamState } from "@/lib/team";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { temSessao, exigirSessao } from "@/lib/auth";
@@ -58,8 +58,6 @@ function juntarIdentidade(prev: Identity, idc: { name?: string; escudo?: Record<
 }
 type Guide = "welcome" | "counter" | "slot" | "captain" | "actions" | null;
 type Modal = { kind: "missing" | "saved" | "trash" | "share" | "login" | "leave" | "precisaNome" | "acima" } | { kind: "athlete"; a: Athlete } | null;
-// Resultado do carry-over para mostrar no banner "Reescala o teu time".
-type Carry = { dropped: string[]; captainDropped: boolean } | null;
 function sameTeam(a: TeamState, b: TeamState): boolean {
   if ((a.captain || "") !== (b.captain || "")) return false;
   if (a.ids.length !== b.ids.length) return false;
@@ -78,7 +76,6 @@ export default function CriarEquipa() {
   const [savingCloud, setSavingCloud] = useState(false);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const [cloudWarn, setCloudWarn] = useState(false);
-  const [carry, setCarry] = useState<Carry>(null); // atletas que sairam no carry-over
   const { ehPro: isPro } = useNivel();
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const router = useRouter();
@@ -167,8 +164,6 @@ export default function CriarEquipa() {
       } catch {}
       // Carrega a lista de atletas desta competição (mesma fonte do Mercado). Sem isto,
       // o resolve() não traduz os ids da equipa e o Dojo aparece "0/8" mesmo com equipa.
-      // Esta lista é também a de INSCRITOS usada pelo carry-over (quem não está aqui,
-        // não está inscrito nesta competição).
       fetch(`/api/atletas?id=${idAlvo}`)
       .then((r) => r.json())
       .then((j) => {
@@ -177,41 +172,14 @@ export default function CriarEquipa() {
           if (list.length > 0) {
             setAthletePool(list);
             bumpPool((t) => t + 1);
-            // CARRY-OVER: só quando esta competição ainda está MESMO vazia (sem
-              // rascunho, sem guardado local e sem nuvem) E só depois de termos a
-            // lista de inscritos. Traz a última equipa guardada e larga os não
-            // inscritos. Só semeia o rascunho — não há commit automático.
-            tryCarryOver(idAlvo, list);
+            // DECISÃO (Kainan, 27/09): cada competição começa com a equipa
+            // VAZIA — não se herda a equipa anterior. Cria o hábito de voltar e
+            // montar a cada rodada, e elimina o caso confuso de a equipa herdada
+            // ficar acima do orçamento. Por isso o carry-over foi removido; a
+            // equipa guardada DESTA competição (local/nuvem) continua a carregar.
           }
         })
       .catch(() => {});
-      // Corre o carry-over quando a competição-alvo está vazia. `inscritos` é a
-      // lista de atletas desta competição (a pool acabada de carregar). A guarda
-      // de segurança contra inscritos vazios vive dentro de carryOver().
-      async function tryCarryOver(idComp: string, inscritos: Athlete[]) {
-        // Não mexer se já há rascunho ou equipa guardada local nesta competição.
-        const draftLocal = loadDraftFor(idComp);
-        const savedLocal = loadSavedFor(idComp);
-        if (draftLocal.ids.length > 0 || savedLocal.ids.length > 0) return;
-        if (!(await temSessao())) return;
-        // Não mexer se já existe equipa na nuvem para esta competição.
-        const cloudAlvo = await loadSavedCloudFor(idComp);
-        if (!active) return;
-        if (cloudAlvo && cloudAlvo.ids.length > 0) return;
-        // Base = última equipa guardada noutra competição.
-        const anterior = await loadLatestSavedCloudExcept(idComp);
-        if (!active || !anterior) return;
-        const inscritosIds = inscritos.map((a) => a.id);
-        const res = carryOver(anterior.team, inscritosIds);
-        // Se, entretanto, o utilizador já começou a montar, não sobrescrever.
-        const draftAgora = loadDraftFor(idComp);
-        if (draftAgora.ids.length > 0) return;
-        setDraft(res.team);
-        saveDraftFor(idComp, res.team);
-        if (res.dropped.length > 0 || res.captainDropped) {
-          setCarry({ dropped: res.dropped, captainDropped: res.captainDropped });
-        }
-      }
       temSessao().then((logado) => {
           if (!active || !logado) return;
           try {
@@ -268,7 +236,7 @@ export default function CriarEquipa() {
     update({ ...draft, captain: draft.captain === id ? null : id });
     setModal(null);
   }
-  function clearAll() { update({ ids: [], captain: null }); setCarry(null); setModal(null); }
+  function clearAll() { update({ ids: [], captain: null }); setModal(null); }
   function sell(id: string) {
     update({ ids: draft.ids.filter((x) => x !== id), captain: draft.captain === id ? null : draft.captain });
     setModal(null);
@@ -298,7 +266,6 @@ export default function CriarEquipa() {
     // Sincroniza o rascunho local com o guardado, para não ficar um rascunho
     // "fantasma" que faria o meu-time pedir para guardar sem haver alterações.
     saveDraftFor(alvo.idCompeticao, draft);
-    setCarry(null); // a partir daqui a equipa desta competição está confirmada
     setSavingCloud(false);
     setCloudWarn(!res.ok);
     // FUNIL DO NOME: a equipa está guardada. Mas se o time ainda não tem nome
@@ -377,24 +344,6 @@ export default function CriarEquipa() {
     </div>
     <button onClick={openGuide} aria-label={t("ce.comoMontar")} style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent", color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?</button>
     </header>
-    {/* Banner do carry-over: atletas da equipa anterior que não estão inscritos
-      nesta competição sairam; o JC deles já voltou pelo preço atual. */}
-    {carry && (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a2410,#10160f)", border: "1px solid #5a4a18", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", marginBottom: 10 }}>
-        <div style={{ width: 34, height: 34, flexShrink: 0 }}><Mascot belt={corFaixa} expression="indicando" /></div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{t("ce.reescala")}</div>
-        <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "5px 0 0" }}>
-        {carry.dropped.length === 1
-          ? t("ce.carrySaiu1")
-          : t("ce.carrySaiuN", { n: carry.dropped.length })}
-        {carry.captainDropped ? ` ${t("ce.carryCapitao")}` : ""}
-        {" "}{t("ce.carryJC")}
-        </p>
-        <button onClick={() => setCarry(null)} style={{ marginTop: 8, background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB, padding: 0 }}>{t("ce.percebiDispensar")}</button>
-        </div>
-        </div>
-      )}
     {/* Quando há competição a decorrer, mostra-a com aviso de que se escala para a próxima. */}
     {emAndamento && (
         <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a1f1c,#10160f)", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "10px 13px", marginBottom: 10 }}>
