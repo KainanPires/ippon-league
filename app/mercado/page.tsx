@@ -80,6 +80,7 @@ const JANELA: Record<Lingua, {
 };
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
+const MAX = "#7fb8f5"; // azul do Pro Max (info exclusiva: mínimo para valorizar)
 const START_JC = 100;
 const FAV_KEY = "ippon_favorites";
 // Competição-alvo do mercado: a de mercado aberto (mesma regra do resto da app).
@@ -102,13 +103,14 @@ type SortId = "caros" | "baratos" | "valorizados" | "desvalorizados" | "media" |
 // CHAVES, não texto. Estes arrays vivem fora do componente e são avaliados no
 // arranque do módulo, quando o `t` ainda não existe. O texto resolve-se no
 // render, na língua da altura.
-const SORTS: { id: SortId; label: string; pro?: boolean }[] = [
+const SORTS: { id: SortId; label: string; pro?: boolean; proMax?: boolean }[] = [
   { id: "caros", label: "ord.caros" },
   { id: "baratos", label: "ord.baratos" },
   { id: "valorizados", label: "ord.valorizados" },
   { id: "desvalorizados", label: "ord.desvalorizados" },
   { id: "media", label: "ord.media" },
-  { id: "min-valorizar", label: "ord.minValorizar", pro: true },
+  // Exclusivo Pro Max: ordenar por quem valoriza mais fácil (menos pontos p/ subir).
+  { id: "min-valorizar", label: "ord.minValorizar", proMax: true },
 ];
 const sortLabelKey = (id: SortId) => SORTS.find((s) => s.id === id)?.label || "mk.ordenar";
 const PRICE_MIN = 2;
@@ -160,7 +162,7 @@ function MercadoInner() {
   const [loading, setLoading] = useState(true);
   // Nível da tabela `users` — nunca do metadata. `ehPro` é verdadeiro também
   // para Pro Max: os níveis são cumulativos.
-  const { ehPro: isPro } = useNivel();
+  const { ehPro: isPro, ehProMax: isProMax } = useNivel();
   const [loadErr, setLoadErr] = useState("");
   const [aoVivoIds, setAoVivoIds] = useState<Set<string>>(new Set());
   const [aoVivoNome, setAoVivoNome] = useState<string | null>(null);
@@ -694,9 +696,9 @@ function MercadoInner() {
               <div className={idx === 0 && focus === "scout" ? "glow" : undefined} style={{ fontSize: 11, color: "#7c8a82", marginTop: 2, display: "inline-block", padding: "2px 4px" }}>
               Média {a.avg.toFixed(1)} · Última {a.last}
               </div>
-              {isPro && (
-                  <div style={{ fontSize: 11, color: GOLD, marginTop: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
-                  <LockIcon /> Mínimo p/ valorizar: {fmt(expEsperada(a))} pts
+              {isProMax && (
+                  <div style={{ fontSize: 11, color: MAX, marginTop: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                  <LockIcon /> Valoriza a partir de {expEsperada(a)} pts
                   </div>
                 )}
               </div>
@@ -734,12 +736,14 @@ function MercadoInner() {
         <Sheet title={t("mk.ordenar")} onClose={() => setSheet(null)}>
         {SORTS.map((o) => {
               const active = sort === o.id;
-              const bloqueada = o.pro && !isPro; // Pro pode usar; não-Pro vê bloqueada
+              // Bloqueada quando o nível não chega: `pro` exige Pro; `proMax` exige Pro Max.
+              const bloqueada = (o.pro && !isPro) || (o.proMax && !isProMax);
               return (
                 <button key={o.id} onClick={() => { if (bloqueada) return; setSort(o.id); setSheet(null); }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", textAlign: "left", background: active ? "#16201b" : "#121815", border: `1.5px solid ${active ? GOLD : "#2a3a33"}`, borderRadius: 11, padding: "13px 14px", marginBottom: 8, color: bloqueada ? "#cfd8d2" : "#f1ede2", fontSize: 14, fontFamily: FB, cursor: bloqueada ? "default" : "pointer", opacity: bloqueada ? 0.75 : 1 }}>
-                <span>{o.label}</span>
+                <span>{t(o.label)}</span>
                 {o.pro && <span style={{ display: "flex", alignItems: "center", gap: 5, color: GOLD, fontSize: 11, fontWeight: 700 }}><LockIcon /> Pro</span>}
+                {o.proMax && <span style={{ display: "flex", alignItems: "center", gap: 5, color: MAX, fontSize: 11, fontWeight: 700 }}><LockIcon /> Pro Max</span>}
                 </button>
               );
             })}
@@ -824,13 +828,14 @@ export default function Mercado() {
     </Suspense>
   );
 }
-// "Mínimo para valorizar" (Pro): quantos pontos o atleta precisa de fazer na
-// competição para superar a sua expectativa — acima disso, o preço sobe e o
-// jogador ganha JC. A expectativa é a média típica do atleta (campo avg, que vem
-  // da forma: média 12m). Fazer MAIS do que isto valoriza; logo, quem tem este
-// número mais baixo é mais fácil de valorizar.
+// "Mínimo para valorizar" (Pro Max): a partir de quantos pontos o atleta começa
+// a valorizar e a dar JC. ECONOMIA v2 (lib/engine -> computeNewPrice): o atleta
+// valoriza quando faz MAIS pontos do que o seu preço em JC (D = pontos − preço).
+// Logo, o mínimo de pontos para valorizar é `floor(preço) + 1` — o menor inteiro
+// acima do preço. Ex.: preço 12.0 → 13 pts; preço 12.5 → 13 pts; preço 13.0 → 14
+// pts. (A média/expectativa 70/30 já NÃO conta na época; só move o preço inicial.)
 function expEsperada(a: Athlete): number {
-  return Math.max(0, Math.round((a.avg || 0) * 10) / 10);
+  return Math.floor(Math.max(0, a.priceJc || 0)) + 1;
 }
 const cnt: React.CSSProperties = { background: GOLD, color: "#1b211e", borderRadius: 999, fontSize: 11, fontWeight: 700, padding: "1px 7px" };
 const sectionTitle: React.CSSProperties = { fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#93a39a", marginBottom: 8 };
