@@ -15,6 +15,7 @@ import { focoMercado, estadoMercado, formatarContagem } from "@/lib/calendario";
 import { renderNotif, agruparPorLingua, type LinguaNotif } from "@/lib/i18nServidor";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { jcCompradosValidosEmLote } from "@/lib/carteira";
+import { reengajarNaoMontaram } from "@/lib/reengajarEmail";
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 // Folga de arredondamento na verificação de orçamento — igual à da A2
@@ -212,8 +213,8 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
     const naJanela = msAteFecho !== null && msAteFecho > 0 && msAteFecho <= VESPERA_MS;
     if (naJanela && (await reservarEvento(`mercado_vespera:${foco.alvo.idCompeticao}`))) {
       const montaram = await quemMontou(foco.alvo.idCompeticao);
+      const restante = formatarContagem(msAteFecho); // ex.: "23h 10min" ou "1d 0h"
       if (montaram.length > 0) {
-        const restante = formatarContagem(msAteFecho); // ex.: "23h 10min" ou "1d 0h"
         // ACIMA DO ORÇAMENTO: quem tem a equipa guardada a valer mais do que o
         // orçamento (ver A2) recebe um aviso ESPECÍFICO — arrisca ficar inativo
         // se não vender antes do fecho. Os restantes recebem o lembrete normal.
@@ -242,6 +243,9 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
           });
         }
       }
+      // REENGAJAMENTO por email: a quem NÃO montou (todos, decisão do Kainan),
+      // a puxá-lo a montar antes do fecho. Best-effort; não bloqueia o resto.
+      try { await reengajarNaoMontaram(foco.alvo.idCompeticao, foco.alvo.nome, restante, montaram); } catch {}
       vespera = foco.alvo.idCompeticao;
     }
   }
