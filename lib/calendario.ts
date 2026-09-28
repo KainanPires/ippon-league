@@ -68,6 +68,18 @@ export interface SemanaCalendario {
   // o fecho do mercado e a contagem decrescente passam a ser ao minuto. Quando
   // não existe, a app cai no comportamento por data (ver estadoMercado).
   inicioUTC?: string;
+  // MODO ROLLING — só para competições de VÁRIOS DIAS com categorias por dia
+  // (Mundial de judô, Olimpíadas). O mercado fica aberto toda a semana e cada
+  // CATEGORIA tranca no seu instante (o início do seu dia). Fora deste bloco,
+  // tudo funciona com a regra normal (um mercado, fecha 1h antes do início).
+  //   fecho: categoria ("-60", "+78", ...) -> instante ISO em que essa categoria
+  //          deixa de ser contratável (e os atletas dela ficam bloqueados).
+  //   fim:   instante ISO do FIM do evento (após o último dia). Até lá o mercado
+  //          está "aberto" e a competição é o foco; depois, é congelada.
+  rolling?: {
+    fecho: Record<string, string>;
+    fim: string;
+  };
 }
 
 // As 52 semanas de 2026. As reais (classico:false) estão confirmadas na lista
@@ -122,8 +134,23 @@ export const CALENDARIO_2026: SemanaCalendario[] = [
   { semana: 37, idCompeticao: "3155", nome: "Hungary Grand Slam",                      nivel: "Grand Slam",    de: "2026/09/11", classico: false },
   { semana: 38, idCompeticao: "3250", nome: "Skopje Senior European Cup",              nivel: "European Cup",  de: "2026/09/19", classico: false },
   { semana: 39, idCompeticao: "1837", nome: "Grand Slam 2019 — Clássico", nomeCompleto: "Grand Slam Brasília 2019 — Clássico", nivel: "Grand Slam", de: "2026/09/26", classico: true, anoOriginal: 2019 },
-  { semana: 40, idCompeticao: "3151", nome: "Mundial de Baku (Individuais)",           nivel: "Mundial",       de: "2026/10/04", classico: false },
-  { semana: 41, idCompeticao: "3251", nome: "Malaga Senior European Cup",              nivel: "European Cup",  de: "2026/10/10", classico: false },
+  // MUNDIAL DE BAKU — evento de 7 dias (4→10/10), MODO ROLLING. Cada categoria
+  // tranca às 09:00 de Baku (AZT, UTC+4 = 05:00 UTC) do seu dia. Ocupa as semanas
+  // 40 e 41; a Malaga European Cup (que era a semana 41) saiu deste ciclo — o
+  // Mundial é dono da semana e a seguinte é o clássico de Marraquexe (17/10).
+  { semana: 40, idCompeticao: "3151", nome: "Mundial de Baku (Individuais)",           nivel: "Mundial",       de: "2026/10/04", classico: false,
+    rolling: {
+      fecho: {
+        "-60": "2026-10-04T05:00:00Z", "-48": "2026-10-04T05:00:00Z",
+        "-66": "2026-10-05T05:00:00Z", "-52": "2026-10-05T05:00:00Z",
+        "-73": "2026-10-06T05:00:00Z", "-57": "2026-10-06T05:00:00Z",
+        "-81": "2026-10-07T05:00:00Z", "-63": "2026-10-07T05:00:00Z",
+        "-90": "2026-10-08T05:00:00Z", "-70": "2026-10-08T05:00:00Z",
+        "-100": "2026-10-09T05:00:00Z", "-78": "2026-10-09T05:00:00Z",
+        "+100": "2026-10-10T05:00:00Z", "+78": "2026-10-10T05:00:00Z",
+      },
+      fim: "2026-10-11T00:00:00Z",
+    } },
   { semana: 42, idCompeticao: "1702", nome: "Grand Prix 2019 — Clássico", nomeCompleto: "Grand Prix Marrakech 2019 — Clássico", nivel: "Grand Prix", de: "2026/10/17", classico: true, anoOriginal: 2019 },
   { semana: 43, idCompeticao: "2253", nome: "Grand Prix 2021 — Clássico", nomeCompleto: "Grand Prix Zagreb 2021 — Clássico", nivel: "Grand Prix", de: "2026/10/22", classico: true, anoOriginal: 2021 },
   { semana: 44, idCompeticao: "3157", nome: "Abu Dhabi Grand Slam",                    nivel: "Grand Slam",    de: "2026/10/29", classico: false },
@@ -240,6 +267,15 @@ function inicioEstimado(s: SemanaCalendario): { inicio: Date; preciso: boolean }
 }
 
 export function estadoMercado(s: SemanaCalendario, agora: Date = new Date()): EstadoMercado {
+  // MODO ROLLING: o mercado do evento inteiro fica "aberto" até ao `fim` — o
+  // fecho real é POR CATEGORIA (ver categoriaTrancada / o ecrã do mercado). Sem
+  // isto, a competição de vários dias ficaria "fechada" logo no 1º dia.
+  if (s.rolling) {
+    const fim = new Date(s.rolling.fim);
+    const msAteFecho = fim.getTime() - agora.getTime();
+    const { inicio } = inicioEstimado(s);
+    return { estado: msAteFecho > 0 ? "aberto" : "fechado", temHora: true, inicio, fecho: fim, msAteFecho };
+  }
   // Fecho = 1h antes do INÍCIO ESTIMADO. Antes, sem `inicioUTC`, fechava à
   // meia-noite UTC do dia `de` — ignorava o fuso e podia fechar o mercado muitas
   // horas antes do início real (ex.: Lima, UTC-5, fechava de madrugada quando a
@@ -272,6 +308,34 @@ export function formatarContagem(ms: number): string {
 // FOCO DO MERCADO — a regra única usada por todas as telas.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// MODO ROLLING — funções de apoio.
+// ---------------------------------------------------------------------------
+
+/** Está `agora` dentro da janela de um evento rolling? (do dia de início ao fim). */
+function dentroJanelaRolling(s: SemanaCalendario, agora: Date): boolean {
+  if (!s.rolling) return false;
+  const { inicio } = inicioEstimado(s);      // ~meia-noite do dia `de`
+  const fim = Date.parse(s.rolling.fim);
+  return agora.getTime() >= inicio.getTime() && agora.getTime() < fim;
+}
+
+/** O evento rolling ATIVO neste instante (o Mundial durante a sua semana), se houver. */
+export function competicaoRollingAtiva(agora: Date = new Date()): SemanaCalendario | null {
+  return CALENDARIO_2026.find((s) => dentroJanelaRolling(s, agora)) || null;
+}
+
+/**
+ * Numa competição rolling, esta CATEGORIA já trancou? (o seu dia já começou).
+ * Numa competição normal, nunca tranca por categoria (devolve false).
+ */
+export function categoriaTrancada(s: SemanaCalendario, categoria: string, agora: Date = new Date()): boolean {
+  if (!s.rolling) return false;
+  const iso = s.rolling.fecho[categoria];
+  if (!iso) return false;                     // categoria sem fecho definido: livre
+  return agora.getTime() >= Date.parse(iso);
+}
+
 export interface FocoMercado {
   atual: SemanaCalendario;             // competição da semana
   alvo: SemanaCalendario;              // competição de mercado ABERTO (onde se monta)
@@ -286,6 +350,15 @@ export interface FocoMercado {
  * fechou (início - 1h), escala-se para a próxima.
  */
 export function focoMercado(agora: Date = new Date()): FocoMercado {
+  // MODO ROLLING primeiro: um evento de vários dias (Mundial) atravessa duas
+  // semanas ISO. Durante a sua janela é SEMPRE o foco e o alvo (onde se monta),
+  // mesmo que a semana ISO já tenha avançado. Nunca fica "a decorrer" no sentido
+  // de bloquear o ecrã — o mercado continua aberto e tranca por categoria.
+  const rolling = competicaoRollingAtiva(agora);
+  if (rolling) {
+    const est = estadoMercado(rolling, agora);
+    return { atual: rolling, alvo: rolling, aDecorrer: null, estadoAtual: est, estadoAlvo: est };
+  }
   const atual = competicaoDaSemana(agora);
   const estadoAtual = estadoMercado(atual, agora);
   const fechado = estadoAtual.estado === "fechado";
@@ -404,6 +477,10 @@ function chaveCidade(nome: string): string {
  * Regra das 60h a partir do início (ver explicação acima).
  */
 export function competicaoFechada(s: SemanaCalendario, agora: Date = new Date()): boolean {
+  // MODO ROLLING: um evento de vários dias só termina no seu `fim` (após o
+  // último dia). A regra das 60h a partir do início daria o Mundial como
+  // terminado a meio (ex.: 6/10), congelando cedo demais.
+  if (s.rolling) return agora.getTime() >= Date.parse(s.rolling.fim);
   // Início estimado + 60h. Uma competição de judô dura 1-2 dias; 60h cobre com
   // folga e absorve desvios de fuso/horário de verão. Usa a MESMA estimativa do
   // fecho do mercado (inicioEstimado), para haver uma só verdade sobre o início.
@@ -485,6 +562,10 @@ export function cidadeEscondida(s: SemanaCalendario, agora: Date = new Date()): 
  * podeVerEquipa da chave da Copa. Aqui fica a versão partilhada.
  */
 export function pontosVisiveis(s: SemanaCalendario, agora: Date = new Date()): boolean {
+  // MODO ROLLING: os pontos são visíveis AO VIVO durante o evento. Não há
+  // espreitadela a explorar, porque cada categoria tranca no INÍCIO do seu dia
+  // (antes de ter lutas) — quem já tem o atleta não o pode trocar depois de ver.
+  if (s.rolling) return true;
   return estadoMercado(s, agora).estado === "fechado";
 }
 
