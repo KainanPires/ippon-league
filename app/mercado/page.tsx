@@ -5,7 +5,7 @@ import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatu
 import { loadDraftFor, saveDraftFor, setAthletePool, loadSavedCloudFor, loadSavedFor } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
-import { focoMercado, nomeCompeticao, textoFecho } from "@/lib/calendario";
+import { focoMercado, nomeCompeticao, textoFecho, categoriaTrancada } from "@/lib/calendario";
 import { supabase } from "@/lib/supabase";
 import { useNivel } from "@/lib/useNivel";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
@@ -33,6 +33,14 @@ const LOJA_MK: Record<Lingua, { curto: string; falta: string }> = {
   es: { curto: "Comprar Judocoins", falta: "¿Poco presupuesto para fichar? Compra Judocoins." },
   fr: { curto: "Acheter des Judocoins", falta: "Peu de budget pour recruter ? Achète des Judocoins." },
   de: { curto: "Judocoins kaufen", falta: "Wenig Budget für Verpflichtungen? Kaufe Judocoins." },
+};
+// MODO ROLLING (Mundial/Olimpíadas) — banner e rótulo do botão, por língua.
+const ROLLING_MK: Record<Lingua, { titulo: string; corpo: string; botaoTrancada: string }> = {
+  pt: { titulo: "Modo Mundial", corpo: "O Mundial dura a semana toda. Cada categoria fecha quando começa o seu dia — monta com as que ainda faltam. Quem entra a meio joga pela experiência e pontua nas categorias que restam.", botaoTrancada: "Já lutou" },
+  en: { titulo: "Worlds mode", corpo: "The Worlds run all week. Each weight category closes when its day begins — build with the ones still ahead. Join mid-event to experience it and score in the remaining categories.", botaoTrancada: "Fought" },
+  es: { titulo: "Modo Mundial", corpo: "El Mundial dura toda la semana. Cada categoría cierra cuando empieza su día — arma con las que aún faltan. Si entras a mitad, juegas por la experiencia y puntúas en las categorías restantes.", botaoTrancada: "Ya luchó" },
+  fr: { titulo: "Mode Mondiaux", corpo: "Les Mondiaux durent toute la semaine. Chaque catégorie ferme au début de sa journée — compose avec celles qui restent. En arrivant en cours, tu joues pour l'expérience et marques dans les catégories restantes.", botaoTrancada: "A combattu" },
+  de: { titulo: "WM-Modus", corpo: "Die WM läuft die ganze Woche. Jede Gewichtsklasse schließt zu Beginn ihres Tages — stelle mit den noch offenen auf. Wer mitten einsteigt, spielt für das Erlebnis und punktet in den verbleibenden Klassen.", botaoTrancada: "Gekämpft" },
 };
 // Fase I — textos da experiência "monta para a próxima" (janela entre competições).
 // Guardados LOCALMENTE por língua (padrão já usado na FAQ/legal/consentimento),
@@ -478,6 +486,9 @@ function MercadoInner() {
   const acimaDoOrcamento = jcLeft < 0;
   const txtOrc = ORC_ACIMA[lingua] ?? ORC_ACIMA.pt;
   const txtLojaMk = LOJA_MK[lingua] ?? LOJA_MK.pt;
+  // MODO ROLLING: o alvo do mercado é uma competição de vários dias (Mundial)?
+  const emRolling = !!focoAgora.alvo?.rolling;
+  const txtRolling = ROLLING_MK[lingua] ?? ROLLING_MK.pt;
   const countM = teamAthletes.filter((a) => a.gender === "M").length;
   const countF = teamAthletes.filter((a) => a.gender === "F").length;
   const takenM = new Set(teamAthletes.filter((a) => a.gender === "M").map((a) => a.category));
@@ -510,6 +521,11 @@ function MercadoInner() {
     const full = !inTeam && genderCount >= 4;
     const catTaken = !inTeam && taken.has(a.category);
     const afford = a.priceJc <= jcLeft;
+    // MODO ROLLING (Mundial): se a categoria já trancou (o seu dia começou),
+    // ninguém a adiciona NEM a vende — os que já lá estão ficam a pontuar.
+    if (emRolling && categoriaTrancada(focoAgora.alvo, a.category)) {
+      return { label: txtRolling.botaoTrancada, kind: "blocked" as const };
+    }
     if (inTeam) return { label: "Vender", kind: "sell" as const };
     if (full) return { label: "Lotado", kind: "blocked" as const };
     if (catTaken) return { label: "Categoria ocupada", kind: "blocked" as const };
@@ -517,6 +533,8 @@ function MercadoInner() {
     return { label: "Contratar", kind: "buy" as const };
   }
   async function toggle(a: Athlete) {
+    // MODO ROLLING: categoria já trancada não se mexe (nem vender nem comprar).
+    if (emRolling && categoriaTrancada(focoAgora.alvo, a.category)) return;
     if (team.includes(a.id)) { persist(team.filter((id) => id !== a.id)); return; }
     const st = buttonState(a);
     if (st.kind === "buy") {
@@ -603,6 +621,15 @@ function MercadoInner() {
         </span>
         <span style={{ color: GOLD, fontSize: 18, lineHeight: 1, flexShrink: 0 }} aria-hidden="true">›</span>
         </a>
+      )}
+    {emRolling && (
+        <div style={{ background: "linear-gradient(160deg,#16243a,#0d1116)", border: "1px solid #2a4d6e", borderLeft: "3px solid #7fb8f5", borderRadius: 10, padding: "9px 12px", marginBottom: 9 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+        <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#7fb8f5", flexShrink: 0 }} />
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#7fb8f5" }}>{txtRolling.titulo} · {nomeCompeticao(focoAgora.alvo)}</span>
+        </div>
+        <div style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5 }}>{txtRolling.corpo}</div>
+        </div>
       )}
     {montarProxima && competicaoADecorrer && (
         <div style={{ background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: "3px solid #d9a441", borderRadius: 10, padding: "9px 12px", marginBottom: 9 }}>
