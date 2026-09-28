@@ -336,6 +336,17 @@ export function categoriaTrancada(s: SemanaCalendario, categoria: string, agora:
   return agora.getTime() >= Date.parse(iso);
 }
 
+/** O próximo instante (ms) em que uma categoria tranca; null se já trancaram todas. */
+function proximoFechoRolling(s: SemanaCalendario, agora: Date): number | null {
+  if (!s.rolling) return null;
+  let prox: number | null = null;
+  for (const iso of Object.values(s.rolling.fecho)) {
+    const t = Date.parse(iso);
+    if (t > agora.getTime() && (prox === null || t < prox)) prox = t;
+  }
+  return prox;
+}
+
 export interface FocoMercado {
   atual: SemanaCalendario;             // competição da semana
   alvo: SemanaCalendario;              // competição de mercado ABERTO (onde se monta)
@@ -384,6 +395,16 @@ type Tradutor = (chave: string, vars?: Record<string, string | number>) => strin
 // `t` e o texto sai na língua do utilizador; sem ele, mantém o PT (fallback para
 // chamadas ainda por migrar). Chaves em lib/i18n (cal.*).
 export function textoFecho(s: SemanaCalendario, t?: Tradutor, agora: Date = new Date()): string {
+  // MODO ROLLING: o mercado do evento fica aberto a semana toda, por isso mostrar
+  // "fecha em 12d" (o fim do evento) engana. Mostra-se a PRÓXIMA categoria a fechar.
+  if (s.rolling) {
+    const prox = proximoFechoRolling(s, agora);
+    if (prox != null) {
+      const tempo = formatarContagem(prox - agora.getTime());
+      return t ? t("cal.rollingContagem", { t: tempo }) : `Fecha por categoria · próxima em ${tempo}`;
+    }
+    return t ? t("cal.rollingADecorrer") : "Mundial a decorrer";
+  }
   const e = estadoMercado(s, agora);
   if (e.estado === "fechado") return t ? t("cal.mercadoFechado") : "Mercado fechado";
   if (e.temHora && e.msAteFecho !== null) return t ? t("cal.fechaEm", { t: formatarContagem(e.msAteFecho) }) : `Mercado fecha em ${formatarContagem(e.msAteFecho)}`;
