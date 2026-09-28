@@ -190,13 +190,21 @@ export function counts(t: TeamState) {
   const a = resolve(t.ids);
   return { m: a.filter((x) => x.gender === "M").length, f: a.filter((x) => x.gender === "F").length, total: a.length };
 }
-export function isComplete(t: TeamState): boolean {
+// `rolling` = competição de vários dias (Mundial/Olimpíadas): a equipa pode ter
+// MENOS de 8 (monta-se com as categorias que ainda faltam). Basta 1 atleta + capitão.
+export function isComplete(t: TeamState, rolling: boolean = false): boolean {
   const c = counts(t);
+  if (rolling) return c.total >= 1 && !!t.captain;
   return c.m === 4 && c.f === 4 && !!t.captain;
 }
-export function missing(t: TeamState): string[] {
+export function missing(t: TeamState, rolling: boolean = false): string[] {
   const c = counts(t);
   const out: string[] = [];
+  if (rolling) {
+    if (c.total < 1) out.push("pelo menos 1 atleta");
+    if (!t.captain) out.push("escolher o capitão");
+    return out;
+  }
   if (c.m < 4) out.push(`${4 - c.m} atleta${4 - c.m > 1 ? "s" : ""} masculino${4 - c.m > 1 ? "s" : ""}`);
   if (c.f < 4) out.push(`${4 - c.f} atleta${4 - c.f > 1 ? "s" : ""} feminino${4 - c.f > 1 ? "s" : ""}`);
   if (!t.captain) out.push("escolher o capitão");
