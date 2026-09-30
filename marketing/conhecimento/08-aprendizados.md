@@ -22,6 +22,9 @@ Cada correção do Kainan entra aqui, datada, com a regra resultante. Só regras
 - 2026-09-30 · **Permanente:** entoação **assimétrica** — a voz não mantém um tom só; muda com cada informação (grito, suspense lento, rajada rápida nos números, professor seco, voz baixa antes do perigo, peso crescente, alívio, CTA caloroso). Marca-se na escrita da fala e no campo `audio.narracao.entoacao` do plano.
 - 2026-09-30 · **Permanente:** as cenas feitas pela Máquina entregam-se **animadas (MP4)**, não como imagens paradas: cada elemento entra no momento em que a narração fala dele (estúdio animado em `marketing/estudio/`).
 - 2026-09-30 · **Permanente:** carrossel entrega-se em dois passos: (1) uma folha com todas as páginas juntas, só para aprovar; (2) depois de aprovado, **cada página em ficheiro separado** (JPG 1080×1350, `pagina_01.jpg`…), pronta para postar.
+- 2026-09-30 · **Permanente (retrospetiva como-pontuar):** narração **sem pausas de respiração**. Mantém entoação e emoção, mas corrida, sem silêncios entre frases (não é falar mais rápido). Na escrita: sem reticências, poucas frases soltas, ligar com vírgulas e dois-pontos. Depois de gerar, a Máquina corta os silêncios acima de ~0,15 s antes de montar.
+- 2026-09-30 · **Permanente:** o vídeo entrega-se **já com todo o som**: efeitos sonoros em cada elemento que aparece e música de fundo, mixados com a voz. A Máquina vai buscar o que gerou no Higgsfield, monta o vídeo completo e entrega o MP4 final. A música pode ser escolhida pelo Kainan (a Máquina põe uma provisória).
+- 2026-09-30 · Pendente: melhorar a exportação para PowerPoint (o carrossel em imagens ficou muito bom; o .pptx não).
 
 ## Registo de resultados por peça
 `marketing/campanhas/registro-resultados.csv` — colunas: data_publicacao, campanha, versao, rede, formato, angulo, utm_campaign, utm_content, duracao_s, idioma, creditos_gastos, views, conclusao_pct, saves, partilhas, cliques, registos, equipas_montadas, pro_iniciados, notas.
