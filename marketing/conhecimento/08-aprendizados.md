@@ -20,6 +20,7 @@ Cada correção do Kainan entra aqui, datada, com a regra resultante. Só regras
 - 2026-09-30 · Verificado no código (30/09): waza-ari sofrido **−2** (lib/engine.ts e tabela pública em /como-jogar). Património: o **preço** muda metade da diferença (pontos − preço); o dono **ganha metade** da subida do preço e **perde a descida inteira** (lib/congelar.ts, modelo v2). Património parte de 100 a cada época. ⚠️ Esta assimetria não está explicada aos jogadores em /como-jogar.
 - 2026-09-30 · Exemplos de luta com shidos e hansoku-make também são verificados: `plano.json → exemplos[].lutas[]` aceita `{eu:{ippon,waza,yuko,shido}, adv:{...}}` e o teste compara com as funções reais de lib/engine.ts.
 - 2026-09-30 · **Permanente:** entoação **assimétrica** — a voz não mantém um tom só; muda com cada informação (grito, suspense lento, rajada rápida nos números, professor seco, voz baixa antes do perigo, peso crescente, alívio, CTA caloroso). Marca-se na escrita da fala e no campo `audio.narracao.entoacao` do plano.
+- 2026-09-30 · **Permanente:** as cenas feitas pela Máquina entregam-se **animadas (MP4)**, não como imagens paradas: cada elemento entra no momento em que a narração fala dele (estúdio animado em `marketing/estudio/`).
 
 ## Registo de resultados por peça
 `marketing/campanhas/registro-resultados.csv` — colunas: data_publicacao, campanha, versao, rede, formato, angulo, utm_campaign, utm_content, duracao_s, idioma, creditos_gastos, views, conclusao_pct, saves, partilhas, cliques, registos, equipas_montadas, pro_iniciados, notas.
