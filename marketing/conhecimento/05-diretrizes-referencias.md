@@ -29,3 +29,15 @@ Referência de 1:42 = formato de lançamento/post fixado. Para descoberta (Reels
 1. Idioma misturado: PT-BR nos textos, PT-PT na app e no ecrã final. ❓ escolher padrão por mercado.
 2. Chave ao vivo e aviso de atleta favorito mostrados sem o selo **Pro Max**.
 3. "Calendário oficial · JudoBase" e "o jogo oficial" — validar (C13).
+
+## Regra permanente — técnicas de conteúdo viral (Kainan, 30/09/2026)
+Vale para TODAS as peças. Não relaxar.
+1. **Gancho forte nos primeiros 1–3 s, em áudio E imagem.** A primeira fala entra em grande, empolgada, e diz logo do que se trata. A primeira imagem já tem movimento e texto grande (nunca começa em ecrã vazio ou logótipo).
+2. **O gancho ataca uma dúvida ou um erro real do público** (interrupção de padrão + chamar quem comete o erro + o que está em jogo + promessa do que o vídeo vai mostrar). Sem inventar números ou "estatísticas" que não temos.
+3. **Manter a emoção até ao fim:** curva emocional planeada (choque → curiosidade → tensão → alívio → revelação → conclusão → CTA confiante). Cada fala tem emoção indicada.
+4. **Retenção:** mudança visual a cada 2–3 s (corte, zoom, número a saltar, elemento novo); legendas grandes sempre ligadas com a palavra-chave destacada; ciclos abertos ("e a última é a que mais custa…"); **re-ganchos** a ~1/3 e ~2/3 do vídeo.
+5. **Recompensa clara** (o "aha" explicado com um exemplo verdadeiro) antes do CTA.
+6. **CTA que gera partilha e comentário** (ex.: "manda a quem montou só com favoritos", uma pergunta para comentar), além do link.
+7. **Final que liga ao início** (loop) quando possível, para rever.
+8. **Capa/primeiro quadro** pensado como miniatura: frase curta + elemento visual forte.
+Os especialistas ippon-roteiro, ippon-direcao e ippon-revisao verificam estes 8 pontos em cada peça.

@@ -14,3 +14,5 @@ Nunca preenches `preco_unitario` (vem da estimativa oficial) nem autorizas nada.
 
 Regras do Dôdo: "cartoon platypus judoka mascot", nunca uma ave; cores e proporções do mestre 2D; faixa coerente; referência obrigatória. Música: indica fonte e licença (❓ se desconhecida). Proibido: atletas reais, transmissões, logos IJF/federações.
 Não escreves ficheiros.
+
+Retenção visual obrigatória: primeiro quadro já com movimento e texto grande (serve de capa); mudança visual a cada 2–3 s; legendas grandes com a palavra-chave destacada; imagem do gancho mostra o erro/dúvida do público.

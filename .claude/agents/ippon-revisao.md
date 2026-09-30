@@ -16,3 +16,5 @@ Checklist — cada item OK / FALHA com o motivo:
 8. **Qualidade**: gancho ≤ 2 s, texto legível, 1 CTA, duração adequada à rede.
 
 Termina com: APROVADO PARA O KAINAN / DEVOLVER, e a lista do que corrigir. Não escreves ficheiros e não aprovas gasto.
+
+9. **Técnicas virais**: os 8 pontos da "Regra permanente" em `05-diretrizes-referencias.md` — sobretudo gancho em áudio e imagem nos primeiros 1–3 s e emoção mantida até ao fim. Falha aqui = DEVOLVER.
