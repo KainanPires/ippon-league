@@ -18,6 +18,7 @@ Cada correção do Kainan entra aqui, datada, com a regra resultante. Só regras
   - Pontuação = como os pontos se fazem nas lutas (ações, shidos, capitão); ângulo: campeão/favorito nem sempre pontua mais — leva shidos, sofre pontos; judô limpo e agressivo pontua mais.
   - Judocoins = valorização/desvalorização, como ganhar, perder, recuperar e em que focar.
 - 2026-09-30 · Verificado no código (30/09): waza-ari sofrido **−2** (lib/engine.ts e tabela pública em /como-jogar). Património: o **preço** muda metade da diferença (pontos − preço); o dono **ganha metade** da subida do preço e **perde a descida inteira** (lib/congelar.ts, modelo v2). Património parte de 100 a cada época. ⚠️ Esta assimetria não está explicada aos jogadores em /como-jogar.
+- 2026-09-30 · Exemplos de luta com shidos e hansoku-make também são verificados: `plano.json → exemplos[].lutas[]` aceita `{eu:{ippon,waza,yuko,shido}, adv:{...}}` e o teste compara com as funções reais de lib/engine.ts.
 
 ## Registo de resultados por peça
 `marketing/campanhas/registro-resultados.csv` — colunas: data_publicacao, campanha, versao, rede, formato, angulo, utm_campaign, utm_content, duracao_s, idioma, creditos_gastos, views, conclusao_pct, saves, partilhas, cliques, registos, equipas_montadas, pro_iniciados, notas.
