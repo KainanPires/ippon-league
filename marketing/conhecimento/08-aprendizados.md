@@ -10,3 +10,8 @@ Cada correção do Kainan entra aqui, datada, com a regra resultante. Só regras
 ## Registo de resultados por peça
 `marketing/campanhas/registro-resultados.csv` — colunas: data_publicacao, campanha, versao, rede, formato, angulo, utm_campaign, utm_content, duracao_s, idioma, creditos_gastos, views, conclusao_pct, saves, partilhas, cliques, registos, equipas_montadas, pro_iniciados, notas.
 Eventos do funil no código (`lib/analytics.ts`): landing_viewed, signup_started, signup_completed, team_saved, paywall_viewed, trial_started, subscription_started.
+
+## Retrospetiva de campanha
+Depois de cada peça publicada: preencher `templates/retrospectiva.md` em `campanhas/<id>/retrospectiva.md`.
+Classificar cada aprendizado como **permanente** (confirmado pelo Kainan), **desta campanha** ou **hipótese** (um só resultado). Só os permanentes entram na lista acima.
+Mudanças às diretrizes: propostas com motivo; aplicadas só depois de aprovadas, com o texto anterior guardado em "Histórico" no ficheiro alterado. Regras de gasto e autorizações nunca mudam por retrospetiva.
