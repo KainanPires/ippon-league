@@ -14,6 +14,10 @@ Cada correção do Kainan entra aqui, datada, com a regra resultante. Só regras
 - 2026-09-30 · **Permanente:** usar **atletas reais e conhecidos** de cada categoria (nomes públicos, como na app) para o público reconhecer que é judô — nunca nomes inventados. Só nome, país e categoria; nunca foto/vídeo do atleta. Números que não sejam resultados reais levam o selo **EXAMPLE**. Nomes de **utilizadores** da app continuam protegidos.
 - 2026-09-30 · **Permanente:** o Dôdo **atua** — pose, gesto e expressão mostram o que está a ser dito (STOP → palma para a lente; atenção → dedo levantado; perda → triste; ganho → comemora). Biblioteca em `04-dodo.md`.
 - 2026-09-30 · **Permanente:** exemplos podem ser lúdicos, mas os **números seguem sempre as regras reais do jogo** (pontos por ação, preço, Judocoins). Todo o exemplo com números entra em `plano.json → exemplos` e o `validar` recalcula-o contra `lib/engine.ts` — número errado bloqueia o plano. Na tela, **pontos** e **preço** aparecem separados e com rótulo, para ninguém confundir.
+- 2026-09-30 · **Permanente:** **pontuação** e **Judocoins/património** são **conteúdos separados**, nunca o mesmo vídeo.
+  - Pontuação = como os pontos se fazem nas lutas (ações, shidos, capitão); ângulo: campeão/favorito nem sempre pontua mais — leva shidos, sofre pontos; judô limpo e agressivo pontua mais.
+  - Judocoins = valorização/desvalorização, como ganhar, perder, recuperar e em que focar.
+- 2026-09-30 · Verificado no código (30/09): waza-ari sofrido **−2** (lib/engine.ts e tabela pública em /como-jogar). Património: o **preço** muda metade da diferença (pontos − preço); o dono **ganha metade** da subida do preço e **perde a descida inteira** (lib/congelar.ts, modelo v2). Património parte de 100 a cada época. ⚠️ Esta assimetria não está explicada aos jogadores em /como-jogar.
 
 ## Registo de resultados por peça
 `marketing/campanhas/registro-resultados.csv` — colunas: data_publicacao, campanha, versao, rede, formato, angulo, utm_campaign, utm_content, duracao_s, idioma, creditos_gastos, views, conclusao_pct, saves, partilhas, cliques, registos, equipas_montadas, pro_iniciados, notas.
