@@ -1,0 +1,331 @@
+{
+  "_nota": "Valores conferidos contra o código por `verificar-conhecimento`. Se um falhar, o jogo mudou: atualizar a base antes de usar o facto em conteúdo.",
+  "verificado_em": "2026-09-30",
+  "commit_app": "e816cac",
+  "factos": [
+    {
+      "id": "pontos.ippon_feito",
+      "valor": "10",
+      "descricao": "Ippon aplicado",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "^\\s*ippon_feito:\\s*(-?\\d+),"
+      }
+    },
+    {
+      "id": "pontos.waza_ari_feito",
+      "valor": "4",
+      "descricao": "Waza-ari aplicado",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "^\\s*waza_ari_feito:\\s*(-?\\d+),"
+      }
+    },
+    {
+      "id": "pontos.yuko_feito",
+      "valor": "2",
+      "descricao": "Yuko aplicado",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "^\\s*yuko_feito:\\s*(-?\\d+),"
+      }
+    },
+    {
+      "id": "pontos.shido_provocado",
+      "valor": "1",
+      "descricao": "1.º shido provocado (tabela base)",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "^\\s*shido_provocado:\\s*(-?\\d+),"
+      }
+    },
+    {
+      "id": "pontos.ippon_sofrido",
+      "valor": "-5",
+      "descricao": "Ippon sofrido",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "^\\s*ippon_sofrido:\\s*(-?\\d+),"
+      }
+    },
+    {
+      "id": "pontos.waza_ari_sofrido",
+      "valor": "-2",
+      "descricao": "Waza-ari sofrido",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "^\\s*waza_ari_sofrido:\\s*(-?\\d+),"
+      }
+    },
+    {
+      "id": "pontos.yuko_sofrido",
+      "valor": "-1",
+      "descricao": "Yuko sofrido",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "^\\s*yuko_sofrido:\\s*(-?\\d+),"
+      }
+    },
+    {
+      "id": "pontos.shido_recebido",
+      "valor": "-2",
+      "descricao": "1.º shido recebido (tabela base)",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "^\\s*shido_recebido:\\s*(-?\\d+),"
+      }
+    },
+    {
+      "id": "pontos.hansoku_make_recebido",
+      "valor": "-10",
+      "descricao": "Hansoku-make direto",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "^\\s*hansoku_make_recebido:\\s*(-?\\d+),"
+      }
+    },
+    {
+      "id": "preco.minimo",
+      "valor": "2",
+      "descricao": "Piso de preço de atleta (JC)",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "export const MIN_PRICE = (\\d+);"
+      }
+    },
+    {
+      "id": "preco.topo_inicial",
+      "valor": "20",
+      "descricao": "Topo da escala inicial (JC)",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "export const MAX_PRICE = (\\d+);"
+      }
+    },
+    {
+      "id": "preco.teto_seguranca",
+      "valor": "50",
+      "descricao": "Teto de segurança (não é muro de jogo)",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "export const TETO_PRECO = (\\d+);"
+      }
+    },
+    {
+      "id": "preco.peso_12m",
+      "valor": "0.7",
+      "descricao": "Peso da média de 12 meses no preço inicial",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "export const WEIGHT_12M = ([\\d.]+);"
+      }
+    },
+    {
+      "id": "preco.peso_ult3",
+      "valor": "0.3",
+      "descricao": "Peso das últimas 3 competições no preço inicial",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "export const WEIGHT_LAST3 = ([\\d.]+);"
+      }
+    },
+    {
+      "id": "faixa.preta",
+      "valor": "0.05",
+      "descricao": "Fração de topo mensal para a faixa preta",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "topFraction <= ([\\d.]+)\\) return \\\"preta\""
+      }
+    },
+    {
+      "id": "faixa.marrom",
+      "valor": "0.15",
+      "descricao": "Fração de topo mensal para a faixa marrom",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "topFraction <= ([\\d.]+)\\) return \\\"marrom\""
+      }
+    },
+    {
+      "id": "faixa.roxa",
+      "valor": "0.3",
+      "descricao": "Fração de topo mensal para a faixa roxa",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "topFraction <= ([\\d.]+)\\) return \\\"roxa\""
+      }
+    },
+    {
+      "id": "faixa.verde",
+      "valor": "0.5",
+      "descricao": "Fração de topo mensal para a faixa verde",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "topFraction <= ([\\d.]+)\\) return \\\"verde\""
+      }
+    },
+    {
+      "id": "faixa.amarela",
+      "valor": "0.7",
+      "descricao": "Fração de topo mensal para a faixa amarela",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "topFraction <= ([\\d.]+)\\) return \\\"amarela\""
+      }
+    },
+    {
+      "id": "faixa.azul",
+      "valor": "0.9",
+      "descricao": "Fração de topo mensal para a faixa azul",
+      "fonte": {
+        "ficheiro": "lib/engine.ts",
+        "padrao": "topFraction <= ([\\d.]+)\\) return \\\"azul\""
+      }
+    },
+    {
+      "id": "equipa.orcamento_inicial",
+      "valor": "100",
+      "descricao": "Judocoins iniciais",
+      "fonte": {
+        "ficheiro": "lib/team.ts",
+        "padrao": "export const START_JC = (\\d+);"
+      }
+    },
+    {
+      "id": "equipa.composicao",
+      "valor": "4|4",
+      "descricao": "Atletas masculinos|femininos",
+      "fonte": {
+        "ficheiro": "lib/team.ts",
+        "padrao": "c\\.m === (\\d) && c\\.f === (\\d)"
+      }
+    },
+    {
+      "id": "ligas.gratis",
+      "valor": "1|1",
+      "descricao": "Ligas de pontos|copas (grátis)",
+      "fonte": {
+        "ficheiro": "lib/planos.ts",
+        "padrao": "gratis: \\{ pontos: (\\d+), copa: (\\d+) \\}"
+      }
+    },
+    {
+      "id": "ligas.pro",
+      "valor": "5|5",
+      "descricao": "Ligas de pontos|copas (Pro)",
+      "fonte": {
+        "ficheiro": "lib/planos.ts",
+        "padrao": "pro: \\{ pontos: (\\d+), copa: (\\d+) \\}"
+      }
+    },
+    {
+      "id": "ligas.promax",
+      "valor": "10|10",
+      "descricao": "Ligas de pontos|copas (Pro Max)",
+      "fonte": {
+        "ficheiro": "lib/planos.ts",
+        "padrao": "promax: \\{ pontos: (\\d+), copa: (\\d+) \\}"
+      }
+    },
+    {
+      "id": "jc.pacote_10",
+      "valor": "20",
+      "descricao": "Preço (€) do pacote de 10 JC — NÃO anunciar (ver C5)",
+      "fonte": {
+        "ficheiro": "lib/planos.ts",
+        "padrao": "\\{ jc: 10, euros: (\\d+),"
+      }
+    },
+    {
+      "id": "jc.pacote_100",
+      "valor": "70",
+      "descricao": "Preço (€) do pacote de 100 JC — NÃO anunciar (ver C5)",
+      "fonte": {
+        "ficheiro": "lib/planos.ts",
+        "padrao": "\\{ jc: 100, euros: (\\d+),"
+      }
+    },
+    {
+      "id": "preco_plano.pro_promo",
+      "valor": "5,99€",
+      "descricao": "Ippon Pro promoção",
+      "fonte": {
+        "ficheiro": "lib/precos.ts",
+        "padrao": "const PRO_PROMO = \"([^\"]+)\";"
+      }
+    },
+    {
+      "id": "preco_plano.pro_cheio",
+      "valor": "8,99€",
+      "descricao": "Ippon Pro preço cheio",
+      "fonte": {
+        "ficheiro": "lib/precos.ts",
+        "padrao": "const PRO_CHEIO = \"([^\"]+)\";"
+      }
+    },
+    {
+      "id": "preco_plano.max_promo",
+      "valor": "6,99€",
+      "descricao": "Pro Max promoção",
+      "fonte": {
+        "ficheiro": "lib/precos.ts",
+        "padrao": "const MAX_PROMO = \"([^\"]+)\";"
+      }
+    },
+    {
+      "id": "preco_plano.max_cheio",
+      "valor": "9,99€",
+      "descricao": "Pro Max preço cheio",
+      "fonte": {
+        "ficheiro": "lib/precos.ts",
+        "padrao": "const MAX_CHEIO = \"([^\"]+)\";"
+      }
+    },
+    {
+      "id": "promo.meses_desconto",
+      "valor": "6",
+      "descricao": "Meses de desconto por pessoa",
+      "fonte": {
+        "ficheiro": "lib/precos.ts",
+        "padrao": "const MESES_DESCONTO = (\\d+);"
+      }
+    },
+    {
+      "id": "promo.dias_janela",
+      "valor": "90",
+      "descricao": "Dias da janela de promoção após o lançamento",
+      "fonte": {
+        "ficheiro": "lib/precos.ts",
+        "padrao": "const DIAS_JANELA = (\\d+);"
+      }
+    },
+    {
+      "id": "promo.em_promocao",
+      "valor": "true",
+      "descricao": "A promoção está ligada no código",
+      "fonte": {
+        "ficheiro": "lib/precos.ts",
+        "padrao": "emPromocao: (true|false),"
+      }
+    },
+    {
+      "id": "copa_dodo.vagas_por_continente",
+      "valor": "6",
+      "descricao": "Vagas por continente na Copa do Dôdo",
+      "fonte": {
+        "ficheiro": "lib/sorteioDodo.ts",
+        "padrao": "export const VAGAS_POR_CONTINENTE = (\\d+);"
+      }
+    },
+    {
+      "id": "copa_dodo.total_vagas",
+      "valor": "32",
+      "descricao": "Lugares na Copa do Dôdo",
+      "fonte": {
+        "ficheiro": "lib/sorteioDodo.ts",
+        "padrao": "export const TOTAL_VAGAS = (\\d+);"
+      }
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "_como_usar": "Copiar para marketing/campanhas/<id>/plano.json. Campos com ❓ são decisões pendentes. `geracao` só em cenas que precisam de geração paga.",
+  "campanha": {
+    "id": "<id-em-minusculas-com-hifens>",
+    "versao": "1",
+    "titulo": "",
+    "objetivo": "",
+    "publico": "",
+    "promessa": "",
+    "hipotese": "",
+    "redes": [],
+    "formato": "9:16 vertical, 1080×1920",
+    "idioma": "",
+    "cta": "",
+    "link_utm": "",
+    "sinopse": ""
+  },
+  "factos": [
+    {
+      "texto": "",
+      "fonte": "ficheiro da app",
+      "estado": "IMPLEMENTADO · VERIFICADO"
+    }
+  ],
+  "musica": [
+    {
+      "de_s": 0,
+      "ate_s": 0,
+      "faixa": "",
+      "fonte": "",
+      "licenca": null,
+      "intensidade": "",
+      "nota": ""
+    }
+  ],
+  "cenas": [
+    {
+      "id": "c01",
+      "duracao_s": 3,
+      "funcao": "gancho",
+      "origem": "gravacao | motion (CapCut) | asset | higgsfield",
+      "cenario": "",
+      "personagens": [],
+      "acao": "",
+      "enquadramento": "",
+      "camera": "",
+      "texto_ecra": [
+        {
+          "texto": "",
+          "estilo": "",
+          "posicao": ""
+        }
+      ],
+      "narracao": "",
+      "som": {
+        "musica": "",
+        "efeitos": []
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "",
+      "storyboard": "",
+      "geracao": {
+        "endpoint": "<endpoint oficial do modelo, ex.: kling-video/v3.0-turbo/image-to-video>",
+        "parametros": {
+          "prompt": "",
+          "image_url": "https://<url pública da referência>",
+          "duration": 3,
+          "resolution": "720p"
+        },
+        "referencias": [
+          {
+            "caminho": "assets/dodo/3d/dodo3d_3.jpg",
+            "url": "https://<url pública da referência>"
+          }
+        ],
+        "quantidade": 1,
+        "preco_unitario": {
+          "creditos": 0,
+          "fonte": "higgsfield /estimate (preenchido por confirmar-precos)",
+          "data": ""
+        }
+      }
+    }
+  ]
+}

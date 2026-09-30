@@ -1,0 +1,11 @@
+# Máquina de Conteúdo — o repositório é PÚBLICO.
+# Planos de campanha, razões de execução, resultados gerados e pacotes de
+# montagem ficam fora do git por defeito (estratégia e identificadores de
+# pedidos). O exemplo e o registo de resultados vazio ficam versionados.
+campanhas/*
+!campanhas/exemplo-mundial-baku/
+!campanhas/LEIA-ME.md
+campanhas/exemplo-mundial-baku/execucao/
+campanhas/exemplo-mundial-baku/saidas/
+campanhas/exemplo-mundial-baku/entrega-capcut/
+config/limites.json

@@ -1,0 +1,190 @@
+{
+  "_estado": "EXEMPLO DE FORMATO — não aprovado, sem preço confirmado, referência ainda não alojada. Não executar.",
+  "campanha": {
+    "id": "exemplo-mundial-baku",
+    "versao": "0.1",
+    "titulo": "Mundial de Baku — corte de 15 s",
+    "objetivo": "Levar fãs de judo a montar equipa para o Mundial de Baku",
+    "publico": "fãs de judo que vão ver o Mundial",
+    "promessa": "Vive o Mundial a jogar: 8 atletas, 100 JC, 1 capitão",
+    "hipotese": "Um gancho com o Dôdo 3D + 'não é bet' aumenta a conclusão face a um tutorial",
+    "redes": [
+      "TikTok",
+      "Instagram Reels",
+      "YouTube Shorts"
+    ],
+    "formato": "9:16 vertical, 1080×1920",
+    "idioma": "❓ PT-BR ou PT-PT",
+    "cta": "Monta a tua equipa — link na bio",
+    "link_utm": "https://www.ipponleague.com/?utm_source=tiktok&utm_medium=video&utm_campaign=mundial-baku&utm_content=nao-e-bet-v1"
+  },
+  "factos": [
+    {
+      "texto": "Equipa de 8 atletas com 100 Judocoins e 1 capitão",
+      "fonte": "lib/team.ts",
+      "estado": "IMPLEMENTADO · VERIFICADO"
+    },
+    {
+      "texto": "Mundial de Baku começa a 04/10/2026 no calendário do jogo",
+      "fonte": "lib/calendario.ts",
+      "estado": "IMPLEMENTADO"
+    }
+  ],
+  "musica": [
+    {
+      "de_s": 0,
+      "ate_s": 15,
+      "faixa": "❓ a escolher",
+      "fonte": "❓",
+      "licenca": null,
+      "intensidade": "crescente",
+      "nota": "batida sobe no c03"
+    }
+  ],
+  "cenas": [
+    {
+      "id": "c01",
+      "duracao_s": 3,
+      "funcao": "gancho",
+      "origem": "higgsfield",
+      "cenario": "estúdio escuro, raios de luz dourados, partículas",
+      "personagens": [
+        "Dôdo 3D, determinado, faixa preta"
+      ],
+      "acao": "Dôdo aponta para a câmara",
+      "enquadramento": "plano médio → close",
+      "camera": "push-in lento",
+      "texto_ecra": [
+        {
+          "texto": "FANTASY",
+          "estilo": "Oswald dourado",
+          "posicao": "terço inferior"
+        },
+        {
+          "texto": "DE JUDÔ",
+          "estilo": "Oswald creme"
+        }
+      ],
+      "narracao": "",
+      "som": {
+        "musica": "entra a batida",
+        "efeitos": [
+          "whoosh"
+        ]
+      },
+      "transicao_saida": "corte seco",
+      "storyboard": "Dôdo 3D a apontar, texto a entrar letra a letra",
+      "geracao": {
+        "endpoint": "kling-video/v3.0-turbo/image-to-video",
+        "parametros": {
+          "prompt": "The cartoon platypus judoka mascot from the reference image (vinyl toy look, teal head, wide orange bill, white judogi, black belt) points at the camera with a determined face; slow push-in; dark studio, golden light rays and particles; keep exact character design",
+          "image_url": "https://referencia-por-alojar.invalid/dodo3d_3.jpg",
+          "duration": 3,
+          "resolution": "1080p"
+        },
+        "referencias": [
+          {
+            "caminho": "assets/dodo/3d/dodo3d_3.jpg",
+            "sha256": "5895f97b41375b6186647952016f14b2c46ea4725d2dd38ceb69df49979fc7cb",
+            "url": "https://referencia-por-alojar.invalid/dodo3d_3.jpg"
+          }
+        ],
+        "quantidade": 1
+      }
+    },
+    {
+      "id": "c02",
+      "duracao_s": 3,
+      "funcao": "o que é",
+      "origem": "gravacao",
+      "acao": "gravação de ecrã: mercado a montar a equipa",
+      "enquadramento": "telemóvel inclinado com brilho dourado",
+      "camera": "leve rotação",
+      "texto_ecra": [
+        {
+          "texto": "8 ATLETAS · 100 JC · 1 CAPITÃO",
+          "estilo": "Oswald dourado"
+        }
+      ],
+      "som": {
+        "musica": "batida",
+        "efeitos": [
+          "cliques de interface"
+        ]
+      },
+      "transicao_saida": "deslize para cima"
+    },
+    {
+      "id": "c03",
+      "duracao_s": 3,
+      "funcao": "posicionamento",
+      "origem": "motion (CapCut)",
+      "acao": "texto 'NÃO É BET.' riscado a vermelho; entra 'É JOGO.'",
+      "texto_ecra": [
+        {
+          "texto": "NÃO É BET.",
+          "estilo": "creme, risco vermelho"
+        },
+        {
+          "texto": "É JOGO.",
+          "estilo": "dourado grande"
+        }
+      ],
+      "som": {
+        "musica": "pico",
+        "efeitos": [
+          "risco"
+        ]
+      },
+      "transicao_saida": "corte seco"
+    },
+    {
+      "id": "c04",
+      "duracao_s": 3,
+      "funcao": "evento",
+      "origem": "motion (CapCut)",
+      "acao": "chips D1–D7 acendem; 'MUNDIAL DE BAKU · 4 OUT'",
+      "texto_ecra": [
+        {
+          "texto": "MUNDIAL DE BAKU",
+          "estilo": "Oswald dourado"
+        },
+        {
+          "texto": "COMEÇA A 4 DE OUTUBRO",
+          "estilo": "Manrope creme"
+        }
+      ],
+      "som": {
+        "musica": "batida",
+        "efeitos": [
+          "ticks"
+        ]
+      },
+      "transicao_saida": "fundido"
+    },
+    {
+      "id": "c05",
+      "duracao_s": 3,
+      "funcao": "CTA",
+      "origem": "asset (logótipo + Dôdo 2D)",
+      "acao": "Dôdo 2D a comemorar + logótipo + botão",
+      "texto_ecra": [
+        {
+          "texto": "MONTA A TUA EQUIPA",
+          "estilo": "botão dourado"
+        },
+        {
+          "texto": "LINK NA BIO",
+          "estilo": "rodapé"
+        }
+      ],
+      "som": {
+        "musica": "final",
+        "efeitos": [
+          "ding"
+        ]
+      },
+      "transicao_saida": "fim"
+    }
+  ]
+}
