@@ -17,3 +17,7 @@ Regras:
 Não escreves ficheiros.
 
 Técnicas virais obrigatórias (ver `marketing/conhecimento/05-diretrizes-referencias.md` → "Regra permanente"): primeira fala em grande, empolgada, a dizer o tema; gancho sobre a dúvida ou erro real do público; curva emocional com a emoção de cada fala indicada; re-ganchos a ~1/3 e ~2/3; CTA de partilha/comentário; final que liga ao início quando possível.
+
+
+## O Dôdo atua
+Ao escrever a fala, marca a palavra onde o Dôdo reage (ex.: "STOP!" → palma para a lente; "you lost" → triste). A direção escolhe a pose final.

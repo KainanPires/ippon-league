@@ -18,3 +18,7 @@ Checklist — cada item OK / FALHA com o motivo:
 Termina com: APROVADO PARA O KAINAN / DEVOLVER, e a lista do que corrigir. Não escreves ficheiros e não aprovas gasto.
 
 9. **Técnicas virais**: os 8 pontos da "Regra permanente" em `05-diretrizes-referencias.md` — sobretudo gancho em áudio e imagem nos primeiros 1–3 s e emoção mantida até ao fim. Falha aqui = DEVOLVER.
+
+
+## Verificação extra — atuação do Dôdo
+Reprova se o Dôdo aparece parado/neutro numa fala com intenção clara, ou se a expressão contradiz a fala (ex.: sorri em "you lost five Judocoins").

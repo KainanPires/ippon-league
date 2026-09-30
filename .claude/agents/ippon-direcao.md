@@ -16,3 +16,7 @@ Regras do Dôdo: "cartoon platypus judoka mascot", nunca uma ave; cores e propor
 Não escreves ficheiros.
 
 Retenção visual obrigatória: primeiro quadro já com movimento e texto grande (serve de capa); mudança visual a cada 2–3 s; legendas grandes com a palavra-chave destacada; imagem do gancho mostra o erro/dúvida do público.
+
+
+## O Dôdo atua (regra permanente)
+Em cada aparição do Dôdo indica **momento da fala → pose + expressão**, usando a biblioteca de atuação em `marketing/conhecimento/04-dodo.md`. Nunca Dôdo neutro (braços em baixo) numa fala com intenção clara. Se a pose não existe em 2D, marca-a como "criar no estúdio (custo zero)".

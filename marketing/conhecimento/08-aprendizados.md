@@ -12,6 +12,7 @@ Cada correção do Kainan entra aqui, datada, com a regra resultante. Só regras
 - 2026-09-30 · **Permanente:** o STOP/gancho vem **na cara** do espectador (gesto e texto em direção à lente) e o primeiro quadro mostra **identidade de judô + Ippon League** (tatame, judogi, logótipo, "JUDO FANS") para quem é do meio se reconhecer.
 - 2026-09-30 · **Permanente:** todo o vídeo termina com **CTA para montar a equipa com o link** ("link na bio" / link na legenda).
 - 2026-09-30 · **Permanente:** usar **atletas reais e conhecidos** de cada categoria (nomes públicos, como na app) para o público reconhecer que é judô — nunca nomes inventados. Só nome, país e categoria; nunca foto/vídeo do atleta. Números que não sejam resultados reais levam o selo **EXAMPLE**. Nomes de **utilizadores** da app continuam protegidos.
+- 2026-09-30 · **Permanente:** o Dôdo **atua** — pose, gesto e expressão mostram o que está a ser dito (STOP → palma para a lente; atenção → dedo levantado; perda → triste; ganho → comemora). Biblioteca em `04-dodo.md`.
 
 ## Registo de resultados por peça
 `marketing/campanhas/registro-resultados.csv` — colunas: data_publicacao, campanha, versao, rede, formato, angulo, utm_campaign, utm_content, duracao_s, idioma, creditos_gastos, views, conclusao_pct, saves, partilhas, cliques, registos, equipas_montadas, pro_iniciados, notas.
