@@ -57,7 +57,7 @@ export function gerarEntregaCapcut(raiz, plano) {
       lista(s.texto_ecra).map((x) => [n, s.id, mmss(de), mmss(ate), x.texto, x.estilo, x.posicao].map(csv).join(",")))].join("\n") + "\n");
 
   let k = 0;
-  const srt = linhasCenas.filter(({ s }) => s.narracao).map(({ s, de, ate }) => `${++k}\n${srtT(de)} --> ${srtT(ate)}\n${s.narracao}\n`).join("\n");
+  const srt = linhasCenas.filter(({ s }) => s.narracao).map(({ s, de, ate }) => `${++k}\n${srtT(de)} --> ${srtT(ate)}\n${s.narracao.replace(/\s*\[pausa[^\]]*\]\s*/g, " ").trim()}\n`).join("\n");
   fs.writeFileSync(path.join(destino, "legendas-narracao.srt"), srt);
 
   fs.writeFileSync(path.join(destino, "mapa-musical.csv"),
