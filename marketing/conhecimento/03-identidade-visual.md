@@ -34,4 +34,4 @@ Tatames (Pro Max), dentro/fora: Amarelo/Azul `#e6b422`/`#2f6fb3` (padrão) · Am
 Tatame; avatares de kimono de costas com back number e sigla de país; escudo da equipa (`components/Escudo.tsx`); troféu da Copa do Dôdo (`components/TrofeuDodo.tsx`); cards de desempenho/certificado; fundo escuro com textura diagonal e partículas douradas (referências).
 
 ## Proibido
-Fotos/vídeos de atletas reais · imagens de transmissões IJF/JudoBase · logos IJF/federações/JudoBase · alterar anatomia ou cores do Dôdo · landing antiga azul/amarela (`#1565C0`/`#FDD835`, Nunito) — obsoleta.
+Fotos/vídeos de atletas reais (nomes podem aparecer — ver 08) · imagens de transmissões IJF/JudoBase · logos IJF/federações/JudoBase · alterar anatomia ou cores do Dôdo · landing antiga azul/amarela (`#1565C0`/`#FDD835`, Nunito) — obsoleta.

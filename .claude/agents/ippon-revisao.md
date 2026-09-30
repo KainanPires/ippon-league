@@ -10,7 +10,7 @@ Checklist — cada item OK / FALHA com o motivo:
 2. **Compreensão**: um fã de judo que não conhece a app percebe o que é e o que fazer em 1 visualização sem som.
 3. **Marca**: cores e fontes de `03`; logótipo correto; nada da landing antiga.
 4. **Dôdo**: ornitorrinco, proporções e cores do mestre, faixa coerente, referência indicada.
-5. **Direitos**: sem atletas reais, sem transmissões, sem logos IJF/federações; música com licença.
+5. **Direitos**: sem fotos/vídeos de atletas reais (nomes reais sim; números inventados com selo EXAMPLE), sem transmissões, sem logos IJF/federações; música com licença.
 6. **Linguagem**: idioma consistente com o mercado (❓ decisão pendente); sem "oficial"/"JudoBase" até validação (C13).
 7. **Gasto**: gerações só onde necessárias; quantidade 1 salvo justificação; nenhuma regeração automática prevista.
 8. **Qualidade**: gancho ≤ 2 s, texto legível, 1 CTA, duração adequada à rede.

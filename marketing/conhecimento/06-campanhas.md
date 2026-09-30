@@ -4,7 +4,7 @@
 Validar com gasto mínimo se há apetite e pagantes. Estrela-guia: **jogadores que voltam de uma competição para a seguinte**.
 
 ## Tipos de peça (Kainan, 30/09/2026)
-Vídeos curtos · carrosséis · posts fixados (apresentação do produto) · anúncios · vídeos híbridos (Dôdo animado a interagir com vídeo real — ❓ só material próprio ou licenciado; nunca atletas reais nem transmissões).
+Vídeos curtos · carrosséis · posts fixados (apresentação do produto) · anúncios · vídeos híbridos (Dôdo animado a interagir com vídeo real — ❓ só material próprio ou licenciado; nunca imagens de atletas reais nem transmissões).
 
 ## Redes e formatos (❓ lista final por confirmar — conflito C9)
 | Rede | Formato | KPI |

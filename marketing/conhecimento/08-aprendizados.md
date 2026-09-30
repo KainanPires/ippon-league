@@ -11,6 +11,7 @@ Cada correção do Kainan entra aqui, datada, com a regra resultante. Só regras
 - 2026-09-30 · **Permanente:** a narração gera-se em **blocos contínuos** (2–3 takes por vídeo), com a emoção a mudar **de forma gradual**, como uma pessoa real a falar: o grito do gancho desce para o tom de conversa ao longo de 2–3 frases, sem saltos. Emoção indicada pela escrita (maiúsculas, reticências, pontuação).
 - 2026-09-30 · **Permanente:** o STOP/gancho vem **na cara** do espectador (gesto e texto em direção à lente) e o primeiro quadro mostra **identidade de judô + Ippon League** (tatame, judogi, logótipo, "JUDO FANS") para quem é do meio se reconhecer.
 - 2026-09-30 · **Permanente:** todo o vídeo termina com **CTA para montar a equipa com o link** ("link na bio" / link na legenda).
+- 2026-09-30 · **Permanente:** usar **atletas reais e conhecidos** de cada categoria (nomes públicos, como na app) para o público reconhecer que é judô — nunca nomes inventados. Só nome, país e categoria; nunca foto/vídeo do atleta. Números que não sejam resultados reais levam o selo **EXAMPLE**. Nomes de **utilizadores** da app continuam protegidos.
 
 ## Registo de resultados por peça
 `marketing/campanhas/registro-resultados.csv` — colunas: data_publicacao, campanha, versao, rede, formato, angulo, utm_campaign, utm_content, duracao_s, idioma, creditos_gastos, views, conclusao_pct, saves, partilhas, cliques, registos, equipas_montadas, pro_iniciados, notas.
