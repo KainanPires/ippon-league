@@ -14,6 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { hashCanonico, sha256Ficheiro } from "./canonico.mjs";
+import { verificarExemplos } from "./exemplos.mjs";
 
 export const RAIZ_MARKETING = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -80,6 +81,8 @@ export function validarPlano(raiz, plano, idEsperado) {
       if (!(Number(p.creditos) > 0) || !p.fonte || !p.data) erros.push(`${cena.id}: preco_unitario precisa de creditos>0, fonte e data`);
     }
   }
+  // Exemplos com números: têm de bater com as regras reais do jogo (lib/engine.ts).
+  if (plano?.exemplos) erros.push(...verificarExemplos(plano, path.resolve(raiz, "..")));
   if (erros.length) throw new ErroPlano("plano inválido:\n - " + erros.join("\n - "));
 }
 
