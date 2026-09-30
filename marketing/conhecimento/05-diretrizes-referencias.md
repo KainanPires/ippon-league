@@ -40,4 +40,7 @@ Vale para TODAS as peças. Não relaxar.
 6. **CTA que gera partilha e comentário** (ex.: "manda a quem montou só com favoritos", uma pergunta para comentar), além do link.
 7. **Final que liga ao início** (loop) quando possível, para rever.
 8. **Capa/primeiro quadro** pensado como miniatura: frase curta + elemento visual forte.
+9. **Voz com transição gradual:** a entrada é grande, mas a energia desce aos poucos até ao tom de conversa (nunca um corte seco entre grito e explicação). Narração em blocos contínuos, não fala a fala.
+10. **Gancho do nicho:** STOP/interrupção dirigida à lente + sinais de judô e Ippon League no primeiro quadro.
+11. **CTA final obrigatório:** montar a equipa + link.
 Os especialistas ippon-roteiro, ippon-direcao e ippon-revisao verificam estes 8 pontos em cada peça.
