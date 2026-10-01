@@ -4,6 +4,7 @@ import { Mascot } from "@/components/Mascot";
 import { loadSavedFor, resolve, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
 import { loadIdentity, type Identity } from "@/components/Escudo";
 import { Desempenho } from "@/components/Desempenho";
+import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 import { GaleriaResumos } from "@/components/GaleriaResumos";
 import { desempenhosVistosConta, marcarDesempenhoVisto, aoVivoVistoConta, marcarAoVivoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
@@ -173,6 +174,11 @@ export default function Inicio() {
   // e os resultados congelados são sempre FINAIS (aoVivo=false).
   const [desempenhoAoVivo, setDesempenhoAoVivo] = useState(false);
   const [galeriaAberta, setGaleriaAberta] = useState(false);
+  // Pedido de avaliação (NPS). Aparece quando a pessoa fecha o resumo da rodada —
+  // um momento de valor: acabou de ver o resultado. O devePedirAvaliacao() traz
+  // o intervalo para reaparecer embutido (mesma cadência do resto da app), por
+  // isso nunca incomoda quem já votou ou já disse para não mostrar mais.
+  const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
   const [userIdState, setUserIdState] = useState<string | null>(null);
   // Identidade (nome + escudo) a usar no cartão de resumo. Arranca da identidade
   // local (rápida), mas ao abrir um resumo é substituída pela identidade REAL da
@@ -497,7 +503,7 @@ export default function Inicio() {
   // Os modais de evento só aparecem fora do tutorial de onboarding e sem outro
   // overlay aberto (resumo da rodada / galeria), para não empilhar pop-ups.
   const modalEvento = modaisFila[0] ?? null;
-  const podeMostrarModalEvento = !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta;
+  const podeMostrarModalEvento = !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
     <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes iltut{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.75)}50%{box-shadow:0 0 0 9px rgba(74,144,217,0.18)}} .iltut{animation:iltut 1.3s ease-in-out infinite} @keyframes ilentrar{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.28)}} .ilentrar{animation:ilentrar 1.5s ease-in-out infinite;border-radius:999px} @keyframes ilmodalin{0%{opacity:0;transform:translateY(10px) scale(0.97)}100%{opacity:1;transform:none}} .ilmodalin{animation:ilmodalin 0.28s cubic-bezier(0.2,0.7,0.3,1)}`}</style>
@@ -745,17 +751,24 @@ export default function Inicio() {
             // O ao vivo já foi marcado como visto na CONTA quando apareceu, por
             // isso aqui só fechamos. Não reaparece sozinho — fica em "Os meus
             // resumos".
+            // Resultado FINAL da competição (não ao vivo, não da galeria): é
+            // altura de pedir avaliação, se a cadência o permitir. Vale para
+            // "pular" e para "pular para sempre". Lê-se o estado ANTES de limpar.
+            const pedirAvaliacao = !desempenhoAoVivo && !desempenhoDaGaleria && devePedirAvaliacao();
             setDesempenho(null);
             setExtra(null);
             setDesempenhoDaGaleria(false);
             setDesempenhoAoVivo(false);
+            if (pedirAvaliacao) setMostrarAvaliacao(true);
           }}
         onNaoMostrarMais={() => {
+            const pedirAvaliacao = !desempenhoAoVivo && !desempenhoDaGaleria && devePedirAvaliacao();
             marcarDesempenhoVisto(desempenho.dados.idCompeticao);
             setDesempenho(null);
             setExtra(null);
             setDesempenhoDaGaleria(false);
             setDesempenhoAoVivo(false);
+            if (pedirAvaliacao) setMostrarAvaliacao(true);
           }}
         />
       )}
@@ -765,6 +778,9 @@ export default function Inicio() {
         onAbrir={(comp) => abrirResumoDaGaleria(comp)}
         onClose={() => setGaleriaAberta(false)}
         />
+      )}
+    {mostrarAvaliacao && (
+        <Avaliacao nomeTime={identityResumo.name || nomeMostrado} onClose={() => setMostrarAvaliacao(false)} />
       )}
     </main>
   );
