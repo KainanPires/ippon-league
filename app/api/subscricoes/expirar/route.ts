@@ -49,11 +49,17 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { stripeFetch, nivelDoPreco, fimDoPeriodo } from "@/lib/stripe";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { sincronizarLigasOficiais } from "@/lib/ligasOficiais";
+import { reverterEscudoParaGratis } from "@/lib/escudoServidor";
 import { registarCorrida } from "@/lib/cronLog";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-/** Dias de folga depois da data de expiração antes de sequer olhar para a conta. */
-const FOLGA_DIAS = 2;
+/** Dias de folga depois da data de expiração antes de sequer olhar para a conta.
+ *  Uma SEMANA: dá tempo de sobra para quem teve uma falha de cartão regularizar o
+ *  pagamento antes de perder o acesso Pro (e, com ele, o escudo voltar ao grátis).
+ *  A Stripe ainda tenta cobrar várias vezes durante este período; só se nem assim
+ *  passar é que se rebaixa. Errar para o lado de dar mais dias custa cêntimos;
+ *  errar para o outro custa um cliente. */
+const FOLGA_DIAS = 7;
 interface Assinatura {
   id: string;
   status: string;
@@ -86,7 +92,7 @@ export async function GET(req: Request) {
   // devolver 200 como se estivesse tudo bem.
   try {
   const limite = new Date(Date.now() - FOLGA_DIAS * 24 * 60 * 60 * 1000).toISOString();
-  // Quem tem acesso na base de dados mas cuja data já passou há mais de dois dias.
+  // Quem tem acesso na base de dados mas cuja data já passou há mais de uma semana.
   const { data: candidatos, error: erroQuery } = await supabaseAdmin
   .from("users")
   .select("id, name, is_pro, is_pro_max, stripe_subscription_id, pro_expira_em")
@@ -132,6 +138,9 @@ export async function GET(req: Request) {
         }).eq("id", uid);
       await sincronizarLigasOficiais(uid);
       rebaixados++;
+      // Perdeu o Pro: o escudo volta à versão gratuita (elementos pagos trocados
+      // pelo equivalente grátis mais próximo). Best-effort, nunca parte a corrida.
+      try { await reverterEscudoParaGratis(uid); } catch { /* reversão é extra */ }
       try {
         await criarNotificacaoServidor({
             paraUserId: uid,
