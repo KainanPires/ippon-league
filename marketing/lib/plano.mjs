@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { hashCanonico, sha256Ficheiro } from "./canonico.mjs";
 import { verificarExemplos } from "./exemplos.mjs";
 import { verificarNarracao } from "./narracao.mjs";
+import { verificarFormato } from "./formatos.mjs";
 
 export const RAIZ_MARKETING = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -86,6 +87,8 @@ export function validarPlano(raiz, plano, idEsperado) {
   if (plano?.exemplos) erros.push(...verificarExemplos(plano, path.resolve(raiz, "..")));
   // Narração contínua e direção vocal (conhecimento/11-voz-e-narracao.md).
   erros.push(...verificarNarracao(plano).erros);
+  // Formatos de produção (conhecimento/12-formatos-kainan-apresenta.md).
+  erros.push(...verificarFormato(plano).erros);
   if (erros.length) throw new ErroPlano("plano inválido:\n - " + erros.join("\n - "));
 }
 

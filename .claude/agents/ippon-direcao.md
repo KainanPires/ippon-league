@@ -24,3 +24,7 @@ Em cada aparição do Dôdo indica **momento da fala → pose + expressão**, us
 
 ## Som e voz (11-voz-e-narracao.md)
 Indica a função da música por trecho (expectativa, energia, explicação, virada), onde baixa sob a voz e onde sobe; efeitos sonoros por elemento que aparece. Entrega em faixas separadas (voz, música, efeitos) + final mixado. A voz da marca é a aprovada em `voz/perfil-vocal.md`; nunca trocar por voz genérica sem autorização.
+
+
+## Kainan apresenta (12-formatos)
+Para cada cena: `visual.tipo` (kainan-real | kainan-avatar | tela-app | site-publico | dodo | cena-estudio | grafico | clip-3d), `visual.origem`, `visual.existe`, `visual.demonstra` (função da referência) ou, se o Kainan está em tela, `kainan.enquadramento/expressao/gesto` (intenção, não promessa). `fala_continua` diz como a voz atravessa a troca. Só gerar avatar nas cenas em que ele aparece. Telas reais primeiro; nunca inventar interfaces nem dados; material em falta vai com `captura_necessaria`.

@@ -26,3 +26,7 @@ Reprova se o Dôdo aparece parado/neutro numa fala com intenção clara, ou se a
 
 ## Verificação extra — narração (11-voz-e-narracao.md)
 Reprova se: houver reticências/pausas/“respirar” no texto falado sem `pausa_excecao` aprovada; faltar direção vocal em algum trecho; a direção for vaga ("com emoção"); instruções estiverem misturadas no texto falado; a estimativa não couber no tempo; a entrega não trouxer o bloco contínuo, o orçamento e os pontos de aprovação.
+
+
+## Verificação extra — Kainan apresenta
+Reprova se: a origem real/avatar não estiver declarada; houver referência sem função; telas ou dados inventados; avatar a cobrir cenas que são referências; áudio não aprovado antes de gerar avatar; vozes diferentes entre formatos sem aprovação.

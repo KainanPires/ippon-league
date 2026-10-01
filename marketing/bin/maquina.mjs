@@ -21,6 +21,7 @@ import { criarProvedorHiggsfield } from "../lib/provedores/higgsfield.mjs";
 import { criarProvedorSimulado } from "../lib/provedores/simulado.mjs";
 import { verificarConhecimento } from "../lib/conhecimento.mjs";
 import { verificarNarracao } from "../lib/narracao.mjs";
+import { verificarFormato } from "../lib/formatos.mjs";
 
 const RAIZ = RAIZ_MARKETING;
 const PASTA_CHAVE = path.join(os.homedir(), ".ippon-marketing");
@@ -104,6 +105,8 @@ async function main() {
       const vn = verificarNarracao(plano);
       if (vn.estimativa) console.log(`🎙️  narração: ${vn.estimativa.palavras} palavras ≈ ${vn.estimativa.segundos} s para ${vn.estimativa.disponivel} s (estimativa — validar ouvindo)`);
       for (const a of vn.avisos) console.log(`⚠️  ${a}`);
+      const vf = verificarFormato(plano);
+      if (plano.campanha.formato_producao === "kainan-apresenta") console.log(`🎬 Kainan em tela ${vf.kainan_s} s (avatar ${vf.avatar_s} s) · referências ${vf.referencias_s} s · materiais em falta: ${vf.materiais_em_falta.length}`);
       return;
     }
 

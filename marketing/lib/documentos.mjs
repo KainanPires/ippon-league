@@ -1,3 +1,4 @@
+import { verificarFormato } from "./formatos.mjs";
 import { verificarNarracao } from "./narracao.mjs";
 // marketing/lib/documentos.mjs
 //
@@ -35,6 +36,7 @@ export function roteiroMd(plano) {
   L.push("> Documento de planeamento. **Não autoriza nenhum gasto.**", "");
   L.push("| Campo | Valor |", "|---|---|");
   for (const [k, v] of [
+    ["Formato", c.formato_producao ? `${c.formato_producao} — ${c.formato_motivo ?? ""}` : undefined],
     ["Objetivo", c.objetivo], ["Público", c.publico], ["Dor / dúvida", c.dor], ["Ideia central", c.ideia_central], ["Ação esperada", c.acao_esperada], ["Promessa", c.promessa], ["Hipótese", c.hipotese],
     ["Formato / redes", lista(c.redes).join(", ")], ["Duração total", `${total} s`], ["Idioma", c.idioma],
     ["CTA", c.cta], ["Link UTM", c.link_utm],
@@ -46,6 +48,14 @@ export function roteiroMd(plano) {
     const tt = t.get(s.id);
     L.push(`### ${s.id} · ${mmss(tt.de)}–${mmss(tt.ate)} (${s.duracao_s} s)${s.funcao ? " · " + s.funcao : ""}`);
     L.push(`- **Origem:** ${s.origem ?? "—"}`);
+    if (s.visual) {
+      const v = s.visual;
+      L.push(`- **Em tela:** ${v.tipo}${v.demonstra ? " — demonstra: " + v.demonstra : ""}`);
+      L.push(`- **Material:** ${v.origem ?? "—"} · ${v.existe === false ? "❌ FALTA — capturar: " + (v.captura_necessaria ?? "?") : "✅ existe"}`);
+      if (s.kainan) L.push(`- **Kainan:** enquadramento ${s.kainan.enquadramento} · expressão ${s.kainan.expressao} · gesto ${s.kainan.gesto}`);
+      if (s.fala_continua) L.push(`- **Fala na troca de imagem:** ${s.fala_continua}`);
+      if (s.audio_trechos) L.push(`- **Trechos de áudio:** ${lista(s.audio_trechos).join(", ")}`);
+    }
     for (const [k, v] of [["Cenário", s.cenario], ["Personagens", lista(s.personagens).join(", ")], ["Ação", s.acao],
       ["Enquadramento", s.enquadramento], ["Câmara", s.camera]]) L.push(`- **${k}:** ${v ?? "—"}`);
     L.push(`- **Texto em ecrã:** ${lista(s.texto_ecra).map((x) => `"${x.texto}"${x.estilo ? ` (${x.estilo})` : ""}`).join(" · ") || "—"}`);
@@ -64,6 +74,11 @@ export function roteiroMd(plano) {
     L.push("## Mapa musical", "", "| De | Até | Faixa | Fonte / licença | Intensidade | Nota |", "|---|---|---|---|---|---|");
     for (const m of plano.musica) L.push(`| ${mmss(m.de_s)} | ${mmss(m.ate_s)} | ${m.faixa ?? "—"} | ${m.fonte ?? "—"} / ${m.licenca ?? "❓"} | ${m.intensidade ?? "—"} | ${m.nota ?? ""} |`);
     L.push("");
+  }
+  const vf = verificarFormato(plano);
+  if (c.formato_producao === "kainan-apresenta") {
+    L.push("## Kainan em tela × referências", "", `- Kainan em tela: **${vf.kainan_s} s** (avatar a gerar: **${vf.avatar_s} s**) · referências: **${vf.referencias_s} s**`);
+    L.push(vf.materiais_em_falta.length ? "- **Materiais em falta:**\n" + vf.materiais_em_falta.map((x) => "  - " + x).join("\n") : "- Todos os materiais existem.", "");
   }
   if (c.montagem) L.push("## Montagem", "", ...lista(c.montagem).map((x) => `- ${x}`), "");
   if (lista(plano.orcamento_ferramentas).length) {

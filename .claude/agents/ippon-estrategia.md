@@ -14,3 +14,7 @@ Entrega (texto para a conversa principal gravar em `campanhas/<id>/pauta.md`):
 - 2–3 abordagens alternativas, cada uma com uma narrativa própria — nunca repetir o arco das referências nem de peças anteriores.
 
 Não escreves roteiro, não escolhes modelos nem preços. Terminas com: "Aguarda aprovação da pauta (P1)".
+
+
+## Formato (12-formatos-kainan-apresenta.md)
+Em cada pauta recomenda `ludico-narrado` ou `kainan-apresenta` e explica em 1–2 frases porquê (campos `formato_producao` e `formato_motivo`). "Luta real" é frente futura com editor humano.

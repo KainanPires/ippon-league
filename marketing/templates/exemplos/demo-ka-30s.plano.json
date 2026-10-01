@@ -1,0 +1,502 @@
+{
+  "_estado": "EXEMPLO DEMONSTRATIVO — formato Kainan apresenta (01/10/2026). Nada gerado.",
+  "campanha": {
+    "id": "demo-ka-30s",
+    "versao": "1.0",
+    "titulo": "Kainan apresenta · Venceu e perdeu pontos? (30 s)",
+    "objetivo": "Explicar que os shidos acumulam e custam cada vez mais, e levar a montar o time",
+    "publico": "jogadores e fãs que escolhem atletas só por vencer",
+    "dor": "\"O meu atleta ganhou, porque é que pontuou mal?\"",
+    "ideia_central": "Shido acumula: −2, −3, −4 (−9 no hansoku-make); os do adversário dão +1, +2, +3",
+    "acao_esperada": "montar o time a pensar em quem luta limpo",
+    "redes": [
+      "Reels",
+      "TikTok",
+      "Shorts"
+    ],
+    "formato": "9:16, 1080×1920, 30 fps",
+    "idioma": "PT-BR",
+    "cta": "Monte seu time — link na bio",
+    "montagem": [
+      "Áudio aprovado primeiro; avatar só para c01, c04 e c06 (≈ 13 s)",
+      "A voz atravessa todos os cortes; o Kainan olha para o lado da referência no fim de c01 ('olha isto')",
+      "Cartões de shido (c03) do estúdio animado (custo zero), já em PT",
+      "Efeitos e música em faixas separadas; legendas sempre ligadas"
+    ],
+    "formato_producao": "kainan-apresenta",
+    "formato_motivo": "dúvida real da comunidade respondida pelo fundador; a tabela oficial do site e a tela do atleta tornam a regra verificável"
+  },
+  "factos": [
+    {
+      "texto": "Shido sofrido −2/−3/−4 (3 = −9, hansoku-make); provocado +1/+2/+3",
+      "fonte": "lib/ijf.ts scoreContestSide; lib/engine.ts",
+      "estado": "IMPLEMENTADO · VERIFICADO"
+    },
+    {
+      "texto": "Vencer por waza-ari com 2 shidos sofridos dá −1",
+      "fonte": "exemplos (validar)",
+      "estado": "VERIFICADO"
+    }
+  ],
+  "exemplos": [
+    {
+      "id": "c01 venceu e perdeu",
+      "cena": "c01",
+      "lutas": [
+        {
+          "resultado": "venceu por waza-ari; levou 2 shidos",
+          "eu": {
+            "waza": 1,
+            "shido": 2
+          },
+          "adv": {},
+          "pontos": -1
+        }
+      ],
+      "pontos": -1
+    },
+    {
+      "id": "c03 três shidos",
+      "cena": "c03",
+      "lutas": [
+        {
+          "eu": {
+            "shido": 3
+          },
+          "adv": {
+            "ippon": 0
+          },
+          "pontos": -9
+        }
+      ],
+      "pontos": -9
+    },
+    {
+      "id": "c04 shidos do rival",
+      "cena": "c04",
+      "lutas": [
+        {
+          "eu": {},
+          "adv": {
+            "shido": 3
+          },
+          "pontos": 6
+        }
+      ],
+      "pontos": 6
+    }
+  ],
+  "musica": [
+    {
+      "de_s": 0,
+      "ate_s": 30,
+      "faixa": "Trap japonês / taiko hip hop, 95–105 BPM, instrumental",
+      "fonte": "escolha do Kainan ou provisória da Máquina",
+      "licenca": "uso comercial",
+      "intensidade": "tensa → aberta → alta",
+      "nota": "função: tensão (c02–c03), virada (c04), energia no CTA"
+    }
+  ],
+  "audio": {
+    "narracao": {
+      "continua": true,
+      "voz": "voz aprovada do Kainan (clone ou gravação) — consistente com o formato A",
+      "idioma": "PT-BR",
+      "caminho": "gravacao-kainan | clone-texto",
+      "velocidade_alvo_wps": 2.7,
+      "tempo_disponivel_s": 29.5,
+      "trechos": [
+        {
+          "id": "T1",
+          "cenas": [
+            "c01"
+          ],
+          "texto": "O seu atleta venceu a luta e mesmo assim te tirou pontos?",
+          "intencao": "surpreender",
+          "energia": "alta: espanto real, voz projetada",
+          "ritmo": "ágil",
+          "velocidade": "rápida (~2,8 palavras/s)",
+          "enfase": [
+            "venceu",
+            "tirou pontos"
+          ],
+          "entonacao": "sobe em 'venceu', cai incrédula em 'tirou pontos?'",
+          "duracao_estimada_s": 4.3,
+          "edicao": "começa no quadro 0; nada de respiração antes"
+        },
+        {
+          "id": "T2",
+          "cenas": [
+            "c02"
+          ],
+          "texto": "Culpa dos shidos: na Ippon League, cada um custa mais que o anterior.",
+          "intencao": "explicar",
+          "energia": "média: tom de quem revela o motivo",
+          "ritmo": "contínuo",
+          "velocidade": "confortável (~2,6 palavras/s)",
+          "enfase": [
+            "shidos",
+            "cada um",
+            "mais"
+          ],
+          "entonacao": "'Culpa dos shidos' em tom de revelação; 'cada um custa mais' devagar e firme",
+          "duracao_estimada_s": 5.0,
+          "edicao": "emendar direto na resposta, sem silêncio depois da pergunta"
+        },
+        {
+          "id": "T3",
+          "cenas": [
+            "c03"
+          ],
+          "texto": "O primeiro tira dois, o segundo tira três, o terceiro tira quatro, e aí é hansoku-make: menos nove.",
+          "intencao": "alertar",
+          "energia": "média → alta: cada número mais pesado",
+          "ritmo": "crescente",
+          "velocidade": "rápida (~2,8 palavras/s)",
+          "enfase": [
+            "dois",
+            "três",
+            "quatro",
+            "menos nove"
+          ],
+          "entonacao": "cada número um degrau mais grave; 'menos nove' é o ponto mais pesado do vídeo",
+          "duracao_estimada_s": 6.8,
+          "edicao": "números colados aos cartões de shido; sem silêncio entre os números"
+        },
+        {
+          "id": "T4",
+          "cenas": [
+            "c04"
+          ],
+          "texto": "Mas quando é o adversário que leva, você ganha um, dois e três.",
+          "intencao": "virada/alívio",
+          "energia": "média → alta: a voz volta a sorrir",
+          "ritmo": "crescente",
+          "velocidade": "rápida (~2,8 palavras/s)",
+          "enfase": [
+            "adversário",
+            "ganha"
+          ],
+          "entonacao": "'Mas' muda o clima; 'um, dois e três' a subir",
+          "duracao_estimada_s": 4.6,
+          "edicao": "emendar logo a seguir a 'menos nove' (a música faz a virada)"
+        },
+        {
+          "id": "T5",
+          "cenas": [
+            "c05"
+          ],
+          "texto": "Então escolhe atleta que ataca e luta limpo.",
+          "intencao": "aconselhar",
+          "energia": "média: sensei calmo e firme",
+          "ritmo": "contínuo",
+          "velocidade": "confortável (~2,5 palavras/s)",
+          "enfase": [
+            "ataca",
+            "limpo"
+          ],
+          "entonacao": "descendente e segura, como conselho",
+          "duracao_estimada_s": 3.2,
+          "edicao": "sem respiração antes de 'Então'"
+        },
+        {
+          "id": "T6",
+          "cenas": [
+            "c06"
+          ],
+          "texto": "Monta o seu time agora, o link tá na bio!",
+          "intencao": "convidar",
+          "energia": "alta e calorosa",
+          "ritmo": "crescente",
+          "velocidade": "confortável (~2,6 palavras/s)",
+          "enfase": [
+            "agora",
+            "bio"
+          ],
+          "entonacao": "sobe até 'bio' e termina para cima",
+          "duracao_estimada_s": 3.4,
+          "edicao": "deixar 0,4 s de música depois da última palavra"
+        }
+      ],
+      "texto_completo": "O seu atleta venceu a luta e mesmo assim te tirou pontos? Culpa dos shidos: na Ippon League, cada um custa mais que o anterior. O primeiro tira dois, o segundo tira três, o terceiro tira quatro, e aí é hansoku-make: menos nove. Mas quando é o adversário que leva, você ganha um, dois e três. Então escolhe atleta que ataca e luta limpo. Monta o seu time agora, o link tá na bio!",
+      "pausa_excecao": []
+    }
+  },
+  "cenas": [
+    {
+      "id": "c01",
+      "duracao_s": 4.3,
+      "funcao": "GANCHO — Kainan pergunta",
+      "origem": "HeyGen Digital Twin (piloto por fazer)",
+      "cenario": "",
+      "personagens": [],
+      "acao": "",
+      "enquadramento": "plano próximo, olhar na lente",
+      "camera": "estática; zoom digital lento na montagem",
+      "texto_ecra": [
+        {
+          "texto": "VENCEU… E PERDEU PONTOS?",
+          "estilo": "Oswald, vermelho em 'PERDEU'"
+        }
+      ],
+      "narracao": "O seu atleta venceu a luta e mesmo assim te tirou pontos?",
+      "som": {
+        "musica": "entra com impacto",
+        "efeitos": [
+          "apito de fim de luta"
+        ]
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "corte seco",
+      "storyboard": "GANCHO — Kainan pergunta",
+      "visual": {
+        "tipo": "kainan-avatar",
+        "origem": "HeyGen Digital Twin (piloto por fazer)",
+        "existe": false,
+        "captura_necessaria": "gravação de treino do avatar + consentimento"
+      },
+      "fala_continua": "T1 inteiro em tela; termina a olhar para o lado onde a tabela vai entrar",
+      "audio_trechos": [
+        "T1"
+      ],
+      "kainan": {
+        "enquadramento": "plano próximo, olhar na lente",
+        "expressao": "espanto real, sobrancelhas levantadas",
+        "gesto": "mãos abertas, 'como assim?'"
+      }
+    },
+    {
+      "id": "c02",
+      "duracao_s": 5.0,
+      "funcao": "referência oficial: tabela de shidos",
+      "origem": "ipponleague.com/como-jogar — tabela de pontuação e caixas de shido",
+      "cenario": "",
+      "personagens": [],
+      "acao": "",
+      "enquadramento": "tela cheia 9:16",
+      "camera": "estática; zoom digital lento na montagem",
+      "texto_ecra": [
+        {
+          "texto": "REGRA OFICIAL",
+          "estilo": "etiqueta pequena"
+        }
+      ],
+      "narracao": "",
+      "som": {
+        "musica": "baixa e grave",
+        "efeitos": [
+          "cartão a cair"
+        ]
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "corte seco",
+      "storyboard": "referência oficial: tabela de shidos",
+      "visual": {
+        "tipo": "site-publico",
+        "origem": "ipponleague.com/como-jogar — tabela de pontuação e caixas de shido",
+        "existe": false,
+        "demonstra": "que a regra é oficial e está publicada: shido sofrido −2, −3, −4",
+        "captura_necessaria": "gravação de ecrã de /como-jogar (página pública) com zoom na tabela"
+      },
+      "fala_continua": "T2 corre sobre a tabela; zoom nas linhas de shido quando diz 'cada um custa mais'",
+      "audio_trechos": [
+        "T2"
+      ]
+    },
+    {
+      "id": "c03",
+      "duracao_s": 6.8,
+      "funcao": "demonstração: escada de shidos",
+      "origem": "estúdio animado (cartões −2, −3, −4, −9 e Dôdo), versão PT",
+      "cenario": "",
+      "personagens": [],
+      "acao": "",
+      "enquadramento": "tela cheia 9:16",
+      "camera": "estática; zoom digital lento na montagem",
+      "texto_ecra": [
+        {
+          "texto": "−2 · −3 · −4 = −9",
+          "estilo": "Oswald vermelho"
+        }
+      ],
+      "narracao": "",
+      "som": {
+        "musica": "tensão crescente",
+        "efeitos": [
+          "impacto por cartão",
+          "grave no −9"
+        ]
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "corte seco",
+      "storyboard": "demonstração: escada de shidos",
+      "visual": {
+        "tipo": "cena-estudio",
+        "origem": "estúdio animado (cartões −2, −3, −4, −9 e Dôdo), versão PT",
+        "existe": false,
+        "demonstra": "o custo crescente até ao hansoku-make (−9)",
+        "captura_necessaria": "renderizar a cena c07 do como-pontuar em PT (custo zero)"
+      },
+      "fala_continua": "T3 inteiro sobre a animação; cada número bate com um cartão",
+      "audio_trechos": [
+        "T3"
+      ]
+    },
+    {
+      "id": "c04",
+      "duracao_s": 4.6,
+      "funcao": "virada — Kainan alivia",
+      "origem": "HeyGen Digital Twin (piloto por fazer)",
+      "cenario": "",
+      "personagens": [],
+      "acao": "",
+      "enquadramento": "plano médio",
+      "camera": "estática; zoom digital lento na montagem",
+      "texto_ecra": [
+        {
+          "texto": "SHIDOS DO ADVERSÁRIO: +1 · +2 · +3",
+          "estilo": "Oswald verde"
+        }
+      ],
+      "narracao": "Mas quando é o adversário que leva, você ganha um, dois e três.",
+      "som": {
+        "musica": "abre e sobe",
+        "efeitos": [
+          "chime ascendente ×3"
+        ]
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "corte seco",
+      "storyboard": "virada — Kainan alivia",
+      "visual": {
+        "tipo": "kainan-avatar",
+        "origem": "HeyGen Digital Twin (piloto por fazer)",
+        "existe": false,
+        "captura_necessaria": "mesmo avatar"
+      },
+      "fala_continua": "Kainan volta em 'Mas'; a voz já vinha a subir desde o −9",
+      "audio_trechos": [
+        "T4"
+      ],
+      "kainan": {
+        "enquadramento": "plano médio",
+        "expressao": "alívio, sorriso",
+        "gesto": "conta 1, 2, 3 com os dedos"
+      }
+    },
+    {
+      "id": "c05",
+      "duracao_s": 3.2,
+      "funcao": "tela real: atleta que ataca",
+      "origem": "app — popup do atleta no ranking com as ações (ippons, waza-aris, shidos)",
+      "cenario": "",
+      "personagens": [],
+      "acao": "",
+      "enquadramento": "tela cheia 9:16",
+      "camera": "estática; zoom digital lento na montagem",
+      "texto_ecra": [
+        {
+          "texto": "ESCOLHA QUEM ATACA E LUTA LIMPO",
+          "estilo": "Oswald dourado"
+        }
+      ],
+      "narracao": "",
+      "som": {
+        "musica": "firme",
+        "efeitos": [
+          "check"
+        ]
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "corte seco",
+      "storyboard": "tela real: atleta que ataca",
+      "visual": {
+        "tipo": "tela-app",
+        "origem": "app — popup do atleta no ranking com as ações (ippons, waza-aris, shidos)",
+        "existe": false,
+        "demonstra": "onde o jogador vê quem ataca e quem leva shidos antes de escolher",
+        "captura_necessaria": "gravação de ecrã do popup de ações de um atleta (dados reais do ranking; sem foto do atleta)"
+      },
+      "fala_continua": "T5 sobre a tela; destaque nas ações ofensivas",
+      "audio_trechos": [
+        "T5"
+      ]
+    },
+    {
+      "id": "c06",
+      "duracao_s": 6.1,
+      "funcao": "CTA — Kainan convida",
+      "origem": "HeyGen Digital Twin (piloto por fazer)",
+      "cenario": "",
+      "personagens": [],
+      "acao": "",
+      "enquadramento": "plano médio",
+      "camera": "estática; zoom digital lento na montagem",
+      "texto_ecra": [
+        {
+          "texto": "MONTE SEU TIME · LINK NA BIO",
+          "estilo": "botão dourado"
+        }
+      ],
+      "narracao": "Monta o seu time agora, o link tá na bio!",
+      "som": {
+        "musica": "sobe e fecha com impacto",
+        "efeitos": [
+          "botão pop",
+          "impacto final"
+        ]
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "corte seco",
+      "storyboard": "CTA — Kainan convida",
+      "visual": {
+        "tipo": "kainan-avatar",
+        "origem": "HeyGen Digital Twin (piloto por fazer)",
+        "existe": false,
+        "captura_necessaria": "mesmo avatar"
+      },
+      "fala_continua": "Kainan volta em 'Monta'; botão por cima nos 2 s finais",
+      "audio_trechos": [
+        "T6"
+      ],
+      "kainan": {
+        "enquadramento": "plano médio",
+        "expressao": "sorriso aberto",
+        "gesto": "aponta para a câmera, depois polegar"
+      }
+    }
+  ],
+  "orcamento_ferramentas": [
+    {
+      "ferramenta": "Áudio",
+      "o_que": "narração 74 palavras (gravação = 0; clone ≈ 1,5 cr Higgsfield ou caracteres ElevenLabs)",
+      "quantidade": 1,
+      "creditos_estimados": "0–1,5",
+      "tentativas_reserva": 1,
+      "fonte_preco": "11-voz; confirmar na data"
+    },
+    {
+      "ferramenta": "HeyGen Avatar IV",
+      "o_que": "só c01 + c04 + c06 ≈ 15 s de avatar",
+      "quantidade": 1,
+      "creditos_estimados": "≈ 5 créditos premium (20/min)",
+      "tentativas_reserva": 1,
+      "fonte_preco": "fonte secundária 22/09/2026 — confirmar na conta"
+    },
+    {
+      "ferramenta": "Captura de telas + estúdio + montagem + som",
+      "o_que": "c02, c03, c05, legendas, efeitos, mistura",
+      "quantidade": 1,
+      "creditos_estimados": 0,
+      "tentativas_reserva": 0,
+      "fonte_preco": "custo zero"
+    }
+  ],
+  "pontos_aprovacao": [
+    "formato e motivo",
+    "texto e direção vocal",
+    "Kainan real ou avatar em c01/c04/c06",
+    "telas a capturar",
+    "gasto: áudio + ≈ 15 s de avatar + 1 tentativa"
+  ]
+}

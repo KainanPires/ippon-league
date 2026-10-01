@@ -61,3 +61,21 @@ test("texto que não cabe no tempo é erro", () => { const p = base(); p.cenas[0
 test("bloco contínuo tem de bater com os trechos", () => { const p = base(); p.audio.narracao.texto_completo = "outra coisa"; assert.match(verificarNarracao(p).erros.join(), /não coincide/); });
 test("plano antigo (sem continua) não é afetado", () => { assert.deepEqual(verificarNarracao({ cenas: [{ id: "c01", narracao: "a… b" }] }).erros, []); });
 test("contagem de palavras com acentos e hífens", () => { assert.equal(contarPalavras("Waza-ari, yuko e ippon: dezesseis!"), 5); });
+
+import { verificarFormato } from "../lib/formatos.mjs";
+const ka = () => ({ campanha: { formato_producao: "kainan-apresenta", formato_motivo: "confiança do fundador" },
+  audio: { narracao: { continua: true, trechos: [{ id: "T1" }, { id: "T2" }] } },
+  cenas: [
+    { id: "k1", duracao_s: 4, visual: { tipo: "kainan-avatar", origem: "HeyGen" }, kainan: { enquadramento: "plano médio", expressao: "sorriso", gesto: "aponta" }, fala_continua: "abre", audio_trechos: ["T1"] },
+    { id: "k2", duracao_s: 5, visual: { tipo: "tela-app", origem: "/criar-equipa", demonstra: "100 JC e 8 vagas", existe: false, captura_necessaria: "gravação de ecrã de /criar-equipa" }, fala_continua: "T2 continua sobre a tela", audio_trechos: ["T2"] }] });
+test("kainan-apresenta válido soma segundos e lista materiais em falta", () => {
+  const r = verificarFormato(ka()); assert.deepEqual(r.erros, []); assert.equal(r.avatar_s, 4); assert.equal(r.referencias_s, 5); assert.equal(r.materiais_em_falta.length, 1);
+});
+test("referência sem função e Kainan sem direção são erros", () => {
+  const p = ka(); delete p.cenas[1].visual.demonstra; delete p.cenas[0].kainan.gesto;
+  const e = verificarFormato(p).erros.join(" | "); assert.match(e, /demonstra/); assert.match(e, /gesto/);
+});
+test("formato desconhecido e plano antigo", () => {
+  assert.match(verificarFormato({ campanha: { formato_producao: "x" } }).erros.join(), /inválido/);
+  assert.deepEqual(verificarFormato({ campanha: {} }).erros, []);
+});

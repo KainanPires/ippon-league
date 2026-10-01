@@ -26,6 +26,7 @@ Cada correção do Kainan entra aqui, datada, com a regra resultante. Só regras
 - 2026-09-30 · **Permanente:** o vídeo entrega-se **já com todo o som**: efeitos sonoros em cada elemento que aparece e música de fundo, mixados com a voz. A Máquina vai buscar o que gerou no Higgsfield, monta o vídeo completo e entrega o MP4 final. A música pode ser escolhida pelo Kainan (a Máquina põe uma provisória).
 - 2026-09-30 · Pendente: melhorar a exportação para PowerPoint (o carrossel em imagens ficou muito bom; o .pptx não).
 - 2026-10-01 · **Permanente:** módulo de voz aprovado (`11-voz-e-narracao.md`). Supera as notas anteriores sobre narração. A voz da marca passa a ser construída sobre a voz real do Kainan.
+- 2026-10-01 · **Permanente:** dois formatos prioritários — lúdico narrado e Kainan apresenta (`12-formatos-kainan-apresenta.md`). A origem do Kainan (real/avatar) é sempre declarada.
 
 ## Registo de resultados por peça
 `marketing/campanhas/registro-resultados.csv` — colunas: data_publicacao, campanha, versao, rede, formato, angulo, utm_campaign, utm_content, duracao_s, idioma, creditos_gastos, views, conclusao_pct, saves, partilhas, cliques, registos, equipas_montadas, pro_iniciados, notas.
