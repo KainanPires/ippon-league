@@ -435,6 +435,20 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Le paiement n'est pas passé. Tu gardes l'accès et nous réessaierons dans les prochains jours — si ta carte a changé, mets-la à jour dans ton profil. Si ce n'est pas réglé et que tu perds le Pro, tes points dans les ligues Mondiale et Continentale sont remis à zéro et tu sors de la Copa do Dôdo.",
     de: "Die Zahlung ging nicht durch. Du behältst den Zugang und wir versuchen es in den nächsten Tagen erneut — falls sich deine Karte geändert hat, aktualisiere sie im Profil. Wird es nicht gelöst und verlierst du Pro, werden deine Punkte in der Welt- und Kontinentalliga auf null gesetzt und du verlässt die Copa do Dôdo.",
   },
+  "escudo.revertidoTitulo": {
+    pt: "O teu escudo voltou à versão gratuita",
+    en: "Your crest is back to the free version",
+    es: "Tu escudo volvió a la versión gratuita",
+    fr: "Ton blason est revenu à la version gratuite",
+    de: "Dein Wappen ist wieder in der Gratis-Version",
+  },
+  "escudo.revertidoCorpo": {
+    pt: "Como o Ippon Pro terminou, as formas, estampas, símbolos e cores exclusivos do teu escudo foram trocados pelos equivalentes gratuitos mais próximos. Volta ao Pro para personalizares o escudo à vontade outra vez.",
+    en: "Since Ippon Pro has ended, the exclusive shapes, patterns, symbols and colours of your crest were swapped for the nearest free equivalents. Go Pro again to fully customise your crest.",
+    es: "Como Ippon Pro terminó, las formas, estampados, símbolos y colores exclusivos de tu escudo se cambiaron por los equivalentes gratuitos más cercanos. Vuelve a Pro para personalizar tu escudo a tu gusto otra vez.",
+    fr: "Comme Ippon Pro a pris fin, les formes, motifs, symboles et couleurs exclusifs de ton blason ont été remplacés par les équivalents gratuits les plus proches. Repasse Pro pour personnaliser ton blason à volonté.",
+    de: "Da Ippon Pro beendet ist, wurden die exklusiven Formen, Muster, Symbole und Farben deines Wappens durch die nächstgelegenen Gratis-Varianten ersetzt. Werde wieder Pro, um dein Wappen frei zu gestalten.",
+  },
   "dodo.conviteTitulo": {
     pt: "🏆 Faltam {dias} dias para a {numero}ª Copa do Dôdo",
     en: "🏆 {dias} days left for the Copa do Dôdo #{numero}",
