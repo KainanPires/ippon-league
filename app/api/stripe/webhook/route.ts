@@ -69,6 +69,7 @@ import { nivelDoPreco, stripeFetch, verificarAssinatura, fimDoPeriodo, PRECOS, t
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { sincronizarLigasOficiais } from "@/lib/ligasOficiais";
 import { reverterEscudoParaGratis } from "@/lib/escudoServidor";
+import { resolverLigasAoPerderPro } from "@/lib/sucessaoLigas";
 import { creditarJudocoins, estornarJudocoinsPorPaymentIntent } from "@/lib/carteira";
 import { trackServer } from "@/lib/analytics.server";
 export const dynamic = "force-dynamic";
@@ -156,6 +157,9 @@ async function aplicarSubscricao(sub: Assinatura): Promise<void> {
   // o escudo é irreversível, por isso só no fim mesmo. Best-effort.
   if (sub.status === "canceled") {
     try { await reverterEscudoParaGratis(uid); } catch { /* reversão é extra */ }
+    // Ligas de amigos em excesso que ele administra: passa o bastão a um membro
+    // Pro ou, sem Pro, encerra a liga. Best-effort, nunca parte o webhook.
+    try { await resolverLigasAoPerderPro(uid); } catch { /* sucessão é extra */ }
   }
 }
 export async function POST(req: Request) {
