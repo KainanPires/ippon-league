@@ -1,42 +1,11 @@
 "use client";
 
 import { uid } from "@/lib/team";
-
-export type ShapeId = "classic" | "round" | "circle" | "hex" | "diamond";
-export type PatternId = "solido" | "listras-v" | "listras-h" | "xadrez" | "cruz" | "diagonal" | "metade";
-export type SymbolId = "none" | "estrela" | "montanha" | "torii" | "chama" | "raio" | "punho" | "faixa" | "kimono" | "ippon" | "sol-nascente" | "fuji" | "sakura" | "saudacao" | "dragao" | "trofeu" | "taca" | "medalha" | "bandeirola" | "flamula" | "mundo" | "mapa-americas" | "mapa-europa" | "mapa-africa" | "mapa-asia" | "mapa-oceania";
-
-export type Identity = {
-  name: string;
-  shape: ShapeId;
-  pattern: PatternId;
-  bg1: string;
-  bg2: string;
-  stamp1: string;
-  stamp2: string;
-  border: string;     // borda do FUNDO (contorno da forma)
-  symbol: SymbolId;
-  // Cores do ÍCONE — opcionais para retrocompatibilidade. Escudos antigos sem
-  // estes campos desenham-se como antes: o ícone usa a cor da borda do fundo e
-  // não tem contorno próprio. Os novos (e os editados) ganham cor e contorno
-  // próprios, separados da borda do fundo.
-  icon?: string;        // cor de preenchimento do ícone
-  iconBorder?: string;  // contorno do ícone ("" / ausente = sem contorno)
-};
-
-export const DEFAULT_IDENTITY: Identity = {
-  name: "A minha equipa",
-  shape: "classic",
-  pattern: "solido",
-  bg1: "#1c3a2e",
-  bg2: "#2a4d3e",
-  stamp1: "#d9a441",
-  stamp2: "#efeadd",
-  border: "#d9a441",
-  symbol: "estrela",
-  icon: "#d9a441",      // cor do ícone (igual à antiga, para não mudar o aspeto base)
-  iconBorder: "#141110", // contorno escuro tipo autocolante (destaca o ícone)
-};
+// FONTE ÚNICA dos dados do escudo em lib/escudoDados (módulo puro, usável no
+// servidor). Aqui re-exporta-se tudo, para que `@/components/Escudo` continue a
+// servir os tipos, listas e helpers a quem já os importava daqui.
+import { DEFAULT_IDENTITY, type Identity, type ShapeId, type PatternId, type SymbolId } from "@/lib/escudoDados";
+export * from "@/lib/escudoDados";
 
 // Chave da identidade, ISOLADA POR CONTA: "ippon_identity__<uid>".
 // Assim o nome/escudo de uma conta não aparece noutra no mesmo browser.
@@ -58,67 +27,9 @@ export function saveIdentity(id: Identity) {
   try { localStorage.setItem(identityKey(), JSON.stringify(id)); } catch {}
 }
 
-export const SHAPES: ShapeId[] = ["classic", "round", "circle", "hex", "diamond"];
-export const PATTERNS: { id: PatternId; label: string }[] = [
-  { id: "solido", label: "Sólido" },
-  { id: "listras-v", label: "Riscas" },
-  { id: "listras-h", label: "Faixas" },
-  { id: "xadrez", label: "Xadrez" },
-  { id: "cruz", label: "Cruz" },
-  { id: "diagonal", label: "Diagonal" },
-  { id: "metade", label: "Metade" },
-];
-export const SYMBOLS: { id: SymbolId; label: string }[] = [
-  { id: "none", label: "Nenhum" },
-  { id: "estrela", label: "Estrela" },
-  { id: "montanha", label: "Montanha" },
-  { id: "torii", label: "Torii" },
-  { id: "chama", label: "Chama" },
-  { id: "raio", label: "Raio" },
-  { id: "punho", label: "Punho" },
-  { id: "faixa", label: "Faixa" },
-  { id: "kimono", label: "Kimono" },
-  { id: "ippon", label: "Ippon" },
-  { id: "sol-nascente", label: "Sol nascente" },
-  { id: "fuji", label: "Fuji" },
-  { id: "sakura", label: "Sakura" },
-  { id: "saudacao", label: "Saudação" },
-  { id: "dragao", label: "Dragão" },
-];
-export const LEAGUE_SYMBOLS: { id: SymbolId; label: string }[] = [
-  { id: "trofeu", label: "Troféu" },
-  { id: "taca", label: "Taça" },
-  { id: "medalha", label: "Medalha" },
-  { id: "bandeirola", label: "Bandeirola" },
-  { id: "flamula", label: "Flâmula" },
-  { id: "none", label: "Nenhum" },
-];
-export const COLORS: string[] = [
-  "#1c3a2e", "#2a4d3e", "#d9a441", "#2f6fb3", "#c0392b",
-  "#7a4fa3", "#141110", "#efeadd", "#2a9d8f", "#e67e22", "#c9b037", "#3f8f5a",
-];
-
-// ---------------------------------------------------------------------------
-// GRÁTIS vs. PRO — a personalização do escudo é uma vantagem do Ippon Pro.
-// Esta é a FONTE ÚNICA do que é grátis; o construtor (app/escudo) lê isto para
-// pôr cadeados e bloquear a seleção a quem não é Pro. É cosmético, por isso a
-// tranca é no frontend. Escudos já gravados com opções Pro continuam a
-// desenhar-se na mesma — a tranca é só para NOVAS escolhas de quem não é Pro.
-// Para mudar o que é grátis, edita só estas quatro listas.
-//
-// NOTA: as cores por defeito do escudo (DEFAULT_IDENTITY) têm de estar todas em
-// FREE_COLORS, senão um utilizador grátis começaria com um escudo "trancado".
-// ---------------------------------------------------------------------------
-export const FREE_SHAPES: ShapeId[] = ["classic", "round"];
-export const FREE_PATTERNS: PatternId[] = ["solido", "metade", "listras-v"];
-export const FREE_SYMBOLS: SymbolId[] = ["none", "estrela", "kimono", "faixa", "ippon"];
-export const FREE_COLORS: string[] = ["#1c3a2e", "#2a4d3e", "#d9a441", "#efeadd", "#141110", "#c0392b"];
-
-const normCor = (c: string) => (c || "").trim().toLowerCase();
-export function shapeIsFree(s: ShapeId): boolean { return FREE_SHAPES.includes(s); }
-export function patternIsFree(p: PatternId): boolean { return FREE_PATTERNS.includes(p); }
-export function symbolIsFree(s: SymbolId): boolean { return FREE_SYMBOLS.includes(s); }
-export function colorIsFree(c: string): boolean { return FREE_COLORS.some((f) => normCor(f) === normCor(c)); }
+// As listas (SHAPES, PATTERNS, SYMBOLS, LEAGUE_SYMBOLS, COLORS), as listas do
+// que é grátis (FREE_*) e os helpers (shapeIsFree, colorIsFree, etc.) vivem agora
+// em lib/escudoDados e são re-exportados no topo deste ficheiro (export *).
 
 function shapeNode(shape: ShapeId, props: Record<string, unknown>) {
   switch (shape) {
