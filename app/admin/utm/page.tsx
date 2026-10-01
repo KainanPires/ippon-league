@@ -4,6 +4,13 @@
 //
 // Painel de admin (so admin): construtor de links UTM + "de onde vem".
 // A verdadeira barreira e no servidor; aqui so escondemos a UI.
+//
+// CONVENCAO (decidida com o Kainan, 01/10/2026): SEGMENTAR SEMPRE A ACAO.
+//   utm_source = <acao>-<rede>   (ex.: bio-ig, story-ig, dm-ig, ads-tiktok, bio-yt)
+//   utm_content = assunto/criativo (ex.: apresentacao-app, favoritos)  [opcional]
+//   utm_campaign = fase atual (agora: lancamento)
+//   destino = sempre /criar-equipa
+// Assim, em "Por fonte", cada linha e uma ACAO por rede e da para ver qual rende mais.
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -14,8 +21,24 @@ const CARTAO = "#1e1a17";
 const BORDA = "#2c2622";
 const BASE = "https://www.ipponleague.com";
 
-const FONTES = ["instagram", "tiktok", "youtube", "x", "facebook", "whatsapp", "google", "blog", "email", "push", "influenciador", "atleta", "federacao", "clube", "outro"];
-const MEIOS = ["social", "video", "story", "bio", "post", "ads", "dm", "referral", "email", "push", "organico"];
+// Acao = O QUE voce fez. Rede = ONDE. Juntas formam o utm_source (bio-ig, etc.).
+const ACOES: { v: string; r: string }[] = [
+  { v: "bio", r: "Bio (link fixo do perfil)" },
+  { v: "story", r: "Story" },
+  { v: "post", r: "Post / conteudo do feed" },
+  { v: "reels", r: "Reels / video curto" },
+  { v: "dm", r: "Inbox / DM (automacao)" },
+  { v: "ads", r: "Trafego pago" },
+  { v: "perfil", r: "Perfil (generico)" },
+];
+const REDES: { v: string; r: string }[] = [
+  { v: "ig", r: "Instagram" },
+  { v: "tiktok", r: "TikTok" },
+  { v: "yt", r: "YouTube" },
+  { v: "x", r: "X (Twitter)" },
+  { v: "wpp", r: "WhatsApp" },
+  { v: "", r: "(sem rede especifica)" },
+];
 
 interface Item { chave: string; registos: number; ativaram: number; pro: number }
 interface Aquisicao {
@@ -33,24 +56,33 @@ interface Aquisicao {
 }
 
 // minusculas + so letras/numeros, palavras separadas por hifen (convencao para
-// dados limpos). Acentos/espacos/simbolos viram hifen -- os utm tags devem ser
-// simples de qualquer forma.
+// dados limpos). Acentos/espacos/simbolos viram hifen.
 function limpa(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
 export default function UtmPage() {
   const [acesso, setAcesso] = useState<"..." | "sim" | "nao">("...");
-  const [fonte, setFonte] = useState("instagram");
-  const [meio, setMeio] = useState("social");
-  const [campanha, setCampanha] = useState("copa-dodo-1");
+
+  // Construtor: acao + rede montam a fonte; o campo da fonte fica editavel
+  // (para casos especiais como nome de atleta, ou -dodo no fim).
+  const [acao, setAcao] = useState("bio");
+  const [rede, setRede] = useState("ig");
+  const [fonte, setFonte] = useState("bio-ig");
+  const [campanha, setCampanha] = useState("lancamento");
   const [conteudo, setConteudo] = useState("");
-  const [destino, setDestino] = useState("/");
+  const [destino, setDestino] = useState("/criar-equipa");
   const [copiado, setCopiado] = useState(false);
 
   const [dias, setDias] = useState(30);
   const [aq, setAq] = useState<Aquisicao | null>(null);
   const [aCarregar, setACarregar] = useState(false);
+
+  // Quando acao/rede mudam, recompoe a fonte sugerida (acao-rede).
+  useEffect(() => {
+    const sugestao = limpa(acao) + (rede ? `-${limpa(rede)}` : "");
+    setFonte(sugestao);
+  }, [acao, rede]);
 
   const token = useCallback(async (): Promise<string> => {
     const { data } = await supabase.auth.getSession();
@@ -89,16 +121,18 @@ export default function UtmPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acesso]);
 
+  // O utm_medium acompanha a acao (decorativo; o painel nao le o medium, mas
+  // deixa o link arrumado para outras ferramentas, como o Meta/GA).
   const link = useMemo(() => {
     const path = destino.startsWith("/") ? destino : `/${destino}`;
     const p = new URLSearchParams();
     if (fonte) p.set("utm_source", limpa(fonte));
-    if (meio) p.set("utm_medium", limpa(meio));
+    if (acao) p.set("utm_medium", limpa(acao));
     if (campanha) p.set("utm_campaign", limpa(campanha));
     if (conteudo) p.set("utm_content", limpa(conteudo));
     const qs = p.toString();
     return `${BASE}${path === "/" ? "/" : path}${qs ? `?${qs}` : ""}`;
-  }, [fonte, meio, campanha, conteudo, destino]);
+  }, [fonte, acao, campanha, conteudo, destino]);
 
   async function copiar() {
     try { await navigator.clipboard.writeText(link); setCopiado(true); setTimeout(() => setCopiado(false), 1500); } catch { /* sem clipboard */ }
@@ -113,33 +147,38 @@ export default function UtmPage() {
     <Moldura>
       <h1 style={{ color: GOLD, fontSize: 22, margin: "0 0 4px" }}>Links de marketing (UTM)</h1>
       <p style={{ color: "#c8c0b8", marginTop: 0, fontSize: 14, lineHeight: 1.5 }}>
-        Cria um link etiquetado por cada acao de marketing. Quando alguem cria conta a partir dele, a app
-        grava de onde veio -- e depois ves aqui em baixo quantas contas vieram de cada fonte/campanha.
+        Cada link marca uma <b>acao</b> (bio, story, dm, trafego pago...) numa <b>rede</b>. Quando alguem cria
+        conta por ele, a app grava de onde veio, e la em baixo ves qual acao trouxe mais gente.
       </p>
 
       {/* ---- Construtor ---- */}
       <div style={caixa}>
         <div style={titulo}>Construtor de links</div>
         <div style={{ display: "grid", gap: 12 }}>
-          <Campo rot="Canal (utm_source)">
-            <select value={fonte} onChange={(e) => setFonte(e.target.value)} style={input}>
-              {FONTES.map((f) => <option key={f} value={f}>{f}</option>)}
+          <Campo rot="Acao (o que voce fez)">
+            <select value={acao} onChange={(e) => setAcao(e.target.value)} style={input}>
+              {ACOES.map((a) => <option key={a.v} value={a.v}>{a.r}</option>)}
             </select>
           </Campo>
-          <Campo rot="Meio (utm_medium)">
-            <select value={meio} onChange={(e) => setMeio(e.target.value)} style={input}>
-              {MEIOS.map((m) => <option key={m} value={m}>{m}</option>)}
+          <Campo rot="Rede (onde)">
+            <select value={rede} onChange={(e) => setRede(e.target.value)} style={input}>
+              {REDES.map((r) => <option key={r.v} value={r.v}>{r.r}</option>)}
             </select>
           </Campo>
-          <Campo rot="Campanha (utm_campaign) -- ex.: copa-dodo-1, lancamento">
-            <input value={campanha} onChange={(e) => setCampanha(e.target.value)} style={input} />
+          <Campo rot="Fonte final (utm_source) -- editavel: p/ atleta use o nome, p/ Dodo acrescente -dodo">
+            <input value={fonte} onChange={(e) => setFonte(e.target.value)} style={input} />
           </Campo>
-          <Campo rot="Mensagem/formato (utm_content) -- ex.: video-explica, dica-1">
+          <Campo rot="Assunto/criativo (utm_content) -- ex.: apresentacao-app, favoritos (opcional)">
             <input value={conteudo} onChange={(e) => setConteudo(e.target.value)} style={input} />
+          </Campo>
+          <Campo rot="Campanha (utm_campaign) -- a fase atual">
+            <input value={campanha} onChange={(e) => setCampanha(e.target.value)} style={input} />
           </Campo>
           <Campo rot="Destino (para onde o link leva)">
             <select value={destino} onChange={(e) => setDestino(e.target.value)} style={input}>
-              <option value="/">Inicio (/)</option>
+              <option value="/criar-equipa">Montar equipa (/criar-equipa)</option>
+              <option value="/inicio">Inicio / entrada suave (/inicio)</option>
+              <option value="/">Raiz (/)</option>
               <option value="/dodo">Copa do Dodo (/dodo)</option>
               <option value="/comecar">Comecar (/comecar)</option>
               <option value="/ippon-pro">Ippon Pro (/ippon-pro)</option>
@@ -154,10 +193,26 @@ export default function UtmPage() {
           {copiado ? "Copiado!" : "Copiar link"}
         </button>
         <p style={{ fontSize: 11.5, color: "#8b8079", marginTop: 10, lineHeight: 1.5 }}>
-          Convencao (para os dados nao virem sujos): tudo em minusculas, sem acentos nem espacos, palavras
-          separadas por hifen. O construtor ja limpa isso por ti. Usa o mesmo <b>utm_campaign</b> para a mesma
-          campanha em todas as redes, e muda o <b>utm_source</b> por rede e o <b>utm_content</b> por mensagem.
+          Regra: a <b>acao</b> + a <b>rede</b> montam a fonte (ex.: <b>bio-ig</b>, <b>story-ig</b>, <b>dm-ig</b>, <b>ads-tiktok</b>).
+          O mesmo <b>utm_campaign</b> para a mesma fase (agora: <b>lancamento</b>). O <b>utm_content</b> so para separar o assunto do criativo.
+          Tudo em minusculas, sem acentos nem espacos (o construtor ja limpa).
         </p>
+      </div>
+
+      {/* ---- Legenda ---- */}
+      <div style={{ ...caixa, marginTop: 18 }}>
+        <div style={titulo}>Como ler o relatorio</div>
+        <div style={{ display: "grid", gap: 8, fontSize: 12.5, color: "#c8c0b8", lineHeight: 1.5 }}>
+          <Leg termo="Registos (R)" txt="Contas criadas no periodo." />
+          <Leg termo="Ativaram (A)" txt="Dessas, quantas montaram equipa. A % e sobre os registos daquela origem." />
+          <Leg termo="Pro (P)" txt="Dessas, quantas viraram Pro." />
+          <Leg termo="Diretas" txt="Chegaram SEM etiqueta: sem link UTM e sem site de origem. Inclui quem digitou o endereco, quem abriu pelo icone no telemovel, E boa parte do trafego de redes sociais/WhatsApp (o navegador interno delas apaga o rastro). Diretas alto normalmente e social sem etiqueta. Por isso usa-se sempre links UTM." />
+          <Leg termo="Indicacao" txt="Vieram por convite de amigo (sistema de indicacao interno)." />
+          <Leg termo="(referrer) ..." txt="Vieram de um site externo que linkou, mas sem UTM." />
+          <Leg termo="Por fonte" txt="Agrupa por acao-rede (bio-ig, story-ig, ads-ig...). E aqui que ves qual ACAO rende mais." />
+          <Leg termo="Por mensagem" txt="Quebra a fonte pelo assunto do criativo (fonte / utm_content)." />
+          <Leg termo="Canal declarado" txt="O que a pessoa respondeu no 'Como nos conheceste?' ao criar a conta." />
+        </div>
       </div>
 
       {/* ---- De onde vem ---- */}
@@ -194,7 +249,7 @@ export default function UtmPage() {
             <p style={{ fontSize: 11, color: "#8b8079", margin: "0 0 4px", lineHeight: 1.5 }}>
               Cada linha: <b style={{ color: "#efeadd" }}>R</b> registos &rarr; <b style={{ color: "#8bd4b0" }}>A</b> ativaram (montaram equipa) &rarr; <b style={{ color: GOLD }}>P</b> pro. A % e sobre os registos dessa origem.
             </p>
-            <Tabela titulo="Por fonte (utm_source)" itens={aq.porFonte || []} />
+            <Tabela titulo="Por fonte (acao-rede)" itens={aq.porFonte || []} />
             <Tabela titulo="Por campanha (utm_campaign)" itens={aq.porCampanha || []} />
             <Tabela titulo="Por fonte + campanha" itens={aq.porFonteCampanha || []} />
             <Tabela titulo="Por mensagem (fonte + utm_content)" itens={aq.porConteudo || []} />
@@ -253,6 +308,13 @@ function Stat({ rot, val, sub }: { rot: string; val: string; sub?: string }) {
         {val}{sub ? <span style={{ fontSize: 12, color: "#8b8079", fontWeight: 400 }}> {sub}</span> : null}
       </div>
       <div style={{ fontSize: 11, color: "#8b8079" }}>{rot}</div>
+    </div>
+  );
+}
+function Leg({ termo, txt }: { termo: string; txt: string }) {
+  return (
+    <div>
+      <b style={{ color: "#efeadd" }}>{termo}:</b> {txt}
     </div>
   );
 }
