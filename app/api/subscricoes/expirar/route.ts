@@ -50,6 +50,7 @@ import { stripeFetch, nivelDoPreco, fimDoPeriodo } from "@/lib/stripe";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { sincronizarLigasOficiais } from "@/lib/ligasOficiais";
 import { reverterEscudoParaGratis } from "@/lib/escudoServidor";
+import { resolverLigasAoPerderPro } from "@/lib/sucessaoLigas";
 import { registarCorrida } from "@/lib/cronLog";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -141,6 +142,9 @@ export async function GET(req: Request) {
       // Perdeu o Pro: o escudo volta à versão gratuita (elementos pagos trocados
       // pelo equivalente grátis mais próximo). Best-effort, nunca parte a corrida.
       try { await reverterEscudoParaGratis(uid); } catch { /* reversão é extra */ }
+      // E as ligas de amigos em excesso que ele administra: bastão a um membro Pro
+      // ou, sem Pro, encerra. Best-effort.
+      try { await resolverLigasAoPerderPro(uid); } catch { /* sucessão é extra */ }
       try {
         await criarNotificacaoServidor({
             paraUserId: uid,
