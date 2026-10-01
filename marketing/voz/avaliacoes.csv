@@ -1,0 +1,3 @@
+data,versao_perfil,conteudo,idioma,ferramenta,voz,trecho,problema,ajuste,resultado_reavaliacao,regra_aprovada
+2026-09-30,v0,como-pontuar,EN,Higgsfield/ElevenLabs,Archie,narração inteira,pausas de respiração e silêncios entre frases (reticências alongaram ~10 s),escrever sem reticências; cortar silêncios >120 ms na edição,—,narração contínua sem respiros (11-voz §2)
+2026-09-30,v0,como-pontuar,PT,Higgsfield/ElevenLabs,Archie,—,voz não representa a identidade do Kainan,PT passa a ser gravado pelo Kainan; construir clone da voz dele,—,não usar voz genérica como voz da marca sem autorização

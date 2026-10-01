@@ -1,0 +1,274 @@
+{
+  "_estado": "EXEMPLO DEMONSTRATIVO — módulo de voz (01/10/2026). Nada gerado.",
+  "campanha": {
+    "id": "demo-voz-15s",
+    "versao": "1.0",
+    "titulo": "Cem Judocoins, oito vagas (15 s)",
+    "objetivo": "Fazer quem não joga entender em 15 s como se monta o time e clicar no link",
+    "publico": "fãs de judô que ainda não jogam",
+    "dor": "\"Como funciona? Parece complicado.\"",
+    "ideia_central": "Montar o time é simples: 100 JC, 4 + 4 atletas e um capitão que vale o dobro",
+    "acao_esperada": "clicar no link da bio e montar o time",
+    "redes": [
+      "Reels",
+      "TikTok",
+      "Shorts"
+    ],
+    "formato": "9:16, 1080×1920, 30 fps",
+    "idioma": "PT-BR",
+    "cta": "Monte seu time — link na bio",
+    "montagem": [
+      "Montagem pela Máquina (estúdio animado + voz + efeitos + música provisória); entrega em faixas separadas e MP4 final",
+      "Voz: silêncios internos ≤120 ms; música −20 dB debaixo da voz, sobe 0,3 s no fim",
+      "Se for o Kainan a gravar: um take por trecho, sem cortes dentro do trecho"
+    ]
+  },
+  "factos": [
+    {
+      "texto": "Equipa de 8 atletas: 4 homens + 4 mulheres; 100 JC; capitão ×2",
+      "fonte": "01-produto.md / lib/congelar.ts",
+      "estado": "IMPLEMENTADO · VERIFICADO"
+    }
+  ],
+  "musica": [
+    {
+      "de_s": 0,
+      "ate_s": 15,
+      "faixa": "Trap japonês / taiko hip hop, 95–105 BPM, instrumental",
+      "fonte": "escolha do Kainan ou provisória da Máquina",
+      "licenca": "uso comercial",
+      "intensidade": "média → alta no CTA",
+      "nota": "função: energia e convite; baixa sob a voz, sobe no final"
+    }
+  ],
+  "audio": {
+    "narracao": {
+      "continua": true,
+      "voz": "Kainan (gravação) ou clone aprovado",
+      "idioma": "PT-BR",
+      "caminho": "gravacao-kainan | clone-texto",
+      "velocidade_alvo_wps": 2.7,
+      "tempo_disponivel_s": 14.5,
+      "trechos": [
+        {
+          "id": "T1",
+          "cenas": [
+            "c01"
+          ],
+          "texto": "Você tem cem Judocoins e oito vagas. Quem entra no seu time?",
+          "intencao": "desafiar",
+          "energia": "alta: voz projetada e sorriso na voz, sem gritar",
+          "ritmo": "ágil e contínuo: emenda a pergunta sem parar",
+          "velocidade": "rápida (~2,8 palavras/s)",
+          "enfase": [
+            "cem Judocoins",
+            "quem"
+          ],
+          "entonacao": "firme em 'cem Judocoins'; sobe em 'Quem' e fecha 'time' em desafio amigável",
+          "duracao_estimada_s": 4.3,
+          "edicao": "começar no quadro 0, sem respiração antes; cortar a respiração entre 'vagas' e 'Quem'"
+        },
+        {
+          "id": "T2",
+          "cenas": [
+            "c02",
+            "c03"
+          ],
+          "texto": "Quatro homens, quatro mulheres e um capitão que pontua em dobro.",
+          "intencao": "explicar",
+          "energia": "média-alta: clara, ritmo de lista",
+          "ritmo": "contínuo, acelera de leve na lista e trava em 'dobro'",
+          "velocidade": "rápida (~2,7 palavras/s)",
+          "enfase": [
+            "Quatro homens",
+            "quatro mulheres",
+            "dobro"
+          ],
+          "entonacao": "lista no mesmo nível; 'em dobro' sobe e bate como novidade",
+          "duracao_estimada_s": 4.1,
+          "edicao": "a fala atravessa o corte c02→c03 sem parar; 'dobro' em cima do ×2 na tela"
+        },
+        {
+          "id": "T3",
+          "cenas": [
+            "c04"
+          ],
+          "texto": "Escolhe bem e monta o seu agora: o link tá na bio!",
+          "intencao": "convidar",
+          "energia": "alta e calorosa: energia de final, sorriso aberto",
+          "ritmo": "crescente",
+          "velocidade": "confortável (~2,6 palavras/s)",
+          "enfase": [
+            "agora",
+            "link"
+          ],
+          "entonacao": "desce um pouco em 'Escolhe bem' (conselho) e sobe até 'bio' (convite)",
+          "duracao_estimada_s": 4.2,
+          "edicao": "emendar logo depois de 'dobro'; deixar 0,3 s de música no fim, depois da última palavra"
+        }
+      ],
+      "texto_completo": "Você tem cem Judocoins e oito vagas. Quem entra no seu time? Quatro homens, quatro mulheres e um capitão que pontua em dobro. Escolhe bem e monta o seu agora: o link tá na bio!",
+      "pausa_excecao": []
+    }
+  },
+  "cenas": [
+    {
+      "id": "c01",
+      "duracao_s": 4,
+      "funcao": "GANCHO",
+      "origem": "motion (estúdio animado, custo zero)",
+      "cenario": "moeda JC gira e mostra '100 JC'; 8 vagas vazias em grelha 4×2; Dôdo 2D a apontar",
+      "personagens": [
+        "Dôdo 2D: 'Quem entra' → indicando, desafio"
+      ],
+      "acao": "contador 0→100 JC; as 8 vagas piscam",
+      "enquadramento": "fixo 9:16",
+      "camera": "zoom lento contínuo",
+      "texto_ecra": [
+        {
+          "texto": "100 JUDOCOINS",
+          "estilo": "Oswald dourado gigante"
+        },
+        {
+          "texto": "8 VAGAS. QUEM ENTRA?",
+          "estilo": "Oswald creme"
+        }
+      ],
+      "narracao": "Você tem cem Judocoins e oito vagas. Quem entra no seu time?",
+      "som": {
+        "musica": "entra com impacto no quadro 0",
+        "efeitos": [
+          "moeda 'ka-ching' em 100",
+          "tic nas vagas"
+        ]
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "corte seco",
+      "storyboard": "GANCHO"
+    },
+    {
+      "id": "c02",
+      "duracao_s": 3,
+      "funcao": "4 + 4",
+      "origem": "motion (estúdio animado, custo zero)",
+      "cenario": "vagas preenchem-se: 4 silhuetas azuis (M) e 4 rosa-dourado (F)",
+      "personagens": [
+        "—"
+      ],
+      "acao": "silhuetas entram uma a uma no ritmo da fala",
+      "enquadramento": "fixo 9:16",
+      "camera": "zoom lento contínuo",
+      "texto_ecra": [
+        {
+          "texto": "4 HOMENS + 4 MULHERES",
+          "estilo": "Oswald creme"
+        }
+      ],
+      "narracao": "Quatro homens, quatro mulheres",
+      "som": {
+        "musica": "batida constante",
+        "efeitos": [
+          "pop por silhueta"
+        ]
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "corte seco",
+      "storyboard": "4 + 4"
+    },
+    {
+      "id": "c03",
+      "duracao_s": 3,
+      "funcao": "capitão",
+      "origem": "motion (estúdio animado, custo zero)",
+      "cenario": "braçadeira C dourada pousa numa vaga; '×2' bate",
+      "personagens": [
+        "Dôdo 2D comemorando em 'dobro'"
+      ],
+      "acao": "C pousa; ×2 com impacto",
+      "enquadramento": "fixo 9:16",
+      "camera": "zoom lento contínuo",
+      "texto_ecra": [
+        {
+          "texto": "CAPITÃO = PONTOS ×2",
+          "estilo": "Oswald dourado"
+        }
+      ],
+      "narracao": "e um capitão que pontua em dobro.",
+      "som": {
+        "musica": "mini drop em 'dobro'",
+        "efeitos": [
+          "whoosh",
+          "impacto em ×2"
+        ]
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "corte seco",
+      "storyboard": "capitão"
+    },
+    {
+      "id": "c04",
+      "duracao_s": 5,
+      "funcao": "CTA",
+      "origem": "motion (estúdio animado, custo zero)",
+      "cenario": "ecrã final: logótipo + botão dourado 'MONTE SEU TIME → LINK NA BIO'",
+      "personagens": [
+        "Dôdo 2D: 'agora' → aponta para a câmara; 'bio' → polegar"
+      ],
+      "acao": "botão pulsa",
+      "enquadramento": "fixo 9:16",
+      "camera": "zoom lento contínuo",
+      "texto_ecra": [
+        {
+          "texto": "MONTE SEU TIME",
+          "estilo": "botão dourado"
+        },
+        {
+          "texto": "LINK NA BIO",
+          "estilo": "Oswald"
+        }
+      ],
+      "narracao": "Escolhe bem e monta o seu agora: o link tá na bio!",
+      "som": {
+        "musica": "sobe e fecha com impacto",
+        "efeitos": [
+          "botão pop",
+          "impacto final"
+        ]
+      },
+      "efeitos_visuais": [],
+      "transicao_saida": "corte seco",
+      "storyboard": "CTA"
+    }
+  ],
+  "orcamento_ferramentas": [
+    {
+      "ferramenta": "Gravação do Kainan",
+      "o_que": "narração PT",
+      "quantidade": 1,
+      "creditos_estimados": 0,
+      "tentativas_reserva": 0,
+      "fonte_preco": "—"
+    },
+    {
+      "ferramenta": "Higgsfield → ElevenLabs (clone, quando aprovado)",
+      "o_que": "narração PT (35 palavras)",
+      "quantidade": 1,
+      "creditos_estimados": "≈0,7 (estimado por palavra; confirmar com get_cost)",
+      "tentativas_reserva": 1,
+      "fonte_preco": "médias medidas a 30/09 (~0,02 cr/palavra)"
+    },
+    {
+      "ferramenta": "Estúdio animado + efeitos + mistura",
+      "o_que": "cenas e som",
+      "quantidade": 4,
+      "creditos_estimados": 0,
+      "tentativas_reserva": 0,
+      "fonte_preco": "custo zero"
+    }
+  ],
+  "pontos_aprovacao": [
+    "texto e direção vocal dos 3 trechos",
+    "voz: gravação do Kainan ou clone",
+    "gasto (se clone): 1 geração + 1 tentativa de reserva"
+  ]
+}

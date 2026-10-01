@@ -20,6 +20,7 @@ import { gerarEntregaCapcut } from "../lib/capcut.mjs";
 import { criarProvedorHiggsfield } from "../lib/provedores/higgsfield.mjs";
 import { criarProvedorSimulado } from "../lib/provedores/simulado.mjs";
 import { verificarConhecimento } from "../lib/conhecimento.mjs";
+import { verificarNarracao } from "../lib/narracao.mjs";
 
 const RAIZ = RAIZ_MARKETING;
 const PASTA_CHAVE = path.join(os.homedir(), ".ippon-marketing");
@@ -100,6 +101,9 @@ async function main() {
       console.log(`✅ plano válido · versão ${plano.campanha.versao} · pacote ${orc.hash.slice(0, 12)}…`);
       console.log(orc.semPreco.length ? `⚠️  sem preço confirmado: ${orc.semPreco.join(", ")}` : `Total máximo: ${orc.total} créditos`);
       console.log(`Gerados: campanhas/${campanha}/roteiro.md, storyboard.md, orcamento.md`);
+      const vn = verificarNarracao(plano);
+      if (vn.estimativa) console.log(`🎙️  narração: ${vn.estimativa.palavras} palavras ≈ ${vn.estimativa.segundos} s para ${vn.estimativa.disponivel} s (estimativa — validar ouvindo)`);
+      for (const a of vn.avisos) console.log(`⚠️  ${a}`);
       return;
     }
 

@@ -9,3 +9,10 @@ campanhas/exemplo-mundial-baku/execucao/
 campanhas/exemplo-mundial-baku/saidas/
 campanhas/exemplo-mundial-baku/entrega-capcut/
 config/limites.json
+
+# áudios de voz nunca vão para o repositório público
+voz/**/*.wav
+voz/**/*.mp3
+voz/**/*.m4a
+voz/**/*.flac
+voz/**/*.ogg

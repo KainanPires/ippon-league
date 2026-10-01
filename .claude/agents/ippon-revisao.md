@@ -22,3 +22,7 @@ Termina com: APROVADO PARA O KAINAN / DEVOLVER, e a lista do que corrigir. Não 
 
 ## Verificação extra — atuação do Dôdo
 Reprova se o Dôdo aparece parado/neutro numa fala com intenção clara, ou se a expressão contradiz a fala (ex.: sorri em "you lost five Judocoins").
+
+
+## Verificação extra — narração (11-voz-e-narracao.md)
+Reprova se: houver reticências/pausas/“respirar” no texto falado sem `pausa_excecao` aprovada; faltar direção vocal em algum trecho; a direção for vaga ("com emoção"); instruções estiverem misturadas no texto falado; a estimativa não couber no tempo; a entrega não trouxer o bloco contínuo, o orçamento e os pontos de aprovação.

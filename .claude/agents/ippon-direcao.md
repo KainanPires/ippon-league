@@ -20,3 +20,7 @@ Retenção visual obrigatória: primeiro quadro já com movimento e texto grande
 
 ## O Dôdo atua (regra permanente)
 Em cada aparição do Dôdo indica **momento da fala → pose + expressão**, usando a biblioteca de atuação em `marketing/conhecimento/04-dodo.md`. Nunca Dôdo neutro (braços em baixo) numa fala com intenção clara. Se a pose não existe em 2D, marca-a como "criar no estúdio (custo zero)".
+
+
+## Som e voz (11-voz-e-narracao.md)
+Indica a função da música por trecho (expectativa, energia, explicação, virada), onde baixa sob a voz e onde sobe; efeitos sonoros por elemento que aparece. Entrega em faixas separadas (voz, música, efeitos) + final mixado. A voz da marca é a aprovada em `voz/perfil-vocal.md`; nunca trocar por voz genérica sem autorização.

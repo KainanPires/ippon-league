@@ -46,3 +46,18 @@ test("luta com shidos e hansoku bate com o motor real", async () => {
   assert.equal(pontosDaLuta({ eu: { shido: 3 }, adv: { ippon: 1 } }, t), -9);
   assert.equal(pontosDaLuta({ eu: { ippon: 1 }, adv: { shido: 2 } }, t), 13);
 });
+
+import { verificarNarracao, contarPalavras } from "../lib/narracao.mjs";
+const base = () => ({ cenas: [{ id: "c01", duracao_s: 15, narracao: "" }], audio: { narracao: { continua: true, velocidade_alvo_wps: 2.7,
+  trechos: [{ id: "T1", cenas: ["c01"], texto: "Você tem cem Judocoins. Quem entra no seu time?", intencao: "desafiar", energia: "alta", ritmo: "contínuo", velocidade: "rápida", enfase: ["cem Judocoins"], entonacao: "sobe em quem", duracao_estimada_s: 3.5, edicao: "sem silêncio" }],
+  texto_completo: "Você tem cem Judocoins. Quem entra no seu time?" } } });
+test("narração contínua válida passa", () => { const r = verificarNarracao(base()); assert.deepEqual(r.erros, []); assert.equal(r.estimativa.palavras, 9); });
+test("reticências e [pausa] são bloqueadas", () => {
+  const p = base(); p.audio.narracao.trechos[0].texto = "Você tem… cem [pausa 0,3 s] Judocoins"; p.audio.narracao.texto_completo = p.audio.narracao.trechos[0].texto;
+  const e = verificarNarracao(p).erros.join(" | "); assert.match(e, /reticências/); assert.match(e, /pausa/);
+});
+test("falta direção vocal é erro", () => { const p = base(); delete p.audio.narracao.trechos[0].energia; assert.match(verificarNarracao(p).erros.join(), /energia/); });
+test("texto que não cabe no tempo é erro", () => { const p = base(); p.cenas[0].duracao_s = 2; assert.match(verificarNarracao(p).erros.join(), /não cabe|corte ou reformule/); });
+test("bloco contínuo tem de bater com os trechos", () => { const p = base(); p.audio.narracao.texto_completo = "outra coisa"; assert.match(verificarNarracao(p).erros.join(), /não coincide/); });
+test("plano antigo (sem continua) não é afetado", () => { assert.deepEqual(verificarNarracao({ cenas: [{ id: "c01", narracao: "a… b" }] }).erros, []); });
+test("contagem de palavras com acentos e hífens", () => { assert.equal(contarPalavras("Waza-ari, yuko e ippon: dezesseis!"), 5); });

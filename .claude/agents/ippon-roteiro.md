@@ -21,3 +21,11 @@ Técnicas virais obrigatórias (ver `marketing/conhecimento/05-diretrizes-refere
 
 ## O Dôdo atua
 Ao escrever a fala, marca a palavra onde o Dôdo reage (ex.: "STOP!" → palma para a lente; "you lost" → triste). A direção escolhe a pose final.
+
+
+## Módulo de voz (obrigatório — conhecimento/11-voz-e-narracao.md)
+- Antes de escrever: duração total, tempo de narração, mensagem, objetivo, ação esperada.
+- Narração contínua: sem reticências, sem "[pausa]", sem "respirar". Frases curtas, uma ideia por trecho; se não couber, corte antes de acelerar.
+- Para cada trecho preencher `audio.narracao.trechos[]`: texto exato, intenção, energia (concreta), ritmo, velocidade, ênfase, entonação, duração estimada, edição. Texto falado separado das instruções.
+- `texto_completo` = soma exata dos trechos, pronto para copiar. A fala pode atravessar cortes de cena.
+- Velocidade de planeamento: `voz/perfil-vocal.md`. Duração é estimativa até ouvir.

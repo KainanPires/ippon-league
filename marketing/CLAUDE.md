@@ -18,6 +18,9 @@ Esta pasta é a ferramenta interna de marketing. **Não faz parte do jogo**: nã
 8. `acompanhar <id> --real` → rever cenas com o Kainan (**P3**). Cena má → `rejeitar`. **Nunca** propor regenerar sem nova autorização.
 9. `capcut <id>` → pacote de montagem. Kainan monta e aprova (**P4**). Resultados → `08-aprendizados.md` e `registro-resultados.csv` (**P5**).
 
+## Voz e narração
+Módulo permanente em `conhecimento/11-voz-e-narracao.md`; perfil e avaliações em `voz/`. Narração contínua (sem respiros), direção vocal por trecho, bloco contínuo para copiar, faixas separadas. Nunca afirmar que um clone ou API existe sem ter executado e verificado.
+
 ## Proibido
 - Gerar pelo conector MCP do Higgsfield (as ferramentas de geração estão negadas em `.claude/settings.json`). Consultas (`balance`, `models_explore`, `get_cost`) são permitidas.
 - Reenviar uma geração depois de timeout/erro: corre `reconciliar` e mostra ao Kainan.

@@ -1,5 +1,5 @@
 {
-  "_como_usar": "Copiar para marketing/campanhas/<id>/plano.json. Campos com ❓ são decisões pendentes. `geracao` só em cenas que precisam de geração paga.",
+  "_como_usar": "Copiar para marketing/campanhas/<id>/plano.json. Campos com ❓ são decisões pendentes. `geracao` só em cenas que precisam de geração paga. | Narração: preencher audio.narracao (trechos com direção vocal + texto_completo). O validar bloqueia pausas/reticências e textos que não cabem no tempo.",
   "campanha": {
     "id": "<id-em-minusculas-com-hifens>",
     "versao": "1",
@@ -81,5 +81,53 @@
         }
       }
     }
+  ],
+  "audio": {
+    "narracao": {
+      "_regras": "conhecimento/11-voz-e-narracao.md — narração contínua: sem reticências, sem [pausa], sem 'respirar'; direção vocal fora do texto; texto_completo = soma exata dos trechos",
+      "continua": true,
+      "voz": "<voz aprovada do perfil-vocal.md, ou 'Kainan (gravação)'>",
+      "idioma": "PT-BR",
+      "caminho": "gravacao-kainan | clone-texto | dublagem",
+      "velocidade_alvo_wps": 2.7,
+      "tempo_disponivel_s": 0,
+      "trechos": [
+        {
+          "id": "T1",
+          "cenas": [
+            "c01"
+          ],
+          "texto": "",
+          "intencao": "explicar | desafiar | surpreender | convidar | alertar",
+          "energia": "baixa | média | alta — descrição concreta",
+          "ritmo": "contínuo | crescente | ágil",
+          "velocidade": "confortável | rápida | muito rápida (~x palavras/s)",
+          "enfase": [
+            ""
+          ],
+          "entonacao": "",
+          "duracao_estimada_s": 0,
+          "edicao": "cortar respiração antes de …; emendar sem silêncio"
+        }
+      ],
+      "texto_completo": "",
+      "pausa_excecao": [],
+      "partes_geracao": "se gerado em partes: mesma voz/volume/velocidade; normalizar −16 LUFS; crossfade 10–30 ms; silêncios internos ≤120 ms"
+    }
+  },
+  "orcamento_ferramentas": [
+    {
+      "ferramenta": "Higgsfield (ElevenLabs/clone)",
+      "o_que": "narração",
+      "quantidade": 1,
+      "creditos_estimados": 0,
+      "tentativas_reserva": 0,
+      "fonte_preco": "get_cost na data"
+    }
+  ],
+  "pontos_aprovacao": [
+    "roteiro e direção vocal",
+    "voz/idioma",
+    "gasto: cenas, idiomas, duração e nº de versões"
   ]
 }

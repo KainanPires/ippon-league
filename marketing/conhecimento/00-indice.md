@@ -28,6 +28,7 @@ Regra: conteúdo publicado só usa factos **IMPLEMENTADO + VERIFICADO** (ou **PU
 | 08 | `08-aprendizados.md` | correções e regras aprendidas, datadas |
 | 09 | `09-assets-ausentes.md` | o que falta e quem tem de o fornecer |
 | 10 | `10-higgsfield-api.md` | o que a documentação oficial da API diz (e o que não diz) |
+| 11 | `11-voz-e-narracao.md` | identidade vocal, narração contínua, direção vocal, clone, montagem de áudio |
 | — | `factos.json` | números conferidos contra o código |
 
 Última revisão: 30/09/2026 · commit da app `e816cac`.

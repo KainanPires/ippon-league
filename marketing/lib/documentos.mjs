@@ -1,3 +1,4 @@
+import { verificarNarracao } from "./narracao.mjs";
 // marketing/lib/documentos.mjs
 //
 // Gera, a partir do plano.json, os documentos que o Kainan lê ANTES de
@@ -34,7 +35,7 @@ export function roteiroMd(plano) {
   L.push("> Documento de planeamento. **Não autoriza nenhum gasto.**", "");
   L.push("| Campo | Valor |", "|---|---|");
   for (const [k, v] of [
-    ["Objetivo", c.objetivo], ["Público", c.publico], ["Promessa", c.promessa], ["Hipótese", c.hipotese],
+    ["Objetivo", c.objetivo], ["Público", c.publico], ["Dor / dúvida", c.dor], ["Ideia central", c.ideia_central], ["Ação esperada", c.acao_esperada], ["Promessa", c.promessa], ["Hipótese", c.hipotese],
     ["Formato / redes", lista(c.redes).join(", ")], ["Duração total", `${total} s`], ["Idioma", c.idioma],
     ["CTA", c.cta], ["Link UTM", c.link_utm],
   ]) L.push(`| ${k} | ${v ?? "—"} |`);
@@ -64,8 +65,28 @@ export function roteiroMd(plano) {
     for (const m of plano.musica) L.push(`| ${mmss(m.de_s)} | ${mmss(m.ate_s)} | ${m.faixa ?? "—"} | ${m.fonte ?? "—"} / ${m.licenca ?? "❓"} | ${m.intensidade ?? "—"} | ${m.nota ?? ""} |`);
     L.push("");
   }
-  const narr = plano.cenas.map((s) => s.narracao).filter(Boolean);
-  if (narr.length) L.push("## Narração corrida", "", narr.join(" "), "");
+  if (c.montagem) L.push("## Montagem", "", ...lista(c.montagem).map((x) => `- ${x}`), "");
+  if (lista(plano.orcamento_ferramentas).length) {
+    L.push("## Consumo estimado das ferramentas pagas", "", "| Ferramenta | O quê | Qtd. | Créditos estimados | Reserva de tentativas | Fonte do preço |", "|---|---|---|---|---|---|");
+    for (const o of plano.orcamento_ferramentas) L.push(`| ${o.ferramenta} | ${o.o_que} | ${o.quantidade} | ${o.creditos_estimados} | ${o.tentativas_reserva} | ${o.fonte_preco} |`);
+    L.push("");
+  }
+  if (lista(plano.pontos_aprovacao).length) L.push("## Depende da aprovação do Kainan", "", ...plano.pontos_aprovacao.map((x) => `- ${x}`), "");
+  const nv = plano.audio?.narracao;
+  if (nv?.continua && Array.isArray(nv.trechos)) {
+    const est = verificarNarracao(plano).estimativa;
+    L.push("## Narração e direção vocal", "");
+    L.push(`- **Voz:** ${nv.voz ?? "—"} · **Idioma:** ${nv.idioma ?? c.idioma ?? "—"} · **Velocidade de planeamento:** ${nv.velocidade_alvo_wps ?? "—"} palavras/s`);
+    if (est) L.push(`- **Estimativa:** ${est.palavras} palavras ≈ ${est.segundos} s para ${est.disponivel} s disponíveis (estimativa — validar ouvindo)`);
+    L.push("- **Regra:** narração contínua, sem silêncios de respiro; a fala atravessa os cortes de cena.", "");
+    L.push("| Trecho | Cenas | Texto exato | Intenção | Energia | Ritmo | Velocidade | Ênfase | Entonação | Duração | Edição |", "|---|---|---|---|---|---|---|---|---|---|---|");
+    for (const t of nv.trechos) L.push(`| ${t.id} | ${lista(t.cenas).join(", ")} | "${t.texto}" | ${t.intencao} | ${t.energia} | ${t.ritmo} | ${t.velocidade} | ${lista(t.enfase).join(", ")} | ${t.entonacao} | ~${t.duracao_estimada_s} s | ${t.edicao} |`);
+    L.push("", "### Texto completo (copiar e colar — só a fala)", "", "```", nv.texto_completo ?? "", "```", "");
+    if (lista(nv.pausa_excecao).length) { L.push("### Pausas de exceção (precisam de aprovação)", ""); for (const p of nv.pausa_excecao) L.push(`- ${p.trecho}: ${p.duracao_s} s — ${p.justificativa}`); L.push(""); }
+  } else {
+    const narr = plano.cenas.map((s) => s.narracao).filter(Boolean);
+    if (narr.length) L.push("## Narração corrida", "", narr.join(" "), "");
+  }
   L.push("## Factos usados (verificar com ippon-produto)", "", ...lista(plano.factos).map((f) => `- ${f.texto} — fonte: ${f.fonte ?? "❓"} (${f.estado ?? "❓"})`), "");
   return L.join("\n");
 }

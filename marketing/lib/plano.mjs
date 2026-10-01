@@ -15,6 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { hashCanonico, sha256Ficheiro } from "./canonico.mjs";
 import { verificarExemplos } from "./exemplos.mjs";
+import { verificarNarracao } from "./narracao.mjs";
 
 export const RAIZ_MARKETING = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -83,6 +84,8 @@ export function validarPlano(raiz, plano, idEsperado) {
   }
   // Exemplos com números: têm de bater com as regras reais do jogo (lib/engine.ts).
   if (plano?.exemplos) erros.push(...verificarExemplos(plano, path.resolve(raiz, "..")));
+  // Narração contínua e direção vocal (conhecimento/11-voz-e-narracao.md).
+  erros.push(...verificarNarracao(plano).erros);
   if (erros.length) throw new ErroPlano("plano inválido:\n - " + erros.join("\n - "));
 }
 
