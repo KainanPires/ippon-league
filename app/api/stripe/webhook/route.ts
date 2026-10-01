@@ -68,6 +68,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { nivelDoPreco, stripeFetch, verificarAssinatura, fimDoPeriodo, PRECOS, type Nivel } from "@/lib/stripe";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { sincronizarLigasOficiais } from "@/lib/ligasOficiais";
+import { reverterEscudoParaGratis } from "@/lib/escudoServidor";
 import { creditarJudocoins, estornarJudocoinsPorPaymentIntent } from "@/lib/carteira";
 import { trackServer } from "@/lib/analytics.server";
 export const dynamic = "force-dynamic";
@@ -147,6 +148,15 @@ async function aplicarSubscricao(sub: Assinatura): Promise<void> {
   // Ligas oficiais: entra ao ganhar Pro, sai quando o acesso termina.
   // Depois do update, nunca antes - a funcao le o nivel de public.users.
   await sincronizarLigasOficiais(uid);
+
+  // ESCUDO: reverte para a versão gratuita só quando a subscrição é CANCELADA
+  // em definitivo. Num 'past_due' (falha passageira de cartão) NÃO se mexe — a
+  // Stripe ainda vai tentar cobrar, e a rede de segurança (cron de expiração)
+  // trata de qualquer caso que fique por resolver depois da tolerância. Reverter
+  // o escudo é irreversível, por isso só no fim mesmo. Best-effort.
+  if (sub.status === "canceled") {
+    try { await reverterEscudoParaGratis(uid); } catch { /* reversão é extra */ }
+  }
 }
 export async function POST(req: Request) {
   // O corpo em bruto, tal como chegou. Nunca req.json() — ver a nota do topo.
