@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { LIMITES } from "@/lib/planos";
+import { sucederOuApagarLiga } from "@/lib/sucessaoLigas";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
   if (ids.length === 0) return NextResponse.json({ ok: true, saiu: 0 });
   const { data: ligas } = await supabaseAdmin
     .from("leagues")
-    .select("id, formato, estado, copa_estado")
+    .select("id, formato, estado, copa_estado, created_by")
     .in("id", ids)
     .eq("type", "amigos");
   const ativas = (ligas || []).filter((l) =>
@@ -84,6 +85,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, erro: "Escolheste mais ligas do que o teu limite permite." }, { status: 400 });
   }
 
+  // Donos das ligas que vai largar (para correr a sucessão só nessas).
+  const donoDe = new Set(
+    ativas.filter((l) => String(l.created_by ?? "") === uid).map((l) => String(l.id)),
+  );
+
   // Sai de todas as ligas de amigos ativas que NÃO escolheu manter.
   const sair = ativas.map((l) => String(l.id)).filter((id) => !manter.has(id));
   let saiu = 0;
@@ -93,6 +99,11 @@ export async function POST(req: Request) {
     try {
       await supabaseAdmin.from("league_requests").delete().eq("league_id", league_id).eq("user_id", uid);
     } catch { /* pedido pendente órfão: não bloqueia */ }
+    // Se ERA o dono desta liga, passa o bastão a um membro Pro — ou encerra a liga
+    // se não houver nenhum Pro para assumir. Best-effort: não bloqueia a saída.
+    if (donoDe.has(league_id)) {
+      try { await sucederOuApagarLiga(league_id, { saindoUid: uid }); } catch { /* sucessão é extra */ }
+    }
   }
 
   return NextResponse.json({ ok: true, saiu });
