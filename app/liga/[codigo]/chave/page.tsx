@@ -13,6 +13,7 @@ import {
   type LadoCaixa,
 } from "@/components/Chave";
 import { useT } from "@/lib/i18n";
+import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -175,6 +176,17 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
   // necessidade; tudo o resto (estado, "ver equipa", nota da janela da final)
   // vive aqui, ao toque.
   const [aberto, setAberto] = useState<ConfrontoAPI | null>(null);
+  // Pedido de avaliação (NPS) quando a copa terminou: a pessoa acabou de ver o
+  // pódio, um momento de valor. Pequeno atraso para o pódio aparecer primeiro. O
+  // devePedirAvaliacao() traz a cadência para reaparecer (igual ao resto da app),
+  // por isso só aparece a quem está na janela — nunca incomoda quem já votou.
+  const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
+  useEffect(() => {
+    if (!terminada) return;
+    if (!devePedirAvaliacao()) return;
+    const tmr = setTimeout(() => setMostrarAvaliacao(true), 1200);
+    return () => clearTimeout(tmr);
+  }, [terminada]);
   // Agrupa os confrontos por ronda. A final e o bronze estão na última ronda.
   // JANELA DO ACUMULADO DA FINAL. Os finalistas ficam conhecidos antes de a
   // repescagem acabar; durante essa espera continuam a somar pontos. A janela
@@ -193,6 +205,10 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
     {/* Pódio (no topo) quando a copa terminou. */}
     {terminada && (podio.campeao || podio.vice || podio.terceiro || (podio.terceiros?.length ?? 0) > 0) && (
         <Podio podio={podio} nome={nome} escudoDe={escudoDe} meuId={meuId} nomeCopa={liga.name} nParticipantes={nParticiparam} />
+      )}
+    {/* Avaliação (NPS) — a copa terminou e a pessoa viu o pódio. */}
+    {mostrarAvaliacao && (
+        <Avaliacao nomeTime={nome(meuId)} onClose={() => setMostrarAvaliacao(false)} />
       )}
     {/* Cabeçalho da liga + nº de equipas na chave. */}
     <div style={{ display: "flex", alignItems: "center", gap: 11, background: "#0f1411", border: "1px solid #243029", borderRadius: 14, padding: "11px 13px", marginBottom: 14 }}>
