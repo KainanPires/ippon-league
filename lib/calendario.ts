@@ -210,6 +210,33 @@ export function rotuloRodada(idCompeticao: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// LOCALIZAÇÃO DOS TEXTOS DO CALENDÁRIO (nível + nome da competição).
+//
+// Os nomes das competições vêm da IJF e são quase todos em inglês por convenção
+// (Grand Slam, Grand Prix, Open, Masters) — mantêm-se iguais em todas as línguas.
+// Só se traduzem as partes DESCRITIVAS em português: o nível "Mundial", o nome
+// "Mundial de Baku", o sufixo "— Clássico" e "(Individuais)".
+//
+// Recebem o tradutor `t` (de useT, no cliente) para não importar o i18n aqui.
+// ---------------------------------------------------------------------------
+
+/** Nível da competição traduzido (só o que não é nome próprio internacional). */
+export function rotuloNivel(nivel: string, t: (k: string) => string): string {
+  if (nivel === "Mundial") return t("nivel.mundial");
+  if (nivel === "Continental" || nivel === "Continental fraco") return t("nivel.continental");
+  return nivel; // Grand Slam, Grand Prix, Open, Masters, European Open/Cup: universais
+}
+
+/** Nome da competição com as partes em português traduzidas. */
+export function localizarNomeCompeticao(nome: string, t: (k: string) => string): string {
+  let s = nome;
+  if (s.includes("Mundial de Baku")) s = s.replace("Mundial de Baku", t("comp.mundialBaku"));
+  s = s.replace(/\(Individuais\)/g, t("comp.individuais"));
+  s = s.replace(/—\s*Clássico/g, "— " + t("comp.classicoSufixo"));
+  return s;
+}
+
+// ---------------------------------------------------------------------------
 // FECHO DE MERCADO + CONTAGEM (Live Round, passos 1a + 1b)
 // ---------------------------------------------------------------------------
 
