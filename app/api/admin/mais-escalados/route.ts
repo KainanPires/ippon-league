@@ -20,6 +20,7 @@
 // jogadores com o mercado ABERTO deixaria copiar a maioria — fica como decisão
 // de produto (uma aba pública só faz sentido depois de o mercado fechar).
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { competicaoDaSemana, CALENDARIO_2026 } from "@/lib/calendario";
 import {
@@ -34,14 +35,45 @@ function esc(v: unknown): string {
   return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// AUTORIZAÇÃO — dois caminhos, para o mesmo painel poder ser:
+//   (1) aberto por TI com ?key=<CRON_SECRET> (uso rápido / cron / print direto); ou
+//   (2) aberto por quem tem SESSÃO e o papel `is_admin` OU `is_conteudo`
+//       (ex.: a pessoa de social media). Assim partilhas a página SEM nunca dar o
+//       segredo: a barreira é o login + o papel, não uma chave no URL.
+async function autorizado(req: Request, searchParams: URLSearchParams): Promise<boolean> {
+  // (1) chave de cron/admin
+  const key = searchParams.get("key") || "";
+  if (process.env.CRON_SECRET && key === process.env.CRON_SECRET) return true;
+  // (2) sessão com papel
+  try {
+    const auth = req.headers.get("authorization") || "";
+    const tok = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+    if (!tok) return false;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+    if (!url || !pub || !supabaseAdmin) return false;
+    const sb = createClient(url, pub, {
+      global: { headers: { Authorization: `Bearer ${tok}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await sb.auth.getUser();
+    if (error || !data?.user?.id) return false;
+    const { data: u } = await supabaseAdmin
+      .from("users").select("is_admin, is_conteudo").eq("id", data.user.id).maybeSingle();
+    return !!(u?.is_admin || u?.is_conteudo);
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(req: Request) {
   if (!supabaseAdmin) return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
   const { searchParams } = new URL(req.url);
-  const key = searchParams.get("key") || "";
-  if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
+  if (!(await autorizado(req, searchParams))) {
     return NextResponse.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
   }
 
+  const key = searchParams.get("key") || ""; // só para os links da vista HTML (?key=...&html=1)
   const escopo = (searchParams.get("escopo") || "comp").toLowerCase() as "comp" | "mes" | "ano";
   const fresco = searchParams.get("fresco") === "1";
   const html = searchParams.get("html") === "1";
