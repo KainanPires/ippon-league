@@ -621,6 +621,15 @@ const PT: Dicionario = {
 
   // --- montra / precos.ts (acrescentado) ---
   "precos.etiqueta": "Promoção de lançamento",
+  "precos.periodo": "/mês",
+  "inicio.classicoTag": "Clássico",
+  "inicio.emAndamentoAqui": "Em andamento · acompanha aqui",
+  "nivel.mundial": "Mundial",
+  "nivel.continental": "Continental",
+  "comp.individuais": "(Individuais)",
+  "comp.classicoSufixo": "Clássico",
+  "comp.mundialBaku": "Mundial de Baku",
+  "time.nomeDefault": "A minha equipa",
   "precos.duracaoDesconto": "{meses} meses com desconto",
   "precos.premios": "Joga com mais informação e compete pelo topo do ranking",
 
@@ -2500,6 +2509,15 @@ const EN: Dicionario = {
 
   // --- montra / precos.ts (acrescentado) ---
   "precos.etiqueta": "Launch offer",
+  "precos.periodo": "/month",
+  "inicio.classicoTag": "Classic",
+  "inicio.emAndamentoAqui": "Live now · follow here",
+  "nivel.mundial": "World Championship",
+  "nivel.continental": "Continental",
+  "comp.individuais": "(Individual)",
+  "comp.classicoSufixo": "Classic",
+  "comp.mundialBaku": "Baku World Championship",
+  "time.nomeDefault": "My team",
   "precos.duracaoDesconto": "{meses} months at a discount",
   "precos.premios": "Play with more information and compete for the top of the ranking",
 
@@ -4360,6 +4378,15 @@ const ES: Dicionario = {
 
   // --- montra / precos.ts (acrescentado) ---
   "precos.etiqueta": "Promoción de lanzamiento",
+  "precos.periodo": "/mes",
+  "inicio.classicoTag": "Clásico",
+  "inicio.emAndamentoAqui": "En curso · sigue aquí",
+  "nivel.mundial": "Mundial",
+  "nivel.continental": "Continental",
+  "comp.individuais": "(Individuales)",
+  "comp.classicoSufixo": "Clásico",
+  "comp.mundialBaku": "Mundial de Bakú",
+  "time.nomeDefault": "Mi equipo",
   "precos.duracaoDesconto": "{meses} meses con descuento",
   "precos.premios": "Juega con más información y compite por lo más alto del ranking",
 
@@ -6220,6 +6247,15 @@ const FR: Dicionario = {
 
   // --- montra / precos.ts (acrescentado) ---
   "precos.etiqueta": "Offre de lancement",
+  "precos.periodo": "/mois",
+  "inicio.classicoTag": "Classique",
+  "inicio.emAndamentoAqui": "En cours · suis ici",
+  "nivel.mundial": "Championnat du monde",
+  "nivel.continental": "Continental",
+  "comp.individuais": "(Individuel)",
+  "comp.classicoSufixo": "Classique",
+  "comp.mundialBaku": "Championnat du monde de Bakou",
+  "time.nomeDefault": "Mon équipe",
   "precos.duracaoDesconto": "{meses} mois à prix réduit",
   "precos.premios": "Joue avec plus d'informations et vise le sommet du classement",
 
@@ -8088,6 +8124,15 @@ const DE: Dicionario = {
 
   // --- montra / precos.ts (acrescentado) ---
   "precos.etiqueta": "Launch-Aktion",
+  "precos.periodo": "/Monat",
+  "inicio.classicoTag": "Klassiker",
+  "inicio.emAndamentoAqui": "Läuft gerade · hier verfolgen",
+  "nivel.mundial": "Weltmeisterschaft",
+  "nivel.continental": "Kontinental",
+  "comp.individuais": "(Einzel)",
+  "comp.classicoSufixo": "Klassiker",
+  "comp.mundialBaku": "Baku-Weltmeisterschaft",
+  "time.nomeDefault": "Mein Team",
   "precos.duracaoDesconto": "{meses} Monate mit Rabatt",
   "precos.premios": "Spiele mit mehr Informationen und kämpfe um die Spitze der Rangliste",
 
