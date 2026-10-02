@@ -379,7 +379,7 @@ export default function Perfil() {
     <div style={{ display: "flex", alignItems: "center", gap: 14, background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 12 }}>
     <div style={{ flexShrink: 0, display: "flex" }}><Escudo config={identity} size={52} /></div>
     <div style={{ minWidth: 0, flex: 1 }}>
-    <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name}</div>
+    <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name === "A minha equipa" ? t("time.nomeDefault") : identity.name}</div>
     <div style={{ fontSize: 12, color: "#93a39a", marginTop: 2 }}>{t("perfil.escudoNome")}</div>
     </div>
     </div>
