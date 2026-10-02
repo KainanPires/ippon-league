@@ -8,7 +8,7 @@ import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 import { GaleriaResumos } from "@/components/GaleriaResumos";
 import { desempenhosVistosConta, marcarDesempenhoVisto, aoVivoVistoConta, marcarAoVivoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
-import { focoMercado, textoFecho, competicaoDaSemana, nomeCompeticao, estadoMercado } from "@/lib/calendario";
+import { focoMercado, textoFecho, competicaoDaSemana, nomeCompeticao, estadoMercado, localizarNomeCompeticao, rotuloNivel } from "@/lib/calendario";
 import { mensagensModaisDeHoje, type MensagemEspecial } from "@/lib/mensagensEspeciais";
 import { continenteDoPais } from "@/lib/continentes";
 import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
@@ -199,9 +199,13 @@ export default function Inicio() {
   // Nomes a MOSTRAR. Num clássico com o mercado ainda aberto, nomeCompeticao()
   // esconde a cidade ("Grand Prix 2018 — Clássico"): quem a visse ia ao JudoBase
   // buscar os resultados de 2018 e montava a equipa perfeita.
-  const nomeComp = nomeCompeticao(comp);
-  const nomeADecorrer = aDecorrer ? nomeCompeticao(aDecorrer) : null;
-  const teamInfo = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
+  const nomeComp = localizarNomeCompeticao(nomeCompeticao(comp), t);
+  const nomeADecorrer = aDecorrer ? localizarNomeCompeticao(nomeCompeticao(aDecorrer), t) : null;
+  const teamInfoRaw = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
+  // Nome de equipa por defeito ("A minha equipa") traduzido para a língua do utilizador.
+  const teamInfo = teamInfoRaw
+    ? { ...teamInfoRaw, name: teamInfoRaw.name === "A minha equipa" ? t("time.nomeDefault") : teamInfoRaw.name }
+    : null;
   const temEquipaCompleta = !!savedTeam && savedTeam.ids.length === 8 && !!savedTeam.captain;
   // LOJA DE JUDOCOINS (Fase B): a propaganda só faz sentido nos momentos de
   // MONTAR/decidir — mercado aberto (competição não a decorrer), ou ainda sem
@@ -515,7 +519,7 @@ export default function Inicio() {
         <Mascot belt="#efeadd" expression="feliz" />
         </div>
         <div>
-        <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>Campeão</div>
+        <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{t("inicio.campeao")}</div>
         <div style={{ fontSize: 11, color: GOLD }}>{t("inicio.entrarParaJogar")}</div>
         </div>
         </a>
@@ -595,15 +599,15 @@ export default function Inicio() {
         <div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Ippon Pro</span>
-        {PRECO.emPromocao && <span style={{ background: "#1b211e", color: GOLD, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>{PRECO.etiqueta}</span>}
+        {PRECO.emPromocao && <span style={{ background: "#1b211e", color: GOLD, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("precos.etiqueta")}</span>}
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
         {PRECO.emPromocao && <span style={{ fontSize: 12, color: "#7a5e12", textDecoration: "line-through" }}>{PRECO.normal}</span>}
         <span style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: "#3a2a08" }}>{PRECO.atual}</span>
-        <span style={{ fontSize: 11, color: "#5c4410" }}>{PRECO.periodo}</span>
+        <span style={{ fontSize: 11, color: "#5c4410" }}>{t("precos.periodo")}</span>
         </div>
         <div style={{ fontSize: 11, color: "#5c4410", marginTop: 2 }}>{t("inicio.proSub")}</div>
-        <div style={{ fontSize: 11, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{PRECO.premios}</div>
+        <div style={{ fontSize: 11, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{t("precos.premios")}</div>
         </div>
         <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>{t("inicio.assinar")}</span>
         </a>
@@ -635,18 +639,18 @@ export default function Inicio() {
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
     <CardTitle>{ehClassico ? (emAndamento ? t("inicio.classicoAtual") : t("inicio.proximoClassico")) : (emAndamento ? t("inicio.competicaoAtual") : t("inicio.proximaCompeticao"))}</CardTitle>
     {ehClassico && (
-        <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#3a2f12", color: GOLD, fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.03em" }}>↻ Clássico</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#3a2f12", color: GOLD, fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.03em" }}>↻ {t("inicio.classicoTag")}</span>
       )}
     </div>
     <div style={{ fontSize: 15, fontWeight: 700 }}>{nomeComp}</div>
     <div style={{ fontSize: 12, color: "#93a39a", marginTop: 2 }}>
-    {comp.nivel}{ehClassico ? ` · ${t("inicio.rodadaEspecial")}` : ""} · {t("inicio.aValerPontos")}
+    {rotuloNivel(comp.nivel, t)}{ehClassico ? ` · ${t("inicio.rodadaEspecial")}` : ""} · {t("inicio.aValerPontos")}
     </div>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
     {emAndamento ? (
         <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#e2655a", fontSize: 12, fontWeight: 700 }}>
         <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
-        Em andamento · acompanha aqui
+        {t("inicio.emAndamentoAqui")}
         </span>
       ) : (
         <span style={{ fontSize: 12, color: "#7fd1a3" }}>{textoFecho(comp, t)}</span>
