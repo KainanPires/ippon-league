@@ -67,6 +67,21 @@ const COMO_CONHECESTE: Record<string, BlocoOrigem> = {
   fr: { label: "Comment nous as-tu connus ? (optionnel)", placeholder: "Choisis une option", opcoes: { amigo: "Ami ou recommandation", treinador: "Entraîneur ou club", evento: "Événement ou compétition", social: "Réseaux sociaux", google: "Recherche Google", outro: "Autre" } },
   de: { label: "Wie hast du von uns erfahren? (optional)", placeholder: "Wähle eine Option", opcoes: { amigo: "Freund oder Empfehlung", treinador: "Trainer oder Verein", evento: "Event oder Wettkampf", social: "Soziale Medien", google: "Google-Suche", outro: "Sonstiges" } },
 };
+
+// CONSENTIMENTO DE EMAIL DE MARKETING (opcional, opt-in) — exigido no RGPD/GDPR
+// para quem está na UE (França, Alemanha, Holanda...). É SEPARADO da declaração
+// de termos/privacidade de propósito: o consentimento tem de ser granular e
+// nunca pré-marcado. Emails TRANSACIONAIS (verificação, avisos de rodada) não
+// dependem disto — só os de novidades/dicas/promoções. Mapa local (como o
+// COMO_CONHECESTE) para a alteração ficar contida num só ficheiro.
+const CONSENT_EMAIL: Record<string, string> = {
+  pt: "Quero receber novidades, dicas das rodadas e promoções por email.",
+  en: "I'd like to receive news, round tips and offers by email.",
+  es: "Quiero recibir novedades, consejos de las rondas y promociones por email.",
+  fr: "Je souhaite recevoir les actualités, les conseils des tournois et les offres par email.",
+  de: "Ich möchte Neuigkeiten, Runden-Tipps und Angebote per E-Mail erhalten.",
+};
+
 export default function Comecar() {
   // A PORTA DE ENTRADA. O seletor de bandeiras fica no topo, antes de tudo:
   // quem não percebe a língua do ecrã tem de a poder trocar sem ler nada.
@@ -84,10 +99,22 @@ export default function Comecar() {
   const [aviso, setAviso] = useState<AvisoEmail | null>(null);
   const [confirmarEmail, setConfirmarEmail] = useState(false);
   const [mostrarDeclaracao, setMostrarDeclaracao] = useState(false);
+  // Consentimento de email de marketing (opt-in; começa DESMARCADO, RGPD).
+  const [aceitaEmail, setAceitaEmail] = useState(false);
+  // FUNIL: para onde ir depois do registo. Por omissão /inicio; o link do funil
+  // (ex.: a página da chave do Mundial) passa ?next=/mundial e a pessoa volta lá.
+  // Só se aceita caminho interno seguro (começa por "/", nunca "//" nem "://").
+  const nextRef = useRef<string>("/inicio");
 
   // Aquisição: chegou ao ecrã de criar conta. Espera pelo consentimento (e pelo
   // id estável) — só mede que a pessoa entrou no cadastro, não os campos.
   useEffect(() => { aoTerConsentimento(() => track("signup_started")); }, []);
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get("next") || "";
+      if (p.startsWith("/") && !p.startsWith("//") && !p.includes("://")) nextRef.current = p;
+    } catch { /* sem query: fica /inicio */ }
+  }, []);
   const maxData = new Date().toISOString().slice(0, 10);
   function update(field: keyof Form, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -229,8 +256,20 @@ export default function Comecar() {
         });
       }
     } catch { /* sem token: segue na mesma */ }
+    // CONSENTIMENTO DE EMAIL — grava a escolha (opt-in) no servidor (o cliente
+    // não escreve na users por RLS). Fire-and-forget, não bloqueia a entrada.
+    try {
+      const tk5 = data.session?.access_token;
+      if (tk5) {
+        void fetch("/api/consentimento-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tk5}` },
+          body: JSON.stringify({ aceita: aceitaEmail }),
+        });
+      }
+    } catch { /* sem token: segue na mesma */ }
     if (data.session) {
-      window.location.href = "/inicio";
+      window.location.href = nextRef.current;
     } else {
       setSaving(false);
       setConfirmSent(true);
@@ -363,6 +402,11 @@ export default function Comecar() {
           </Field>
         );
       })()}
+    {/* Consentimento de email (opcional, começa desmarcado — RGPD). */}
+    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "2px 0 8px", cursor: "pointer" }}>
+    <input type="checkbox" checked={aceitaEmail} onChange={(e) => setAceitaEmail(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17, accentColor: GOLD, flexShrink: 0, cursor: "pointer" }} />
+    <span style={{ fontSize: 12.5, color: "#93a39a", lineHeight: 1.5 }}>{CONSENT_EMAIL[lingua] ?? CONSENT_EMAIL.pt}</span>
+    </label>
     <button onClick={abrirDeclaracao} disabled={saving} style={{ width: "100%", marginTop: 8, padding: "14px", borderRadius: 12, border: "none", background: GOLD, color: "#1b211e", fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
     {t("comecar.comecarJogar")}
     </button>
