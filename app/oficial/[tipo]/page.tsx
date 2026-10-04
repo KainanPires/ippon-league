@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { focoMercado, competicoesReais } from "@/lib/calendario";
+import { focoMercado, competicoesReais, localizarNomeCompeticao } from "@/lib/calendario";
 import { useNivel } from "@/lib/useNivel";
 import { useT } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -74,6 +74,14 @@ export default function PaginaOficial() {
   const compAtual = foco.aDecorrer ?? foco.atual;
   const idComp = compAtual.idCompeticao;
   const emAndamento = foco.aDecorrer !== null;
+  // Clicar numa linha do ranking abre o dojo DESSE jogador. No dojo do rival
+  // (ver=<uid>) só se veem os atletas de categorias já em competição (os outros
+  // ficam escondidos — ver /meu-time). Clicar em mim mesmo abre o meu time normal.
+  function irParaDojo(uid: string) {
+    if (!uid) return;
+    if (uid === meuId) { window.location.href = "/meu-time"; return; }
+    window.location.href = `/meu-time?ver=${uid}&comp=${idComp}`;
+  }
   // Época anual: qual a última competição do ano corrente, e a atual já é essa?
   const anoCorrente = new Date().getFullYear();
   const ultimaDoAno = ultimaCompeticaoDoAno(anoCorrente);
@@ -292,7 +300,7 @@ return (
                 const euMesmo = m.user_id === meuId;
                 const ouro = m.posicao === 1 && m.pontos_geral > 0;
                 return (
-                  <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : (ouro ? GOLD : "#243029")}`, borderRadius: 12, padding: "11px 12px" }}>
+                  <div key={m.user_id} onClick={() => irParaDojo(m.user_id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); irParaDojo(m.user_id); } }} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : (ouro ? GOLD : "#243029")}`, borderRadius: 12, padding: "11px 12px", cursor: "pointer" }}>
                   <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: ouro ? GOLD : "#7c8a82" }}>{m.posicao}</div>
                   <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -318,7 +326,7 @@ return (
   {estado === "pronto" && vista === "rodada" && (
       <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-      <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>Rodada · {compAtual.nome}</span>
+      <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>{t("comp.rodada")} · {localizarNomeCompeticao(compAtual.nome, t)}</span>
       {emAndamento ? (
           <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo
@@ -337,7 +345,7 @@ return (
                 const euMesmo = m.user_id === meuId;
                 const ouro = !mercadoAberto && m.posicao === 1 && m.escalou;
                 return (
-                  <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : (ouro ? GOLD : "#243029")}`, borderRadius: 12, padding: "11px 12px" }}>
+                  <div key={m.user_id} onClick={() => irParaDojo(m.user_id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); irParaDojo(m.user_id); } }} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : (ouro ? GOLD : "#243029")}`, borderRadius: 12, padding: "11px 12px", cursor: "pointer" }}>
                   <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: ouro ? GOLD : "#7c8a82" }}>{mercadoAberto ? "—" : (m.escalou ? m.posicao : "—")}</div>
                   <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
