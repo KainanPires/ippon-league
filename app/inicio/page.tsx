@@ -193,7 +193,11 @@ export default function Inicio() {
   const foco = focoMercado();
   const comp = foco.atual;
   const ehClassico = comp.classico;
-  const emAndamento = foco.aDecorrer !== null;
+  // "A decorrer" rolling-aware: no Mundial (rolling) o aDecorrer é null, mas a
+  // competição ESTÁ a decorrer — então a home tem de a tratar como atual (não
+  // "próxima"). O resumo ao vivo (overlay) continua a usar `aDecorrer`, por isso
+  // isto não dispara o pop-up; só muda o card para "em andamento".
+  const emAndamento = foco.aDecorrer !== null || !!foco.atual?.rolling;
   const alvo = foco.alvo;
   const aDecorrer = foco.aDecorrer;
   // Nomes a MOSTRAR. Num clássico com o mercado ainda aberto, nomeCompeticao()
