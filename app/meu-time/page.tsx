@@ -173,8 +173,9 @@ type ItemVisita = {
   pais: string; // ISO ("JP") ou já IOC ("JPN"); code3() normaliza
   categoria: string; // ex.: "73"
   capitao: boolean;
-  gender?: string; // "M" | "F" quando a pool resolveu
+  gender?: string; // "M" | "F" quando a pool resolveu (ou veio do servidor, no oculto)
   athlete?: Athlete; // Athlete completo da pool (para a grelha e o detalhe)
+  oculto?: boolean; // rolling: categoria ainda aberta — atleta escondido (cadeado)
 };
 function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string }) {
   const t = useT();
@@ -201,11 +202,10 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   // Rolling-aware: no Mundial o aDecorrer é null, mas a competição está a decorrer.
   const semanaDoComp = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
   const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp || !!semanaDoComp?.rolling;
-  // No rolling (Mundial), só se pode ver o atleta do rival se a categoria dele JÁ
-  // TRAVOU (já compete, não dá para copiar). As categorias ainda abertas ficam
-  // escondidas. Competição normal a decorrer: o mercado já fechou, vê-se tudo.
-  const rollingDojo = !!semanaDoComp?.rolling;
-  const verAtleta = (cat?: string) => !rollingDojo || (!!cat && categoriaTrancada(semanaDoComp!, cat, new Date()));
+  // No rolling (Mundial), o atleta do rival só aparece quando a categoria dele já
+  // fechou (já compete, não dá para copiar). As categorias ainda abertas vêm
+  // MASCARADAS do servidor (sem id/nome) e mostram-se com um cadeado (i.oculto).
+  // A decisão é do servidor (/api/equipa-na-rodada) para ser à prova de URL à mão.
   // Rodada + data desta competição, tiradas do calendário local pelo idComp
   // (mais robusto do que depender da API). A data vem no formato AAAA/MM/DD e
   // mostramo-la como DD/MM/AAAA. rodadaNum é o nº da rodada (1..52) ou null.
@@ -253,23 +253,39 @@ useEffect(() => {
         const pool = new Map<string, Athlete>();
         const lista: Athlete[] = Array.isArray(poolJson?.atletas) ? poolJson.atletas : [];
         for (const a of lista) pool.set(a.id, a);
-        const base: { id: unknown; nome?: unknown; pais?: unknown; categoria?: unknown; pontos?: unknown; capitao?: unknown }[] =
+        const base: { id: unknown; nome?: unknown; pais?: unknown; categoria?: unknown; pontos?: unknown; capitao?: unknown; oculto?: unknown; genero?: unknown }[] =
         Array.isArray(eqJson.atletas) ? eqJson.atletas : [];
-        const novosItens: ItemVisita[] = base.map((a) => {
+        const novosItens: ItemVisita[] = base.map((a, idx) => {
+            // OCULTO (rolling): o servidor mascarou — categoria ainda aberta. Não
+            // há id/nome; só género e categoria, para pôr o cadeado no sítio certo.
+            if (a.oculto) {
+              const g = String(a.genero || "");
+              return {
+                id: `oculto-${idx}`,
+                oculto: true,
+                nome: "",
+                pais: "",
+                categoria: String(a.categoria || ""),
+                capitao: false,
+                gender: g === "M" || g === "F" ? g : undefined,
+                athlete: undefined,
+              };
+            }
             const id = String(a.id);
             const p = pool.get(id);
+            const g = String(a.genero || "");
             return {
               id,
               nome: p?.name || String(a.nome || t("mt.atletaFallback")),
               pais: p?.countryIso || String(a.pais || ""),
               categoria: p?.category || String(a.categoria || ""),
               capitao: !!a.capitao,
-              gender: p?.gender,
+              gender: p?.gender || (g === "M" || g === "F" ? g : undefined),
               athlete: p,
             };
           });
         const pontosBase: Record<string, number> = {};
-        for (const a of base) pontosBase[String(a.id)] = Number(a.pontos) || 0;
+        for (const a of base) { if (!a.oculto && a.id) pontosBase[String(a.id)] = Number(a.pontos) || 0; }
         setItens(novosItens);
         setCapitao(eqJson.capitao ? String(eqJson.capitao) : null);
         setNomeTime(String(eqJson.nome_time || t("res.equipa")));
@@ -287,7 +303,9 @@ useEffect(() => {
 useEffect(() => {
     if (fase !== "ok" || !aDecorrerAgora || itens.length === 0) return;
     let active = true;
-    const ids = itens.map((i) => i.id);
+    // Só pedimos pontos dos atletas REVELADOS (os ocultos não têm id real).
+    const ids = itens.filter((i) => !i.oculto && i.id).map((i) => i.id);
+    if (ids.length === 0) return;
     const buscar = () => {
       fetch(`/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`)
       .then((r) => r.json())
@@ -317,10 +335,15 @@ const scoreOf = (id: string, cap: boolean) => { const b = pontos[id] ?? 0; retur
 const totalPts = Math.round(itens.reduce((s, i) => s + scoreOf(i.id, i.capitao), 0) * 10) / 10;
 // Grelha de tatame só quando a pool deu género (e Athlete) para TODOS. Senão,
 // lista robusta (histórico sem pool) — igual ao antigo modal da chave.
-const podeGrelha = itens.length > 0 && itens.every((i) => (i.gender === "M" || i.gender === "F") && !!i.athlete);
-const males = itens.filter((i) => i.gender === "M" && i.athlete);
-const females = itens.filter((i) => i.gender === "F" && i.athlete);
-const squadValue = podeGrelha ? fmt(itens.reduce((s, i) => s + (i.athlete?.priceJc ?? 0), 0)) : null;
+// Grelha: cada item ou é um atleta resolvido (tem athlete) ou um slot oculto
+// (cadeado) — ambos precisam de género para saber a linha (masculino/feminino).
+const podeGrelha = itens.length > 0 && itens.every((i) => (i.gender === "M" || i.gender === "F") && (i.oculto || !!i.athlete));
+const males = itens.filter((i) => i.gender === "M" && (i.oculto || i.athlete));
+const females = itens.filter((i) => i.gender === "F" && (i.oculto || i.athlete));
+const temOcultos = itens.some((i) => i.oculto);
+// Valor da equipa só quando está tudo revelado — no rolling seria um valor
+// parcial (faltam os ocultos) e enganava.
+const squadValue = (podeGrelha && !temOcultos) ? fmt(itens.reduce((s, i) => s + (i.athlete?.priceJc ?? 0), 0)) : null;
 const phase: MarketPhase = temResultados ? "ao-vivo" : "fechado";
 const horaTick = ultimaAtualizacao
 ? new Date(ultimaAtualizacao).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -381,13 +404,13 @@ return (
           <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
           <SectionLabel>{t("mt.masculino")}</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
-          {males.map((i) => verAtleta(i.categoria)
+          {males.map((i) => !i.oculto
             ? <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={phase} onClick={() => setModal(i.athlete!)} />
             : <CellEscondida key={i.id} categoria={i.categoria} />)}
           </div>
           <SectionLabel>{t("mt.feminino")}</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-          {females.map((i) => verAtleta(i.categoria)
+          {females.map((i) => !i.oculto
             ? <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={phase} onClick={() => setModal(i.athlete!)} />
             : <CellEscondida key={i.id} categoria={i.categoria} />)}
           </div>
@@ -398,6 +421,15 @@ return (
           // simples por atleta. O capitão dobra só no total, em baixo.
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           {itens.map((i) => {
+                // Oculto (rolling): categoria ainda aberta — linha com cadeado, sem revelar nada.
+                if (i.oculto) {
+                  return (
+                    <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#11201a", border: "1px dashed #2a3a33", borderRadius: 11, padding: "9px 11px" }}>
+                    <div style={{ width: 30, height: 34, borderRadius: 6, background: "#0e1813", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 15 }}>🔒</div>
+                    <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: "#5f6f67" }}>{t("mt.mercadoAberto")}{i.categoria ? ` · ${i.categoria}kg` : ""}</div>
+                    </div>
+                  );
+                }
                 const p = pontos[i.id] ?? 0;
                 return (
                   <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#141a17", border: `1px solid ${i.capitao ? "#FF8F00" : "#243029"}`, borderRadius: 11, padding: "9px 11px" }}>
