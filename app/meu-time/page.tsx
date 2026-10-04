@@ -7,7 +7,7 @@ import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCl
 import { type Athlete } from "@/lib/athletes";
 import { computeNewPrice } from "@/lib/engine";
 import { supabase } from "@/lib/supabase";
-import { focoMercado, numeroDaRodada, nomeCompeticao, pontosVisiveisPorId, CALENDARIO_2026 } from "@/lib/calendario";
+import { focoMercado, numeroDaRodada, nomeCompeticao, pontosVisiveisPorId, categoriaTrancada, CALENDARIO_2026, localizarNomeCompeticao } from "@/lib/calendario";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, deveMostrarTutorial, type TutKey } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
@@ -189,7 +189,9 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   // partilha — que só aparece quando o dojo é meu, por isso é sempre a certa.
   const { cor: corFaixa, nome: nomeFaixa } = useFaixa();
   const foco = focoMercado();
-  const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp;
+  // Rolling-aware: no Mundial o aDecorrer é null, mas a competição está a decorrer.
+  const semanaDoComp = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
+  const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp || !!semanaDoComp?.rolling;
   // Rodada + data desta competição, tiradas do calendário local pelo idComp
   // (mais robusto do que depender da API). A data vem no formato AAAA/MM/DD e
   // mostramo-la como DD/MM/AAAA. rodadaNum é o nº da rodada (1..52) ou null.
@@ -207,7 +209,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   // dizer "ainda não podes ver" e no mesmo fôlego revelar a cidade de 2018.
   const nomeCompMostrar = (() => {
       const ent = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
-      return ent ? nomeCompeticao(ent) : nomeComp;
+      return localizarNomeCompeticao(ent ? nomeCompeticao(ent) : nomeComp, t);
     })();
   // 1) Sessão (exige login) + equipa do alvo (servidor) + pool da competição.
 useEffect(() => {
@@ -699,7 +701,10 @@ function MeuTimeInner() {
         .catch(() => {});
       };
       buscarPontos();
-      const aDecorrerAgora = emAndamento && idComp === atual.idCompeticao;
+      // Atualiza ao vivo também no rolling (Mundial): o mercado fica "aberto" mas
+      // as categorias travadas estão a pontuar e os pontos têm de subir sozinhos.
+      const semanaAtual = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
+      const aDecorrerAgora = (emAndamento && idComp === atual.idCompeticao) || !!semanaAtual?.rolling;
       if (!aDecorrerAgora) {
         return () => { active = false; };
       }
@@ -797,7 +802,19 @@ function MeuTimeInner() {
     ? Math.round(athletes.reduce((s, a) => { const d = deltaAtletaJc(a); return s + (d > 0 ? d / 2 : d); }, 0) * 10) / 10
     : 0;
   const marketPhase: MarketPhase = emCompeticao ? "ao-vivo" : "aberto";
-  // EDITÁVEL só quando NÃO está em competição (mercado aberto).
+  // MODO ROLLING (Mundial): o mercado fica "aberto" a semana toda, mas cada
+  // categoria tranca no início do seu dia. Mostramos PONTOS nas categorias já
+  // TRAVADAS (ao-vivo) e PREÇO nas que ainda estão abertas. A categoria do atleta
+  // já vem com sinal ("-60", "+78"), igual às chaves do rolling.
+  const rollingAtivo = !!atual.rolling && idComp === atual.idCompeticao && hasTeam;
+  const faseAtleta = (a: Athlete): MarketPhase =>
+    rollingAtivo ? (categoriaTrancada(atual, a.category, new Date()) ? "ao-vivo" : "aberto") : marketPhase;
+  // Mostrar a pontuação ao vivo (total + estado "a decorrer")? Competição normal a
+  // decorrer, OU rolling com resultados já de alguma categoria travada.
+  const mostrarPts = emCompeticao || (rollingAtivo && temResultados);
+  // EDITÁVEL só quando NÃO está em competição (mercado aberto). No rolling o
+  // mercado segue aberto — as categorias travadas são protegidas pelo próprio
+  // mercado (categoriaTrancada), que não deixa comprar/trocar quem já trancou.
   const editavel = !emCompeticao;
   const dirty = editavel && !sameTeam(team, saved);
   // Tema de cor do tatame (Pro Max). tatamePorId cai no default se o id não
@@ -1022,12 +1039,12 @@ function MeuTimeInner() {
         <div style={{ background: tema.dentroBg, border: `2px solid ${tema.dentroBorda}`, borderRadius: 10, padding: "12px 10px" }}>
         <SectionLabel>{t("mt.masculino")}</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
-        {males.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} deltaJc={marketPhase === "ao-vivo" ? deltaAtletaJc(a) : null} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
+        {males.map((a) => { const fa = faseAtleta(a); return <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} deltaJc={fa === "ao-vivo" ? deltaAtletaJc(a) : null} phase={fa} onClick={() => setModal({ kind: "athlete", a })} />; })}
         {editavel && Array.from({ length: vagasM }).map((_, i) => <EmptyCell key={"vm" + i} montar={montar} />)}
         </div>
         <SectionLabel>{t("mt.feminino")}</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-        {females.map((a) => <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} deltaJc={marketPhase === "ao-vivo" ? deltaAtletaJc(a) : null} phase={marketPhase} onClick={() => setModal({ kind: "athlete", a })} />)}
+        {females.map((a) => { const fa = faseAtleta(a); return <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} deltaJc={fa === "ao-vivo" ? deltaAtletaJc(a) : null} phase={fa} onClick={() => setModal({ kind: "athlete", a })} />; })}
         {editavel && Array.from({ length: vagasF }).map((_, i) => <EmptyCell key={"vf" + i} montar={montar} />)}
         </div>
         </div>
@@ -1074,10 +1091,10 @@ function MeuTimeInner() {
           )}
         <div className={destaque === "total" ? "ilglow" : undefined} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, padding: "12px 14px", background: "#141a17", border: "1px solid #243029", borderRadius: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={corFaixa} expression={emCompeticao ? "determinado" : "feliz"} /></div>
+        <div style={{ width: 60, height: 60, flexShrink: 0 }}><Mascot belt={corFaixa} expression={mostrarPts ? "determinado" : "feliz"} /></div>
         <div>
         <div style={{ fontSize: 12, color: "#93a39a" }}>
-        {emCompeticao ? t("equipa.rodadaADecorrer") : t("mt.mercadoAbertoStatus")}
+        {mostrarPts ? t("equipa.rodadaADecorrer") : t("mt.mercadoAbertoStatus")}
         </div>
         <div style={{ fontSize: 12, color: "#7fd1a3", fontWeight: 700, marginTop: 2 }}>
         {t("mt.valorEquipa", { v: squadValue })}
@@ -1086,9 +1103,9 @@ function MeuTimeInner() {
         </div>
         <div style={{ textAlign: "right" }}>
         <div style={{ fontFamily: FD, fontSize: 26, fontWeight: 700, color: GOLD }}>
-        {emCompeticao ? totalPts : `JC ${squadValue}`}
+        {mostrarPts ? totalPts : `JC ${squadValue}`}
         </div>
-        <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{emCompeticao ? "pts" : t("mt.valor")}</div>
+        <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{mostrarPts ? "pts" : t("mt.valor")}</div>
         </div>
         </div>
         {emCompeticao ? (
