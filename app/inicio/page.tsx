@@ -1,380 +1,1177 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { Mascot } from "@/components/Mascot";
+import { loadSavedFor, resolve, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
+import { loadIdentity, type Identity } from "@/components/Escudo";
+import { Desempenho } from "@/components/Desempenho";
+import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
+import { GaleriaResumos } from "@/components/GaleriaResumos";
+import { desempenhosVistosConta, marcarDesempenhoVisto, aoVivoVistoConta, marcarAoVivoVisto, construirDesempenho, buscarResultados, buscarResultadosCongelados, buscarResumoExtra, mensagemDesempenho, type DesempenhoRodada, type ResumoExtra } from "@/lib/desempenho";
 import { supabase } from "@/lib/supabase";
-import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { focoMercado, competicoesReais, localizarNomeCompeticao } from "@/lib/calendario";
+import { focoMercado, textoFecho, competicaoDaSemana, nomeCompeticao, estadoMercado, localizarNomeCompeticao, rotuloNivel } from "@/lib/calendario";
+import { mensagensModaisDeHoje, type MensagemEspecial } from "@/lib/mensagensEspeciais";
+import { continenteDoPais } from "@/lib/continentes";
+import { tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
+import { PRECO } from "@/lib/precos";
+import { SinoNotificacoes } from "@/components/SinoNotificacoes";
+import { criarNotificacao } from "@/lib/notificacoes";
+import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
+// NÍVEL DE SUBSCRIÇÃO: vem do useNivel(), que lê da tabela `users` — a MESMA
+// fonte que o servidor usa para bloquear. Antes lia-se do user_metadata da
+// sessão, e desde que o trigger deixou de sincronizar o nível, essa cópia podia
+// estar desatualizada: alguém marcado como Pro na tabela via "Sê Pro" na app.
 import { useNivel } from "@/lib/useNivel";
-import { useT } from "@/lib/i18n";
+import { LIMITES } from "@/lib/planos";
+import { CartaoInstalarApp } from "@/components/InstalarApp";
+import { LembreteNotificacoes } from "@/components/NotificacoesPush";
+import { reconciliarPush } from "@/lib/push";
+// Blog do Dôdo: notícias geradas a partir dos dados do jogo. Dá motivo para
+// abrir a app num dia sem competição — o buraco de retenção que o plano
+// original identificou.
+import { HubCarrossel } from "@/components/HubCarrossel";
+
+// A barra inferior deixou de estar copiada em cada página. Vive uma vez em
+// components/BarraInferior.tsx, e é lá que o separador Pro pulsa a dourado
+// para quem tem Pro e ainda não visitou a área.
+import { BarraInferior } from "@/components/BarraInferior";
+import { useT, useRotuloFaixa, useLingua, type Lingua } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
-// Atualização ao vivo do ranking enquanto a competição decorre.
-const TICK_AO_VIVO_MS = 15000;
-// Descobre a ÚLTIMA competição real de um ano (a que fecha a época anual da liga
-  // oficial). competicoesReais() vem ordenada por data; filtramos as do ano e
-// ficamos com a última. Devolve null se não houver competições nesse ano.
-function ultimaCompeticaoDoAno(ano: number): { idCompeticao: string; nome: string } | null {
-  const doAno = competicoesReais().filter((s) => parseInt(String(s.de).slice(0, 4), 10) === ano);
-  if (doAno.length === 0) return null;
-  const ultima = doAno[doAno.length - 1];
-  return { idCompeticao: ultima.idCompeticao, nome: ultima.nome };
+// Fase A (economia) — alerta na tela inicial de "equipa acima do orçamento" (5 línguas).
+// Atalho para a Loja de Judocoins (economia Fase B). Orçamento extra da
+// temporada — mapa local por língua, mesmo padrão do ORC_INICIO.
+const LOJA_ATALHO: Record<Lingua, { titulo: string; sub: string; botao: string }> = {
+  pt: { titulo: "Loja de Judocoins", sub: "Orçamento extra para montares a equipa que quiseres.", botao: "Abrir" },
+  en: { titulo: "Judocoins Store", sub: "Extra budget to build the team you want.", botao: "Open" },
+  es: { titulo: "Tienda de Judocoins", sub: "Presupuesto extra para montar el equipo que quieras.", botao: "Abrir" },
+  fr: { titulo: "Boutique de Judocoins", sub: "Du budget en plus pour composer l'équipe que tu veux.", botao: "Ouvrir" },
+  de: { titulo: "Judocoins-Shop", sub: "Extra-Budget, um dein Wunschteam zu bauen.", botao: "Öffnen" },
+};
+// CHAVES, não texto. Um array fora do componente é avaliado uma vez, no
+// arranque do módulo — não tem acesso ao `t`, que vive no contexto do React.
+// Guardando as chaves, o texto é resolvido no render, na língua da altura.
+const STEPS = [
+  { title: "tut.comoFunciona", text: "tut.intro" },
+  { title: "tut.montaEquipa", text: "tut.montaEquipaSub" },
+  { title: "tut.pontuaAcoes", text: "tut.pontuaAcoesSub" },
+  { title: "tut.competicoes", text: "tut.competicoesSub" },
+  { title: "tut.sobeFaixa", text: "tut.sobeFaixaSub" },
+];
+const PRO_BENEFITS = ["vant.scout", "vant.analise", "vant.valorizacao", "vant.aoVivo"];
+// Benefícios destacados quando o passo da oferta é PARA subir de Pro a Pro Max
+// (chaves já traduzidas do grupo pro.*). Todos fazem parte do Pro Max.
+const PRO_MAX_BENEFITS = ["pro.vaAoVivoT", "pro.vaChaveamentoT", "pro.va5LigasT", "pro.vaDesignT"];
+type TutTarget = "team" | "ligas" | "belt" | "pro" | null;
+function targetForStep(step: number): TutTarget {
+  const idx = step - 1;
+  if (idx === 1) return "team";
+  if (idx === 3) return "ligas";
+  if (idx === 4) return "belt";
+  return null;
 }
-type Vista = "rodada" | "geral";
-interface MembroRank {
-  user_id: string;
-  nome_time: string;
-  escudo: Identity | null;
-  escalou: boolean;
-  pontos: number;
-  posicao: number;
-  is_pro: boolean;
+// ---------------------------------------------------------------------------
+// LIGA TERMINADA? Mesma regra do ecrã /ligas (componente Ligas), de propósito:
+// os dois sítios têm de concordar sempre. Pontos corridos acabam com
+// estado='terminada'; uma copa acaba com copa_estado='terminada'.
+//
+// O cartão "As tuas ligas" do início mostra o que está A DECORRER. Uma copa já
+// decidida não é uma competição em curso — dizer que é engana o jogador (parecia
+  // que o mata-mata ainda estava a jogar-se depois de haver campeão). O histórico
+// e os certificados vivem em /ligas → Resultados.
+// ---------------------------------------------------------------------------
+interface LigaBruta {
+  id: string;
+  name: string;
+  type?: string;
+  membros?: number;
+  formato?: string;
+  estado?: string | null;
+  copa_estado?: string | null;
 }
-// Linha do ranking GERAL (vem de /api/liga/geral).
-interface MembroGeral {
-  user_id: string;
-  nome_time: string;
-  escudo: Identity | null;
-  pontos_geral: number;
-  pontos_rodada: number;
-  patrimonio: number;
-  escalou: boolean;
-  posicao: number;
-  is_pro: boolean;
+function ligaTerminada(l: LigaBruta): boolean {
+  if (String(l.formato) === "copa") return l.copa_estado === "terminada";
+  return l.estado === "terminada";
 }
-export default function PaginaOficial() {
+function computeTeamInfo(saved: TeamState): { name: string; value: string; last: number } | null {
+  if (saved.ids.length === 0) return null;
+  const athletes = resolve(saved.ids);
+  const resolvido = athletes.length > 0;
+  const value = Math.round(athletes.reduce((s, a) => s + a.priceJc, 0) * 10) / 10;
+  const last = athletes.reduce((s, a) => s + a.last + (a.id === saved.captain ? a.last : 0), 0);
+  return { name: loadIdentity().name, value: resolvido ? String(value) : "—", last: resolvido ? last : 0 };
+}
+// ---------------------------------------------------------------------------
+// Modais de evento: controlo de "visto" (1x por evento) em localStorage, por
+// utilizador. A chave de cada modal vem do motor (comp-<id>, aniversario-<ano>…).
+// ---------------------------------------------------------------------------
+function modalKey(chave: string, userId: string | null | undefined): string {
+  return `ippon_modal_visto__${chave}__${userId ?? "anon"}`;
+}
+function modalVisto(chave: string, userId: string | null | undefined): boolean {
+  try { return localStorage.getItem(modalKey(chave, userId)) === "1"; } catch { return false; }
+}
+function marcarModalVisto(chave: string, userId: string | null | undefined) {
+  try { localStorage.setItem(modalKey(chave, userId), "1"); } catch {}
+}
+export default function Inicio() {
   const t = useT();
-  const params = useParams();
-  const tipo = String(params?.tipo || "").toLowerCase(); // "mundial" | "continental"
-  const ehMundial = tipo === "mundial";
-  const [vista, setVista] = useState<Vista>("geral"); // o GERAL é a vista principal
-  const [estado, setEstado] = useState<"a_carregar" | "pronto" | "sem_sessao" | "sem_continente">("a_carregar");
-  const [membros, setMembros] = useState<MembroRank[]>([]);
-  const [geral, setGeral] = useState<MembroGeral[]>([]);
-  const [geralCarregado, setGeralCarregado] = useState(false);
-  const [nomeContinente, setNomeContinente] = useState<string | null>(null);
-  const [meuId, setMeuId] = useState<string | null>(null);
-  // Mercado ainda aberto? Vem do endpoint (portão anti-espreitadela). Enquanto
-  // aberto, os pontos da rodada mostram-se como "—" (ainda não há pontuação).
-  const [mercadoAberto, setMercadoAberto] = useState(false);
-  // O NÍVEL VEM DO useNivel (tabela `users`), NÃO DO user_metadata.
-  //
-  // O `souPro` decide entre mostrar o cartão com a MINHA posição no ranking
-  // oficial ou o aviso "Estás a ver o ranking dos Pro · passa a Pro para
-  // entrares". Como se lia do metadata — que deixou de ser sincronizado — um
-  // subscritor que pagou via o aviso a mandá-lo comprar o que já tinha, e não
-  // via a sua própria posição na liga em que está inscrito.
-  //
-  // Pro Max entra no mesmo saco: quem tem Max tem Pro.
-  const { ehPro, ehProMax } = useNivel();
-  const souPro = ehPro || ehProMax;
-  const [pesquisa, setPesquisa] = useState("");
-  // A competição da rodada atual (mesma fonte do resto da app).
-  const foco = focoMercado();
-  const compAtual = foco.aDecorrer ?? foco.atual;
-  const idComp = compAtual.idCompeticao;
-  const emAndamento = foco.aDecorrer !== null;
-  // Clicar numa linha do ranking abre o dojo DESSE jogador. No dojo do rival
-  // (ver=<uid>) só se veem os atletas de categorias já em competição (os outros
-  // ficam escondidos — ver /meu-time). Clicar em mim mesmo abre o meu time normal.
-  function irParaDojo(uid: string) {
-    if (!uid) return;
-    if (uid === meuId) { window.location.href = "/meu-time"; return; }
-    window.location.href = `/meu-time?ver=${uid}&comp=${idComp}`;
-  }
-  // Época anual: qual a última competição do ano corrente, e a atual já é essa?
-  const anoCorrente = new Date().getFullYear();
-  const ultimaDoAno = ultimaCompeticaoDoAno(anoCorrente);
-  const atualEhUltimaDoAno = !!ultimaDoAno && ultimaDoAno.idCompeticao === idComp;
-  const titulo = ehMundial ? "Liga Mundial" : (nomeContinente ? `Liga ${nomeContinente}` : "Liga Continental");
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Filtragem da lista pela pesquisa: aceita nome do time OU número de posição.
-  const termo = pesquisa.trim().toLowerCase();
-  const ehNumero = termo !== "" && /^\d+$/.test(termo);
-  function filtrar<T extends { nome_time: string; posicao: number; escalou?: boolean }>(lista: T[]): T[] {
-    if (termo === "") return lista;
-    return lista.filter((m) => {
-        if (ehNumero) return m.posicao === Number(termo);
-        return (m.nome_time || "").toLowerCase().includes(termo);
-    });
-  }
-  const membrosVisiveis = filtrar(membros);
-  const geralVisivel = filtrar(geral);
-  // A MINHA posição em cada vista (para o destaque fixo no topo). Procuro-me na
-  // lista completa (não na filtrada), para o destaque não desaparecer ao pesquisar.
-  const euGeral = meuId ? geral.find((m) => m.user_id === meuId) : undefined;
-  const euRodada = meuId ? membros.find((m) => m.user_id === meuId) : undefined;
-  const minhaPosGeral = euGeral && euGeral.pontos_geral > 0 ? euGeral.posicao : null;
-  const minhaPosRodada = euRodada && euRodada.escalou ? euRodada.posicao : null;
-  const totalGeral = geral.length;
-  const totalRodada = membros.filter((m) => m.escalou).length;
-  // 1) Ranking da RODADA (ao vivo do IJF, via /api/liga/oficial).
-useEffect(() => {
-    let vivo = true;
-    (async () => {
-        const { data: sess } = await supabase.auth.getSession();
-        const uid = sess.session?.user?.id ?? null;
-        if (!vivo) return;
-        setMeuId(uid);
-        if (!uid && !ehMundial) {
-          setEstado("sem_sessao");
-          return;
-        }
+  const rotuloFaixa = useRotuloFaixa();
+  const nomeFaixaTraduzida = (f: string) => rotuloFaixa(f);
+  const [ready, setReady] = useState(false);
+  const [visitante, setVisitante] = useState(false);
+  const [phase, setPhase] = useState<"tutorial" | null>(null);
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState("");
+  // ehPro é verdadeiro para Pro E para Pro Max (os níveis são cumulativos).
+  const { ehPro: isPro, ehProMax: isProMax, pronto: nivelPronto } = useNivel();
+  // Contagem de ligas de AMIGOS ativas (para o gate do downgrade). null = ainda não sei.
+  const [contagemAmigos, setContagemAmigos] = useState<{ pontos: number; copa: number } | null>(null);
+  // GATE do downgrade: se ficou acima do limite de ligas de amigos do nível atual,
+  // tem de resolver antes de continuar (ecrã /resolver-ligas). Voltar ao Pro faz o
+  // limite subir e este redirecionamento deixa de disparar.
+  useEffect(() => {
+    if (!nivelPronto || !contagemAmigos) return;
+    const nivel = isProMax ? "promax" : isPro ? "pro" : "gratis";
+    const lim = LIMITES[nivel];
+    if (contagemAmigos.pontos > lim.pontos || contagemAmigos.copa > lim.copa) {
+      window.location.href = "/resolver-ligas";
+    }
+  }, [nivelPronto, contagemAmigos, isPro, isProMax]);
+  const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
+  // PATRIMÓNIO REAL, de users.patrimony_jc. Não se calcula no ecrã: é o valor
+  // que o motor de congelamento escreve a cada rodada, com as valorizações e
+  // desvalorizações já aplicadas. Ver a nota em TeamBuilt.
+  const [patrimonio, setPatrimonio] = useState<number | null>(null);
+  const { lingua } = useLingua();
+  const txtLojaAtalho = LOJA_ATALHO[lingua] ?? LOJA_ATALHO.pt;
+  // FASE A: o património mostrado = orçamento unificado (patrimony_jc + JC
+  // comprados), a mesma fonte do mercado. Sobrepõe o valor cru vindo do `users`.
+  useEffect(() => {
+      let vivo = true;
+      (async () => {
         try {
-          const p = new URLSearchParams({ tipo: ehMundial ? "mundial" : "continental", comp: idComp });
-          if (uid) p.set("user_id", uid);
-          const res = await fetch(`/api/liga/oficial?${p.toString()}`);
-          const j = await res.json();
-          if (!vivo) return;
-          setMercadoAberto(!!j.mercado_aberto);
-          if (j.semContinente) { setEstado("sem_continente"); return; }
-          if (j.ok) {
-            setMembros(Array.isArray(j.membros) ? j.membros : []);
-            setNomeContinente(j.nomeContinente ?? null);
-            setEstado("pronto");
-          } else {
-            setMembros([]);
-            setEstado("pronto");
+          const { data: sess } = await supabase.auth.getSession();
+          const tok = sess.session?.access_token;
+          if (!tok) return;
+          const r = await fetch("/api/orcamento", { headers: { Authorization: `Bearer ${tok}` }, cache: "no-store" });
+          const j = await r.json();
+          if (vivo && j?.ok && typeof j.base === "number") setPatrimonio(j.base);
+        } catch { /* fica com o valor do users */ }
+      })();
+      return () => { vivo = false; };
+    }, []);
+  // Email por confirmar? Enquanto não estiver, mostra-se uma faixa. Não bloqueia
+  // nada — a pessoa joga na mesma; só fica a saber que falta.
+  const [emailPorVerificar, setEmailPorVerificar] = useState(false);
+  const [modaisFila, setModaisFila] = useState<MensagemEspecial[]>([]);
+  const [savedTeam, setSavedTeam] = useState<TeamState | null>(null);
+  // PONTUAÇÃO AO VIVO da equipa: soma dos pontos reais dos 8 atletas (capitão a
+  // dobrar) na competição a decorrer. É o número em destaque no card do time
+  // durante a competição — o Kainan quis que, com a equipa montada e a competição
+  // a rolar, o que apareça em primeiro seja QUANTO estou a fazer, não quanto gastei.
+  const [pontosAoVivo, setPontosAoVivo] = useState<number | null>(null);
+  const [minhasLigas, setMinhasLigas] = useState<{ id: string; name: string; membros: number }[] | null>(null);
+  const [desempenho, setDesempenho] = useState<{ dados: DesempenhoRodada; team: TeamState } | null>(null);
+  const [extra, setExtra] = useState<ResumoExtra | null>(null);
+  const [desempenhoDaGaleria, setDesempenhoDaGaleria] = useState(false);
+  // O resumo aberto é AO VIVO (competição a decorrer, pontos parciais)? A galeria
+  // e os resultados congelados são sempre FINAIS (aoVivo=false).
+  const [desempenhoAoVivo, setDesempenhoAoVivo] = useState(false);
+  const [galeriaAberta, setGaleriaAberta] = useState(false);
+  // Pedido de avaliação (NPS). Aparece quando a pessoa fecha o resumo da rodada —
+  // um momento de valor: acabou de ver o resultado. O devePedirAvaliacao() traz
+  // o intervalo para reaparecer embutido (mesma cadência do resto da app), por
+  // isso nunca incomoda quem já votou ou já disse para não mostrar mais.
+  const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
+  const [userIdState, setUserIdState] = useState<string | null>(null);
+  // Identidade (nome + escudo) a usar no cartão de resumo. Arranca da identidade
+  // local (rápida), mas ao abrir um resumo é substituída pela identidade REAL da
+  // conta vinda da cloud (loadIdentityCloudFor) — senão o cartão saía com "A minha
+  // equipa" + escudo cinza quando o localStorage não tinha a identidade carregada.
+  const [identityResumo, setIdentityResumo] = useState<Identity>(loadIdentity());
+  const [, bumpPool] = useState(0);
+  const beltRef = useRef<HTMLAnchorElement | null>(null);
+  const teamRef = useRef<HTMLDivElement | null>(null);
+  const ligasRef = useRef<HTMLAnchorElement | null>(null);
+  const tutTarget: TutTarget = phase === "tutorial" ? targetForStep(step) : null;
+  const foco = focoMercado();
+  const comp = foco.atual;
+  const ehClassico = comp.classico;
+  // "A decorrer" rolling-aware: no Mundial (rolling) o aDecorrer é null, mas a
+  // competição ESTÁ a decorrer — então a home tem de a tratar como atual (não
+  // "próxima"). O resumo ao vivo (overlay) continua a usar `aDecorrer`, por isso
+  // isto não dispara o pop-up; só muda o card para "em andamento".
+  const emAndamento = foco.aDecorrer !== null || !!foco.atual?.rolling;
+  const alvo = foco.alvo;
+  const aDecorrer = foco.aDecorrer;
+  // Qual a competição que está mesmo a decorrer (para os pontos ao vivo)? No
+  // Mundial (rolling) o aDecorrer é null, mas a `atual` está a decorrer — é dela
+  // que vêm os pontos. É a MESMA competição de que o savedTeam foi carregado.
+  const idAoVivo = aDecorrer?.idCompeticao ?? (foco.atual?.rolling ? foco.atual.idCompeticao : null);
+  // Nomes a MOSTRAR. Num clássico com o mercado ainda aberto, nomeCompeticao()
+  // esconde a cidade ("Grand Prix 2018 — Clássico"): quem a visse ia ao JudoBase
+  // buscar os resultados de 2018 e montava a equipa perfeita.
+  const nomeComp = localizarNomeCompeticao(nomeCompeticao(comp), t);
+  const nomeADecorrer = aDecorrer ? localizarNomeCompeticao(nomeCompeticao(aDecorrer), t) : null;
+  const teamInfoRaw = !visitante && savedTeam ? computeTeamInfo(savedTeam) : null;
+  // Nome de equipa por defeito ("A minha equipa") traduzido para a língua do utilizador.
+  const teamInfo = teamInfoRaw
+    ? { ...teamInfoRaw, name: teamInfoRaw.name === "A minha equipa" ? t("time.nomeDefault") : teamInfoRaw.name }
+    : null;
+  const temEquipaCompleta = !!savedTeam && savedTeam.ids.length === 8 && !!savedTeam.captain;
+  // LOJA DE JUDOCOINS (Fase B): a propaganda só faz sentido nos momentos de
+  // MONTAR/decidir — mercado aberto (competição não a decorrer), ou ainda sem
+  // equipa (vais montar para a próxima) — ou quando estás ACIMA do orçamento.
+  // Se já tens equipa dentro do orçamento e a competição está a decorrer (só a
+  // ver a pontuação), não se mostra. (Pedido do Kainan: JC nos momentos cruciais,
+  // não quando só se está a ver o time.)
+  const acimaOrcamentoInicio = !!teamInfo && Number(teamInfo.value) > (patrimonio ?? 100);
+  const mostrarLojaInicio = !visitante && (!teamInfo || !emAndamento || acimaOrcamentoInicio);
+  const destinoEscalar = temEquipaCompleta ? "/meu-time" : "/criar-equipa";
+  const nomeMostrado = visitante ? t("inicio.campeao") : name;
+  useEffect(() => {
+      let active = true;
+      supabase.auth.getSession().then(({ data }: { data: { session: { user?: { id?: string; user_metadata?: { nome?: string } } } | null } }) => {
+          if (!active) return;
+          if (!data.session) {
+            setVisitante(true);
+            setSavedTeam(null);
+            setReady(true);
+            return;
           }
-        } catch {
-          if (vivo) { setMembros([]); setEstado("pronto"); }
-        }
-    })();
-    return () => { vivo = false; };
-  }, [tipo, ehMundial, idComp]);
-// 2) Ranking GERAL (acumulado ao vivo, via /api/liga/geral). Atualiza sozinho
-// enquanto a competição decorre.
-useEffect(() => {
-    if (estado !== "pronto") return;
-    let vivo = true;
-    async function buscarGeral() {
-      try {
-        const p = new URLSearchParams({ tipo: ehMundial ? "mundial" : "continental", comp: idComp });
-        if (meuId) p.set("user_id", meuId);
-        const res = await fetch(`/api/liga/geral?${p.toString()}`);
-        const j = await res.json();
-        if (!vivo) return;
-        if (j.ok && Array.isArray(j.membros)) setGeral(j.membros);
-        setGeralCarregado(true);
-      } catch {
-        if (vivo) setGeralCarregado(true);
+          setVisitante(false);
+          const userId = data.session.user?.id;
+          if (userId) setUserIdState(userId);
+          // Reconciliação silenciosa do push: garante que a subscrição deste aparelho
+          // fica ligada à conta ATUAL no servidor. Resolve a troca de conta no mesmo
+          // telemóvel (permissão já concedida → ativarPush nunca corria → a conta nova
+            // ficava sem push). Seguro: não faz nada sem permissão/subscrição.
+          if (userId) { void reconciliarPush(userId); }
+          // MARCA ATIVIDADE. É isto que impede uma conta de ser apagada por
+          // inatividade — e por isso é "abrir a app", não "escalar": quem abre para
+          // ver o ranking está a usar o produto na mesma.
+          //
+          // Não se usa o `last_sign_in_at` do Supabase porque esse só regista logins
+          // NOVOS: quem fica com a sessão aberta no telemóvel durante meses nunca
+          // volta a fazer login, e apareceria como inativo estando cá todos os dias.
+          supabase.rpc("ippon_marcar_atividade").then(() => {}, () => {});
+          if (userId) {
+            fetch(`/api/liga/minhas?user_id=${userId}`)
+            .then((r) => r.json())
+            .then((j) => {
+                if (!active) return;
+                const ligas: LigaBruta[] = Array.isArray(j?.ligas) ? j.ligas : [];
+                // Só as que ainda estão A DECORRER. As terminadas (copa com campeão,
+                  // liga de pontos com a janela fechada) saem daqui — o seu lugar é em
+                // /ligas → Resultados, com o pódio e o certificado.
+                const ativas = ligas.filter((l) => !ligaTerminada(l));
+                setMinhasLigas(ativas.map((l) => ({ id: l.id, name: l.name, membros: l.membros ?? 1 })));
+                // Gate do downgrade: conta as ligas de AMIGOS ativas por formato
+                // (oficiais não contam para o limite). O redirecionamento decide-se
+                // no efeito abaixo, quando o nível já estiver carregado.
+                const amigas = ativas.filter((l) => String(l.type) === "amigos");
+                setContagemAmigos({
+                    pontos: amigas.filter((l) => String(l.formato) !== "copa").length,
+                    copa: amigas.filter((l) => String(l.formato) === "copa").length,
+                  });
+              })
+            .catch(() => { if (active) setMinhasLigas([]); });
+          }
+          try {
+            const metaName = data.session.user?.user_metadata?.nome;
+            const savedName = localStorage.getItem(`ippon_name__${uid()}`) ?? localStorage.getItem("ippon_name");
+            const nomeParaMsg = metaName ? String(metaName).split(" ")[0] : (savedName || "");
+            if (metaName) setName(String(metaName).split(" ")[0]);
+            else if (savedName) setName(savedName);
+            else setName(t("inicio.campeao"));
+            // O nível já vem do useNivel() (tabela `users`) — não se lê do metadata.
+            if (userId) {
+              supabase.from("users").select("belt, data_nascimento, country_code, patrimony_jc, email_verificado_em").eq("id", userId).maybeSingle()
+              .then(({ data: row }) => {
+                  if (!active) return;
+                  setFaixaJogo(normalizarFaixa(row?.belt));
+                  const pat = Number((row as { patrimony_jc?: unknown } | null)?.patrimony_jc);
+                  if (Number.isFinite(pat)) setPatrimonio(pat);
+                  setEmailPorVerificar(!(row as { email_verificado_em?: unknown } | null)?.email_verificado_em);
+                  // Modais de evento do dia: junta data civil (aniversário/Dia do
+                    // Judô/fim/começo de ano) com a grande competição da semana (do
+                    // calendário; nunca clássicos; continental só do continente do user).
+                  // Mostra só os que ainda não foram vistos (1x por evento).
+                  try {
+                    const compSemana = competicaoDaSemana();
+                    const lista = mensagensModaisDeHoje(
+                      t,
+                      new Date(),
+                      {
+                        nome: nomeParaMsg || undefined,
+                        dataNascimento: row?.data_nascimento ? String(row.data_nascimento) : null,
+                        continente: continenteDoPais(row?.country_code),
+                      },
+                      {
+                        // nomeCompeticao por segurança: o motor não faz modais de
+                        // clássicos, mas se um dia fizer, não pode revelar a cidade.
+                        nome: nomeCompeticao(compSemana),
+                        nivel: compSemana.nivel,
+                        classico: compSemana.classico,
+                        idCompeticao: (compSemana as { idCompeticao?: string }).idCompeticao,
+                      },
+                    );
+                    const naoVistos = lista.filter((m) => !modalVisto(m.chave, userId));
+                    if (naoVistos.length > 0) setModaisFila(naoVistos);
+                  } catch { /* sem mensagem: nenhum modal aparece */ }
+                });
+            }
+            if (localStorage.getItem("ippon_onboarding") === "pending") {
+              tutoriaisVistosConta().then((vistos) => {
+                  if (!active) return;
+                  if (vistos["ippon_onboarding"]) {
+                    try { localStorage.setItem("ippon_onboarding", "done"); } catch {}
+                  } else {
+                    setStep(0);
+                    setPhase("tutorial");
+                  }
+                });
+            }
+            const localDecorrer = aDecorrer ? loadSavedFor(aDecorrer.idCompeticao) : { ids: [], captain: null };
+            const localBase = localDecorrer.ids.length > 0 ? localDecorrer : loadSavedFor(alvo.idCompeticao);
+            if (localBase.ids.length > 0) setSavedTeam(localBase);
+          } catch {}
+          setReady(true);
+          const compsPool = aDecorrer ? [aDecorrer.idCompeticao, alvo.idCompeticao] : [alvo.idCompeticao];
+          Promise.all(
+            compsPool.map((id) => fetch(`/api/atletas?id=${id}`).then((r) => r.json()).catch(() => null))
+          ).then((resultados) => {
+              if (!active) return;
+              const merged = new Map<string, { id: string }>();
+              for (const j of resultados) {
+                const list = Array.isArray(j?.atletas) ? j.atletas : [];
+                for (const a of list) merged.set(a.id, a);
+              }
+              if (merged.size > 0) {
+                setAthletePool(Array.from(merged.values()) as never);
+                bumpPool((t) => t + 1);
+              }
+            });
+          (async () => {
+              const naDecorrer = aDecorrer ? await loadSavedCloudFor(aDecorrer.idCompeticao) : null;
+              if (!active) return;
+              if (naDecorrer && naDecorrer.ids.length > 0) {
+                setSavedTeam(naDecorrer);
+                return;
+              }
+              const naAlvo = await loadSavedCloudFor(alvo.idCompeticao);
+              if (!active || !naAlvo || naAlvo.ids.length === 0) return;
+              setSavedTeam(naAlvo);
+            })();
+          (async () => {
+              const vistos = await desempenhosVistosConta();
+              if (!active) return;
+              if (aDecorrer) {
+                if (vistos[aDecorrer.idCompeticao]) return;
+                // A competição ainda NÃO começou. O mercado fecha 1h ANTES do
+                // início, por isso entre o fecho e o início real a rodada ainda
+                // vai acontecer — não há desempenho para mostrar. Sem isto,
+                // aparecia "+0 pontos" como se a rodada já tivesse terminado.
+                const emAoVivo = estadoMercado(aDecorrer);
+                if (emAoVivo.inicio && Date.now() < emAoVivo.inicio.getTime()) return;
+                // Já vi o ponto de situação ao vivo desta competição (guardado na CONTA)?
+                // Então não reaparece automaticamente — fica acessível pela galeria de
+                // resumos ("Os meus resumos"). Só aparece sozinho UMA vez.
+                if (await aoVivoVistoConta(aDecorrer.idCompeticao)) return;
+                if (!active) return;
+                const teamComp = await loadSavedCloudFor(aDecorrer.idCompeticao);
+                if (!active || !teamComp || teamComp.ids.length === 0) return;
+                const pontos = await buscarResultados(aDecorrer.idCompeticao);
+                if (!active || !pontos) return;
+                try {
+                  const j = await fetch(`/api/atletas?id=${aDecorrer.idCompeticao}`).then((r) => r.json());
+                  const list = Array.isArray(j?.atletas) ? j.atletas : [];
+                  if (list.length > 0) setAthletePool(list as never);
+                } catch {}
+                if (!active) return;
+                const dados = construirDesempenho(aDecorrer.idCompeticao, nomeCompeticao(aDecorrer), teamComp, pontos);
+                if (dados) {
+                  await carregarIdentidadeResumo(aDecorrer.idCompeticao);
+                  if (!active) return;
+                  // Marca JÁ como visto na CONTA: aparece uma vez automaticamente e não
+                  // volta a saltar sozinho — nem ao mudar de aba, nem ao reabrir o app,
+                  // nem noutro telemóvel. Fica disponível em "Os meus resumos".
+                  await marcarAoVivoVisto(aDecorrer.idCompeticao);
+                  if (!active) return;
+                  setDesempenhoAoVivo(true);
+                  setDesempenho({ dados, team: teamComp });
+                  // AO VIVO: NÃO criamos a notificação de resumo aqui — a competição
+                  // ainda decorre. A notificação "fizeste X pontos" só sai quando a
+                  // competição fecha (ramo dos resultados congelados, abaixo).
+                }
+                return;
+              }
+              const cong = await buscarResultadosCongelados();
+              if (!active || !cong) return;
+              if (vistos[cong.comp]) return;
+              const teamComp = await loadSavedCloudFor(cong.comp);
+              if (!active || !teamComp || teamComp.ids.length === 0) return;
+              try {
+                const j = await fetch(`/api/atletas?id=${cong.comp}`).then((r) => r.json());
+                const list = Array.isArray(j?.atletas) ? j.atletas : [];
+                if (list.length > 0) setAthletePool(list as never);
+              } catch {}
+              if (!active) return;
+              const dados = construirDesempenho(cong.comp, cong.nome, teamComp, cong.pontos);
+              if (!dados) return;
+              let ex: ResumoExtra | null = null;
+              if (userId) ex = await buscarResumoExtra(cong.comp, userId);
+              if (!active) return;
+              await carregarIdentidadeResumo(cong.comp);
+              if (!active) return;
+              setDesempenhoAoVivo(false);
+              setDesempenho({ dados, team: teamComp });
+              setExtra(ex);
+              await notificarResumo(cong.comp, cong.nome, dados, t);
+            })();
+        });
+      return () => { active = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+  // PONTOS AO VIVO da equipa (atualiza sozinho enquanto a competição decorre).
+  // Mesma fonte e mesma conta do Meu Time e do ranking: /api/resultados por
+  // atleta (rolling-aware — só devolve pontos das categorias já em competição),
+  // capitão a dobrar. Enquanto não houver resultados, fica a null e o card mostra
+  // o normal (património / última / valor).
+  useEffect(() => {
+      if (!emAndamento || !idAoVivo || !savedTeam || savedTeam.ids.length === 0) {
+        setPontosAoVivo(null);
+        return;
+      }
+      let vivo = true;
+      const ids = savedTeam.ids.join(",");
+      const cap = savedTeam.captain;
+      const listaIds = savedTeam.ids;
+      async function buscar() {
+        try {
+          const r = await fetch(`/api/resultados?comp=${idAoVivo}&persons=${ids}`, { cache: "no-store" });
+          const j = await r.json();
+          if (!vivo) return;
+          if (!j || j.bloqueado || !j.pontos) return;
+          const mapa = j.pontos as Record<string, number>;
+          let total = 0;
+          for (const aid of listaIds) {
+            const p = Number(mapa[aid] ?? 0);
+            total += p;
+            if (cap && aid === cap) total += p; // capitão a dobrar
+          }
+          if (j.tem_resultados) setPontosAoVivo(Math.round(total * 10) / 10);
+        } catch { /* mantém o valor anterior */ }
+      }
+      buscar();
+      const timer = setInterval(() => { if (!document.hidden) buscar(); }, 20000);
+      const onVis = () => { if (!document.hidden) buscar(); };
+      document.addEventListener("visibilitychange", onVis);
+      return () => { vivo = false; clearInterval(timer); document.removeEventListener("visibilitychange", onVis); };
+    }, [emAndamento, idAoVivo, savedTeam]);
+  useEffect(() => {
+      if (phase !== "tutorial") return;
+      const t = targetForStep(step);
+      const el = t === "team" ? teamRef.current : t === "ligas" ? ligasRef.current : t === "belt" ? beltRef.current : null;
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, [phase, step]);
+  const glow = (n: TutTarget) => (tutTarget === n ? "iltut" : undefined);
+  function finishOnboarding() {
+    marcarTutorialVisto("ippon_onboarding");
+    setPhase(null);
+  }
+  function openTutorial() {
+    setStep(0);
+    setPhase("tutorial");
+  }
+  // Fecha o modal de evento da frente da fila: marca-o como visto, grava no sino
+  // (para não se perder) e avança para o próximo da fila.
+  // Nota: os eventos COM push (aniversário, Dia do Judô) já são gravados no sino
+  // pelo cron (sino + push), por isso aqui NÃO os duplicamos. Os restantes
+  // (competições, fim/começo de ano) não têm push — é o fecho do modal que os
+  // guarda no sino.
+  function fecharModalEvento() {
+    const m = modaisFila[0];
+    if (m) {
+      marcarModalVisto(m.chave, userIdState);
+      if (!m.push) {
+        const ehCompeticao = m.tipo === "mundial" || m.tipo === "olimpiada" || m.tipo === "masters" || m.tipo === "continental";
+        criarNotificacao({
+            tipo: `evento_${m.tipo}`,
+            titulo: m.titulo,
+            corpo: m.texto,
+            link: ehCompeticao ? destinoEscalar : "/inicio",
+          }).catch(() => {});
       }
     }
-    buscarGeral();
-    if (tickRef.current) clearInterval(tickRef.current);
-    if (emAndamento) {
-      tickRef.current = setInterval(() => { if (!document.hidden) buscarGeral(); }, TICK_AO_VIVO_MS);
-    }
-    const onVis = () => { if (!document.hidden) buscarGeral(); };
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      vivo = false;
-      if (tickRef.current) clearInterval(tickRef.current);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, [estado, ehMundial, idComp, meuId, emAndamento]);
-// Dados do destaque conforme a vista ativa.
-const minhaPos = vista === "geral" ? minhaPosGeral : minhaPosRodada;
-const totalVista = vista === "geral" ? totalGeral : totalRodada;
-return (
-  <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
-  <div style={{ maxWidth: 460, margin: "0 auto", padding: "14px 14px 40px" }}>
-  <header style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
-  <a href="/ligas" aria-label="Voltar" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none", flexShrink: 0 }}>
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-  </a>
-  <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>{titulo}</h1>
-  </header>
-  {/* Cartão de cabeçalho */}
-  <div style={{ background: ehMundial ? "linear-gradient(160deg,#1c3a2e,#102a20)" : "linear-gradient(160deg,#2f6fb3,#1e4a78)", border: `1px solid ${GOLD}`, borderRadius: 16, padding: "16px 16px", marginBottom: 14 }}>
-  <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", color: "#fff", marginBottom: 4 }}>
-  {ehMundial ? "🌍 " : "🗺️ "}{titulo}
-  </div>
-  <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.85)", lineHeight: 1.5 }}>
-  {ehMundial
-    ? t("of.melhoresMundo")
-    : t("of.melhoresContinente", { continente: nomeContinente || t("of.teuContinente") })}
-  </div>
-  <div style={{ marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
-  {t("of.soPro", { comp: compAtual.nome })}
-  </div>
-  </div>
-  {/* Informativo de ÉPOCA ANUAL (Mundial e Continental). A época vai de
-    janeiro à última competição do ano; depois recomeça do zero. Quando a
-    competição atual já é a última do ano, muda para o texto de fecho. */}
-  {estado === "pronto" && (
-      <div style={{ background: "#0f1411", border: `1px solid ${atualEhUltimaDoAno ? GOLD : "#2a4d3e"}`, borderRadius: 12, padding: "11px 13px", marginBottom: 14, display: "flex", gap: 9, alignItems: "flex-start" }}>
-      <span aria-hidden="true" style={{ fontSize: 15, flexShrink: 0 }}>{atualEhUltimaDoAno ? "🏁" : "📅"}</span>
-      <span style={{ fontSize: 12.5, color: atualEhUltimaDoAno ? "#f0d79a" : "#aee9c9", lineHeight: 1.45 }}>
-      {atualEhUltimaDoAno
-        ? t("of.ultimaDoAno", { ano: anoCorrente, proximo: anoCorrente + 1 })
-        : t("of.ligaAnual", { ano: anoCorrente })}
-      </span>
-      </div>
-  )}
-  {/* Banner Pro para quem não é Pro */}
-  {!souPro && estado === "pronto" && (
-      <a href="/ippon-pro" style={{ display: "block", textAlign: "center", marginBottom: 14, background: "#2a2410", border: "1px solid #5a4a18", color: GOLD, fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: "11px 14px", borderRadius: 10, textDecoration: "none", fontSize: 12.5, lineHeight: 1.4 }}>
-      {t("of.bannerPro")}
-      </a>
-  )}
-  {/* Seletor Geral / Rodada (Geral é a vista principal) */}
-  <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: "1px solid #1a221d" }}>
-  {(["geral", "rodada"] as Vista[]).map((v) => (
-        <button key={v} onClick={() => setVista(v)} style={{ flex: 1, textAlign: "center", background: "transparent", border: "none", borderBottom: `2px solid ${vista === v ? GOLD : "transparent"}`, color: vista === v ? "#f1ede2" : "#7c8a82", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", padding: "9px 0", cursor: "pointer" }}>
-        {v === "geral" ? t("of.rankingGeral") : t("of.lideresRodada")}
-        </button>
-  ))}
-  </div>
-  {/* Destaque FIXO da minha posição (na vista ativa). Sempre visível, para
-    saber onde estou sem ter de procurar na lista. Só Pro e se estou no
-    ranking; senão, um convite suave a escalar / ser Pro. */}
-  {estado === "pronto" && souPro && (
-      <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#16201b", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "11px 14px", marginBottom: 13 }}>
-      <div style={{ flexShrink: 0, width: 40, textAlign: "center" }}>
-      {minhaPos !== null ? (
-          <div style={{ fontFamily: FD, fontSize: 22, fontWeight: 700, color: GOLD, lineHeight: 1 }}>{`${minhaPos}º`}</div>
-        ) : (
-          <div style={{ fontFamily: FD, fontSize: 20, color: "#7c8a82", lineHeight: 1 }}>—</div>
-      )}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#aee9c9" }}>{t("of.tuaPosicao")}</div>
-      <div style={{ fontSize: 12, color: "#c7d0c9", marginTop: 2 }}>
-      {minhaPos !== null
-        ? <>{vista === "geral" ? t("of.rankingAno") : t("of.nestaRodada")} · {totalVista === 1 ? t("of.entreJogador", { n: totalVista }) : t("of.entreJogadores", { n: totalVista })}</>
-        : (vista === "geral" ? t("of.semPontosAno") : t("of.naoEscalasteRodada"))}
-      </div>
-      </div>
-      </div>
-  )}
-  {estado === "a_carregar" && <Aviso>{t("of.aCarregarRanking")}</Aviso>}
-  {estado === "sem_sessao" && (
-      <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
-      <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, marginBottom: 16 }}>{t("of.entraParaVer")}</p>
-      <a href="/entrar?voltar=/ligas" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", padding: "12px 22px", borderRadius: 11, textDecoration: "none", fontSize: 14 }}>{t("of.entrar")}</a>
-      </div>
-  )}
-  {estado === "sem_continente" && (
-      <div style={{ textAlign: "center", padding: "30px 16px", background: "#121815", border: "1px solid #243029", borderRadius: 16 }}>
-      <div style={{ fontSize: 30, marginBottom: 6 }}>🗺️</div>
-      <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{t("of.semContinente")}</p>
-      </div>
-  )}
-  {/* Barra de pesquisa partilhada pelas duas vistas */}
-  {estado === "pronto" && (membros.length > 0 || geral.length > 0) && (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#141a17", border: "1px solid #243029", borderRadius: 10, padding: "9px 12px", marginBottom: 11 }}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c8a82" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-      <input
-      value={pesquisa}
-      onChange={(e) => setPesquisa(e.target.value)}
-      placeholder={t("of.procurarTime")}
-      inputMode="text"
-      style={{ flex: 1, background: "transparent", border: "none", color: "#f1ede2", fontSize: 14, fontFamily: FB, outline: "none" }}
-      />
-      {pesquisa && (
-          <button onClick={() => setPesquisa("")} aria-label="Limpar" style={{ background: "transparent", border: "none", color: "#7c8a82", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
-      )}
-      </div>
-  )}
-  {/* Vista GERAL: acumulado ao vivo */}
-  {estado === "pronto" && vista === "geral" && (
-      <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-      <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>{t("pl.rankingGeral")}</span>
-      {emAndamento && (
-          <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo
-          </span>
-      )}
-      </div>
-      {!geralCarregado ? (
-          <Aviso>{t("pl.aSomarEpoca")}</Aviso>
-        ) : geral.length === 0 ? (
-          <Aviso>{t("pl.semPontosAcumulados")}</Aviso>
-        ) : geralVisivel.length === 0 ? (
-          <Aviso>Sem resultados para &quot;{pesquisa}&quot;.</Aviso>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          {geralVisivel.map((m) => {
-                const euMesmo = m.user_id === meuId;
-                const ouro = m.posicao === 1 && m.pontos_geral > 0;
-                return (
-                  <div key={m.user_id} onClick={() => irParaDojo(m.user_id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); irParaDojo(m.user_id); } }} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : (ouro ? GOLD : "#243029")}`, borderRadius: 12, padding: "11px 12px", cursor: "pointer" }}>
-                  <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: ouro ? GOLD : "#7c8a82" }}>{m.posicao}</div>
-                  <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
-                  <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>
-                  {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#93a39a" }}>{m.escalou ? (mercadoAberto ? <span style={{ color: "#7fd1a3" }}>Escalou</span> : <span style={{ color: "#7fd1a3" }}>+{m.pontos_rodada} nesta rodada</span>) : t("pl.semEscalacao")}</div>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: GOLD }}>{m.pontos_geral}</div>
-                  <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>{t("pl.total")}</div>
-                  </div>
-                  </div>
-                );
-          })}
-          </div>
-      )}
-      </>
-  )}
-  {/* Vista RODADA: o ranking só da rodada atual */}
-  {estado === "pronto" && vista === "rodada" && (
-      <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-      <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>{t("comp.rodada")} · {localizarNomeCompeticao(compAtual.nome, t)}</span>
-      {emAndamento ? (
-          <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} /> Ao vivo
-          </span>
-        ) : (
-          <span style={{ fontSize: 11, color: "#7fd1a3" }}>{t("pl.preCompeticao")}</span>
-      )}
-      </div>
-      {membros.length === 0 ? (
-          <Aviso>{t("of.semMembrosPro")}</Aviso>
-        ) : membrosVisiveis.length === 0 ? (
-          <Aviso>Sem resultados para &quot;{pesquisa}&quot;.</Aviso>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          {membrosVisiveis.map((m) => {
-                const euMesmo = m.user_id === meuId;
-                const ouro = !mercadoAberto && m.posicao === 1 && m.escalou;
-                return (
-                  <div key={m.user_id} onClick={() => irParaDojo(m.user_id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); irParaDojo(m.user_id); } }} style={{ display: "flex", alignItems: "center", gap: 11, width: "100%", background: euMesmo ? "#16201b" : "#121815", border: `1px solid ${euMesmo ? GOLD : (ouro ? GOLD : "#243029")}`, borderRadius: 12, padding: "11px 12px", cursor: "pointer" }}>
-                  <div style={{ width: 24, textAlign: "center", flexShrink: 0, fontFamily: FD, fontSize: 16, fontWeight: 700, color: ouro ? GOLD : "#7c8a82" }}>{mercadoAberto ? "—" : (m.escalou ? m.posicao : "—")}</div>
-                  <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={34} /></div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
-                  <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>
-                  {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
-                  </div>
-                  <div style={{ fontSize: 11, color: m.escalou ? "#7fd1a3" : "#e0894f" }}>{m.escalou ? "Escalou" : t("pl.naoEscalou")}</div>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, color: "#f1ede2" }}>{mercadoAberto ? "—" : (m.escalou ? (m.pontos >= 0 ? "+" : "") + m.pontos : "—")}</div>
-                  <div style={{ fontSize: 9, color: "#93a39a", textTransform: "uppercase" }}>{t("comum.pts")}</div>
-                  </div>
-                  </div>
-                );
-          })}
-          </div>
-      )}
-      </>
-  )}
-  </div>
-  </main>
-);
-}
-function Aviso({ children }: { children: React.ReactNode }) {
+    setModaisFila((fila) => fila.slice(1));
+  }
+  async function abrirResumoDaGaleria(compEscolhida: string) {
+    const cong = await buscarResultadosCongelados(compEscolhida);
+    if (!cong) return;
+    const teamComp = await loadSavedCloudFor(compEscolhida);
+    if (!teamComp || teamComp.ids.length === 0) return;
+    try {
+      const j = await fetch(`/api/atletas?id=${compEscolhida}`).then((r) => r.json());
+      const list = Array.isArray(j?.atletas) ? j.atletas : [];
+      if (list.length > 0) setAthletePool(list as never);
+    } catch {}
+    const dados = construirDesempenho(cong.comp, cong.nome, teamComp, cong.pontos);
+    if (!dados) return;
+    let ex: ResumoExtra | null = null;
+    if (userIdState) ex = await buscarResumoExtra(cong.comp, userIdState);
+    await carregarIdentidadeResumo(cong.comp);
+    setDesempenhoAoVivo(false);
+    setDesempenho({ dados, team: teamComp });
+    setExtra(ex);
+    setDesempenhoDaGaleria(true);
+    setGaleriaAberta(false);
+  }
+  // Carrega a identidade REAL da conta para a competição do resumo (nome + escudo
+    // gravados na tabela `equipas`). Faz merge sobre a identidade local: começa de
+  // loadIdentity() e sobrepõe só o que a cloud trouxer, para nenhum campo do tipo
+  // Identity ficar em falta. Assim o cartão mostra o nome/escudo certos.
+  async function carregarIdentidadeResumo(idComp: string) {
+    const base = loadIdentity();
+    try {
+      const cloud = await loadIdentityCloudFor(idComp);
+      if (cloud && (cloud.name || cloud.escudo)) {
+        const doEscudo = (cloud.escudo && typeof cloud.escudo === "object") ? (cloud.escudo as Partial<Identity>) : {};
+        const merged: Identity = { ...base, ...doEscudo } as Identity;
+        if (cloud.name) merged.name = cloud.name;
+        setIdentityResumo(merged);
+        return;
+      }
+    } catch {}
+    setIdentityResumo(base);
+  }
+  if (!ready) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#7c8a82", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ fontFamily: FD, fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase" }}>{t("comum.carregando")}</div>
+      </main>
+    );
+  }
+  // Os modais de evento só aparecem fora do tutorial de onboarding e sem outro
+  // overlay aberto (resumo da rodada / galeria), para não empilhar pop-ups.
+  const modalEvento = modaisFila[0] ?? null;
+  const podeMostrarModalEvento = !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
   return (
-    <div style={{ textAlign: "center", padding: "40px 16px", color: "#7c8a82" }}>
-    <div style={{ fontFamily: FD, fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase" }}>{children}</div>
+    <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+    <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes iltut{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.75)}50%{box-shadow:0 0 0 9px rgba(74,144,217,0.18)}} .iltut{animation:iltut 1.3s ease-in-out infinite} @keyframes ilentrar{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.28)}} .ilentrar{animation:ilentrar 1.5s ease-in-out infinite;border-radius:999px} @keyframes ilmodalin{0%{opacity:0;transform:translateY(10px) scale(0.97)}100%{opacity:1;transform:none}} .ilmodalin{animation:ilmodalin 0.28s cubic-bezier(0.2,0.7,0.3,1)}`}</style>
+    <div style={{ maxWidth: 460, margin: "0 auto", padding: "16px 14px 86px" }}>
+    <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+    {visitante ? (
+        <a href="/entrar?voltar=/inicio" className="ilentrar" style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: `1px solid ${GOLD}`, borderRadius: 999, padding: "5px 14px 5px 5px", textDecoration: "none", color: "#f1ede2" }}>
+        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0 }}>
+        <Mascot belt="#efeadd" expression="feliz" />
+        </div>
+        <div>
+        <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{t("inicio.campeao")}</div>
+        <div style={{ fontSize: 11, color: GOLD }}>{t("inicio.entrarParaJogar")}</div>
+        </div>
+        </a>
+      ) : (
+        <a ref={beltRef} className={glow("belt")} href="/perfil" style={{ display: "flex", alignItems: "center", gap: 9, background: "#141a17", border: "1px solid #243029", borderRadius: 999, padding: "5px 14px 5px 5px", textDecoration: "none", color: "#f1ede2" }}>
+        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1c3a2e", overflow: "hidden", flexShrink: 0, border: `2px solid ${corDaFaixa(faixaJogo)}` }}>
+        <Mascot belt={corDaFaixa(faixaJogo)} expression="feliz" />
+        </div>
+        <div>
+        <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{nomeMostrado || "\u00A0"}</div>
+        <div style={{ fontSize: 11, color: GOLD }}>{rotuloFaixa(faixaJogo)}</div>
+        </div>
+        </a>
+      )}
+    <div style={{ display: "flex", gap: 8 }}>
+    <button onClick={openTutorial} aria-label="Como se joga" style={iconBtn}>?</button>
+    <a href="/ajuda" aria-label="Fale connosco" style={{ ...iconBtn, textDecoration: "none" }}>
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 11a7 7 0 0 1 14 0" />
+    <circle cx="12" cy="8.5" r="2.6" />
+    <rect x="3.5" y="10" width="3" height="6.5" rx="1.5" />
+    <rect x="17.5" y="10" width="3" height="6.5" rx="1.5" />
+    <path d="M19 16.5q0 4-4 4.6l-2.5.2" />
+    <circle cx="12.3" cy="21.3" r="1" fill="currentColor" stroke="none" />
+    </svg>
+    </a>
+    <SinoNotificacoes calcOpts={{ temEquipa: temEquipaCompleta }} />
     </div>
+    </header>
+    {/* Convite para instalar a app (PWA). Só aparece a quem ainda não instalou. */}
+    <CartaoInstalarApp />
+    {/* EMAIL POR CONFIRMAR. Não bloqueia nada: a pessoa joga na mesma. Mas
+      fica visível, e o cron manda um lembrete por dia até confirmar. É o
+      equilíbrio que se quis — não perder ninguém no registo, e ainda assim
+      acabar com endereços que não existem (havia um "@gamil.com" na base). */}
+    {!visitante && emailPorVerificar && <FaixaVerificarEmail />}
+    {!visitante && <ChaveamentoAlerta idADecorrer={aDecorrer ? aDecorrer.idCompeticao : null} idAlvo={alvo.idCompeticao} />}
+    {/* Botão da galeria de resumos (todas as rodadas jogadas). Só para quem tem conta. */}
+    {!visitante && (
+        <button onClick={() => setGaleriaAberta(true)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 10, background: "#141a17", border: "1px solid #243029", borderRadius: 12, padding: "11px 14px", marginBottom: 14, cursor: "pointer", fontFamily: FB, color: "#f1ede2", textAlign: "left" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1c3a2e", flexShrink: 0 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#aee9c9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>
+        </span>
+        <span>
+        <span style={{ display: "block", fontSize: 13.5, fontWeight: 700 }}>{t("inicio.meusResumos")}</span>
+        <span style={{ display: "block", fontSize: 11, color: "#93a39a" }}>{t("inicio.meusResumosSub")}</span>
+        </span>
+        </span>
+        <span style={{ color: GOLD, fontSize: 18 }}>›</span>
+        </button>
+      )}
+    {isProMax ? (
+        <a href="/pro-max-central" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "linear-gradient(135deg,#3f86d6,#7fb8f5)", borderRadius: 14, padding: "13px 14px", marginBottom: 14, textDecoration: "none" }}>
+        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#0a1622", textTransform: "uppercase" }}>{t("inicio.centralMax")}</span>
+        <span style={{ background: "#0a1622", color: "#7fb8f5", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>★ Pro Max</span>
+        </div>
+        <div style={{ fontSize: 11, color: "#0e2236", marginTop: 3 }}>{t("inicio.centralMaxSub")}</div>
+        </div>
+        <span style={{ background: "#0a1622", color: "#7fb8f5", fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>{t("inicio.abrir")}</span>
+        </a>
+      ) : isPro ? (
+        <a href="/pro" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "13px 14px", marginBottom: 14, textDecoration: "none" }}>
+        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>{t("inicio.centralPro")}</span>
+        <span style={{ background: "#1b211e", color: GOLD, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>★ Pro</span>
+        </div>
+        <div style={{ fontSize: 11, color: "#5c4410", marginTop: 3 }}>{t("inicio.centralProSub")}</div>
+        </div>
+        <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>{t("inicio.abrir")}</span>
+        </a>
+      ) : (
+        <a href="/ippon-pro" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: GOLD, borderRadius: 14, padding: "11px 14px", marginBottom: 14, textDecoration: "none" }}>
+        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, color: "#3a2a08", textTransform: "uppercase" }}>Ippon Pro</span>
+        {PRECO.emPromocao && <span style={{ background: "#1b211e", color: GOLD, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("precos.etiqueta")}</span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
+        {PRECO.emPromocao && <span style={{ fontSize: 12, color: "#7a5e12", textDecoration: "line-through" }}>{PRECO.normal}</span>}
+        <span style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, color: "#3a2a08" }}>{PRECO.atual}</span>
+        <span style={{ fontSize: 11, color: "#5c4410" }}>{t("precos.periodo")}</span>
+        </div>
+        <div style={{ fontSize: 11, color: "#5c4410", marginTop: 2 }}>{t("inicio.proSub")}</div>
+        <div style={{ fontSize: 11, color: "#3a2a08", fontWeight: 700, marginTop: 3 }}>{t("precos.premios")}</div>
+        </div>
+        <span style={{ background: "#1b211e", color: GOLD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap" }}>{t("inicio.assinar")}</span>
+        </a>
+      )}
+    {/* FASE B: atalho para a Loja de Judocoins (orçamento extra da temporada).
+        Só nos momentos de montar/decidir ou acima do orçamento — não quando só
+        se está a ver a pontuação com a equipa já feita. */}
+    {mostrarLojaInicio && (
+        <a href="/loja" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "11px 14px", marginBottom: 14, textDecoration: "none" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ width: 30, height: 30, borderRadius: "50%", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>JC</span>
+        <div>
+        <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, color: "#f1ede2", textTransform: "uppercase" }}>{txtLojaAtalho.titulo}</div>
+        <div style={{ fontSize: 11, color: "#93a39a", marginTop: 2 }}>{txtLojaAtalho.sub}</div>
+        </div>
+        </div>
+        <span style={{ background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, padding: "7px 12px", borderRadius: 9, whiteSpace: "nowrap", textTransform: "uppercase" }}>{txtLojaAtalho.botao}</span>
+        </a>
+      )}
+    <div ref={teamRef} className={glow("team")}>
+    {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo, t)} faixa={faixaJogo} patrimonio={patrimonio} pontosAoVivo={pontosAoVivo} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} />}
+    {/* NOTA: o aviso "equipa acima do orçamento" NÃO vive mais aqui (pedido do
+        Kainan — na página inicial era demasiado). Fica no Meu Time (dojo), no
+        Mercado, e nas notificações (push/sino). */}
+    </div>
+    {/* Lembrete de notificações: aparece depois de ter equipa montada. */}
+    {!visitante && teamInfo && userIdState && <LembreteNotificacoes userId={userIdState} />}
+    <Card>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+    <CardTitle>{ehClassico ? (emAndamento ? t("inicio.classicoAtual") : t("inicio.proximoClassico")) : (emAndamento ? t("inicio.competicaoAtual") : t("inicio.proximaCompeticao"))}</CardTitle>
+    {ehClassico && (
+        <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#3a2f12", color: GOLD, fontSize: 10.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.03em" }}>↻ {t("inicio.classicoTag")}</span>
+      )}
+    </div>
+    <div style={{ fontSize: 15, fontWeight: 700 }}>{nomeComp}</div>
+    <div style={{ fontSize: 12, color: "#93a39a", marginTop: 2 }}>
+    {rotuloNivel(comp.nivel, t)}{ehClassico ? ` · ${t("inicio.rodadaEspecial")}` : ""} · {t("inicio.aValerPontos")}
+    </div>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+    {emAndamento ? (
+        <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#e2655a", fontSize: 12, fontWeight: 700 }}>
+        <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
+        {t("inicio.emAndamentoAqui")}
+        </span>
+      ) : (
+        <span style={{ fontSize: 12, color: "#7fd1a3" }}>{textoFecho(comp, t)}</span>
+      )}
+    {emAndamento ? (
+        visitante ? (
+          <a href="/entrar?voltar=/inicio" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>{t("inicio.entrarParaJogar")}</a>
+        ) : (
+          <a href="/meu-time" style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>{t("inicio.verEquipa")}</a>
+        )
+      ) : (
+        <a href={destinoEscalar} style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, textDecoration: "none" }}>{t("inicio.escalar")}</a>
+      )}
+    </div>
+    </Card>
+    {emAndamento && (
+        <Card>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9 }}>
+        <span className="ilpulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a" }} />
+        <span style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", color: "#e2655a" }}>{t("inicio.aoVivo")}</span>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>{nomeADecorrer ?? nomeComp}</div>
+        <div style={{ fontSize: 12, color: "#93a39a", marginTop: 3, lineHeight: 1.4 }}>
+        {t("inicio.competicaoDecorrer")}
+        </div>
+        {/* Botão para a chave ao vivo. Aparece a todos (com competição a
+            decorrer), mas com destinos diferentes por nível:
+          - visitante → entrar (e voltar à chave);
+          - grátis → página de vendas (/ippon-pro);
+          - Pro e Pro Max → /chave-atletas. A própria página mostra a versão
+          certa: Pro vê congelada + convite Pro Max; Pro Max vê ao vivo. */}
+        {(() => {
+              const temAcesso = isPro || isProMax;
+              const destinoChave = visitante
+              ? "/entrar?voltar=/chave-atletas"
+              : temAcesso
+              ? "/chave-atletas"
+              : "/ippon-pro";
+              return (
+                <a href={destinoChave} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 11, background: "#15110a", border: `1px solid ${GOLD}`, borderRadius: 10, padding: "10px 13px", textDecoration: "none", color: "#f1ede2" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 8, background: "#1c3a2e", flexShrink: 0 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#aee9c9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{t("inicio.aoVivoSub")}</span>
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+                {!temAcesso && <span style={{ fontSize: 9.5, color: "#3a2a08", background: GOLD, borderRadius: 999, padding: "2px 8px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro</span>}
+                <span style={{ color: GOLD, fontSize: 18 }}>›</span>
+                </span>
+                </a>
+              );
+            })()}
+        </Card>
+      )}
+    <a ref={ligasRef} className={glow("ligas")} href="/ligas" style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+    <Card>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: minhasLigas && minhasLigas.length > 0 ? 6 : 0 }}>
+    <CardTitle>{t("inicio.tuasLigas")}</CardTitle>
+    <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, color: GOLD }}>{t("inicio.verTodas")}</span>
+    </div>
+    {minhasLigas === null ? (
+        <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6 }}>{t("inicio.aCarregarLigas")}</div>
+      ) : minhasLigas.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#7c8a82", paddingTop: 6, lineHeight: 1.4 }}>
+        {t("inicio.semLigas")}
+        </div>
+      ) : (
+        minhasLigas.slice(0, 4).map((l) => (
+            <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+            <span style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "70%" }}>{l.name}</span>
+            <span style={{ fontSize: 12, color: "#93a39a" }}>{l.membros} {l.membros === 1 ? t("inicio.membro") : t("inicio.membros")}</span>
+            </div>
+          ))
+      )}
+    </Card>
+    </a>
+    {/* BLOG DO DÔDO — no fim, de propósito: quem chega aqui já viu a equipa
+      e as ligas. É conteúdo para ficar, não para decidir. */}
+    <HubCarrossel />
+    </div>
+    <BarraInferior ativo="inicio" />
+    {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || t("inicio.campeao")} target={tutTarget} cor={corDaFaixa(faixaJogo)} contaPro={isPro} contaProMax={isProMax} />}
+    {/* Modais de evento (aniversário, grande competição, etc.). Aparecem 1x por
+      evento; em sequência quando coincidem; ao fechar vão para o sino. */}
+    {podeMostrarModalEvento && modalEvento && (
+        <ModalEvento msg={modalEvento} onClose={fecharModalEvento} cor={corDaFaixa(faixaJogo)} />
+      )}
+    {desempenho && (
+        <Desempenho
+        dados={desempenho.dados}
+        identity={identityResumo}
+        team={desempenho.team}
+        nome={nomeMostrado || t("inicio.campeao")}
+        faixa={nomeFaixaTraduzida(faixaJogo)}
+        pro={isPro}
+        extra={extra}
+        daGaleria={desempenhoDaGaleria}
+        aoVivo={desempenhoAoVivo}
+        userId={userIdState}
+        onFechar={() => {
+            // O ao vivo já foi marcado como visto na CONTA quando apareceu, por
+            // isso aqui só fechamos. Não reaparece sozinho — fica em "Os meus
+            // resumos".
+            // Resultado FINAL da competição (não ao vivo, não da galeria): é
+            // altura de pedir avaliação, se a cadência o permitir. Vale para
+            // "pular" e para "pular para sempre". Lê-se o estado ANTES de limpar.
+            const pedirAvaliacao = !desempenhoAoVivo && !desempenhoDaGaleria && devePedirAvaliacao();
+            setDesempenho(null);
+            setExtra(null);
+            setDesempenhoDaGaleria(false);
+            setDesempenhoAoVivo(false);
+            if (pedirAvaliacao) setMostrarAvaliacao(true);
+          }}
+        onNaoMostrarMais={() => {
+            const pedirAvaliacao = !desempenhoAoVivo && !desempenhoDaGaleria && devePedirAvaliacao();
+            marcarDesempenhoVisto(desempenho.dados.idCompeticao);
+            setDesempenho(null);
+            setExtra(null);
+            setDesempenhoDaGaleria(false);
+            setDesempenhoAoVivo(false);
+            if (pedirAvaliacao) setMostrarAvaliacao(true);
+          }}
+        />
+      )}
+    {galeriaAberta && userIdState && (
+        <GaleriaResumos
+        userId={userIdState}
+        onAbrir={(comp) => abrirResumoDaGaleria(comp)}
+        onClose={() => setGaleriaAberta(false)}
+        />
+      )}
+    {mostrarAvaliacao && (
+        <Avaliacao nomeTime={identityResumo.name || nomeMostrado} onClose={() => setMostrarAvaliacao(false)} />
+      )}
+    </main>
+  );
+}
+async function notificarResumo(idComp: string, nomeComp: string, dados: DesempenhoRodada, t: (chave: string, vars?: Record<string, string | number>) => string) {
+  try {
+    const chaveResumo = `ippon_notif_resumo_${idComp}`;
+    if (localStorage.getItem(chaveResumo)) return;
+    const cap = dados.capitao;
+    const msg = mensagemDesempenho(dados.pontuacaoTotal, "", false, t);
+    const corpo = cap
+    ? t("inicio.resumoCorpoCap", { msg, pts: dados.pontuacaoTotal, cap: cap.atleta.name.split(" ").slice(-1)[0], capPts: cap.pontos })
+    : t("inicio.resumoCorpo", { msg, pts: dados.pontuacaoTotal });
+    await criarNotificacao({
+        tipo: "resumo_rodada",
+        titulo: t("inicio.resumoTitulo", { comp: nomeComp }),
+        corpo: corpo.trim(),
+        link: "/meu-time",
+      });
+    localStorage.setItem(chaveResumo, "1");
+  } catch {}
+}
+const iconBtn: React.CSSProperties = {
+  width: 36, height: 36, borderRadius: "50%", border: "1px solid #243029", background: "transparent",
+  color: "#93a39a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, cursor: "pointer",
+};
+// Faixa de "confirma o teu email". Mostra o estado vindo do redirecionamento
+// (?email=ok, ?email=expirado...) e deixa reenviar a ligação.
+// Alerta "Chave oficial" no dashboard. Aparece quando a competição a decorrer
+// (ou a de mercado aberto) já tem moldura montada, e leva à chave ao vivo
+// (/chave-atletas). Sem moldura, não mostra nada.
+function ChaveamentoAlerta({ idADecorrer, idAlvo }: { idADecorrer: string | null; idAlvo: string }) {
+  const t = useT();
+  const [mostrar, setMostrar] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const ids = [idADecorrer, idAlvo].filter(Boolean) as string[];
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        const tk = sess.session?.access_token;
+        for (const id of ids) {
+          const r = await fetch(`/api/chaveamento-moldura?comp=${encodeURIComponent(id)}`, tk ? { headers: { authorization: `Bearer ${tk}` } } : undefined);
+          const j = await r.json().catch(() => null);
+          if (!vivo) return;
+          if (j && (j.existe || (Array.isArray(j.molduras) && j.molduras.length > 0))) { setMostrar(true); return; }
+        }
+      } catch { /* sem alerta */ }
+    })();
+    return () => { vivo = false; };
+  }, [idADecorrer, idAlvo]);
+  if (!mostrar) return null;
+  return (
+    <a href="/chave-atletas" style={{ display: "flex", alignItems: "center", gap: 11, background: "linear-gradient(160deg,#141a17,#10160f)", border: "1px solid #243029", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", marginBottom: 14, textDecoration: "none" }}>
+      <span aria-hidden="true" style={{ fontSize: 18, flexShrink: 0 }}>🥋</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{t("chv.oficial")}</span>
+      </span>
+      <span style={{ flexShrink: 0, color: GOLD, fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>{t("chv.verChave")} →</span>
+    </a>
+  );
+}
+
+function FaixaVerificarEmail() {
+  const t = useT();
+  const [estado, setEstado] = useState<"normal" | "enviando" | "enviado" | "erro">("normal");
+  const [msg, setMsg] = useState("");
+  async function reenviar() {
+    setEstado("enviando"); setMsg("");
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) { setEstado("erro"); setMsg(t("inicio.entraPrimeiro")); return; }
+      const j = await fetch("/api/verificar-email", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }).then((r) => r.json());
+      if (j?.jaVerificado) { setEstado("enviado"); setMsg(t("inicio.jaConfirmado")); return; }
+      if (j?.jaEnviado) { setEstado("enviado"); setMsg(String(j.nota || t("inicio.acabamosEnviar"))); return; }
+      if (!j?.ok) { setEstado("erro"); setMsg(t("inicio.naoEnviouAgora")); return; }
+      setEstado("enviado"); setMsg(t("inicio.enviado"));
+    } catch {
+      setEstado("erro"); setMsg(t("inicio.naoEnviou"));
+    }
+  }
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "linear-gradient(160deg,#2a2410,#10160f)", border: "1px solid #5a4a18", borderLeft: `3px solid ${GOLD}`, borderRadius: 12, padding: "11px 13px", marginBottom: 14 }}>
+    <span style={{ flexShrink: 0, color: GOLD, marginTop: 1 }}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
+    </span>
+    <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", color: GOLD }}>{t("inicio.confirmaEmail")}</div>
+    <p style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45, margin: "4px 0 0" }}>
+    {t("inicio.confirmaEmailCorpo")}
+</p>
+    {msg && <p style={{ fontSize: 11.5, color: estado === "erro" ? "#ef8d83" : "#7fd1a3", margin: "6px 0 0" }}>{msg}</p>}
+    {estado !== "enviado" && (
+        <button onClick={reenviar} disabled={estado === "enviando"}
+        style={{ marginTop: 8, background: "transparent", border: "none", color: GOLD, fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: FB, padding: 0, textDecoration: "underline" }}>
+        {estado === "enviando" ? "A enviar…" : "Reenviar o email"}
+        </button>
+      )}
+    </div>
+    </div>
+  );
+}
+function Card({ children }: { children: React.ReactNode }) {
+  return <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: 13, marginBottom: 12 }}>{children}</div>;
+}
+function CardTitle({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>{children}</div>;
+}
+function TeamCreate({ corDodo = "#efeadd" }: { corDodo?: string }) {
+  const t = useT();
+  return (
+    <div style={{ border: "1px solid #2a4d3e", borderRadius: 16, overflow: "hidden", marginBottom: 14, background: "repeating-linear-gradient(45deg,#1c3a2e 0 16px,#1a352a 16px 32px)" }}>
+    <div style={{ padding: "20px 16px", textAlign: "center" }}>
+    <div style={{ width: 64, height: 64, margin: "0 auto 6px" }}>
+    <Mascot belt={corDodo} expression="feliz" />
+    </div>
+    <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase" }}>{t("inicio.criarEquipa")}</div>
+    <div style={{ fontSize: 12, color: "#cfe4d8", margin: "4px 0 14px" }}>{t("inicio.criarEquipaSub")}</div>
+    <a href="/criar-equipa" style={{ display: "block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 13, borderRadius: 11, fontSize: 15, textDecoration: "none" }}>
+    {t("inicio.criarMinhaEquipa")}
+    </a>
+    </div>
+    </div>
+  );
+}
+// `patrimonio` = users.patrimony_jc, o valor REAL.
+//
+// Antes calculava-se aqui `100 - valor da equipa`. Isso não é o património: é o
+// SALDO que sobra para gastar, e parte sempre de 100 fixo — por isso nunca
+// oscilava, por mais que os atletas valorizassem. Alguém com 116,2 JC na base
+// via "JC 2,8" no ecrã.
+//
+// São duas coisas diferentes e a app confundia-as:
+// Património = quanto vale ao todo (equipa + saldo). Evolui a cada rodada.
+// Saldo = quanto sobra para comprar. É o 100 - valor da equipa.
+function TeamBuilt({ info, fechoTexto, faixa, patrimonio, pontosAoVivo }: { info: { name: string; value: string; last: number }; fechoTexto: string; faixa: Faixa; patrimonio: number | null; pontosAoVivo: number | null }) {
+  const t = useT();
+  const rotuloFaixa = useRotuloFaixa();
+  const aoVivo = pontosAoVivo !== null;
+  return (
+    <div style={{ border: `1px solid ${aoVivo ? GOLD : "#243029"}`, borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
+    <div style={{ background: "#1c3a2e", padding: 9, textAlign: "center", fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aee9c9" }}>{t("inicio.minhaEquipa")}</div>
+    <div style={{ background: "#0f1411", padding: 14 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+    <div style={{ width: 48, height: 48 }}>
+    <Mascot belt={corDaFaixa(faixa)} expression={aoVivo ? "comemorando" : "feliz"} />
+    </div>
+    <div>
+    <div style={{ fontSize: 16, fontWeight: 700 }}>{info.name}</div>
+    <div style={{ fontSize: 12, color: GOLD }}>{rotuloFaixa(faixa)}</div>
+    </div>
+    </div>
+    {/* PONTUAÇÃO AO VIVO em destaque — enquanto a competição decorre, o número
+        grande é quanto a equipa está a fazer. Sem resultados ainda (ou fora de
+        competição), nem aparece: fica só o resumo património/última/valor. */}
+    {aoVivo && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "#15110a", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        <span className="ilpulse" style={{ width: 9, height: 9, borderRadius: "50%", background: "#e2655a", display: "inline-block" }} />
+        <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#e2655a", letterSpacing: "0.04em" }}>{t("inicio.aoVivo")}</span>
+        </span>
+        <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+        <span style={{ fontFamily: FD, fontSize: 30, fontWeight: 700, color: GOLD, lineHeight: 1 }}>{pontosAoVivo >= 0 ? "+" : ""}{pontosAoVivo}</span>
+        <span style={{ fontSize: 11, color: "#93a39a", textTransform: "uppercase" }}>{t("comum.pts")}</span>
+        </span>
+        </div>
+      )}
+    <div style={{ display: "flex", justifyContent: "space-between", textAlign: "center", marginBottom: 12 }}>
+    {(() => {
+          // Enquanto o património não chega da base, mostra "—" em vez de um
+          // número inventado: um valor errado é pior do que um traço.
+          const pat = patrimonio !== null ? `JC ${Math.round(patrimonio * 10) / 10}` : "—";
+          return [[pat, t("equipa.patrimonio")], [String(info.last), t("inicio.ultima")], [`JC ${info.value}`, t("inicio.valor")]].map(([v, l]) => (
+              <div key={l}>
+              <div style={{ fontFamily: FD, fontSize: 17, fontWeight: 700, color: l === t("equipa.patrimonio") ? GOLD : "#f1ede2" }}>{v}</div>
+              <div style={{ fontSize: 10, color: "#93a39a", textTransform: "uppercase" }}>{l}</div>
+              </div>
+            ));
+        })()}
+    </div>
+    <div style={{ fontSize: 12, color: "#7fd1a3", marginBottom: 10 }}>{fechoTexto}</div>
+    <a href="/meu-time" style={{ display: "block", background: GOLD, color: "#1b211e", textAlign: "center", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 12, borderRadius: 11, fontSize: 14, textDecoration: "none" }}>
+    {t("inicio.verMeuTime")}
+    </a>
+    </div>
+    </div>
+  );
+}
+function Overlay({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(6,8,7,0.78)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 100 }}>
+    <div style={{ width: "100%", maxWidth: 320 }}>{children}</div>
+    </div>
+  );
+}
+// Modal de evento (estilo tutorial, com o Dôdo). Um botão único; ao fechar, o
+// chamador marca como visto, grava no sino e avança para o próximo da fila.
+// `cor` = a faixa REAL do jogador. Era fixa em #141110 (quase preto), o que dava
+// o mesmo Dôdo a toda a gente — inclusive a um faixa-branca.
+function ModalEvento({ msg, onClose, cor }: { msg: MensagemEspecial; onClose: () => void; cor: string }) {
+  const expr: React.ComponentProps<typeof Mascot>["expression"] =
+  msg.tipo === "aniversario" ? "comemorando"
+  : msg.tipo === "fim_de_ano" || msg.tipo === "comeco_de_ano" || msg.tipo === "dia_do_judo" ? "feliz"
+  : "indicando";
+  return (
+    <Overlay>
+    <div className="ilmodalin" style={{ background: "#121815", border: `1px solid ${msg.cor}`, borderRadius: 16, padding: 20, textAlign: "center" }}>
+    <div style={{ width: 76, height: 76, margin: "0 auto 4px" }}>
+    <Mascot belt={cor} expression={expr} />
+    </div>
+    <div style={{ fontSize: 30, lineHeight: 1, marginBottom: 8 }} aria-hidden="true">{msg.emoji}</div>
+    <div style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.15, marginBottom: 9, color: msg.cor }}>{msg.titulo}</div>
+    <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 18px" }}>{msg.texto}</p>
+    <button onClick={onClose} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 14, borderRadius: 12, fontSize: 15, cursor: "pointer", boxSizing: "border-box" }}>
+    {msg.botao}
+    </button>
+    </div>
+    </Overlay>
+  );
+}
+// `cor` = a faixa REAL do jogador (ver a nota do ModalEvento).
+// A oferta final adapta-se ao nível do utilizador:
+//   grátis  -> oferece Ippon Pro
+//   Pro     -> oferece Ippon Pro Max (subir de nível)
+//   Pro Max -> NÃO há passo de oferta (o tutorial acaba um passo antes)
+// CUIDADO: a variável `isPro` aqui dentro é LOCAL e significa "este é o passo da
+// oferta" — não confundir com contaPro/contaProMax (o nível de subscrição real).
+function Tutorial({ step, setStep, onClose, name, target, cor, contaPro, contaProMax }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string; target: TutTarget; cor: string; contaPro: boolean; contaProMax: boolean }) {
+  const t = useT();
+  // Pro Max já tem tudo: não vê passo de oferta. Os outros têm-no no fim.
+  const temOferta = !contaProMax;
+  const total = STEPS.length + 1 + (temOferta ? 1 : 0);
+  const isWelcome = step === 0;
+  const isPro = temOferta && step === STEPS.length + 1; // este é o passo da OFERTA
+  const isLast = step === total - 1;                    // último passo (fecha o tutorial)
+  // Quem já é Pro (mas não Max) recebe a oferta de SUBIR para Pro Max.
+  const ofereceMax = contaPro && !contaProMax;
+  const teach = STEPS[step - 1];
+  if (target) {
+    const title = isPro ? (ofereceMax ? "Ippon Pro Max" : "Ippon Pro") : t(teach.title);
+    const text = isPro
+    ? (ofereceMax ? t("inicio.ofertaMaxSub") : t("inicio.tocaProSub", { preco: PRECO.atualComPeriodo }))
+    : t(teach.text);
+    return (
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 74, padding: "0 12px", zIndex: 100 }}>
+      <div style={{ maxWidth: 436, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
+      <div style={{ width: 56, height: 56, flexShrink: 0 }}><Mascot belt={cor} expression="indicando" /></div>
+      <div style={{ flex: 1, background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "12px 14px" }}>
+      <div style={{ textAlign: "right", marginBottom: 4 }}>
+      <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 11, cursor: "pointer", fontFamily: FB }}>{t("comum.pular")} ✕</button>
+      </div>
+      <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{title}</div>
+      <p style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.45, margin: 0 }}>{text}</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+      <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>{t("comum.anterior")}</button>
+      <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
+      <button onClick={() => (isLast ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "8px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{isLast ? t("comum.concluir") : t("comum.seguinte")}</button>
+      </div>
+      </div>
+      </div>
+      </div>
+    );
+  }
+  return (
+    <Overlay>
+    <div style={{ textAlign: "right", marginBottom: 8 }}>
+    <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#cfd8d2", fontSize: 12, cursor: "pointer", fontFamily: FB }}>{t("inicio.pularTutorial")}</button>
+    </div>
+    <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+    {Array.from({ length: total }).map((_, i) => (
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 999, background: i <= step ? GOLD : "#3a463f" }} />
+        ))}
+    </div>
+    {isWelcome ? (
+        <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+        <div style={{ width: 64, height: 64, flexShrink: 0 }}>
+        <Mascot belt={cor} expression="comemorando" />
+        </div>
+        <div>
+        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>{t("tut.olaDodo", { nome: name })}</div>
+        <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{t("tut.senseiIntro")}</p>
+        </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+        <button onClick={() => setStep(1)} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 20px", borderRadius: 9, fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{t("inicio.vamos")}</button>
+        </div>
+        </div>
+      ) : isPro ? (
+        <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 20, textAlign: "center" }}>
+        <div style={{ width: 80, height: 80, margin: "0 auto 2px" }}>
+        <Mascot belt={cor} expression="sabio" />
+        </div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: GOLD }}>{t("inicio.ofertaLancamento")}</div>
+        <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0" }}>{ofereceMax ? "Ippon Pro Max" : "Ippon Pro"}</div>
+        {ofereceMax ? (
+        <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: "6px 0 14px" }}>{t("inicio.ofertaMaxSub")}</p>
+        ) : (
+        <div style={{ margin: "6px 0 14px" }}>
+        {PRECO.emPromocao && <><span style={{ fontSize: 14, color: "#7c8a82", textDecoration: "line-through" }}>{PRECO.normal}</span>{" "}</>}
+        <span style={{ fontFamily: FD, fontSize: 30, fontWeight: 700, color: GOLD }}>{PRECO.atual}</span>
+        <span style={{ fontSize: 12, color: "#93a39a" }}>{t("precos.porMes")}</span>
+        </div>
+        )}
+        <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
+        {(ofereceMax ? PRO_MAX_BENEFITS : PRO_BENEFITS).map((b) => (
+              <div key={b} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+              <span style={{ color: GOLD, fontWeight: 700 }}>✓</span>
+              <span style={{ fontSize: 13, color: "#c7d0c9" }}>{t(b)}</span>
+              </div>
+            ))}
+        </div>
+        <a href="/ippon-pro" style={{ display: "block", width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 15, borderRadius: 12, fontSize: 16, textDecoration: "none", boxSizing: "border-box" }}>{ofereceMax ? t("pro.passarMax") : t("inicio.sejaProAgora")}</a>
+        <a href="/ippon-pro" style={{ display: "block", marginTop: 9, textAlign: "center", color: GOLD, fontSize: 13, fontWeight: 700, textDecoration: "none", fontFamily: FB }}>{t("inicio.saberMais")}</a>
+        <button onClick={onClose} style={{ marginTop: 10, background: "transparent", border: "none", color: "#93a39a", fontSize: 12, cursor: "pointer", fontFamily: FB }}>{t("inicio.continuarSemPagar")}</button>
+        </div>
+      ) : (
+        <div style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 18 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+        <div style={{ width: 64, height: 64, flexShrink: 0 }}>
+        <Mascot belt={cor} expression="indicando" />
+        </div>
+        <div>
+        <div style={{ fontFamily: FD, fontSize: 16, fontWeight: 700, textTransform: "uppercase", marginBottom: 5 }}>{t(teach.title)}</div>
+        <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5, margin: 0 }}>{t(teach.text)}</p>
+        </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+        <button onClick={() => setStep(step - 1)} style={{ background: "transparent", border: "none", color: "#93a39a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FB }}>{t("comum.anterior")}</button>
+        <span style={{ fontSize: 11, color: "#5f6f67" }}>{step + 1} de {total}</span>
+        <button onClick={() => (isLast ? onClose() : setStep(step + 1))} style={{ background: GOLD, border: "none", color: "#1b211e", padding: "9px 18px", borderRadius: 9, fontFamily: FD, fontSize: 13, fontWeight: 700, textTransform: "uppercase", cursor: "pointer" }}>{isLast ? t("comum.concluir") : t("comum.seguinte")}</button>
+        </div>
+        </div>
+      )}
+    </Overlay>
   );
 }
