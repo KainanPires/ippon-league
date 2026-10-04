@@ -32,7 +32,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, type IjfContest } from "@/lib/ijf";
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import { competicaoPorId } from "@/lib/copa";
-import { CALENDARIO_2026, estadoMercado } from "@/lib/calendario";
+import { CALENDARIO_2026, pontosVisiveis } from "@/lib/calendario";
 import { hidratarHorarios } from "@/lib/horarios";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -66,7 +66,11 @@ export async function GET(req: Request) {
   // histórico congelado (resultados_rodada) não é afetado por isto.
   await hidratarHorarios();
   const semanaComp = CALENDARIO_2026.find((c) => c.idCompeticao === comp);
-  const mercadoAberto = !!semanaComp && estadoMercado(semanaComp).estado === "aberto";
+  // "Esconder os pontos?" — agora rolling-aware (igual ao /api/resultados).
+  // No rolling (Mundial), o mercado fica "aberto" a semana toda MAS os pontos das
+  // categorias já travadas DEVEM aparecer; pontosVisiveis trata isso (rolling=true).
+  // Competição normal: só mostra com o mercado FECHADO. Mantém o nome da variável.
+  const mercadoAberto = !!semanaComp && !pontosVisiveis(semanaComp);
   // -------------------------------------------------------------------------
   // 1) Quem são os participantes? Dois modos de alvo.
 // -------------------------------------------------------------------------
