@@ -15,6 +15,7 @@ import { uid } from "@/lib/team";
 import { AnaliseConfrontos } from "@/components/AnaliseConfrontos";
 import { useT, useLingua, type Lingua } from "@/lib/i18n";
 import { focoMercado } from "@/lib/calendario";
+import { ChaveLead } from "@/components/ChaveLead";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -306,6 +307,8 @@ export default function ChaveAtletasPage() {
   const eClassico = (() => { try { return focoMercado().atual?.classico === true; } catch { return false; } })();
   const [avisoClassico, setAvisoClassico] = useState(false);
   const [nivel, setNivel] = useState<"verificar" | "promax" | "pro" | "gratis">("verificar");
+  // Está logado? (distingue "deslogado" de "logado mas grátis" no muro.)
+  const [logado, setLogado] = useState<boolean | null>(null);
   const [comp, setComp] = useState<string>(() => lerParamUrl("comp", ""));
   const [compNome, setCompNome] = useState<string | null>(null);
   const [cat, setCat] = useState<string>(() => catInicialDoUrl());
@@ -328,6 +331,13 @@ export default function ChaveAtletasPage() {
       else if (ehPro) setNivel("pro");
       else setNivel("gratis");
     }, [nivelPronto, ehPro, ehProMax]);
+  // Sabe se há sessão iniciada — para o muro de grátis mostrar "criar conta/entrar"
+  // a quem chega deslogado, e manter o convite de planos a quem já tem conta.
+  useEffect(() => {
+      let vivo = true;
+      supabase.auth.getSession().then(({ data }) => { if (vivo) setLogado(!!data.session); });
+      return () => { vivo = false; };
+    }, []);
   // Aviso de clássico: aparece ao entrar, se for semana de clássico e o utilizador
   // não o tiver silenciado. Reavaliado a cada montagem — "Percebi" fecha só desta
   // vez; "Não mostrar mais" grava o silêncio permanente.
@@ -417,8 +427,11 @@ export default function ChaveAtletasPage() {
     }, [nivel, carregar]);
   const nomes = useMemo(() => (chave ? mapearNomes(chave) : {}), [chave]);
   const nomeDe = useCallback((id: string | null) => (id && nomes[id] ? sobrenome(nomes[id].nome) : "—"), [nomes]);
-  if (nivel === "verificar") return <Tela texto={t("ck.aVerificarAcesso")} />;
+  if (nivel === "verificar" || (nivel === "gratis" && logado === null)) return <Tela texto={t("ck.aVerificarAcesso")} />;
   if (nivel === "gratis") {
+    // DESLOGADO → funil de captação: vê a chave real (teaser) e cria conta grátis / entra.
+    // LOGADO mas grátis (ex.: promo terminou) → mantém o convite para os planos abaixo.
+    if (!logado) return <ChaveLead />;
     return (
       <main style={{ minHeight: "100vh", background: FUNDO, color: "#f1ede2", fontFamily: FB, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ maxWidth: 440, textAlign: "center" }}>
