@@ -67,6 +67,15 @@ const IOC: Record<string, string> = {
 };
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
+
+// Nota quando a categoria do atleta já travou (rolling): não dá para mudar/vender.
+const NOTA_TRANCADO: Record<string, string> = {
+  pt: "Esta categoria já está a competir — não dá para mudar nem vender.",
+  en: "This category is already competing — you can't change or sell.",
+  es: "Esta categoría ya está compitiendo — no se puede cambiar ni vender.",
+  fr: "Cette catégorie est déjà en compétition — impossible de changer ou de vendre.",
+  de: "Diese Gewichtsklasse kämpft bereits — nicht änderbar oder verkäuflich.",
+};
 // Tutorial de EDIÇÃO (mercado aberto). Todas as setas apontam para cima (os
   // elementos destacados estão acima do balão, que fica em baixo). `target` indica
 // o que pulsa em cada passo.
@@ -192,6 +201,11 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   // Rolling-aware: no Mundial o aDecorrer é null, mas a competição está a decorrer.
   const semanaDoComp = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
   const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp || !!semanaDoComp?.rolling;
+  // No rolling (Mundial), só se pode ver o atleta do rival se a categoria dele JÁ
+  // TRAVOU (já compete, não dá para copiar). As categorias ainda abertas ficam
+  // escondidas. Competição normal a decorrer: o mercado já fechou, vê-se tudo.
+  const rollingDojo = !!semanaDoComp?.rolling;
+  const verAtleta = (cat?: string) => !rollingDojo || (!!cat && categoriaTrancada(semanaDoComp!, cat, new Date()));
   // Rodada + data desta competição, tiradas do calendário local pelo idComp
   // (mais robusto do que depender da API). A data vem no formato AAAA/MM/DD e
   // mostramo-la como DD/MM/AAAA. rodadaNum é o nº da rodada (1..52) ou null.
@@ -367,11 +381,15 @@ return (
           <div style={{ background: "#e6b422", border: "2px solid #f0cf6a", borderRadius: 10, padding: "12px 10px" }}>
           <SectionLabel>{t("mt.masculino")}</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
-          {males.map((i) => <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={phase} onClick={() => setModal(i.athlete!)} />)}
+          {males.map((i) => verAtleta(i.categoria)
+            ? <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={phase} onClick={() => setModal(i.athlete!)} />
+            : <CellEscondida key={i.id} categoria={i.categoria} />)}
           </div>
           <SectionLabel>{t("mt.feminino")}</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-          {females.map((i) => <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={phase} onClick={() => setModal(i.athlete!)} />)}
+          {females.map((i) => verAtleta(i.categoria)
+            ? <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={phase} onClick={() => setModal(i.athlete!)} />
+            : <CellEscondida key={i.id} categoria={i.categoria} />)}
           </div>
           </div>
           </section>
@@ -812,6 +830,12 @@ function MeuTimeInner() {
   // Mostrar a pontuação ao vivo (total + estado "a decorrer")? Competição normal a
   // decorrer, OU rolling com resultados já de alguma categoria travada.
   const mostrarPts = emCompeticao || (rollingAtivo && temResultados);
+  // Atleta com a categoria já TRAVADA (rolling) — não pode ser vendido nem
+  // tornado/removido capitão (já lutou; mudar agora seria alterar o que já
+  // aconteceu). O capitão fica FIXO assim que a categoria dele trancar.
+  const atletaTrancado = (a: Athlete): boolean => rollingAtivo && categoriaTrancada(atual, a.category, new Date());
+  const capitaoAtleta = athletes.find((a) => a.id === team.captain) || null;
+  const capitaoTrancado = !!capitaoAtleta && atletaTrancado(capitaoAtleta);
   // EDITÁVEL só quando NÃO está em competição (mercado aberto). No rolling o
   // mercado segue aberto — as categorias travadas são protegidas pelo próprio
   // mercado (categoriaTrancada), que não deixa comprar/trocar quem já trancou.
@@ -833,10 +857,18 @@ function MeuTimeInner() {
     saveDraftFor(alvo.idCompeticao, next);
   }
   function tornarCapitao(id: string) {
+    // Capitão já lutou (categoria travada) -> fica FIXO, não se muda. E não se
+    // torna capitão quem já trancou (resultado já conhecido). Guarda defensiva.
+    if (capitaoTrancado) { setModal(null); return; }
+    const alvo = athletes.find((a) => a.id === id);
+    if (alvo && atletaTrancado(alvo)) { setModal(null); return; }
     update({ ...team, captain: team.captain === id ? null : id });
     setModal(null);
   }
   function vender(id: string) {
+    // Não se vende quem já trancou (já está a competir / lutou).
+    const alvo = athletes.find((a) => a.id === id);
+    if (alvo && atletaTrancado(alvo)) { setModal(null); return; }
     update({ ids: team.ids.filter((x) => x !== id), captain: team.captain === id ? null : team.captain });
     setModal(null);
   }
@@ -1171,6 +1203,8 @@ function MeuTimeInner() {
         temResultados={temResultados}
         editavel={editavel}
         idComp={idComp}
+        atletaTrancado={atletaTrancado(modal.a)}
+        capitaoTrancado={capitaoTrancado}
         onCaptain={() => tornarCapitao(modal.a.id)}
         onSell={() => vender(modal.a.id)}
         onClose={() => setModal(null)}
@@ -1304,8 +1338,9 @@ type EstadoDetalhe =
 | { fase: "vazio"; estadoTexto?: string }
 | { fase: "ok"; lutas: LutaDetalhe[]; total: number };
 const sinal = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
-function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onCaptain, onSell, onClose }: { a: Athlete; captain: boolean; score: number; temResultados: boolean; editavel: boolean; idComp: string; onCaptain: () => void; onSell: () => void; onClose: () => void }) {
+function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, atletaTrancado, capitaoTrancado, onCaptain, onSell, onClose }: { a: Athlete; captain: boolean; score: number; temResultados: boolean; editavel: boolean; idComp: string; atletaTrancado?: boolean; capitaoTrancado?: boolean; onCaptain: () => void; onSell: () => void; onClose: () => void }) {
   const t = useT();
+  const { lingua } = useLingua();
   const up = a.variation >= 0;
   const [detalhe, setDetalhe] = useState<EstadoDetalhe>({ fase: "carregando" });
   // Mercado ainda aberto? Então não há detalhe nenhum a mostrar — nem sequer
@@ -1411,10 +1446,22 @@ function AthleteDetail({ a, captain, score, temResultados, editavel, idComp, onC
     {/* AÇÕES: só quando editável (mercado aberto). Em competição, não se mexe. */}
     {editavel ? (
         <div style={{ marginTop: 16 }}>
-        <button onClick={onCaptain} style={{ ...primaryBtn, background: captain ? "#1c3a2e" : GOLD, color: captain ? "#aee9c9" : "#1b211e" }}>
-        {captain ? t("mt.removerCapitao") : t("mt.tornarCapitao")}
-        </button>
-        <button onClick={onSell} style={{ display: "block", width: "100%", marginTop: 10, textAlign: "center", border: "1px solid #5a2f2c", background: "transparent", color: "#ef8d83", padding: "11px", borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer" }}>{t("mt.vender")}</button>
+        {/* Capitão: só se este atleta NÃO trancou E o capitão atual NÃO trancou
+            (capitão que já lutou fica fixo). */}
+        {!atletaTrancado && !capitaoTrancado && (
+          <button onClick={onCaptain} style={{ ...primaryBtn, background: captain ? "#1c3a2e" : GOLD, color: captain ? "#aee9c9" : "#1b211e" }}>
+          {captain ? t("mt.removerCapitao") : t("mt.tornarCapitao")}
+          </button>
+        )}
+        {/* Vender: só se este atleta ainda NÃO trancou (já compete = não se vende). */}
+        {!atletaTrancado && (
+          <button onClick={onSell} style={{ display: "block", width: "100%", marginTop: 10, textAlign: "center", border: "1px solid #5a2f2c", background: "transparent", color: "#ef8d83", padding: "11px", borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.03em", cursor: "pointer" }}>{t("mt.vender")}</button>
+        )}
+        {atletaTrancado && (
+          <div style={{ textAlign: "center", fontSize: 12, color: "#93a39a", lineHeight: 1.5, padding: "4px 2px" }}>
+          {NOTA_TRANCADO[lingua] ?? NOTA_TRANCADO.pt}
+          </div>
+        )}
         </div>
       ) : null}
     </div>
@@ -1556,6 +1603,16 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
     <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#5a4a12" }}>{children}</span>
     <span style={{ flex: 1, height: 1, background: "rgba(90,74,18,0.35)" }} />
+    </div>
+  );
+}
+// Slot ESCONDIDO no time do rival: a categoria dele ainda não travou, por isso
+// não se revela o atleta (anti-cópia). Mostra só um cadeado e a categoria.
+function CellEscondida({ categoria }: { categoria?: string }) {
+  return (
+    <div style={{ background: "#11201a", border: "1px dashed #2a3a33", borderRadius: 10, padding: "8px 4px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 92, gap: 5 }}>
+      <div style={{ fontSize: 18, opacity: 0.8 }}>🔒</div>
+      {categoria ? <div style={{ fontSize: 9, color: "#5f6f67", fontFamily: FD }}>{categoria}kg</div> : null}
     </div>
   );
 }
