@@ -3,7 +3,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { loadSavedFor, loadDraftFor, saveDraftFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, loadIdentityCloudFor, loadPrecosCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
+import { loadSavedFor, loadDraftFor, saveDraftFor, loadDraftTsFor, commitSavedFor, commitSavedCloudFor, resolve, resolveRich, jcLeft, isComplete, missing, loadSavedCloudFor, loadIdentityCloudFor, loadPrecosCloudFor, setAthletePool, temNomeProprio, type TeamState } from "@/lib/team";
 import { type Athlete } from "@/lib/athletes";
 import { computeNewPrice } from "@/lib/engine";
 import { supabase } from "@/lib/supabase";
@@ -58,7 +58,11 @@ const GOLD = "#d9a441";
 // quem fosse preta. O cartão de partilha saía igualmente com "Branca". Era o
 // sítio mais errado da app quanto a isto — e o mais visível, porque é onde o
 // jogador passa mais tempo.
-const TICK_AO_VIVO_MS = 15000;
+// Atualização ao vivo: de quanto em quanto tempo o ecrã repede os pontos. Mais
+// baixo = acompanha a chave quase em tempo real (mais emoção), à custa de mais
+// pedidos. O travão real da frescura é a cache do servidor (lib/ijf) — este tick
+// só adianta se o servidor também reler o JudoBase a tempo.
+const TICK_AO_VIVO_MS = 8000;
 type MarketPhase = "aberto" | "fechado" | "ao-vivo";
 const IOC: Record<string, string> = {
   JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
@@ -192,6 +196,9 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   const [capitao, setCapitao] = useState<string | null>(null);
   const [pontos, setPontos] = useState<Record<string, number>>({});
   const [temResultados, setTemResultados] = useState(false);
+  // Lutas por atleta (de /api/resultados): enquanto for 0, o atleta do rival já
+  // está revelado (categoria travada) mas ainda não lutou — mostra "—", não "+0".
+  const [lutasPorAtleta, setLutasPorAtleta] = useState<Record<string, number>>({});
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null);
   const [modal, setModal] = useState<Athlete | null>(null);
   const [partilhar, setPartilhar] = useState(false);
@@ -307,11 +314,12 @@ useEffect(() => {
     const ids = itens.filter((i) => !i.oculto && i.id).map((i) => i.id);
     if (ids.length === 0) return;
     const buscar = () => {
-      fetch(`/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`)
+      fetch(`/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => {
           if (!active) return;
           if (j && j.pontos) setPontos(j.pontos);
+          setLutasPorAtleta(j && j.lutas ? j.lutas : {});
           setTemResultados(!!(j && j.tem_resultados));
           setUltimaAtualizacao(Date.now());
         })
@@ -344,6 +352,10 @@ const temOcultos = itens.some((i) => i.oculto);
 // Valor da equipa só quando está tudo revelado — no rolling seria um valor
 // parcial (faltam os ocultos) e enganava.
 const squadValue = (podeGrelha && !temOcultos) ? fmt(itens.reduce((s, i) => s + (i.athlete?.priceJc ?? 0), 0)) : null;
+// Fase POR ATLETA: um atleta revelado só mostra pontos depois de lutar. Antes
+// disso fica "— —" (não "+0"), igual ao dojo próprio.
+const faseItem = (id: string): MarketPhase => ((lutasPorAtleta[id] ?? 0) > 0 ? "ao-vivo" : "fechado");
+// Fase da equipa (para o Dôdo do rodapé): ao vivo se já há lutas desta equipa.
 const phase: MarketPhase = temResultados ? "ao-vivo" : "fechado";
 const horaTick = ultimaAtualizacao
 ? new Date(ultimaAtualizacao).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -405,13 +417,13 @@ return (
           <SectionLabel>{t("mt.masculino")}</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
           {males.map((i) => !i.oculto
-            ? <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={phase} onClick={() => setModal(i.athlete!)} />
+            ? <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={faseItem(i.id)} onClick={() => setModal(i.athlete!)} />
             : <CellEscondida key={i.id} categoria={i.categoria} />)}
           </div>
           <SectionLabel>{t("mt.feminino")}</SectionLabel>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
           {females.map((i) => !i.oculto
-            ? <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={phase} onClick={() => setModal(i.athlete!)} />
+            ? <Cell key={i.id} a={i.athlete!} captain={i.capitao} score={scoreOf(i.id, i.capitao)} phase={faseItem(i.id)} onClick={() => setModal(i.athlete!)} />
             : <CellEscondida key={i.id} categoria={i.categoria} />)}
           </div>
           </div>
@@ -524,6 +536,10 @@ function MeuTimeInner() {
   const [poolPronto, setPoolPronto] = useState(false); // já tentámos carregar a lista de atletas?
   const [pontos, setPontos] = useState<Record<string, number>>({});
   const [temResultados, setTemResultados] = useState(false);
+  // Nº de lutas por atleta nesta competição (de /api/resultados). Sinal de "já
+  // entrou no tatame": enquanto for 0, o atleta ainda não lutou — mostra "—" e
+  // NÃO valoriza/desvaloriza (nada de JC negativo antes de a luta acontecer).
+  const [lutasPorAtleta, setLutasPorAtleta] = useState<Record<string, number>>({});
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<number | null>(null);
   const [modal, setModal] = useState<Modal>(null);
   const [savingCloud, setSavingCloud] = useState(false);
@@ -698,7 +714,15 @@ function MeuTimeInner() {
               // referência (saved) e o rascunho local. Só NÃO alinhamos se o utilizador
               // tem uma edição mesmo diferente da nuvem em curso (compras/vendas reais).
               const curDraft = loadDraftFor(alvo.idCompeticao);
-              const edicaoEmCurso = curDraft.ids.length > 0 && !sameTeam(curDraft, naAlvo);
+              // EDIÇÃO EM CURSO só vence a nuvem se o rascunho local for MAIS
+              // RECENTE do que a última gravação na conta. Um rascunho antigo
+              // (de outra sessão ou de OUTRO APARELHO) não pode sobrepor-se à
+              // equipa da conta — era isso que fazia a mesma conta mostrar
+              // equipas diferentes no telemóvel e no computador. A nuvem é a
+              // fonte de verdade; só uma edição local fresca a ultrapassa.
+              const draftTs = loadDraftTsFor(alvo.idCompeticao);
+              const cloudTs = naAlvo.atualizadoEm ?? 0;
+              const edicaoEmCurso = curDraft.ids.length > 0 && !sameTeam(curDraft, naAlvo) && draftTs > cloudTs;
               if (!edicaoEmCurso) {
                 setTeam(naAlvo);
                 saveDraftFor(alvo.idCompeticao, naAlvo);
@@ -722,6 +746,7 @@ function MeuTimeInner() {
       if (!idComp) return;
       if (!pontosVisiveisPorId(idComp)) {
         setPontos({});
+        setLutasPorAtleta({});
         setTemResultados(false);
         return () => { active = false; };
       }
@@ -740,11 +765,12 @@ function MeuTimeInner() {
         const qs = ids.length > 0
         ? `/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`
         : `/api/resultados?comp=${idComp}`;
-        fetch(qs)
+        fetch(qs, { cache: "no-store" })
         .then((r) => r.json())
         .then((j) => {
             if (!active) return;
             setPontos(j && j.pontos ? j.pontos : {});
+            setLutasPorAtleta(j && j.lutas ? j.lutas : {});
             setTemResultados(!!(j && j.tem_resultados));
             setUltimaAtualizacao(Date.now());
           })
@@ -844,10 +870,17 @@ function MeuTimeInner() {
   // atleta (o x2 do capitão é só para os pontos da equipa, não para o preço) —
   // exatamente como o congelamento. `a.priceJc` durante a competição é o preço
   // PRÉ-rodada (só congela no fim), por isso bate certo com o valor final.
-  const deltaAtletaJc = (a: Athlete) => computeNewPrice(a.priceJc, 0, pontos[a.id] ?? 0).delta;
+  // JÁ LUTOU? Só quem já entrou no tatame (lutas > 0) pontua e valoriza. Antes
+  // disso o atleta fica a "—", sem subir nem descer de preço — a luta ainda não
+  // aconteceu, não há como ter perdido (nem ganho) nada.
+  const jaLutou = (id: string) => (lutasPorAtleta[id] ?? 0) > 0;
+  // Delta de preço só para quem já lutou; quem não lutou tem delta 0 (nunca
+  // negativo por "0 pontos" quando na verdade ainda nem competiu).
+  const deltaAtletaJc = (a: Athlete) => jaLutou(a.id) ? computeNewPrice(a.priceJc, 0, pontos[a.id] ?? 0).delta : 0;
   const emCompeticao = emAndamento && idComp === atual.idCompeticao && hasTeam;
   // Variação de PATRIMÓNIO do jogador nesta rodada (assimétrica: ganha metade da
-  // subida de cada atleta, perde a descida inteira). Só faz sentido a decorrer.
+  // subida de cada atleta, perde a descida inteira). Só faz sentido a decorrer, e
+  // só conta atletas que já lutaram (deltaAtletaJc já devolve 0 para os outros).
   const patrimonioDelta = emCompeticao
     ? Math.round(athletes.reduce((s, a) => { const d = deltaAtletaJc(a); return s + (d > 0 ? d / 2 : d); }, 0) * 10) / 10
     : 0;
@@ -857,8 +890,18 @@ function MeuTimeInner() {
   // TRAVADAS (ao-vivo) e PREÇO nas que ainda estão abertas. A categoria do atleta
   // já vem com sinal ("-60", "+78"), igual às chaves do rolling.
   const rollingAtivo = !!atual.rolling && idComp === atual.idCompeticao && hasTeam;
-  const faseAtleta = (a: Athlete): MarketPhase =>
-    rollingAtivo ? (categoriaTrancada(atual, a.category, new Date()) ? "ao-vivo" : "aberto") : marketPhase;
+  // Fase de CADA atleta. Mesmo com a categoria já travada (ou a competição a
+  // decorrer), enquanto o atleta NÃO tiver lutado fica "fechado" → mostra "— —"
+  // e sem variação de JC. Só quando luta (jaLutou) passa a "ao-vivo" e começa a
+  // pontuar/valorizar. Categoria ainda aberta no rolling = "aberto" (mostra preço).
+  const faseAtleta = (a: Athlete): MarketPhase => {
+    if (rollingAtivo) {
+      if (!categoriaTrancada(atual, a.category, new Date())) return "aberto";
+      return jaLutou(a.id) ? "ao-vivo" : "fechado";
+    }
+    if (marketPhase === "ao-vivo") return jaLutou(a.id) ? "ao-vivo" : "fechado";
+    return marketPhase;
+  };
   // Mostrar a pontuação ao vivo (total + estado "a decorrer")? Competição normal a
   // decorrer, OU rolling com resultados já de alguma categoria travada.
   const mostrarPts = emCompeticao || (rollingAtivo && temResultados);
