@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
@@ -58,11 +58,11 @@ const GOLD = "#d9a441";
 // quem fosse preta. O cartão de partilha saía igualmente com "Branca". Era o
 // sítio mais errado da app quanto a isto — e o mais visível, porque é onde o
 // jogador passa mais tempo.
-// Atualização ao vivo: de quanto em quanto tempo o ecrã repede os pontos. Mais
-// baixo = acompanha a chave quase em tempo real (mais emoção), à custa de mais
-// pedidos. O travão real da frescura é a cache do servidor (lib/ijf) — este tick
-// só adianta se o servidor também reler o JudoBase a tempo.
-const TICK_AO_VIVO_MS = 8000;
+// Atualização ao vivo: de quanto em quanto tempo o ecrã repede os pontos. 15s é
+// suficiente para acompanhar a chave (confirmado pelo Kainan). Os pedidos vão
+// sempre buscar dados frescos (cache: "no-store"), por isso dentro deste ciclo
+// não há valores presos no browser.
+const TICK_AO_VIVO_MS = 15000;
 type MarketPhase = "aberto" | "fechado" | "ao-vivo";
 const IOC: Record<string, string> = {
   JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
@@ -741,6 +741,13 @@ function MeuTimeInner() {
   // e ver quanto fez, para depois o trocar. O servidor já recusa (/api/resultados
     // e /api/atleta-rodada devolvem vazio), mas parar aqui evita 4 pedidos por
   // minuto que nunca dariam nada, e deixa o ecrã coerente.
+  // Ids da equipa que está NO ECRÃ (atualizado a cada render). O tick ao vivo usa
+  // isto quando o localStorage deste aparelho não tem a equipa guardada — caso
+  // típico de quem montou o time noutro aparelho (a equipa vem da nuvem). Sem
+  // isto, o pedido ia SEM `persons`, a API não devolvia o nº de lutas, e os
+  // atletas que JÁ LUTARAM ficavam presos em "— —". É a fonte certa dos ids.
+  const teamIdsRef = useRef<string[]>([]);
+  teamIdsRef.current = team.ids.map(String);
   useEffect(() => {
       let active = true;
       if (!idComp) return;
@@ -762,6 +769,11 @@ function MeuTimeInner() {
           const rascunho = loadDraftFor(idComp);
           ids = (guardada.ids.length > 0 ? guardada.ids : rascunho.ids).map(String);
         } catch {}
+        // Rede de segurança: se este aparelho não tem a equipa no localStorage
+        // (veio da nuvem), usa os ids da equipa que está no ecrã. Garante que o
+        // pedido vai SEMPRE com `persons` -> a API devolve o nº de lutas -> os
+        // atletas que já lutaram mostram e atualizam a pontuação (não ficam "—").
+        if (ids.length === 0 && teamIdsRef.current.length > 0) ids = teamIdsRef.current;
         const qs = ids.length > 0
         ? `/api/resultados?comp=${idComp}&persons=${encodeURIComponent(ids.join(","))}`
         : `/api/resultados?comp=${idComp}`;
@@ -803,8 +815,12 @@ function MeuTimeInner() {
         para();
         document.removeEventListener("visibilitychange", aoMudarVisibilidade);
       };
+      // Depende também do TAMANHO da equipa: quando ela chega (ids 0 -> 8, vindo
+      // da nuvem), o efeito recorre e busca já os pontos com `persons`, sem ter
+      // de esperar pelo próximo tick. Trocar um atleta (mesmo tamanho) não
+      // reinicia o tick — o ref trata de usar os ids novos na próxima volta.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [idComp]);
+    }, [idComp, team.ids.length]);
   // Modo atual (edição vs competição) para decidir qual tutorial. Calculado também
   // aqui (antes do return) para o efeito de "primeira vez" poder usá-lo.
   const emCompeticaoNow = emAndamento && idComp === atual.idCompeticao && team.ids.length > 0;
