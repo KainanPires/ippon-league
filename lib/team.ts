@@ -11,9 +11,13 @@
 import { ATHLETES, type Athlete } from "@/lib/athletes";
 import { supabase } from "@/lib/supabase";
 
-export type TeamState = { ids: string[]; captain: string | null };
+// `atualizadoEm` (ms) vem SÓ da nuvem (loadSavedCloudFor): é quando a equipa foi
+// gravada na conta pela última vez. Serve para decidir, entre o rascunho local e
+// a equipa da nuvem, qual é a mais recente (ver loadDraftTsFor no ecrã Meu Time).
+export type TeamState = { ids: string[]; captain: string | null; atualizadoEm?: number };
 
 const DRAFT = "ippon_team_draft";
+const DRAFT_TS = "ippon_team_draft_ts"; // quando o rascunho local foi editado (ms)
 const SAVED = "ippon_team_saved";
 const LEGACY = "ippon_team"; // versão antiga (só ids)
 const POOL = "ippon_athletes_pool"; // memória partilhada dos atletas reais (do Mercado)
@@ -73,6 +77,9 @@ export function uid(): string {
 function draftKey(idComp?: string) {
   return idComp ? `${DRAFT}__${uid()}__${idComp}` : `${DRAFT}__${uid()}`;
 }
+function draftTsKey(idComp?: string) {
+  return idComp ? `${DRAFT_TS}__${uid()}__${idComp}` : `${DRAFT_TS}__${uid()}`;
+}
 function savedKey(idComp?: string) {
   return idComp ? `${SAVED}__${uid()}__${idComp}` : `${SAVED}__${uid()}`;
 }
@@ -117,7 +124,22 @@ export function loadDraftFor(idComp: string): TeamState {
   return read(draftKey(idComp)) || { ids: [], captain: null };
 }
 export function saveDraftFor(idComp: string, t: TeamState) {
-  try { localStorage.setItem(draftKey(idComp), JSON.stringify(t)); } catch {}
+  try {
+    localStorage.setItem(draftKey(idComp), JSON.stringify(t));
+    // Carimbo de tempo do rascunho: quando ESTE aparelho mexeu na equipa pela
+    // última vez. Usado para só deixar o rascunho vencer a nuvem se for mais
+    // recente do que a última gravação na conta (ver Meu Time).
+    localStorage.setItem(draftTsKey(idComp), String(Date.now()));
+  } catch {}
+}
+// Quando foi editado o rascunho local desta competição (ms). 0 = não há carimbo
+// (rascunho antigo, de antes desta lógica) — nesse caso a nuvem ganha sempre.
+export function loadDraftTsFor(idComp: string): number {
+  try {
+    const raw = localStorage.getItem(draftTsKey(idComp));
+    const n = raw ? parseInt(raw, 10) : 0;
+    return isNaN(n) ? 0 : n;
+  } catch { return 0; }
 }
 export function loadSavedFor(idComp: string): TeamState {
   return read(savedKey(idComp)) || { ids: [], captain: null };
@@ -437,7 +459,7 @@ export async function loadSavedCloudFor(idComp: string): Promise<TeamState | nul
 
     const { data, error } = await supabase
       .from("equipas")
-      .select("atletas, capitao")
+      .select("atletas, capitao, atualizado_em")
       .eq("user_id", userId)
       .eq("id_competicao", idComp)
       .maybeSingle();
@@ -445,7 +467,10 @@ export async function loadSavedCloudFor(idComp: string): Promise<TeamState | nul
     if (error || !data) return null;
     const ids = Array.isArray(data.atletas) ? (data.atletas as string[]) : [];
     const captain = (data.capitao as string | null) ?? null;
-    return { ids, captain };
+    // Quando a equipa foi gravada na conta (ms). Serve para o ecrã decidir se o
+    // rascunho local (de outro aparelho/sessão) é mais recente ou não.
+    const atualizadoEm = data.atualizado_em ? Date.parse(String(data.atualizado_em)) : 0;
+    return { ids, captain, atualizadoEm: isNaN(atualizadoEm) ? 0 : atualizadoEm };
   } catch {
     return null;
   }
