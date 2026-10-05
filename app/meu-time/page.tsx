@@ -353,8 +353,10 @@ const temOcultos = itens.some((i) => i.oculto);
 // parcial (faltam os ocultos) e enganava.
 const squadValue = (podeGrelha && !temOcultos) ? fmt(itens.reduce((s, i) => s + (i.athlete?.priceJc ?? 0), 0)) : null;
 // Fase POR ATLETA: um atleta revelado só mostra pontos depois de lutar. Antes
-// disso fica "— —" (não "+0"), igual ao dojo próprio.
-const faseItem = (id: string): MarketPhase => ((lutasPorAtleta[id] ?? 0) > 0 ? "ao-vivo" : "fechado");
+// disso fica "— —" (não "+0"). Se não temos a lista de lutas (mapa vazio), não
+// escondemos — mostramos os pontos à mesma (nunca esconder quem já lutou).
+const temDadosLutasDojo = Object.keys(lutasPorAtleta).length > 0;
+const faseItem = (id: string): MarketPhase => ((!temDadosLutasDojo || (lutasPorAtleta[id] ?? 0) > 0) ? "ao-vivo" : "fechado");
 // Fase da equipa (para o Dôdo do rodapé): ao vivo se já há lutas desta equipa.
 const phase: MarketPhase = temResultados ? "ao-vivo" : "fechado";
 const horaTick = ultimaAtualizacao
@@ -888,12 +890,19 @@ function MeuTimeInner() {
   // atleta (o x2 do capitão é só para os pontos da equipa, não para o preço) —
   // exatamente como o congelamento. `a.priceJc` durante a competição é o preço
   // PRÉ-rodada (só congela no fim), por isso bate certo com o valor final.
-  // JÁ LUTOU? Só quem já entrou no tatame (lutas > 0) pontua e valoriza. Antes
-  // disso o atleta fica a "—", sem subir nem descer de preço — a luta ainda não
-  // aconteceu, não há como ter perdido (nem ganho) nada.
-  const jaLutou = (id: string) => (lutasPorAtleta[id] ?? 0) > 0;
-  // Delta de preço só para quem já lutou; quem não lutou tem delta 0 (nunca
-  // negativo por "0 pontos" quando na verdade ainda nem competiu).
+  // Temos a lista de lutas por atleta (de /api/resultados)? Se o mapa veio vazio
+  // (ex.: o pedido não levou `persons`), NÃO sabemos quem lutou — e nesse caso
+  // NUNCA escondemos a pontuação: o pior erro é esconder os pontos de quem já
+  // lutou. Com a lista presente, usamo-la para separar quem lutou de quem não.
+  const temDadosLutas = Object.keys(lutasPorAtleta).length > 0;
+  // MOSTRAR pontos (display): com dados de lutas, só quem lutou; sem dados,
+  // mostramos à mesma (não esconder quem já competiu).
+  const mostraPontosAtleta = (id: string) => !temDadosLutas || (lutasPorAtleta[id] ?? 0) > 0;
+  // JÁ LUTOU com CERTEZA? (para mexer no preço/JC). Só quando temos dados de
+  // lutas E esse atleta tem pelo menos uma. Sem certeza, não mexemos no JC —
+  // nada de desvalorização fantasma antes de o atleta competir.
+  const jaLutou = (id: string) => temDadosLutas && (lutasPorAtleta[id] ?? 0) > 0;
+  // Delta de preço só para quem lutou com certeza; senão 0.
   const deltaAtletaJc = (a: Athlete) => jaLutou(a.id) ? computeNewPrice(a.priceJc, 0, pontos[a.id] ?? 0).delta : 0;
   const emCompeticao = emAndamento && idComp === atual.idCompeticao && hasTeam;
   // Variação de PATRIMÓNIO do jogador nesta rodada (assimétrica: ganha metade da
@@ -915,9 +924,9 @@ function MeuTimeInner() {
   const faseAtleta = (a: Athlete): MarketPhase => {
     if (rollingAtivo) {
       if (!categoriaTrancada(atual, a.category, new Date())) return "aberto";
-      return jaLutou(a.id) ? "ao-vivo" : "fechado";
+      return mostraPontosAtleta(a.id) ? "ao-vivo" : "fechado";
     }
-    if (marketPhase === "ao-vivo") return jaLutou(a.id) ? "ao-vivo" : "fechado";
+    if (marketPhase === "ao-vivo") return mostraPontosAtleta(a.id) ? "ao-vivo" : "fechado";
     return marketPhase;
   };
   // Mostrar a pontuação ao vivo (total + estado "a decorrer")? Competição normal a
@@ -1164,12 +1173,12 @@ function MeuTimeInner() {
         <div style={{ background: tema.dentroBg, border: `2px solid ${tema.dentroBorda}`, borderRadius: 10, padding: "12px 10px" }}>
         <SectionLabel>{t("mt.masculino")}</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 14 }}>
-        {males.map((a) => { const fa = faseAtleta(a); return <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} deltaJc={fa === "ao-vivo" ? deltaAtletaJc(a) : null} phase={fa} onClick={() => setModal({ kind: "athlete", a })} />; })}
+        {males.map((a) => { const fa = faseAtleta(a); return <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} deltaJc={fa === "ao-vivo" && jaLutou(a.id) ? deltaAtletaJc(a) : null} phase={fa} onClick={() => setModal({ kind: "athlete", a })} />; })}
         {editavel && Array.from({ length: vagasM }).map((_, i) => <EmptyCell key={"vm" + i} montar={montar} />)}
         </div>
         <SectionLabel>{t("mt.feminino")}</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-        {females.map((a) => { const fa = faseAtleta(a); return <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} deltaJc={fa === "ao-vivo" ? deltaAtletaJc(a) : null} phase={fa} onClick={() => setModal({ kind: "athlete", a })} />; })}
+        {females.map((a) => { const fa = faseAtleta(a); return <Cell key={a.id} a={a} captain={a.id === team.captain} score={scoreOf(a)} deltaJc={fa === "ao-vivo" && jaLutou(a.id) ? deltaAtletaJc(a) : null} phase={fa} onClick={() => setModal({ kind: "athlete", a })} />; })}
         {editavel && Array.from({ length: vagasF }).map((_, i) => <EmptyCell key={"vf" + i} montar={montar} />)}
         </div>
         </div>
