@@ -23,6 +23,12 @@
 // ações é só para EXIBIÇÃO. Por isso a soma "visual" das ações pode não bater
 // ao cêntimo em lutas com shido/hansoku — o número que manda é o `pontos` da luta.
 //
+// ORDEM DAS LUTAS (exibição): as lutas são montadas em ordem CRONOLÓGICA (a 1ª
+// luta primeiro, até à final), o que mantém a numeração das poules certa
+// ("1ª luta", "2ª luta"...) e os rótulos de fase coerentes. No FIM invertemos o
+// array, para o cliente mostrar a luta MAIS RECENTE no topo e a MAIS ANTIGA em
+// baixo (oitavas em baixo, a subir até à final no topo) — pedido do Kainan.
+//
 // ---------------------------------------------------------------------------
 // PORTÃO ANTI-ESPREITADELA (servidor) — LER ANTES DE MEXER
 //
@@ -285,6 +291,13 @@ export async function GET(req: Request) {
   }
 
   const nLutas = lutas.length;
+
+  // ORDEM DE EXIBIÇÃO: a construção acima foi cronológica (precisa de ser, para
+  // numerar as poules e nomear as fases). Invertemos agora para a MAIS RECENTE
+  // ficar no topo e a MAIS ANTIGA em baixo. O `total` é uma soma (não depende da
+  // ordem) e os rótulos já estão fixados em cada luta.
+  lutas.reverse();
+
   let place: string | null = null;
   try {
     const rows = await getCompetitorResults(person);
