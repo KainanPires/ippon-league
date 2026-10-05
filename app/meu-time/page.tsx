@@ -747,7 +747,9 @@ function MeuTimeInner() {
   // isto, o pedido ia SEM `persons`, a API não devolvia o nº de lutas, e os
   // atletas que JÁ LUTARAM ficavam presos em "— —". É a fonte certa dos ids.
   const teamIdsRef = useRef<string[]>([]);
-  teamIdsRef.current = team.ids.map(String);
+  // Atualiza o ref num efeito (nunca durante o render — o lint não deixa, e é a
+  // forma correta). Corre antes do tick ao vivo porque está declarado antes.
+  useEffect(() => { teamIdsRef.current = team.ids.map(String); }, [team]);
   useEffect(() => {
       let active = true;
       if (!idComp) return;
