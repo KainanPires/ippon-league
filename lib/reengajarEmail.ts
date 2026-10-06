@@ -18,7 +18,7 @@ const SITE = "https://www.ipponleague.com";
 
 function normLingua(v: unknown): LinguaNotif {
   const s = String(v || "").toLowerCase();
-  return (["pt", "en", "es", "fr", "de"].includes(s) ? s : "pt") as LinguaNotif;
+  return (["pt", "en", "es", "fr", "de", "ja", "ru"].includes(s) ? s : "pt") as LinguaNotif;
 }
 
 /**
