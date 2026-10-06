@@ -42,7 +42,7 @@ const GOLD = "#d9a441";
 // Fase A (economia) — alerta na tela inicial de "equipa acima do orçamento" (5 línguas).
 // Atalho para a Loja de Judocoins (economia Fase B). Orçamento extra da
 // temporada — mapa local por língua, mesmo padrão do ORC_INICIO.
-const LOJA_ATALHO: Record<Lingua, { titulo: string; sub: string; botao: string }> = {
+const LOJA_ATALHO: Record<string, { titulo: string; sub: string; botao: string }> = {
   pt: { titulo: "Loja de Judocoins", sub: "Orçamento extra para montares a equipa que quiseres.", botao: "Abrir" },
   en: { titulo: "Judocoins Store", sub: "Extra budget to build the team you want.", botao: "Open" },
   es: { titulo: "Tienda de Judocoins", sub: "Presupuesto extra para montar el equipo que quieras.", botao: "Abrir" },
