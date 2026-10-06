@@ -51,7 +51,7 @@ function classicoAvisoSilenciado(): boolean {
   if (typeof window === "undefined") return false;
   try { return localStorage.getItem(CLASSICO_DISMISS) === "skip"; } catch { return false; }
 }
-const AVISO_CLASSICO: Record<Lingua, { titulo: string; corpo: string; corpoComNome: string; ok: string; naoMostrar: string }> = {
+const AVISO_CLASSICO: Record<string, { titulo: string; corpo: string; corpoComNome: string; ok: string; naoMostrar: string }> = {
   pt: {
     titulo: "Semana de clássico",
     corpo: "Esta semana o jogo é sobre um clássico, e um clássico não tem chaveamento próprio. O que vês aqui é o chaveamento da última competição oficial — serve só de referência.",
