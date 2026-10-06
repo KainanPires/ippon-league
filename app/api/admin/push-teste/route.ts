@@ -64,7 +64,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
   }
 
-  const email = (searchParams.get("email") || ALVO_DEFAULT).trim();
+  // REGRA PERMANENTE (pós-lançamento): teste só vai para o fundador. Ignoramos
+  // qualquer ?email= — nenhum teste pode apontar para outra conta nem para todos.
+  const email = ALVO_DEFAULT;
   const uid = await uidPorEmail(email);
   if (!uid) {
     return NextResponse.json({ ok: false, erro: "Conta não encontrada.", email }, { status: 404 });
