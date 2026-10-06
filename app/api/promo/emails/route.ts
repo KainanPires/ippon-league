@@ -61,12 +61,12 @@ type Tipo = (typeof TIPOS)[number];
 
 function normLingua(v: unknown): LinguaNotif {
   const s = String(v || "").toLowerCase();
-  return (["pt", "en", "es", "fr", "de"].includes(s) ? s : "pt") as LinguaNotif;
+  return (["pt", "en", "es", "fr", "de", "ja", "ru"].includes(s) ? s : "pt") as LinguaNotif;
 }
 
 // Palavra para substituir {nome} quando a pessoa não tem nome definido.
 const FALLBACK_NOME: Record<LinguaNotif, string> = {
-  pt: "campeão", en: "champion", es: "campeón", fr: "champion", de: "Champion",
+  pt: "campeão", en: "champion", es: "campeón", fr: "champion", de: "Champion", ja: "チャンピオン", ru: "чемпион",
 };
 
 // Rodapé partilhado: nota de marketing (opt-out) + linha de "e-mail automático".
@@ -92,6 +92,14 @@ const RODAPE: Record<LinguaNotif, { optout: string; naoResponder: string }> = {
   de: {
     optout: `Du erhältst diese E-Mail, weil du die Neuigkeiten der Ippon League aktiviert hast. Deine Einstellungen kannst du in deinem <a href="__PERFIL__" style="color:#6c766d">Profil</a> verwalten.`,
     naoResponder: "Diese E-Mail ist automatisch, du musst nicht antworten.",
+  },
+  ja: {
+    optout: `このメールは、Ippon Leagueのお知らせを有効にしているためお届けしています。設定は<a href="__PERFIL__" style="color:#6c766d">プロフィール</a>で管理できます。`,
+    naoResponder: "これは自動送信メールです。返信は不要です。",
+  },
+  ru: {
+    optout: `Ты получаешь это письмо, потому что включил новости Ippon League. Настройки можно изменить в своём <a href="__PERFIL__" style="color:#6c766d">профиле</a>.`,
+    naoResponder: "Это автоматическое письмо, отвечать не нужно.",
   },
 };
 
@@ -134,6 +142,18 @@ const EMAILS: Record<Tipo, Record<LinguaNotif, Txt>> = {
       corpo: `Als Gründer der Ippon League hast du Pro Max gratis bis zum 1. Januar, ohne etwas zu zahlen. Das heißt der Live-Baum, sehen wer gleich im Wert steigt, die Baum-Wahrscheinlichkeiten und das direkte Duell zwischen Athleten, schon ab der WM. Stell dein Team auf und erlebe das Spiel von innen. Deine Gründer-Erfahrung läuft bis zum 1. Januar, und das Gründer-Abzeichen bleibt für immer deins.`,
       botao: `Mein Team aufstellen`,
     },
+    ja: {
+      assunto: `Pro Maxが解放されました。世界選手権をフル装備で 🥋`,
+      saud: `こんにちは、{nome}さん！`,
+      corpo: `Ippon Leagueの創設メンバーとして、1月1日までPro Maxを無料で使えます。費用はかかりません。ライブの組み合わせ、誰が価値を上げるか、組み合わせの勝率、選手同士の直接対決が、世界選手権からすぐに使えます。チームを組んで、ゲームを内側から感じよう。あなたの創設メンバー体験は1月1日まで、創設メンバーのバッジはずっとあなたのものです。`,
+      botao: `チームを組む`,
+    },
+    ru: {
+      assunto: `Твой Pro Max открыт — играй чемпионат мира на полную 🥋`,
+      saud: `Привет, {nome}!`,
+      corpo: `Как Основатель Ippon League, ты получаешь Pro Max бесплатно до 1 января, без оплаты. Это живая сетка, возможность видеть, кто вот-вот вырастет в цене, вероятности по сетке и очные сравнения атлетов — уже с чемпионата мира. Собери команду и почувствуй игру изнутри. Твой опыт Основателя длится до 1 января, а значок Основателя остаётся твоим навсегда.`,
+      botao: `Собрать команду`,
+    },
   },
   promo_e3: {
     pt: {
@@ -165,6 +185,18 @@ const EMAILS: Record<Tipo, Record<LinguaNotif, Txt>> = {
       saud: `Hallo {nome}!`,
       corpo: `Dein kostenloser Zugang zu Pro Max endet am 1. Januar. Wenn du den Vorteil behalten willst, den Live-Baum, die Wert-Lesart und die Baum-Wahrscheinlichkeiten, nimm den Startpreis: Pro Max für 6,99 € statt 9,99 €, oder Pro für 5,99 €. Sichere dir jetzt deinen Gründer-Preis.`,
       botao: `Mein Angebot ansehen`,
+    },
+    ja: {
+      assunto: `創設メンバーのPro Maxは残り7日`,
+      saud: `こんにちは、{nome}さん！`,
+      corpo: `Pro Maxの無料アクセスは1月1日で終了します。優位性、ライブの組み合わせ、価値上昇の読み、組み合わせの勝率を維持したいなら、ローンチ価格をどうぞ：Pro Maxは9,99 €のところ6,99 €、またはProが5,99 €。今すぐ創設メンバー価格を確保しよう。`,
+      botao: `自分のオファーを見る`,
+    },
+    ru: {
+      assunto: `Остаётся 7 дней твоего Pro Max Основателя`,
+      saud: `Привет, {nome}!`,
+      corpo: `Бесплатный доступ к Pro Max заканчивается 1 января. Если хочешь сохранить преимущество — живую сетку, чтение роста цены и вероятности по сетке — возьми цену запуска: Pro Max за 6,99 € вместо 9,99 €, или Pro за 5,99 €. Зафиксируй свою цену Основателя прямо сейчас.`,
+      botao: `Посмотреть моё предложение`,
     },
   },
   promo_e4: {
@@ -198,6 +230,18 @@ const EMAILS: Record<Tipo, Record<LinguaNotif, Txt>> = {
       corpo: `Am 1. Januar endet dein Gründer-Pro-Max. Ohne ihn verlierst du den Live-Baum, das "steigt im Wert ab X Punkten", die Wert-Inhalte der Runde, die Baum-Wahrscheinlichkeiten und das direkte Duell, und deine Ligen fallen auf nur eine. Behalte alles für 6,99 €, oder behalte das Wesentliche für 5,99 €, immer zum Startpreis.`,
       botao: `Meinen Vorteil behalten`,
     },
+    ja: {
+      assunto: `残り2日。これが使えなくなります`,
+      saud: `こんにちは、{nome}さん！`,
+      corpo: `1月1日に創設メンバーのPro Maxが終了します。それがないと、ライブの組み合わせ、「Xポイントから価値が上がる」、ラウンドの価値上昇コンテンツ、組み合わせの勝率、直接対決が使えなくなり、リーグは1つだけになります。すべてを6,99 €で維持、または基本を5,99 €で、どちらもローンチ価格です。`,
+      botao: `優位性を維持する`,
+    },
+    ru: {
+      assunto: `Остаётся 2 дня — вот что ты потеряешь`,
+      saud: `Привет, {nome}!`,
+      corpo: `1 января твой Pro Max Основателя закончится. Без него ты теряешь живую сетку, «растёт в цене от X очк.», контент о росте цены за тур, вероятности по сетке и очное сравнение, а твои лиги сократятся до одной. Сохрани всё за 6,99 € или оставь главное за 5,99 €, всегда по цене запуска.`,
+      botao: `Сохранить преимущество`,
+    },
   },
   promo_e5: {
     pt: {
@@ -229,6 +273,18 @@ const EMAILS: Record<Tipo, Record<LinguaNotif, Txt>> = {
       saud: `Hallo {nome}!`,
       corpo: `Danke, dass du von Anfang an dabei warst, dein Gründer-Abzeichen bleibt für immer deins. Der kostenlose Zugang zu Pro Max ist zu Ende, aber dein Startpreis steht weiter: Pro Max 6,99 € oder Pro 5,99 €. Dein Team wartet hier weiter auf dich, komm zurück zum Vorteil, wann immer du willst.`,
       botao: `Pro Max zurückholen`,
+    },
+    ja: {
+      assunto: `創設メンバー体験が終了しました 🥋`,
+      saud: `こんにちは、{nome}さん！`,
+      corpo: `最初から一緒にいてくれてありがとう。創設メンバーのバッジはずっとあなたのものです。Pro Maxの無料アクセスは終了しましたが、あなたのローンチ価格はまだ有効です：Pro Max 6,99 € または Pro 5,99 €。あなたのチームはここで待っています。いつでも優位性に戻ってこられます。`,
+      botao: `Pro Maxを取り戻す`,
+    },
+    ru: {
+      assunto: `Твой опыт Основателя завершился 🥋`,
+      saud: `Привет, {nome}!`,
+      corpo: `Спасибо, что был с нами с самого начала — твой значок Основателя остаётся твоим навсегда. Бесплатный доступ к Pro Max закончился, но твоя цена запуска всё ещё в силе: Pro Max 6,99 € или Pro 5,99 €. Твоя команда по-прежнему ждёт тебя — вернись к преимуществу, когда захочешь.`,
+      botao: `Вернуть Pro Max`,
     },
   },
 };
