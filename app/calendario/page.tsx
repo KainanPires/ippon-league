@@ -10,9 +10,10 @@
 //
 // Ao ABRIR, a página faz scroll automático até à competição-alvo (a que está a
 // decorrer ou a próxima com mercado aberto — focoMercado().alvo).
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   calendarioDoAno,
+  anosDoCalendario,
   estadoMercado,
   competicaoFechada,
   focoMercado,
@@ -41,16 +42,21 @@ export default function CalendarioPage() {
   const t = useT();
   const foco = focoMercado();
   const alvoId = foco.alvo.idCompeticao;
-  const lista = [...calendarioDoAno(new Date().getFullYear())].sort((a, b) => a.semana - b.semana);
+  const anos = anosDoCalendario();
+  const anoAtual = new Date().getFullYear();
+  const [ano, setAno] = useState(anos.includes(anoAtual) ? anoAtual : anos[anos.length - 1]);
+  const ehAnoAtual = ano === anoAtual;
+  const lista = [...calendarioDoAno(ano)].sort((a, b) => a.semana - b.semana);
   // Cartão-alvo do scroll: o PRIMEIRO que ainda não terminou (em ordem
   // cronológica = o que está a decorrer ou o próximo). Se já tudo terminou, o último.
   let idxAlvo = lista.findIndex((s) => !competicaoFechada(s));
   if (idxAlvo < 0) idxAlvo = lista.length - 1;
   const alvoRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-      // Leva o scroll até à competição atual/próxima ao ABRIR. Repetimos nos
-      // primeiros ~1,2 s: o Next.js faz o seu próprio scroll ao montar, às vezes
-      // depois do nosso. Repetir vence ambos.
+      // Leva o scroll até à competição atual/próxima ao ABRIR — só no ano atual
+      // (num ano futuro começa-se por cima). Repetimos nos primeiros ~1,2 s: o
+      // Next.js faz o seu próprio scroll ao montar, às vezes depois do nosso.
+      if (!ehAnoAtual) return;
       let cancelado = false;
       const delays = [50, 150, 300, 500, 800, 1200];
       const timers = delays.map((ms) => window.setTimeout(() => {
@@ -58,7 +64,7 @@ export default function CalendarioPage() {
             alvoRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
           }, ms));
       return () => { cancelado = true; timers.forEach((id) => clearTimeout(id)); };
-    }, [idxAlvo]);
+    }, [idxAlvo, ehAnoAtual]);
   // Frase com três destaques a negrito: a frase inteira numa chave, com os
   // marcadores %A%/%B%/%C% onde entram os negritos, dividida aqui.
   const cls = t("cal.classicoTexto").split(/%A%|%B%|%C%/);
@@ -75,6 +81,26 @@ export default function CalendarioPage() {
     </a>
     <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>{t("cal.titulo")}</h1>
     </header>
+    {/* Seletor de ano — só aparece quando há mais do que um ano de calendário. */}
+    {anos.length > 1 && (
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        {anos.map((a) => (
+          <button
+            key={a}
+            onClick={() => setAno(a)}
+            style={{
+              flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
+              fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.04em",
+              border: `1px solid ${a === ano ? GOLD : "#2a332c"}`,
+              background: a === ano ? GOLD : "#121815",
+              color: a === ano ? "#1b211e" : "#9fb0a6",
+            }}
+          >
+            {a}
+          </button>
+        ))}
+      </div>
+    )}
     {/* O que é um clássico — explicação fixa no topo. */}
     <div style={{ background: "#181410", border: "1px dashed #3a3320", borderRadius: 14, padding: "13px 14px", marginBottom: 16 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
