@@ -22,7 +22,7 @@ import { useTatame } from "@/components/TatameProvider";
 import { useT, useRotuloFaixa, useLingua, type Lingua } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 // Fase A (economia) — aviso de "equipa acima do orçamento" (5 línguas). {x} = JC a mais.
-const ORC_ACIMA: Record<Lingua, { chip: string; frase: string }> = {
+const ORC_ACIMA: Record<string, { chip: string; frase: string }> = {
   pt: { chip: "Acima do orçamento", frase: "A tua equipa vale {x} JC mais do que o teu património. Vende alguém no mercado até equilibrares — senão ficas inativo nesta rodada." },
   en: { chip: "Over budget", frase: "Your team is worth {x} JC more than your wealth. Sell someone in the market until it balances — otherwise you'll be inactive this round." },
   es: { chip: "Por encima del presupuesto", frase: "Tu equipo vale {x} JC más que tu patrimonio. Vende a alguien en el mercado hasta equilibrar — si no, quedas inactivo esta ronda." },
@@ -32,7 +32,7 @@ const ORC_ACIMA: Record<Lingua, { chip: string; frase: string }> = {
 // Loja de Judocoins (economia Fase B). No Meu Time serve de atalho e, quando a
 // equipa está acima do orçamento, de alternativa a vender: comprar JC aumenta o
 // orçamento e a mesma equipa passa a caber. Mapa local por língua.
-const LOJA_MT: Record<Lingua, { atalho: string; ouCompra: string }> = {
+const LOJA_MT: Record<string, { atalho: string; ouCompra: string }> = {
   pt: { atalho: "Loja de Judocoins", ouCompra: "ou compra Judocoins" },
   en: { atalho: "Judocoins Store", ouCompra: "or buy Judocoins" },
   es: { atalho: "Tienda de Judocoins", ouCompra: "o compra Judocoins" },
@@ -43,7 +43,7 @@ const LOJA_MT: Record<Lingua, { atalho: string; ouCompra: string }> = {
 // mostra-se a variação de preço (JC) e, por baixo do tatame, a variação de
 // PATRIMÓNIO do jogador (assimétrica: ganha metade da subida, perde a descida
 // inteira — igual ao congelamento). "Parcial" porque só fecha no fim.
-const VALOR_MT: Record<Lingua, { patTitulo: string; parcial: string; custo: string; sobra: string }> = {
+const VALOR_MT: Record<string, { patTitulo: string; parcial: string; custo: string; sobra: string }> = {
   pt: { patTitulo: "Património nesta rodada", parcial: "parcial · fecha no fim da competição", custo: "Custo da equipa", sobra: "Sobra" },
   en: { patTitulo: "Wealth this round", parcial: "partial · settles when the event ends", custo: "Team cost", sobra: "Left" },
   es: { patTitulo: "Patrimonio en esta ronda", parcial: "parcial · se cierra al final", custo: "Coste del equipo", sobra: "Resto" },
