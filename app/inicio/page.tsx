@@ -116,6 +116,36 @@ function marcarModalVisto(chave: string, userId: string | null | undefined) {
   try { localStorage.setItem(modalKey(chave, userId), "1"); } catch {}
 }
 // ---------------------------------------------------------------------------
+// PEDIDO DE CONSENTIMENTO DE E-MAIL (marketing) — RGPD/opt-in.
+//
+// Muitos Fundadores registaram-se antes de existir a caixa de consentimento, por
+// isso ficaram em `aceita_email_marketing = false` sem nunca terem sido perguntados.
+// Este aviso dá-lhes a hipótese de dizer sim, de forma limpa (clicam -> grava via
+// /api/consentimento-email). A quem já disse sim (aceita = true) nunca mais aparece.
+//
+// CADÊNCIA: volta a perguntar de tempos a tempos mesmo a quem fechou sem aceitar
+// (o Kainan pediu). Guarda-se a data da última pergunta por utilizador no aparelho
+// (localStorage); reaparece passados CONSENT_REPERGUNTA_DIAS dias. Dizer "sim" tira
+// a pessoa da lista pela própria flag (aceita = true), não por esta data.
+// ---------------------------------------------------------------------------
+const CONSENT_REPERGUNTA_DIAS = 30;
+function consentKey(userId: string | null | undefined): string {
+  return `ippon_consent_pergunta__${userId ?? "anon"}`;
+}
+// Deve perguntar agora? Só se nunca perguntámos ou se já passaram os dias da cadência.
+function devePerguntarConsent(userId: string | null | undefined): boolean {
+  try {
+    const v = localStorage.getItem(consentKey(userId));
+    if (!v) return true;
+    const quando = Date.parse(v);
+    if (!Number.isFinite(quando)) return true;
+    return Date.now() - quando >= CONSENT_REPERGUNTA_DIAS * 24 * 3600 * 1000;
+  } catch { return true; }
+}
+function marcarPerguntaConsent(userId: string | null | undefined) {
+  try { localStorage.setItem(consentKey(userId), new Date().toISOString()); } catch {}
+}
+// ---------------------------------------------------------------------------
 // AVISO DE MUDANÇA DE FAIXA — quando o recálculo mensal (cron) mudou a faixa do
 // jogador, a tela inicial dá-lhe a notícia num modal (estilo tutorial), com o
 // cartão de faixa pronto a partilhar. Lê-se a última linha de `faixas_historico`
@@ -211,6 +241,8 @@ export default function Inicio() {
   // É Fundador? (users.fundador). Usa-se para a estrela nos partilháveis — aqui, no
   // cartão de faixa. Separado de `mostrarFundador`, que é só o modal de boas-vindas.
   const [fundadorConta, setFundadorConta] = useState(false);
+  // Pedir consentimento de e-mail (marketing) a quem ainda não disse sim.
+  const [pedirConsentimento, setPedirConsentimento] = useState(false);
   const txtLojaAtalho = LOJA_ATALHO[lingua] ?? LOJA_ATALHO.pt;
   // FASE A: o património mostrado = orçamento unificado (patrimony_jc + JC
   // comprados), a mesma fonte do mercado. Sobrepõe o valor cru vindo do `users`.
@@ -354,7 +386,7 @@ export default function Inicio() {
             else setName(t("inicio.campeao"));
             // O nível já vem do useNivel() (tabela `users`) — não se lê do metadata.
             if (userId) {
-              supabase.from("users").select("belt, data_nascimento, country_code, patrimony_jc, email_verificado_em, fundador").eq("id", userId).maybeSingle()
+              supabase.from("users").select("belt, data_nascimento, country_code, patrimony_jc, email_verificado_em, fundador, aceita_email_marketing").eq("id", userId).maybeSingle()
               .then(({ data: row }) => {
                   if (!active) return;
                   setFaixaJogo(normalizarFaixa(row?.belt));
@@ -392,6 +424,13 @@ export default function Inicio() {
                   setFundadorConta(ehFundador);
                   if (ehFundador && !modalVisto("fundador", userId)) {
                     setMostrarFundador(true);
+                  }
+                  // Pedido de consentimento de e-mail: a quem ainda não disse sim
+                  // (aceita_email_marketing != true) e respeitando a cadência (volta
+                  // a perguntar passados CONSENT_REPERGUNTA_DIAS, mesmo a quem recusou).
+                  const consentiu = (row as { aceita_email_marketing?: unknown } | null)?.aceita_email_marketing === true;
+                  if (!consentiu && devePerguntarConsent(userId)) {
+                    setPedirConsentimento(true);
                   }
                   // Aviso de mudança de faixa: última linha do histórico (mês mais
                   // recente). Só aparece se a faixa mudou (subiu/desceu) e ainda não
@@ -609,6 +648,27 @@ export default function Inicio() {
     setVerCartaoFaixa(false);
     setFaixaMudanca(null);
   }
+  // Consentimento de e-mail: "sim" grava via API (fica true -> nunca mais pergunta);
+  // "agora não" só regista a data (volta a perguntar passada a cadência). Qualquer
+  // fecho marca a data, para a cadência começar a contar.
+  async function aceitarConsentimento() {
+    marcarPerguntaConsent(userIdState);
+    setPedirConsentimento(false);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const tok = sess.session?.access_token;
+      if (!tok) return;
+      await fetch("/api/consentimento-email", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ aceita: true }),
+      });
+    } catch { /* se falhar, a cadência volta a perguntar mais tarde */ }
+  }
+  function recusarConsentimento() {
+    marcarPerguntaConsent(userIdState);
+    setPedirConsentimento(false);
+  }
   async function abrirResumoDaGaleria(compEscolhida: string) {
     const cong = await buscarResultadosCongelados(compEscolhida);
     if (!cong) return;
@@ -664,7 +724,10 @@ export default function Inicio() {
   // O aviso de mudança de faixa vem logo a seguir ao de Fundador (é um momento de
   // jogo forte). O de evento só aparece quando nenhum destes está a ser mostrado.
   const podeMostrarMudancaFaixa = !podeMostrarFundador && !!faixaMudanca && !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
-  const podeMostrarModalEvento = !podeMostrarFundador && !podeMostrarMudancaFaixa && !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
+  // O pedido de consentimento vem depois dos momentos de jogo (Fundador, faixa) e
+  // antes dos modais de evento, e nunca a um visitante.
+  const podeMostrarConsent = pedirConsentimento && !podeMostrarFundador && !podeMostrarMudancaFaixa && !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
+  const podeMostrarModalEvento = !podeMostrarFundador && !podeMostrarMudancaFaixa && !podeMostrarConsent && !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
     <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes iltut{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.75)}50%{box-shadow:0 0 0 9px rgba(74,144,217,0.18)}} .iltut{animation:iltut 1.3s ease-in-out infinite} @keyframes ilentrar{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.28)}} .ilentrar{animation:ilentrar 1.5s ease-in-out infinite;border-radius:999px} @keyframes ilmodalin{0%{opacity:0;transform:translateY(10px) scale(0.97)}100%{opacity:1;transform:none}} .ilmodalin{animation:ilmodalin 0.28s cubic-bezier(0.2,0.7,0.3,1)}`}</style>
@@ -915,6 +978,14 @@ export default function Inicio() {
         identity={identityResumo}
         fundador={!!fundadorConta}
         onClose={fecharMudancaFaixa}
+        />
+      )}
+    {podeMostrarConsent && (
+        <ModalConsentimento
+        lingua={lingua}
+        cor={corDaFaixa(faixaJogo)}
+        onAceitar={aceitarConsentimento}
+        onRecusar={recusarConsentimento}
         />
       )}
     {podeMostrarModalEvento && modalEvento && (
@@ -1268,6 +1339,43 @@ function ModalMudancaFaixa({ mudanca, lingua, rotuloFaixa, onVer, onClose }: {
     </button>
     <button onClick={onClose} style={{ width: "100%", background: "transparent", color: "#9fb0a7", border: "1px solid #2a332e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 12, borderRadius: 12, fontSize: 13.5, cursor: "pointer", boxSizing: "border-box" }}>
     {dic.fechar}
+    </button>
+    </div>
+    </Overlay>
+  );
+}
+// MODAL DE CONSENTIMENTO DE E-MAIL — pede opt-in de marketing (novidades, dicas,
+// scout da rodada, avisos da oferta) a quem ainda não disse sim. "Sim" grava; "agora
+// não" fecha e volta a perguntar passada a cadência. Texto por língua (ja/ru entram
+// no rollout das línguas). Sem travessões.
+const CONSENT_MODAL: Record<string, { titulo: string; texto: string; sim: string; nao: string }> = {
+  pt: { titulo: "Queres receber as novidades?", texto: "Dicas da rodada, scout, avisos da tua oferta e novidades da Ippon League, direto no teu e-mail. Podes desativar quando quiseres.", sim: "Sim, quero receber", nao: "Agora não" },
+  en: { titulo: "Want the updates?", texto: "Round tips, scout, your offer alerts and Ippon League news, straight to your email. You can turn it off whenever you want.", sim: "Yes, send them", nao: "Not now" },
+  es: { titulo: "¿Quieres recibir las novedades?", texto: "Consejos de la ronda, scout, avisos de tu oferta y novedades de Ippon League, directo a tu e-mail. Puedes desactivarlo cuando quieras.", sim: "Sí, quiero recibir", nao: "Ahora no" },
+  fr: { titulo: "Tu veux les nouveautés ?", texto: "Conseils du tour, scout, alertes de ton offre et nouveautés d'Ippon League, directement dans ton e-mail. Tu peux désactiver quand tu veux.", sim: "Oui, je veux bien", nao: "Pas maintenant" },
+  de: { titulo: "Möchtest du die Neuigkeiten?", texto: "Runden-Tipps, Scout, Hinweise zu deinem Angebot und Neuigkeiten der Ippon League, direkt in deine E-Mail. Du kannst es jederzeit abschalten.", sim: "Ja, gerne", nao: "Jetzt nicht" },
+};
+function ModalConsentimento({ lingua, cor, onAceitar, onRecusar }: {
+  lingua: Lingua;
+  cor: string;
+  onAceitar: () => void;
+  onRecusar: () => void;
+}) {
+  const m = CONSENT_MODAL[lingua] ?? CONSENT_MODAL.pt;
+  return (
+    <Overlay>
+    <div className="ilmodalin" style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 20, textAlign: "center" }}>
+    <div style={{ width: 72, height: 72, margin: "0 auto 8px" }}>
+    <Mascot belt={cor} expression="indicando" />
+    </div>
+    <div style={{ fontSize: 26, lineHeight: 1, marginBottom: 8 }} aria-hidden="true">✉️</div>
+    <div style={{ fontFamily: FD, fontSize: 18, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.15, marginBottom: 9, color: GOLD }}>{m.titulo}</div>
+    <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 18px" }}>{m.texto}</p>
+    <button onClick={onAceitar} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 14, borderRadius: 12, fontSize: 15, cursor: "pointer", boxSizing: "border-box", marginBottom: 9 }}>
+    {m.sim}
+    </button>
+    <button onClick={onRecusar} style={{ width: "100%", background: "transparent", color: "#9fb0a7", border: "1px solid #2a332e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 12, borderRadius: 12, fontSize: 13.5, cursor: "pointer", boxSizing: "border-box" }}>
+    {m.nao}
     </button>
     </div>
     </Overlay>
