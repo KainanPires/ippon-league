@@ -1052,13 +1052,13 @@ export const NOTIF: Record<string, Entrada> = {
 // (ver faixa.* no lib/i18n). Uma notificação diz "faixa {faixa}", e {faixa} tem
 // de sair no nome traduzido, não no valor canónico ("roxa").
 const FAIXAS_NOME: Record<string, Entrada> = {
-  branca: { pt: "Branca", en: "White", es: "Blanco", fr: "Blanche", de: "Weiß" },
-  azul: { pt: "Azul", en: "Blue", es: "Azul", fr: "Bleue", de: "Blau" },
-  amarela: { pt: "Amarela", en: "Yellow", es: "Amarillo", fr: "Jaune", de: "Gelb" },
-  verde: { pt: "Verde", en: "Green", es: "Verde", fr: "Verte", de: "Grün" },
-  roxa: { pt: "Roxa", en: "Purple", es: "Morado", fr: "Violette", de: "Lila" },
-  marrom: { pt: "Marrom", en: "Brown", es: "Marrón", fr: "Marron", de: "Braun" },
-  preta: { pt: "Preta", en: "Black", es: "Negro", fr: "Noire", de: "Schwarz" },
+  branca: { pt: "Branca", en: "White", es: "Blanco", fr: "Blanche", de: "Weiß", ja: "白", ru: "белый" },
+  azul: { pt: "Azul", en: "Blue", es: "Azul", fr: "Bleue", de: "Blau", ja: "青", ru: "синий" },
+  amarela: { pt: "Amarela", en: "Yellow", es: "Amarillo", fr: "Jaune", de: "Gelb", ja: "黄", ru: "жёлтый" },
+  verde: { pt: "Verde", en: "Green", es: "Verde", fr: "Verte", de: "Grün", ja: "緑", ru: "зелёный" },
+  roxa: { pt: "Roxa", en: "Purple", es: "Morado", fr: "Violette", de: "Lila", ja: "紫", ru: "фиолетовый" },
+  marrom: { pt: "Marrom", en: "Brown", es: "Marrón", fr: "Marron", de: "Braun", ja: "茶", ru: "коричневый" },
+  preta: { pt: "Preta", en: "Black", es: "Negro", fr: "Noire", de: "Schwarz", ja: "黒", ru: "чёрный" },
 };
 
 /** Nome de uma faixa (valor canónico "roxa") na língua pedida. */
@@ -1070,11 +1070,11 @@ export function nomeFaixaEm(lingua: LinguaNotif, canonica: string): string {
 // Nomes dos CONTINENTES por código (EUR/PAN/ASI/AFR/OCE), nas 5 línguas. Mesmo
 // modelo das faixas: a notificação diz "de {cont}" e {cont} sai traduzido.
 const CONTINENTES_NOME: Record<string, Entrada> = {
-  EUR: { pt: "Europa", en: "Europe", es: "Europa", fr: "Europe", de: "Europa" },
-  PAN: { pt: "América", en: "the Americas", es: "América", fr: "Amériques", de: "Amerika" },
-  ASI: { pt: "Ásia", en: "Asia", es: "Asia", fr: "Asie", de: "Asien" },
-  AFR: { pt: "África", en: "Africa", es: "África", fr: "Afrique", de: "Afrika" },
-  OCE: { pt: "Oceânia", en: "Oceania", es: "Oceanía", fr: "Océanie", de: "Ozeanien" },
+  EUR: { pt: "Europa", en: "Europe", es: "Europa", fr: "Europe", de: "Europa", ja: "ヨーロッパ", ru: "Европа" },
+  PAN: { pt: "América", en: "the Americas", es: "América", fr: "Amériques", de: "Amerika", ja: "アメリカ大陸", ru: "Америка" },
+  ASI: { pt: "Ásia", en: "Asia", es: "Asia", fr: "Asie", de: "Asien", ja: "アジア", ru: "Азия" },
+  AFR: { pt: "África", en: "Africa", es: "África", fr: "Afrique", de: "Afrika", ja: "アフリカ", ru: "Африка" },
+  OCE: { pt: "Oceânia", en: "Oceania", es: "Oceanía", fr: "Océanie", de: "Ozeanien", ja: "オセアニア", ru: "Океания" },
 };
 
 /** Nome de um continente (código "EUR") na língua pedida. */
