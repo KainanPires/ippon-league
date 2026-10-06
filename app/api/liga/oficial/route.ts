@@ -168,9 +168,35 @@ async function pontuacaoPorAtletas(ids: string[], comp: string): Promise<Record<
   const pontos: Record<string, number> = {};
   if (ids.length === 0) return pontos;
 
+  // CAMINHO RÁPIDO (igual ao /api/liga/geral): no evento ao vivo, a tabela
+  // `resultados_atletas` já está fresca (o chave-maestro atualiza-a de minuto a
+  // minuto). Ler daqui é UMA consulta à BD em vez de dezenas de idas ao JudoBase,
+  // o que torna o ranking muito mais rápido a carregar. `pontos` é o valor
+  // SIMPLES por atleta (o x2 do capitão é aplicado por quem chama).
+  const faltam = new Set(ids);
+  if (supabaseAdmin) {
+    for (let i = 0; i < ids.length; i += 300) {
+      const lote = ids.slice(i, i + 300);
+      try {
+        const { data } = await supabaseAdmin
+          .from("resultados_atletas")
+          .select("id_person, pontos")
+          .eq("id_competicao", comp)
+          .in("id_person", lote);
+        for (const r of data || []) {
+          const id = String(r.id_person);
+          pontos[id] = Math.round((Number(r.pontos) || 0) * 10) / 10;
+          faltam.delete(id);
+        }
+      } catch { /* este lote cai no recurso abaixo */ }
+    }
+  }
+
+  // RECURSO: atletas sem linha na tabela (competição sem o maestro) — JudoBase.
+  const restantes = [...faltam];
   const LOTE = 8;
-  for (let i = 0; i < ids.length; i += LOTE) {
-    const lote = ids.slice(i, i + LOTE);
+  for (let i = 0; i < restantes.length; i += LOTE) {
+    const lote = restantes.slice(i, i + LOTE);
     await Promise.all(
       lote.map(async (id) => {
           try {
