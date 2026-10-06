@@ -144,6 +144,9 @@ export default function Inicio() {
   // desvalorizações já aplicadas. Ver a nota em TeamBuilt.
   const [patrimonio, setPatrimonio] = useState<number | null>(null);
   const { lingua } = useLingua();
+  // Modal de boas-vindas de Fundador (uma vez, estilo tutorial). Mostra-se a quem
+  // é Fundador e ainda não o viu neste aparelho.
+  const [mostrarFundador, setMostrarFundador] = useState(false);
   const txtLojaAtalho = LOJA_ATALHO[lingua] ?? LOJA_ATALHO.pt;
   // FASE A: o património mostrado = orçamento unificado (patrimony_jc + JC
   // comprados), a mesma fonte do mercado. Sobrepõe o valor cru vindo do `users`.
@@ -287,7 +290,7 @@ export default function Inicio() {
             else setName(t("inicio.campeao"));
             // O nível já vem do useNivel() (tabela `users`) — não se lê do metadata.
             if (userId) {
-              supabase.from("users").select("belt, data_nascimento, country_code, patrimony_jc, email_verificado_em").eq("id", userId).maybeSingle()
+              supabase.from("users").select("belt, data_nascimento, country_code, patrimony_jc, email_verificado_em, fundador").eq("id", userId).maybeSingle()
               .then(({ data: row }) => {
                   if (!active) return;
                   setFaixaJogo(normalizarFaixa(row?.belt));
@@ -320,6 +323,10 @@ export default function Inicio() {
                     const naoVistos = lista.filter((m) => !modalVisto(m.chave, userId));
                     if (naoVistos.length > 0) setModaisFila(naoVistos);
                   } catch { /* sem mensagem: nenhum modal aparece */ }
+                  // Boas-vindas de Fundador: só a quem é Fundador e ainda não viu.
+                  if ((row as { fundador?: unknown } | null)?.fundador && !modalVisto("fundador", userId)) {
+                    setMostrarFundador(true);
+                  }
                 });
             }
             if (localStorage.getItem("ippon_onboarding") === "pending") {
@@ -507,6 +514,12 @@ export default function Inicio() {
     }
     setModaisFila((fila) => fila.slice(1));
   }
+  // Fecha o modal de Fundador: marca como visto (1x por aparelho). A notificação
+  // no sino já foi tratada à parte; aqui é só o momento visual.
+  function fecharModalFundador() {
+    marcarModalVisto("fundador", userIdState);
+    setMostrarFundador(false);
+  }
   async function abrirResumoDaGaleria(compEscolhida: string) {
     const cong = await buscarResultadosCongelados(compEscolhida);
     if (!cong) return;
@@ -556,7 +569,10 @@ export default function Inicio() {
   // Os modais de evento só aparecem fora do tutorial de onboarding e sem outro
   // overlay aberto (resumo da rodada / galeria), para não empilhar pop-ups.
   const modalEvento = modaisFila[0] ?? null;
-  const podeMostrarModalEvento = !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
+  // O modal de Fundador tem prioridade: é o momento de boas-vindas. O de evento
+  // só aparece quando o de Fundador não está a ser mostrado (não empilhar pop-ups).
+  const podeMostrarFundador = mostrarFundador && !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
+  const podeMostrarModalEvento = !podeMostrarFundador && !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
     <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes iltut{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.75)}50%{box-shadow:0 0 0 9px rgba(74,144,217,0.18)}} .iltut{animation:iltut 1.3s ease-in-out infinite} @keyframes ilentrar{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.28)}} .ilentrar{animation:ilentrar 1.5s ease-in-out infinite;border-radius:999px} @keyframes ilmodalin{0%{opacity:0;transform:translateY(10px) scale(0.97)}100%{opacity:1;transform:none}} .ilmodalin{animation:ilmodalin 0.28s cubic-bezier(0.2,0.7,0.3,1)}`}</style>
@@ -785,6 +801,9 @@ export default function Inicio() {
     {phase === "tutorial" && <Tutorial step={step} setStep={setStep} onClose={finishOnboarding} name={nomeMostrado || t("inicio.campeao")} target={tutTarget} cor={corDaFaixa(faixaJogo)} contaPro={isPro} contaProMax={isProMax} />}
     {/* Modais de evento (aniversário, grande competição, etc.). Aparecem 1x por
       evento; em sequência quando coincidem; ao fechar vão para o sino. */}
+    {podeMostrarFundador && (
+        <ModalFundador onClose={fecharModalFundador} cor={corDaFaixa(faixaJogo)} lingua={lingua} />
+      )}
     {podeMostrarModalEvento && modalEvento && (
         <ModalEvento msg={modalEvento} onClose={fecharModalEvento} cor={corDaFaixa(faixaJogo)} />
       )}
@@ -1053,6 +1072,37 @@ function ModalEvento({ msg, onClose, cor }: { msg: MensagemEspecial; onClose: ()
     <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 18px" }}>{msg.texto}</p>
     <button onClick={onClose} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 14, borderRadius: 12, fontSize: 15, cursor: "pointer", boxSizing: "border-box" }}>
     {msg.botao}
+    </button>
+    </div>
+    </Overlay>
+  );
+}
+// MODAL DE FUNDADOR — boas-vindas em destaque na tela inicial, estilo tutorial
+// (o Dôdo a comemorar). Mostra-se uma vez. Texto por língua num mapa local (o
+// japonês e o russo entram no rollout das línguas). Sem travessões.
+const FUNDADOR_MODAL: Record<string, { selo: string; titulo: string; texto: string; botao: string }> = {
+  pt: { selo: "Fundador", titulo: "Bem-vindo, Fundador", texto: "Estás entre os Fundadores da Ippon League. Este selo é exclusivo de quem chegou no início, e fica contigo para sempre. Obrigado por ajudares a construir o maior fantasy de judô do mundo.", botao: "Vamos a isto" },
+  en: { selo: "Founder", titulo: "Welcome, Founder", texto: "You are among the Founders of Ippon League. This badge belongs only to those who were here from the start, and it is yours forever. Thank you for helping build the biggest judo fantasy game in the world.", botao: "Let's go" },
+  es: { selo: "Fundador", titulo: "Bienvenido, Fundador", texto: "Estás entre los Fundadores de Ippon League. Este sello es exclusivo de quienes llegaron al principio, y es tuyo para siempre. Gracias por ayudar a construir el mayor fantasy de judo del mundo.", botao: "Vamos allá" },
+  fr: { selo: "Fondateur", titulo: "Bienvenue, Fondateur", texto: "Tu fais partie des Fondateurs d'Ippon League. Ce badge est réservé à ceux qui étaient là dès le début, et il est à toi pour toujours. Merci d'aider à construire le plus grand fantasy de judo au monde.", botao: "C'est parti" },
+  de: { selo: "Gründer", titulo: "Willkommen, Gründer", texto: "Du gehörst zu den Gründern der Ippon League. Dieses Abzeichen ist nur für jene, die von Anfang an dabei waren, und es bleibt für immer deins. Danke, dass du hilfst, das größte Judo-Fantasy-Spiel der Welt aufzubauen.", botao: "Los geht's" },
+};
+function ModalFundador({ onClose, cor, lingua }: { onClose: () => void; cor: string; lingua: Lingua }) {
+  const m = FUNDADOR_MODAL[lingua] ?? FUNDADOR_MODAL.pt;
+  return (
+    <Overlay>
+    <div className="ilmodalin" style={{ background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16, padding: 20, textAlign: "center" }}>
+    <div style={{ width: 76, height: 76, margin: "0 auto 6px" }}>
+    <Mascot belt={cor} expression="comemorando" />
+    </div>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, border: `1px solid ${GOLD}`, background: "rgba(217,164,65,0.12)", borderRadius: 999, padding: "3px 11px", marginBottom: 10 }}>
+    <span style={{ color: GOLD, fontSize: 12, lineHeight: 1 }}>★</span>
+    <span style={{ color: GOLD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{m.selo}</span>
+    </div>
+    <div style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.15, marginBottom: 9, color: GOLD }}>{m.titulo}</div>
+    <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 18px" }}>{m.texto}</p>
+    <button onClick={onClose} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 14, borderRadius: 12, fontSize: 15, cursor: "pointer", boxSizing: "border-box" }}>
+    {m.botao}
     </button>
     </div>
     </Overlay>
