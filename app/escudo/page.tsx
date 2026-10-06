@@ -32,7 +32,7 @@ const SLOTS_ESTAMPA: { id: Slot; label: string }[] = [
 // Textos do cadeado Pro. Conteúdo pequeno e específico deste ecrã -> mapa local
 // por língua (o mesmo padrão do resto do conteúdo por ecrã; não mexe no
 // dicionário global de i18n).
-const PRO_LOCK: Record<Lingua, { pro: string; titulo: string; texto: string; cta: string }> = {
+const PRO_LOCK: Record<string, { pro: string; titulo: string; texto: string; cta: string }> = {
   pt: { pro: "Pro", titulo: "Desbloqueia com o Ippon Pro", texto: "Esta opção faz parte do Ippon Pro. Assina para desbloquear todas as formas, estampas, símbolos e cores do teu escudo.", cta: "Conhecer o Ippon Pro" },
   en: { pro: "Pro", titulo: "Unlock with Ippon Pro", texto: "This option is part of Ippon Pro. Subscribe to unlock every shape, pattern, symbol and colour for your crest.", cta: "Discover Ippon Pro" },
   es: { pro: "Pro", titulo: "Desbloquea con Ippon Pro", texto: "Esta opción es parte de Ippon Pro. Suscríbete para desbloquear todas las formas, estampados, símbolos y colores de tu escudo.", cta: "Descubrir Ippon Pro" },
