@@ -52,6 +52,16 @@ type Conta = {
 };
 // O que a pessoa perde quando o acesso terminar (mostrado na confirmação de
 // cancelamento). Mapa local por língua — o texto não vive no dicionário global.
+// Selo de Fundador: rótulo e nota de permanência, por língua. Mapa local (como o
+// CANCEL_PERDE), para a peça ficar contida num só ficheiro. O "ja" entra no
+// rollout do japonês.
+const SELO_FUNDADOR: Record<string, { rotulo: string; nota: string }> = {
+  pt: { rotulo: "Fundador", nota: "Estiveste cá desde o início. Este selo é teu para sempre." },
+  en: { rotulo: "Founder", nota: "You were here from the start. This badge is yours forever." },
+  es: { rotulo: "Fundador", nota: "Estuviste desde el principio. Este sello es tuyo para siempre." },
+  fr: { rotulo: "Fondateur", nota: "Tu étais là dès le début. Ce badge est à toi pour toujours." },
+  de: { rotulo: "Gründer", nota: "Du warst von Anfang an dabei. Dieses Abzeichen bleibt für immer deins." },
+};
 const CANCEL_PERDE: Record<string, string> = {
   pt: "Quando o acesso terminar: a tua pontuação nas ligas Mundial e Continental zera e sais delas, sais de qualquer Copa do Dôdo em curso, e se tiveres mais ligas de amigos do que o limite gratuito terás de escolher quais manter.",
   en: "When your access ends: your points in the World and Continental leagues reset and you leave them, you're out of any ongoing Copa do Dôdo, and if you have more friend leagues than the free limit you'll choose which to keep.",
@@ -66,6 +76,7 @@ export default function Perfil() {
   const [identity, setIdentity] = useState<Identity>(DEFAULT_IDENTITY);
   const [conta, setConta] = useState<Conta | null>(null);
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
+  const [fundador, setFundador] = useState(false);
   const [ready, setReady] = useState(false);
   const [saindo, setSaindo] = useState(false);
   // A subscrição vem da rota, que a lê à Stripe. Não se usa o is_pro do
@@ -156,8 +167,8 @@ export default function Perfil() {
                 isPro: Boolean(m.is_pro),
               });
             try {
-              const { data: row } = await supabase.from("users").select("belt").eq("id", u.id).maybeSingle();
-              if (active) setFaixaJogo(normalizarFaixa(row?.belt));
+              const { data: row } = await supabase.from("users").select("belt, fundador").eq("id", u.id).maybeSingle();
+              if (active) { setFaixaJogo(normalizarFaixa(row?.belt)); setFundador(!!row?.fundador); }
             } catch { /* fica branca por defeito */ }
           }
           setReady(true);
@@ -267,12 +278,24 @@ export default function Perfil() {
     <span style={{ width: 11, height: 11, borderRadius: 3, background: corFaixaJogo, border: "1px solid rgba(255,255,255,0.25)", flexShrink: 0 }} />
     {nomeFaixaJogo}
     </div>
+    {fundador && (
+      <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(217,145,65,0.12)", border: `1px solid ${GOLD}`, borderRadius: 999, padding: "2px 9px" }}>
+        <span style={{ color: GOLD, fontSize: 11, lineHeight: 1 }}>★</span>
+        <span style={{ color: GOLD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{(SELO_FUNDADOR[lingua] ?? SELO_FUNDADOR.pt).rotulo}</span>
+      </div>
+    )}
     <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>{abertoDados ? t("perfil.tocaFechar") : t("perfil.tocaVer")}</div>
     </div>
     <span style={{ flexShrink: 0, color: "#93a39a", transform: abertoDados ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}>
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
     </span>
     </button>
+    {fundador && (
+        <p style={{ fontSize: 11.5, color: "#c9a765", lineHeight: 1.5, margin: "0 2px 18px", display: "flex", gap: 6 }}>
+        <span style={{ color: GOLD, flexShrink: 0 }}>★</span>
+        <span>{(SELO_FUNDADOR[lingua] ?? SELO_FUNDADOR.pt).nota}</span>
+        </p>
+      )}
     {abertoDados && (
         <div style={{ marginBottom: 22 }}>
         {!ready ? (
