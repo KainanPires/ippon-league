@@ -5,9 +5,15 @@ import type { CSSProperties } from "react";
 import type { Athlete } from "@/lib/athletes";
 import { Escudo, type Identity } from "@/components/Escudo";
 import { Mascot } from "@/components/Mascot";
-import { useT } from "@/lib/i18n";
+import { useT, useLingua } from "@/lib/i18n";
 
 const GOLD = "#d9a441";
+
+// Rótulo do selo de Fundador no cartão, por língua (mapa local; japonês/russo
+// entram no rollout das línguas). Sem travessões.
+const FUNDADOR_LABEL: Record<string, string> = {
+  pt: "Fundador", en: "Founder", es: "Fundador", fr: "Fondateur", de: "Gründer",
+};
 
 const IOC: Record<string, string> = {
   JP: "JPN", FR: "FRA", BR: "BRA", GE: "GEO", KZ: "KAZ", AZ: "AZE", BE: "BEL",
@@ -72,6 +78,8 @@ const CARD_CSS = `
 .jcard-headglow{position:absolute;top:-120px;left:0;right:0;height:620px;z-index:0;background:radial-gradient(58% 70% at 34% 24%,color-mix(in srgb,var(--glow-accent) 26%,transparent) 0%,transparent 68%),radial-gradient(80% 60% at 80% 6%,color-mix(in srgb,#d9a441 10%,transparent) 0%,transparent 70%);pointer-events:none}
 .jcard-inner{position:relative;z-index:2;height:100%;padding:64px 60px 56px;display:flex;flex-direction:column;box-sizing:border-box}
 .pro-badge{align-self:center;margin-top:-14px;margin-bottom:30px;padding:13px 40px;border-radius:999px;background:linear-gradient(180deg,#f1c969 0%,#d9a441 55%,#b9842c 100%);color:#20160a;font-weight:700;font-size:31px;letter-spacing:5px;text-transform:uppercase;border:1.5px solid #f4d489;box-shadow:0 0 44px rgba(217,164,65,0.6),inset 0 1px 0 rgba(255,255,255,0.5)}
+.founder-pill{align-self:center;display:inline-flex;align-items:center;gap:14px;margin-top:18px;padding:10px 30px;border-radius:999px;background:rgba(217,164,65,0.14);border:2px solid #d9a441;color:#f3dc9b;font-weight:700;font-size:28px;letter-spacing:5px;text-transform:uppercase;box-shadow:0 0 30px rgba(217,164,65,0.28),inset 0 1px 0 rgba(255,255,255,0.15)}
+.founder-pill .fstar{color:#d9a441;font-size:31px;line-height:1}
 .jcard-head{display:flex;flex-direction:column;align-items:center;text-align:center;gap:18px;padding-bottom:30px;margin-bottom:8px;border-bottom:1.5px solid rgba(241,237,226,0.10)}
 .crest-wrap{flex-shrink:0;width:150px;height:172px;display:grid;place-items:center;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.45))}
 .head-text{min-width:0;width:100%;display:flex;flex-direction:column;align-items:center}
@@ -144,7 +152,7 @@ function loadHtmlToImage(): Promise<any> {
   return _h2iPromise;
 }
 
-export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, nivel, pontos, onClose }: CartaoProps & { pro?: boolean; nivel?: "normal" | "pro" | "pro_max"; pontos?: Record<string, number>; onClose: () => void }) {
+export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, nivel, pontos, fundador = false, onClose }: CartaoProps & { pro?: boolean; nivel?: "normal" | "pro" | "pro_max"; pontos?: Record<string, number>; fundador?: boolean; onClose: () => void }) {
   const t = useT();
   // Nível efetivo: usa 'nivel' se vier; senão converte o 'pro' antigo (compat).
   const nivelEf: "normal" | "pro" | "pro_max" = nivel ?? (pro ? "pro" : "normal");
@@ -240,7 +248,7 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, n
         {/* Pré-visualização: o cartão real (1080px) escalado para a largura do modal. */}
         <div ref={previewRef} style={{ width: "100%", aspectRatio: "1080 / 1350", borderRadius: 12, overflow: "hidden", marginBottom: 14, position: "relative", background: "#0c0e0d" }}>
           <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1350, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <CardNode innerRef={cardRef} vars={cardVars} nivel={nivelEf} belt={bk} beltName={t(b.nameK)} identity={identity} linhas={linhas} capitao={capitao} pontos={pontos} />
+            <CardNode innerRef={cardRef} vars={cardVars} nivel={nivelEf} belt={bk} beltName={t(b.nameK)} identity={identity} linhas={linhas} capitao={capitao} pontos={pontos} fundador={fundador} />
           </div>
         </div>
 
@@ -255,7 +263,7 @@ export function CartaoEquipa({ identity, faixa, atletas, capitao, pro = false, n
 }
 
 // O nó do cartão a 1080×1350 — é isto que o html-to-image captura.
-function CardNode({ innerRef, vars, nivel, belt, beltName, identity, linhas, capitao, pontos }: {
+function CardNode({ innerRef, vars, nivel, belt, beltName, identity, linhas, capitao, pontos, fundador }: {
   innerRef: { current: HTMLDivElement | null };
   vars: CSSProperties;
   nivel: "normal" | "pro" | "pro_max";
@@ -265,8 +273,10 @@ function CardNode({ innerRef, vars, nivel, belt, beltName, identity, linhas, cap
   linhas: Athlete[];
   capitao: string | null;
   pontos?: Record<string, number>;
+  fundador?: boolean;
 }) {
   const t = useT();
+  const { lingua } = useLingua();
   const accent = (vars as any)["--accent"] as string;
   const ehPro = nivel === "pro";
   const ehProMax = nivel === "pro_max";
@@ -274,7 +284,7 @@ function CardNode({ innerRef, vars, nivel, belt, beltName, identity, linhas, cap
   // Classe de moldura: dourado (is-pro) ou azul (is-promax). O Dôdo na medalha
   // herda a cor do judogui do contexto, por isso aqui não forçamos cor de judogui.
   const classeNivel = ehProMax ? "is-promax" : ehPro ? "is-pro" : "";
-  const seloTexto = ehProMax ? "★  IPPON PRO MAX  ★" : "★  IPPON PRO  ★";
+  const seloTexto = ehProMax ? "★  IPPON PRO MAX  ★" : "★  IPPON PRO  ★";
   const rodapeTexto = ehProMax ? t("card.rodapeMax") : t("card.rodapePro");
   // Há pontuação para mostrar? (modo competição). Se vier o mapa de pontos com
   // pelo menos uma entrada, mostramos a coluna de pontos e o total no rodapé.
@@ -302,6 +312,9 @@ function CardNode({ innerRef, vars, nivel, belt, beltName, identity, linhas, cap
           <div className="head-text">
             <h1 className="team-name">{identity.name}</h1>
             <span className="belt-pill">{beltName}</span>
+            {fundador && (
+              <div className="founder-pill"><span className="fstar">★</span><span>{FUNDADOR_LABEL[lingua] ?? FUNDADOR_LABEL.pt}</span></div>
+            )}
           </div>
         </header>
         <div className="roster">
