@@ -12,10 +12,9 @@
 // que ainda não terminou). A lista e a ordem ficam iguais; subindo o scroll vêem-se
 // as competições antigas.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   calendarioDoAno,
-  anosDoCalendario,
   estadoMercado,
   competicaoFechada,
   focoMercado,
@@ -39,11 +38,14 @@ type Estado = "passada" | "aDecorrer" | "proxima" | "futura";
 export function CalendarioConteudo() {
   const foco = focoMercado();
   const alvoId = foco.alvo.idCompeticao;
-  const anos = anosDoCalendario();
+  // Calendário em CONTINUAÇÃO: o ano atual seguido do(s) seguinte(s), em ordem
+  // cronológica. Assim quem planeia uma liga/copa que passa do fim do ano vê já
+  // as rodadas de 2027 a seguir às de 2026, sem ter de trocar de vista.
   const anoAtual = new Date().getFullYear();
-  const [ano, setAno] = useState(anos.includes(anoAtual) ? anoAtual : anos[anos.length - 1]);
-  const lista = [...calendarioDoAno(ano)].sort((a, b) => a.semana - b.semana);
-  const ehAnoAtual = ano === anoAtual;
+  const listaA = calendarioDoAno(anoAtual);
+  const listaProx = calendarioDoAno(anoAtual + 1);
+  const lista = [...(listaProx === listaA ? listaA : [...listaA, ...listaProx])]
+    .sort((a, b) => a.de.localeCompare(b.de));
 
   // Cartão-alvo do scroll: o PRIMEIRO que ainda não terminou (em ordem
   // cronológica = o que está a decorrer ou o próximo). Pela própria lista, para
@@ -54,16 +56,15 @@ export function CalendarioConteudo() {
   const alvoRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    // Ao abrir a aba, salta até ao cartão-alvo — só no ano atual (num ano futuro
-    // começa-se por cima). Duas tentativas curtas chegam.
-    if (!ehAnoAtual) return;
+    // Ao abrir a aba, salta até ao cartão-alvo (a competição a decorrer/próxima,
+    // no ano atual). A partir daí, 2027 fica logo a seguir, a um scroll.
     let cancelado = false;
     const timers = [40, 160].map((ms) => window.setTimeout(() => {
       if (cancelado) return;
       alvoRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     }, ms));
     return () => { cancelado = true; timers.forEach((t) => clearTimeout(t)); };
-  }, [idxAlvo, ehAnoAtual]);
+  }, [idxAlvo]);
 
   return (
     <div>
@@ -71,27 +72,6 @@ export function CalendarioConteudo() {
         0%,100% { box-shadow: 0 0 0 0 rgba(217,164,65,0.0); }
         50% { box-shadow: 0 0 0 3px rgba(217,164,65,0.22); }
       }`}</style>
-
-      {/* Seletor de ano — só aparece quando há mais do que um ano de calendário. */}
-      {anos.length > 1 && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          {anos.map((a) => (
-            <button
-              key={a}
-              onClick={() => setAno(a)}
-              style={{
-                flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
-                fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.04em",
-                border: `1px solid ${a === ano ? GOLD : "#2a332c"}`,
-                background: a === ano ? GOLD : "#121815",
-                color: a === ano ? "#1b211e" : "#9fb0a6",
-              }}
-            >
-              {a}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* O que é um clássico — explicação fixa no topo. */}
       <div style={{ background: "#181410", border: "1px dashed #3a3320", borderRadius: 14, padding: "13px 14px", marginBottom: 16 }}>
@@ -105,14 +85,29 @@ export function CalendarioConteudo() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-        {lista.map((s, i) => (
-          <CartaoSemana
-            key={s.semana}
-            s={s}
-            alvoId={alvoId}
-            alvoRef={i === idxAlvo ? alvoRef : undefined}
-          />
-        ))}
+        {lista.flatMap((s, i) => {
+          const anoS = String(s.de).slice(0, 4);
+          const novoAno = i > 0 && anoS !== String(lista[i - 1].de).slice(0, 4);
+          const els: React.ReactNode[] = [];
+          if (novoAno) {
+            els.push(
+              <div key={`ano-${anoS}`} style={{ display: "flex", alignItems: "center", gap: 10, margin: "8px 2px 2px" }}>
+                <div style={{ flex: 1, height: 1, background: "#243029" }} />
+                <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#e6c97a" }}>{anoS}</span>
+                <div style={{ flex: 1, height: 1, background: "#243029" }} />
+              </div>
+            );
+          }
+          els.push(
+            <CartaoSemana
+              key={`${s.idCompeticao}-${s.de}`}
+              s={s}
+              alvoId={alvoId}
+              alvoRef={i === idxAlvo ? alvoRef : undefined}
+            />
+          );
+          return els;
+        })}
       </div>
     </div>
   );

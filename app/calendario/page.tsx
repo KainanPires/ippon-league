@@ -10,10 +10,9 @@
 //
 // Ao ABRIR, a página faz scroll automático até à competição-alvo (a que está a
 // decorrer ou a próxima com mercado aberto — focoMercado().alvo).
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   calendarioDoAno,
-  anosDoCalendario,
   estadoMercado,
   competicaoFechada,
   focoMercado,
@@ -42,21 +41,23 @@ export default function CalendarioPage() {
   const t = useT();
   const foco = focoMercado();
   const alvoId = foco.alvo.idCompeticao;
-  const anos = anosDoCalendario();
+  // Calendário em CONTINUAÇÃO: o ano atual seguido do(s) seguinte(s), cronológico.
+  // Assim o 2026 flui para o 2027 no mesmo scroll — quem planeia uma liga/copa que
+  // passa do fim do ano vê já as rodadas do ano que vem.
   const anoAtual = new Date().getFullYear();
-  const [ano, setAno] = useState(anos.includes(anoAtual) ? anoAtual : anos[anos.length - 1]);
-  const ehAnoAtual = ano === anoAtual;
-  const lista = [...calendarioDoAno(ano)].sort((a, b) => a.semana - b.semana);
+  const listaA = calendarioDoAno(anoAtual);
+  const listaProx = calendarioDoAno(anoAtual + 1);
+  const lista = [...(listaProx === listaA ? listaA : [...listaA, ...listaProx])]
+    .sort((a, b) => a.de.localeCompare(b.de));
   // Cartão-alvo do scroll: o PRIMEIRO que ainda não terminou (em ordem
   // cronológica = o que está a decorrer ou o próximo). Se já tudo terminou, o último.
   let idxAlvo = lista.findIndex((s) => !competicaoFechada(s));
   if (idxAlvo < 0) idxAlvo = lista.length - 1;
   const alvoRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-      // Leva o scroll até à competição atual/próxima ao ABRIR — só no ano atual
-      // (num ano futuro começa-se por cima). Repetimos nos primeiros ~1,2 s: o
-      // Next.js faz o seu próprio scroll ao montar, às vezes depois do nosso.
-      if (!ehAnoAtual) return;
+      // Leva o scroll até à competição atual/próxima ao ABRIR. Repetimos nos
+      // primeiros ~1,2 s: o Next.js faz o seu próprio scroll ao montar, às vezes
+      // depois do nosso. A partir daí, 2027 fica logo a seguir.
       let cancelado = false;
       const delays = [50, 150, 300, 500, 800, 1200];
       const timers = delays.map((ms) => window.setTimeout(() => {
@@ -64,7 +65,7 @@ export default function CalendarioPage() {
             alvoRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
           }, ms));
       return () => { cancelado = true; timers.forEach((id) => clearTimeout(id)); };
-    }, [idxAlvo, ehAnoAtual]);
+    }, [idxAlvo]);
   // Frase com três destaques a negrito: a frase inteira numa chave, com os
   // marcadores %A%/%B%/%C% onde entram os negritos, dividida aqui.
   const cls = t("cal.classicoTexto").split(/%A%|%B%|%C%/);
@@ -81,26 +82,6 @@ export default function CalendarioPage() {
     </a>
     <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0 }}>{t("cal.titulo")}</h1>
     </header>
-    {/* Seletor de ano — só aparece quando há mais do que um ano de calendário. */}
-    {anos.length > 1 && (
-      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        {anos.map((a) => (
-          <button
-            key={a}
-            onClick={() => setAno(a)}
-            style={{
-              flex: 1, padding: "9px 0", borderRadius: 10, cursor: "pointer",
-              fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.04em",
-              border: `1px solid ${a === ano ? GOLD : "#2a332c"}`,
-              background: a === ano ? GOLD : "#121815",
-              color: a === ano ? "#1b211e" : "#9fb0a6",
-            }}
-          >
-            {a}
-          </button>
-        ))}
-      </div>
-    )}
     {/* O que é um clássico — explicação fixa no topo. */}
     <div style={{ background: "#181410", border: "1px dashed #3a3320", borderRadius: 14, padding: "13px 14px", marginBottom: 16 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -112,14 +93,29 @@ export default function CalendarioPage() {
     </p>
     </div>
     <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-    {lista.map((s, i) => (
-          <CartaoSemana
-          key={s.semana}
-          s={s}
-          alvoId={alvoId}
-          alvoRef={i === idxAlvo ? alvoRef : undefined}
-          />
-        ))}
+    {lista.flatMap((s, i) => {
+          const anoS = String(s.de).slice(0, 4);
+          const novoAno = i > 0 && anoS !== String(lista[i - 1].de).slice(0, 4);
+          const els: React.ReactNode[] = [];
+          if (novoAno) {
+            els.push(
+              <div key={`ano-${anoS}`} style={{ display: "flex", alignItems: "center", gap: 10, margin: "8px 2px 2px" }}>
+                <div style={{ flex: 1, height: 1, background: "#243029" }} />
+                <span style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "#e6c97a" }}>{anoS}</span>
+                <div style={{ flex: 1, height: 1, background: "#243029" }} />
+              </div>
+            );
+          }
+          els.push(
+            <CartaoSemana
+              key={`${s.idCompeticao}-${s.de}`}
+              s={s}
+              alvoId={alvoId}
+              alvoRef={i === idxAlvo ? alvoRef : undefined}
+            />
+          );
+          return els;
+        })}
     </div>
     </div>
       <BarraInferior ativo="ligas" />

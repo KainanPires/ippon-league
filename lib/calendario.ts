@@ -252,14 +252,6 @@ export function calendarioDoAno(ano: number): SemanaCalendario[] {
   return ano <= 2026 ? CALENDARIO_2026 : CALENDARIO_2027;
 }
 
-/** Anos que têm calendário próprio (para o seletor de ano no ecrã de calendário).
- *  Deriva de CALENDARIO_TODAS, por isso cresce sozinho quando se juntar 2028+. */
-export function anosDoCalendario(): number[] {
-  const anos = new Set<number>();
-  for (const s of CALENDARIO_TODAS) anos.add(parseInt(String(s.de).slice(0, 4), 10));
-  return [...anos].sort((a, b) => a - b);
-}
-
 /** Devolve a semana ISO (1..53) de uma data. */
 export function semanaISO(d: Date): number {
   const data = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
