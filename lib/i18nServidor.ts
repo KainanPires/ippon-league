@@ -15,7 +15,7 @@ import { renderNotif, type LinguaNotif } from "@/lib/dicionarioNotif";
 export { renderNotif };
 export type { LinguaNotif };
 
-const VALIDAS = ["pt", "en", "es", "fr", "de"];
+const VALIDAS = ["pt", "en", "es", "fr", "de", "ja", "ru"];
 
 /** Garante uma língua válida; o que não reconhecer cai em "pt". */
 export function normalizarLingua(l: string | null | undefined): LinguaNotif {
