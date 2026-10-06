@@ -12,6 +12,7 @@ import { limparCacheNivel } from "@/lib/useNivel";
 import { SeletorLingua } from "@/components/SeletorLingua";
 import { useRotuloFaixa, useT, useDataPorExtenso, useLingua } from "@/lib/i18n";
 import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
+import { CartaoFaixa } from "@/components/CartaoFaixa";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -62,6 +63,22 @@ const SELO_FUNDADOR: Record<string, { rotulo: string; nota: string }> = {
   fr: { rotulo: "Fondateur", nota: "Tu étais là dès le début. Ce badge est à toi pour toujours." },
   de: { rotulo: "Gründer", nota: "Du warst von Anfang an dabei. Dieses Abzeichen bleibt für immer deins." },
 };
+// Secção "Faixas da época" no perfil, por língua (mapa local; ja/ru no rollout).
+const SECAO_FAIXAS: Record<string, { titulo: string; partilharAtual: string; vazio: string }> = {
+  pt: { titulo: "Faixas da época", partilharAtual: "Partilhar a minha faixa", vazio: "O teu percurso de faixas vai aparecer aqui, mês a mês, a partir de novembro." },
+  en: { titulo: "Belts this season", partilharAtual: "Share my belt", vazio: "Your belt journey will show here, month by month, from November." },
+  es: { titulo: "Cinturones de la temporada", partilharAtual: "Compartir mi cinturón", vazio: "Tu recorrido de cinturones aparecerá aquí, mes a mes, desde noviembre." },
+  fr: { titulo: "Ceintures de la saison", partilharAtual: "Partager ma ceinture", vazio: "Ton parcours de ceintures apparaîtra ici, mois après mois, dès novembre." },
+  de: { titulo: "Gürtel dieser Saison", partilharAtual: "Meinen Gürtel teilen", vazio: "Dein Gürtel-Verlauf erscheint hier, Monat für Monat, ab November." },
+};
+const LOCALE_MES: Record<string, string> = { pt: "pt-PT", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE" };
+function rotuloMes(mes: string, lingua: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(mes);
+  if (!m) return mes;
+  try {
+    return new Date(Number(m[1]), Number(m[2]) - 1, 1).toLocaleDateString(LOCALE_MES[lingua] ?? "pt-PT", { month: "short", year: "numeric" });
+  } catch { return mes; }
+}
 const CANCEL_PERDE: Record<string, string> = {
   pt: "Quando o acesso terminar: a tua pontuação nas ligas Mundial e Continental zera e sais delas, sais de qualquer Copa do Dôdo em curso, e se tiveres mais ligas de amigos do que o limite gratuito terás de escolher quais manter.",
   en: "When your access ends: your points in the World and Continental leagues reset and you leave them, you're out of any ongoing Copa do Dôdo, and if you have more friend leagues than the free limit you'll choose which to keep.",
@@ -77,6 +94,8 @@ export default function Perfil() {
   const [conta, setConta] = useState<Conta | null>(null);
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
   const [fundador, setFundador] = useState(false);
+  const [historico, setHistorico] = useState<{ mes: string; belt: string; belt_anterior: string | null; situacao: string | null }[]>([]);
+  const [cartaoFaixa, setCartaoFaixa] = useState<{ faixa: string; faixaDe: string | null; situacao: "subiu" | "desceu" | "manteve" | null; periodo?: string } | null>(null);
   const [ready, setReady] = useState(false);
   const [saindo, setSaindo] = useState(false);
   // A subscrição vem da rota, que a lê à Stripe. Não se usa o is_pro do
@@ -170,6 +189,10 @@ export default function Perfil() {
               const { data: row } = await supabase.from("users").select("belt, fundador").eq("id", u.id).maybeSingle();
               if (active) { setFaixaJogo(normalizarFaixa(row?.belt)); setFundador(!!row?.fundador); }
             } catch { /* fica branca por defeito */ }
+            try {
+              const { data: hist } = await supabase.from("faixas_historico").select("mes, belt, belt_anterior, situacao").eq("user_id", u.id).order("mes", { ascending: false });
+              if (active && Array.isArray(hist)) setHistorico(hist as { mes: string; belt: string; belt_anterior: string | null; situacao: string | null }[]);
+            } catch { /* sem histórico: a secção mostra o estado vazio */ }
           }
           setReady(true);
         });
@@ -347,6 +370,32 @@ export default function Perfil() {
           )}
         </div>
       )}
+    {/* FAIXAS DA ÉPOCA — o percurso de faixas (um boneco por mês), partilhável.
+        O "partilhar a minha faixa" funciona já; o percurso enche-se a partir de
+        novembro (primeira virada de faixa). */}
+    {ready && conta && (
+        <>
+        <SectionTitle>{(SECAO_FAIXAS[lingua] ?? SECAO_FAIXAS.pt).titulo}</SectionTitle>
+        <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 26 }}>
+        <button onClick={() => setCartaoFaixa({ faixa: faixaJogo, faixaDe: null, situacao: null })} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 12, cursor: "pointer" }}>
+        <span style={{ width: 24, height: 24 }}><Mascot belt={corFaixaJogo} expression="feliz" /></span>
+        {(SECAO_FAIXAS[lingua] ?? SECAO_FAIXAS.pt).partilharAtual}
+        </button>
+        {historico.length > 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(78px, 1fr))", gap: 10, marginTop: 14 }}>
+            {historico.map((h) => (
+                <button key={h.mes} onClick={() => setCartaoFaixa({ faixa: h.belt, faixaDe: h.belt_anterior, situacao: (h.situacao as "subiu" | "desceu" | "manteve" | null) ?? null, periodo: rotuloMes(h.mes, lingua) })} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "#0c0e0d", border: "1px solid #243029", borderRadius: 12, padding: "10px 6px", cursor: "pointer" }}>
+                <span style={{ width: 46, height: 46 }}><Mascot belt={corDaFaixa(normalizarFaixa(h.belt))} expression="feliz" /></span>
+                <span style={{ fontSize: 10.5, color: "#93a39a", textTransform: "capitalize" }}>{rotuloMes(h.mes, lingua)}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p style={{ fontSize: 11.5, color: "#5f6f67", lineHeight: 1.5, margin: "12px 2px 0" }}>{(SECAO_FAIXAS[lingua] ?? SECAO_FAIXAS.pt).vazio}</p>
+          )}
+        </div>
+        </>
+      )}
     {/* IDIOMA — antes das personalizações, de propósito.
         A língua não é um enfeite: é o que decide se a pessoa percebe o resto do
         ecrã. Quem chega ao perfil à procura de trocar de língua não devia ter de
@@ -434,6 +483,17 @@ export default function Perfil() {
     </button>
     <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 22 }}>Ippon League · {t("perfil.versaoTestes")}</p>
     </div>
+    {cartaoFaixa && (
+        <CartaoFaixa
+        faixa={cartaoFaixa.faixa}
+        faixaDe={cartaoFaixa.faixaDe}
+        situacao={cartaoFaixa.situacao}
+        periodoLabel={cartaoFaixa.periodo}
+        identity={identity}
+        fundador={fundador}
+        onClose={() => setCartaoFaixa(null)}
+        />
+      )}
     {/* Confirmação de cancelamento. */}
     {confirmarCancelar && (
         <div onClick={() => setConfirmarCancelar(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
