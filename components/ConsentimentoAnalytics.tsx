@@ -16,7 +16,7 @@ import { consentimentoGuardado, concederConsentimento, negarConsentimento } from
 const GOLD = "#d9a441";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 
-const TXT: Record<Lingua, { texto: string; aceitar: string; recusar: string; politica: string }> = {
+const TXT: Record<string, { texto: string; aceitar: string; recusar: string; politica: string }> = {
   pt: {
     texto: "Usamos análise de utilização para perceber como o jogo é usado e melhorá-lo. Nunca guardamos o teu nome, email ou dados pessoais para isto.",
     aceitar: "Aceitar", recusar: "Recusar", politica: "Política de Privacidade",
