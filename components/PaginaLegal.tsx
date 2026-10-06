@@ -33,7 +33,7 @@ function Inline({ texto }: { texto: string }) {
   );
 }
 
-export function PaginaLegal({ docs }: { docs: Record<Lingua, LegalDoc> }) {
+export function PaginaLegal({ docs }: { docs: Record<string, LegalDoc> }) {
   const { lingua } = useLingua();
   const ui = LEGAL_UI[lingua] ?? LEGAL_UI.pt;
   const oficialPt = docs.pt;
