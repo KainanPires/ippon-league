@@ -16,6 +16,7 @@ import { PRECO } from "@/lib/precos";
 import { SinoNotificacoes } from "@/components/SinoNotificacoes";
 import { criarNotificacao } from "@/lib/notificacoes";
 import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
+import { CartaoFaixa } from "@/components/CartaoFaixa";
 // NÍVEL DE SUBSCRIÇÃO: vem do useNivel(), que lê da tabela `users` — a MESMA
 // fonte que o servidor usa para bloquear. Antes lia-se do user_metadata da
 // sessão, e desde que o trigger deixou de sincronizar o nível, essa cópia podia
@@ -114,6 +115,62 @@ function modalVisto(chave: string, userId: string | null | undefined): boolean {
 function marcarModalVisto(chave: string, userId: string | null | undefined) {
   try { localStorage.setItem(modalKey(chave, userId), "1"); } catch {}
 }
+// ---------------------------------------------------------------------------
+// AVISO DE MUDANÇA DE FAIXA — quando o recálculo mensal (cron) mudou a faixa do
+// jogador, a tela inicial dá-lhe a notícia num modal (estilo tutorial), com o
+// cartão de faixa pronto a partilhar. Lê-se a última linha de `faixas_historico`
+// (só há dados a partir de 1 de novembro). Mostra-se 1x por mês (chave faixa-AAAA-MM).
+// A faixa é SEMPRE mundial — o Top X% vem de posicao/total gravados pelo cron.
+// ---------------------------------------------------------------------------
+interface MudancaFaixa {
+  mes: string;
+  belt: string;
+  belt_anterior: string | null;
+  situacao: "subiu" | "desceu" | "manteve" | null;
+  posicao: number | null;
+  total: number | null;
+}
+function pctDe(pos?: number | null, tot?: number | null): number | null {
+  if (!pos || !tot || tot <= 0) return null;
+  return Math.max(1, Math.ceil((pos / tot) * 100));
+}
+const LOCALE_MES: Record<string, string> = { pt: "pt-PT", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE" };
+function rotuloMes(mes: string, lingua: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(mes);
+  if (!m) return mes;
+  try {
+    return new Date(Number(m[1]), Number(m[2]) - 1, 1).toLocaleDateString(LOCALE_MES[lingua] ?? "pt-PT", { month: "short", year: "numeric" });
+  } catch { return mes; }
+}
+// Texto do modal por língua (o japonês e o russo entram no rollout das línguas).
+// Sem travessões. `{faixa}` é substituído pelo nome da faixa já traduzido.
+const MUDANCA_MODAL: Record<string, { subiu: { titulo: string; texto: string }; desceu: { titulo: string; texto: string }; ver: string; fechar: string }> = {
+  pt: {
+    subiu: { titulo: "Subiste de faixa", texto: "A tua faixa agora é {faixa}. É a tua posição entre todos os jogadores do mundo. Continua assim, rumo à faixa preta." },
+    desceu: { titulo: "Mudaste de faixa", texto: "A tua faixa agora é {faixa}. É só um mês. Volta a subir, recupera o teu lugar e segue rumo à faixa preta." },
+    ver: "Ver e partilhar", fechar: "Fechar",
+  },
+  en: {
+    subiu: { titulo: "You moved up a belt", texto: "Your belt is now {faixa}. It is your standing among every player in the world. Keep going, all the way to black belt." },
+    desceu: { titulo: "Your belt changed", texto: "Your belt is now {faixa}. It is just one month. Climb back, reclaim your spot and keep heading for black belt." },
+    ver: "View and share", fechar: "Close",
+  },
+  es: {
+    subiu: { titulo: "Subiste de cinturón", texto: "Tu cinturón ahora es {faixa}. Es tu posición entre todos los jugadores del mundo. Sigue así, rumbo al cinturón negro." },
+    desceu: { titulo: "Cambiaste de cinturón", texto: "Tu cinturón ahora es {faixa}. Es solo un mes. Vuelve a subir, recupera tu lugar y sigue rumbo al cinturón negro." },
+    ver: "Ver y compartir", fechar: "Cerrar",
+  },
+  fr: {
+    subiu: { titulo: "Tu as monté d'une ceinture", texto: "Ta ceinture est désormais {faixa}. C'est ta place parmi tous les joueurs du monde. Continue, jusqu'à la ceinture noire." },
+    desceu: { titulo: "Ta ceinture a changé", texto: "Ta ceinture est désormais {faixa}. Ce n'est qu'un mois. Remonte, reprends ta place et continue vers la ceinture noire." },
+    ver: "Voir et partager", fechar: "Fermer",
+  },
+  de: {
+    subiu: { titulo: "Du bist einen Gürtel aufgestiegen", texto: "Dein Gürtel ist jetzt {faixa}. Das ist dein Platz unter allen Spielern der Welt. Mach weiter, bis zum schwarzen Gürtel." },
+    desceu: { titulo: "Dein Gürtel hat sich geändert", texto: "Dein Gürtel ist jetzt {faixa}. Es ist nur ein Monat. Steig wieder auf, hol dir deinen Platz zurück und weiter Richtung schwarzer Gürtel." },
+    ver: "Ansehen und teilen", fechar: "Schließen",
+  },
+};
 export default function Inicio() {
   const t = useT();
   const rotuloFaixa = useRotuloFaixa();
@@ -147,6 +204,13 @@ export default function Inicio() {
   // Modal de boas-vindas de Fundador (uma vez, estilo tutorial). Mostra-se a quem
   // é Fundador e ainda não o viu neste aparelho.
   const [mostrarFundador, setMostrarFundador] = useState(false);
+  // Aviso de mudança de faixa (última virada mensal ainda não vista). `verCartaoFaixa`
+  // abre o cartão de faixa partilhável por cima do aviso.
+  const [faixaMudanca, setFaixaMudanca] = useState<MudancaFaixa | null>(null);
+  const [verCartaoFaixa, setVerCartaoFaixa] = useState(false);
+  // É Fundador? (users.fundador). Usa-se para a estrela nos partilháveis — aqui, no
+  // cartão de faixa. Separado de `mostrarFundador`, que é só o modal de boas-vindas.
+  const [fundadorConta, setFundadorConta] = useState(false);
   const txtLojaAtalho = LOJA_ATALHO[lingua] ?? LOJA_ATALHO.pt;
   // FASE A: o património mostrado = orçamento unificado (patrimony_jc + JC
   // comprados), a mesma fonte do mercado. Sobrepõe o valor cru vindo do `users`.
@@ -324,9 +388,27 @@ export default function Inicio() {
                     if (naoVistos.length > 0) setModaisFila(naoVistos);
                   } catch { /* sem mensagem: nenhum modal aparece */ }
                   // Boas-vindas de Fundador: só a quem é Fundador e ainda não viu.
-                  if ((row as { fundador?: unknown } | null)?.fundador && !modalVisto("fundador", userId)) {
+                  const ehFundador = !!(row as { fundador?: unknown } | null)?.fundador;
+                  setFundadorConta(ehFundador);
+                  if (ehFundador && !modalVisto("fundador", userId)) {
                     setMostrarFundador(true);
                   }
+                  // Aviso de mudança de faixa: última linha do histórico (mês mais
+                  // recente). Só aparece se a faixa mudou (subiu/desceu) e ainda não
+                  // foi vista neste aparelho. Há dados a partir de 1 de novembro.
+                  supabase.from("faixas_historico")
+                    .select("mes, belt, belt_anterior, situacao, posicao, total")
+                    .eq("user_id", userId)
+                    .order("mes", { ascending: false })
+                    .limit(1)
+                    .maybeSingle()
+                    .then(({ data: h }) => {
+                      if (!active || !h) return;
+                      const linha = h as MudancaFaixa;
+                      if ((linha.situacao === "subiu" || linha.situacao === "desceu") && !modalVisto(`faixa-${linha.mes}`, userId)) {
+                        setFaixaMudanca(linha);
+                      }
+                    });
                 });
             }
             if (localStorage.getItem("ippon_onboarding") === "pending") {
@@ -520,6 +602,13 @@ export default function Inicio() {
     marcarModalVisto("fundador", userIdState);
     setMostrarFundador(false);
   }
+  // Fecha o aviso de mudança de faixa: marca o mês como visto (1x por aparelho) e
+  // fecha também o cartão partilhável, se estiver aberto.
+  function fecharMudancaFaixa() {
+    if (faixaMudanca) marcarModalVisto(`faixa-${faixaMudanca.mes}`, userIdState);
+    setVerCartaoFaixa(false);
+    setFaixaMudanca(null);
+  }
   async function abrirResumoDaGaleria(compEscolhida: string) {
     const cong = await buscarResultadosCongelados(compEscolhida);
     if (!cong) return;
@@ -572,7 +661,10 @@ export default function Inicio() {
   // O modal de Fundador tem prioridade: é o momento de boas-vindas. O de evento
   // só aparece quando o de Fundador não está a ser mostrado (não empilhar pop-ups).
   const podeMostrarFundador = mostrarFundador && !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
-  const podeMostrarModalEvento = !podeMostrarFundador && !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
+  // O aviso de mudança de faixa vem logo a seguir ao de Fundador (é um momento de
+  // jogo forte). O de evento só aparece quando nenhum destes está a ser mostrado.
+  const podeMostrarMudancaFaixa = !podeMostrarFundador && !!faixaMudanca && !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
+  const podeMostrarModalEvento = !podeMostrarFundador && !podeMostrarMudancaFaixa && !visitante && phase !== "tutorial" && !desempenho && !galeriaAberta && !mostrarAvaliacao;
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
     <style>{`@keyframes ilpulse{0%,100%{opacity:1}50%{opacity:.3}} .ilpulse{animation:ilpulse 1.2s ease-in-out infinite} @keyframes iltut{0%,100%{box-shadow:0 0 0 3px rgba(74,144,217,0.75)}50%{box-shadow:0 0 0 9px rgba(74,144,217,0.18)}} .iltut{animation:iltut 1.3s ease-in-out infinite} @keyframes ilentrar{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0.0)}50%{box-shadow:0 0 0 6px rgba(217,164,65,0.28)}} .ilentrar{animation:ilentrar 1.5s ease-in-out infinite;border-radius:999px} @keyframes ilmodalin{0%{opacity:0;transform:translateY(10px) scale(0.97)}100%{opacity:1;transform:none}} .ilmodalin{animation:ilmodalin 0.28s cubic-bezier(0.2,0.7,0.3,1)}`}</style>
@@ -803,6 +895,27 @@ export default function Inicio() {
       evento; em sequência quando coincidem; ao fechar vão para o sino. */}
     {podeMostrarFundador && (
         <ModalFundador onClose={fecharModalFundador} cor={corDaFaixa(faixaJogo)} lingua={lingua} />
+      )}
+    {podeMostrarMudancaFaixa && faixaMudanca && !verCartaoFaixa && (
+        <ModalMudancaFaixa
+        mudanca={faixaMudanca}
+        lingua={lingua}
+        rotuloFaixa={rotuloFaixa}
+        onVer={() => setVerCartaoFaixa(true)}
+        onClose={fecharMudancaFaixa}
+        />
+      )}
+    {podeMostrarMudancaFaixa && faixaMudanca && verCartaoFaixa && (
+        <CartaoFaixa
+        faixa={faixaMudanca.belt}
+        faixaDe={faixaMudanca.belt_anterior}
+        situacao={faixaMudanca.situacao}
+        percentil={pctDe(faixaMudanca.posicao, faixaMudanca.total)}
+        periodoLabel={rotuloMes(faixaMudanca.mes, lingua)}
+        identity={identityResumo}
+        fundador={!!fundadorConta}
+        onClose={fecharMudancaFaixa}
+        />
       )}
     {podeMostrarModalEvento && modalEvento && (
         <ModalEvento msg={modalEvento} onClose={fecharModalEvento} cor={corDaFaixa(faixaJogo)} />
@@ -1103,6 +1216,58 @@ function ModalFundador({ onClose, cor, lingua }: { onClose: () => void; cor: str
     <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 18px" }}>{m.texto}</p>
     <button onClick={onClose} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 14, borderRadius: 12, fontSize: 15, cursor: "pointer", boxSizing: "border-box" }}>
     {m.botao}
+    </button>
+    </div>
+    </Overlay>
+  );
+}
+// MODAL DE MUDANÇA DE FAIXA — a tela inicial dá a notícia da virada mensal: dois
+// Dôdos (faixa antiga -> faixa nova) com uma seta da cor do sucesso (verde, subiu)
+// ou da derrota (vermelho, desceu), o Top X% mundial e uma frase que aponta sempre
+// à faixa preta. Um botão abre o cartão partilhável; o outro fecha (marca visto).
+const SETA_VERDE = "#4fc27a";
+const SETA_VERMELHO = "#ef6a5f";
+function ModalMudancaFaixa({ mudanca, lingua, rotuloFaixa, onVer, onClose }: {
+  mudanca: MudancaFaixa;
+  lingua: Lingua;
+  rotuloFaixa: (f: string) => string;
+  onVer: () => void;
+  onClose: () => void;
+}) {
+  const subiu = mudanca.situacao === "subiu";
+  const dic = MUDANCA_MODAL[lingua] ?? MUDANCA_MODAL.pt;
+  const bloco = subiu ? dic.subiu : dic.desceu;
+  const corSeta = subiu ? SETA_VERDE : SETA_VERMELHO;
+  const fxNova = normalizarFaixa(mudanca.belt);
+  const fxVelha = normalizarFaixa(mudanca.belt_anterior ?? mudanca.belt);
+  const corNova = corDaFaixa(fxNova);
+  const corVelha = corDaFaixa(fxVelha);
+  const nomeNova = rotuloFaixa(mudanca.belt);
+  const top = pctDe(mudanca.posicao, mudanca.total);
+  return (
+    <Overlay>
+    <div className="ilmodalin" style={{ background: "#121815", border: `1px solid ${corNova}`, borderRadius: 16, padding: 20, textAlign: "center" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 10 }}>
+    <div style={{ width: 58, height: 58, opacity: 0.85 }}>
+    <Mascot belt={corVelha} expression="sabio" />
+    </div>
+    <div aria-hidden="true" style={{ display: "flex", flexDirection: "column", alignItems: "center", color: corSeta }}>
+    <span style={{ fontSize: 26, lineHeight: 1, fontWeight: 900, transform: subiu ? "rotate(-12deg)" : "rotate(12deg)" }}>{subiu ? "↗" : "↘"}</span>
+    </div>
+    <div style={{ width: 76, height: 76 }}>
+    <Mascot belt={corNova} expression={subiu ? "comemorando" : "indicando"} />
+    </div>
+    </div>
+    <div style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", lineHeight: 1.15, marginBottom: 6, color: corNova }}>{bloco.titulo}</div>
+    {top != null && (
+      <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: GOLD, letterSpacing: "0.04em", marginBottom: 8 }}>Top {top}%</div>
+    )}
+    <p style={{ fontSize: 13.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 18px" }}>{bloco.texto.replace("{faixa}", nomeNova)}</p>
+    <button onClick={onVer} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 14, borderRadius: 12, fontSize: 15, cursor: "pointer", boxSizing: "border-box", marginBottom: 9 }}>
+    {dic.ver}
+    </button>
+    <button onClick={onClose} style={{ width: "100%", background: "transparent", color: "#9fb0a7", border: "1px solid #2a332e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", padding: 12, borderRadius: 12, fontSize: 13.5, cursor: "pointer", boxSizing: "border-box" }}>
+    {dic.fechar}
     </button>
     </div>
     </Overlay>
