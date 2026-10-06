@@ -3,9 +3,10 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { focoMercado, CALENDARIO_2026, numeroDaRodada, nomeCompeticao, type SemanaCalendario } from "@/lib/calendario";
+import { focoMercado, CALENDARIO_2026, numeroDaRodada, nomeCompeticao, localizarNomeCompeticao, type SemanaCalendario } from "@/lib/calendario";
 import { competicaoPorId } from "@/lib/copa";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
+import { useFundador } from "@/lib/useFundador";
 import { useT, useNomeDoMes } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -96,8 +97,8 @@ function infoEpoca(
     if (!compFim) return "";
     return t("pl.epocaDeAte", {
       verbo: terminada ? t("pl.decorreu") : t("pl.vaiDecorrer"),
-      ini: nomeCompeticao(compIni),
-      fim: nomeCompeticao(compFim),
+      ini: localizarNomeCompeticao(nomeCompeticao(compIni), t),
+      fim: localizarNomeCompeticao(nomeCompeticao(compFim), t),
     });
   }
 
@@ -106,7 +107,7 @@ function infoEpoca(
     if (!m) return "";
     return t("pl.epocaMes", {
       verbo2: terminada ? t("pl.comecou") : t("pl.comeca"),
-      ini: nomeCompeticao(compIni),
+      ini: localizarNomeCompeticao(nomeCompeticao(compIni), t),
       verbo3: terminada ? t("pl.terminou") : t("pl.termina"),
       mes: nomeMes(Number(m[2])),
       ano: Number(m[1]),
@@ -197,6 +198,7 @@ export default function PaginaLiga() {
   const [erroSair, setErroSair] = useState("");
   // Certificado da liga terminada (a posição que o utilizador clicou).
   const [certificado, setCertificado] = useState<PosicaoPodio | null>(null);
+  const souFundador = useFundador();
   // Overlay "a liga terminou" — salta uma vez (por conta+liga, via localStorage).
   const [mostrarFimLiga, setMostrarFimLiga] = useState(false);
   // Foco do mercado: a competição que decorre (mercado fechado) ou a de mercado aberto.
@@ -573,7 +575,7 @@ export default function PaginaLiga() {
     const n = numeroDaRodada(s.idCompeticao);
     const bruto = nomeCompeticao(s);
     const nome = s.classico ? bruto.replace(/\s*[—-]\s*Cl[áa]ssico\s*$/i, "") : bruto;
-    return `${n ? `Rodada ${n} · ` : ""}${nome}${s.idCompeticao === idComp ? " (atual)" : ""}`;
+    return `${n ? `${t("comp.rodada")} ${n} · ` : ""}${localizarNomeCompeticao(nome, t)}${s.idCompeticao === idComp ? " " + t("comp.atual") : ""}`;
   }
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
@@ -744,7 +746,7 @@ export default function PaginaLiga() {
             {/* Cabeçalho da vista + estado ao vivo */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <span style={{ fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#93a39a" }}>
-            {vista === "geral" ? t("pl.rankingGeral") : vista === "rodada" ? t("pl.rodadaComp", { comp: nomeCompeticao(compVista) }) : t("pl.judocoinsPatrimonio")}
+            {vista === "geral" ? t("pl.rankingGeral") : vista === "rodada" ? t("pl.rodadaComp", { comp: localizarNomeCompeticao(nomeCompeticao(compVista), t) }) : t("pl.judocoinsPatrimonio")}
             </span>
             {emAndamento && vista === "rodada" && rodadaEhAtual ? (
                 <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#e2655a", fontWeight: 700 }}>
@@ -991,6 +993,7 @@ export default function PaginaLiga() {
             identity={ident}
             nomeCopa={liga?.name || "Liga"}
             nParticipantes={nParticipantesEpoca}
+            fundador={souFundador}
             onClose={() => setCertificado(null)}
             />
           );
