@@ -15,6 +15,7 @@ import { AvisoEquipaGuardada } from "@/components/AvisoEquipaGuardada";
 import { useFaixa } from "@/lib/useFaixa";
 // Nível da tabela `users` (a mesma fonte do servidor), não do user_metadata.
 import { useNivel } from "@/lib/useNivel";
+import { useFundador } from "@/lib/useFundador";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
 import { TATAMES, tatamePorId, type TatameId } from "@/lib/tatames";
 import { useTatame } from "@/components/TatameProvider";
@@ -188,6 +189,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   const [souEu, setSouEu] = useState(false);
   // Nível para o cartão de partilha. Do useNivel() (tabela `users`).
   const { ehPro: souPro, ehProMax: souProMax } = useNivel();
+  const souFundador = useFundador();
   const meuNivel: "normal" | "pro" | "pro_max" = souProMax ? "pro_max" : souPro ? "pro" : "normal";
   const [nomeTime, setNomeTime] = useState(t("res.equipa"));
   const [escudoAlvo, setEscudoAlvo] = useState<Identity | null>(null);
@@ -523,6 +525,7 @@ return (
       atletas={itens.map((i) => i.athlete || ({ id: i.id, name: i.nome, countryIso: i.pais, category: i.categoria } as Athlete))}
       capitao={capitao}
       nivel={meuNivel}
+      fundador={souFundador}
       onClose={() => setPartilhar(false)}
       />
     )}
@@ -564,6 +567,7 @@ function MeuTimeInner() {
   // Aviso "e agora?" logo depois de guardar (uma vez, com não-mostrar-mais).
   const [avisoGuardada, setAvisoGuardada] = useState(false);
   const { ehPro: isPro } = useNivel();
+  const souFundador = useFundador();
   // Personalização Pro Max: cor do tatame — agora via TatameProvider, para mudar
   // na hora em todo o lado (Meu Time, central). seletorTatame abre/fecha o painel.
   const { tatameId, isProMax, setTatame } = useTatame();
@@ -1374,6 +1378,7 @@ function MeuTimeInner() {
         capitao={team.captain}
         nivel={isProMax ? "pro_max" : isPro ? "pro" : "normal"}
         pontos={emCompeticao ? pontos : undefined}
+        fundador={souFundador}
         onClose={() => setModal(null)}
         />
       )}
