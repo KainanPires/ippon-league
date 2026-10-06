@@ -506,6 +506,24 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
         });
     }
   }
+  // HISTÓRICO DE FAIXAS DA ÉPOCA: grava a faixa de cada jogador NESTE mês, para o
+  // perfil mostrar o percurso e a pessoa partilhar o "boneco" de cada mês. Só os
+  // que gravaram a faixa com sucesso. Upsert por (user_id, mes) — re-correr o mês
+  // não duplica. Extra: nunca bloqueia o recálculo.
+  try {
+    const hist = atualizacoes
+      .filter((a) => !naoGravou.has(a.user_id))
+      .map((a) => {
+        const antes = faixaAntiga.get(a.user_id) ?? null;
+        let situacao: "subiu" | "desceu" | "manteve" = "manteve";
+        if (antes) situacao = ordemFaixa(a.faixa) > ordemFaixa(antes) ? "subiu" : ordemFaixa(a.faixa) < ordemFaixa(antes) ? "desceu" : "manteve";
+        return { user_id: a.user_id, mes, belt: a.faixa, belt_anterior: antes, situacao };
+      });
+    for (let i = 0; i < hist.length; i += 500) {
+      await supabaseAdmin.from("faixas_historico").upsert(hist.slice(i, i + 500), { onConflict: "user_id,mes" });
+    }
+  } catch { /* o histórico é um extra; nunca bloqueia o recálculo */ }
+
   return {
     jogadores: n,
     percentilAtivo,
