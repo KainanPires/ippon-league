@@ -72,6 +72,11 @@ const SECAO_FAIXAS: Record<string, { titulo: string; partilharAtual: string; vaz
   de: { titulo: "Gürtel dieser Saison", partilharAtual: "Meinen Gürtel teilen", vazio: "Dein Gürtel-Verlauf erscheint hier, Monat für Monat, ab November." },
 };
 const LOCALE_MES: Record<string, string> = { pt: "pt-PT", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE" };
+// Top X% a partir da posição/total do mês (1 = topo). Null se não houver dados.
+function pctDe(pos?: number | null, tot?: number | null): number | null {
+  if (!pos || !tot || tot <= 0) return null;
+  return Math.max(1, Math.ceil((pos / tot) * 100));
+}
 function rotuloMes(mes: string, lingua: string): string {
   const m = /^(\d{4})-(\d{2})$/.exec(mes);
   if (!m) return mes;
@@ -94,8 +99,8 @@ export default function Perfil() {
   const [conta, setConta] = useState<Conta | null>(null);
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
   const [fundador, setFundador] = useState(false);
-  const [historico, setHistorico] = useState<{ mes: string; belt: string; belt_anterior: string | null; situacao: string | null }[]>([]);
-  const [cartaoFaixa, setCartaoFaixa] = useState<{ faixa: string; faixaDe: string | null; situacao: "subiu" | "desceu" | "manteve" | null; periodo?: string } | null>(null);
+  const [historico, setHistorico] = useState<{ mes: string; belt: string; belt_anterior: string | null; situacao: string | null; posicao: number | null; total: number | null }[]>([]);
+  const [cartaoFaixa, setCartaoFaixa] = useState<{ faixa: string; faixaDe: string | null; situacao: "subiu" | "desceu" | "manteve" | null; percentil: number | null; periodo?: string } | null>(null);
   const [ready, setReady] = useState(false);
   const [saindo, setSaindo] = useState(false);
   // A subscrição vem da rota, que a lê à Stripe. Não se usa o is_pro do
@@ -190,8 +195,8 @@ export default function Perfil() {
               if (active) { setFaixaJogo(normalizarFaixa(row?.belt)); setFundador(!!row?.fundador); }
             } catch { /* fica branca por defeito */ }
             try {
-              const { data: hist } = await supabase.from("faixas_historico").select("mes, belt, belt_anterior, situacao").eq("user_id", u.id).order("mes", { ascending: false });
-              if (active && Array.isArray(hist)) setHistorico(hist as { mes: string; belt: string; belt_anterior: string | null; situacao: string | null }[]);
+              const { data: hist } = await supabase.from("faixas_historico").select("mes, belt, belt_anterior, situacao, posicao, total").eq("user_id", u.id).order("mes", { ascending: false });
+              if (active && Array.isArray(hist)) setHistorico(hist as { mes: string; belt: string; belt_anterior: string | null; situacao: string | null; posicao: number | null; total: number | null }[]);
             } catch { /* sem histórico: a secção mostra o estado vazio */ }
           }
           setReady(true);
@@ -271,6 +276,16 @@ export default function Perfil() {
     setGuardando(false);
     // Se houver email pendente, mantém o painel aberto para a pessoa ler o aviso.
     if (!emailMudou) setEditando(false);
+  }
+  // Abre o cartão de faixa a partir de um mês do histórico (com Top %).
+  function abrirFaixaMes(h: { mes: string; belt: string; belt_anterior: string | null; situacao: string | null; posicao: number | null; total: number | null }) {
+    setCartaoFaixa({ faixa: h.belt, faixaDe: h.belt_anterior, situacao: (h.situacao as "subiu" | "desceu" | "manteve" | null) ?? null, percentil: pctDe(h.posicao, h.total), periodo: rotuloMes(h.mes, lingua) });
+  }
+  // "Partilhar a minha faixa": usa o mês mais recente (com transição + Top %) se
+  // existir; senão, a faixa atual sem percentagem (antes de novembro).
+  function abrirFaixaAtual() {
+    if (historico.length > 0) { abrirFaixaMes(historico[0]); return; }
+    setCartaoFaixa({ faixa: faixaJogo, faixaDe: null, situacao: null, percentil: null });
   }
   const nomeMostrado = conta?.nome || t("pro.campeao");
   const corFaixaJogo = corDaFaixa(faixaJogo);
@@ -377,14 +392,14 @@ export default function Perfil() {
         <>
         <SectionTitle>{(SECAO_FAIXAS[lingua] ?? SECAO_FAIXAS.pt).titulo}</SectionTitle>
         <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, padding: 16, marginBottom: 26 }}>
-        <button onClick={() => setCartaoFaixa({ faixa: faixaJogo, faixaDe: null, situacao: null })} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 12, cursor: "pointer" }}>
+        <button onClick={abrirFaixaAtual} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "12px", borderRadius: 12, cursor: "pointer" }}>
         <span style={{ width: 24, height: 24 }}><Mascot belt={corFaixaJogo} expression="feliz" /></span>
         {(SECAO_FAIXAS[lingua] ?? SECAO_FAIXAS.pt).partilharAtual}
         </button>
         {historico.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(78px, 1fr))", gap: 10, marginTop: 14 }}>
             {historico.map((h) => (
-                <button key={h.mes} onClick={() => setCartaoFaixa({ faixa: h.belt, faixaDe: h.belt_anterior, situacao: (h.situacao as "subiu" | "desceu" | "manteve" | null) ?? null, periodo: rotuloMes(h.mes, lingua) })} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "#0c0e0d", border: "1px solid #243029", borderRadius: 12, padding: "10px 6px", cursor: "pointer" }}>
+                <button key={h.mes} onClick={() => abrirFaixaMes(h)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "#0c0e0d", border: "1px solid #243029", borderRadius: 12, padding: "10px 6px", cursor: "pointer" }}>
                 <span style={{ width: 46, height: 46 }}><Mascot belt={corDaFaixa(normalizarFaixa(h.belt))} expression="feliz" /></span>
                 <span style={{ fontSize: 10.5, color: "#93a39a", textTransform: "capitalize" }}>{rotuloMes(h.mes, lingua)}</span>
                 </button>
@@ -488,6 +503,7 @@ export default function Perfil() {
         faixa={cartaoFaixa.faixa}
         faixaDe={cartaoFaixa.faixaDe}
         situacao={cartaoFaixa.situacao}
+        percentil={cartaoFaixa.percentil}
         periodoLabel={cartaoFaixa.periodo}
         identity={identity}
         fundador={fundador}
