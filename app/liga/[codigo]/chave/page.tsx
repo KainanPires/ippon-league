@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
 import { focoMercado, numeroDaRodada, rotuloRodada } from "@/lib/calendario";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
+import { useFundador } from "@/lib/useFundador";
 import {
   BlocoChave,
   CaixaConfronto,
@@ -573,6 +574,7 @@ function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
   const t = useT();
   // Certificado aberto (a posição que o utilizador clicou para partilhar).
   const [certificado, setCertificado] = useState<{ pos: PosicaoPodio; uid: string } | null>(null);
+  const souFundador = useFundador();
   const linha = (uid: string | undefined, medalha: string, label: string, cor: string, pos: PosicaoPodio) => {
     if (!uid) return null;
     const souEu = !!meuId && uid === meuId;
@@ -615,6 +617,7 @@ function Podio({ podio, nome, escudoDe, meuId, nomeCopa, nParticipantes }: {
         identity={idDe(certificado.uid)}
         nomeCopa={nomeCopa}
         nParticipantes={nParticipantes}
+        fundador={souFundador}
         onClose={() => setCertificado(null)}
         />
       )}
