@@ -1,8 +1,10 @@
 // app/api/promo/aderir/route.ts
 //
 // ADESÃO À PROMOÇÃO DE LANÇAMENTO (Mundial) — dá Pro Max GRÁTIS a quem se
-// inscreve dentro da janela, até 31/10. Disparada no registo (fire-and-forget
-// a partir de /comecar), com a identidade pelo token.
+// inscreve dentro da janela de adesão (até 31/12/2026). O benefício dura até ao
+// PENHASCO em 01/01/2027 (decisão de 06/10/2026: Pro Max grátis para TODOS até
+// ao início do ano, para criar hábito e retenção antes de cobrar). Disparada no
+// registo (fire-and-forget a partir de /comecar), com a identidade pelo token.
 //
 // NÃO toca na Stripe: é acesso de promoção, marcado por `users.promo_lancamento_ate`.
 // O corte é feito pelo cron /api/promo/expirar (NUNCA pelo cron do dinheiro, que
@@ -21,10 +23,18 @@ export const runtime = "nodejs";
 
 // --- JANELA DA PROMOÇÃO (edita aqui se precisares) ---
 // Datas em UTC. Portugal está a UTC+1 até 26/10 e UTC+0 depois — a folga de
-// horas nas pontas é irrelevante. Para TESTAR hoje, mete PROMO_INICIO no passado.
+// horas nas pontas é irrelevante.
+//
+// Duas datas DISTINTAS (antes eram a mesma):
+//   • PROMO_ADESAO_FIM = até quando alguém pode ENTRAR na promoção (registar-se
+//     e receber o acesso). Estendida até 31/12 para que os registos de nov/dez
+//     também apanhem a oferta.
+//   • PROMO_FIM_ISO    = o PENHASCO: até quando o Pro Max grátis dura. 01/01/2027.
+//     É o valor gravado em `users.promo_lancamento_ate`; o cron /api/promo/expirar
+//     só rebaixa a partir desta data.
 const PROMO_INICIO = Date.parse("2026-09-28T00:00:00Z");
-const PROMO_FIM_ISO = "2026-10-31T23:59:59Z";
-const PROMO_FIM = Date.parse(PROMO_FIM_ISO);
+const PROMO_ADESAO_FIM = Date.parse("2026-12-31T23:59:59Z");
+const PROMO_FIM_ISO = "2027-01-01T00:00:00Z";
 
 async function uidDoPedido(req: Request): Promise<string | null> {
   try {
@@ -54,9 +64,9 @@ export async function POST(req: Request) {
   const uid = await uidDoPedido(req);
   if (!uid) return NextResponse.json({ ok: false, erro: "Sem sessão." }, { status: 401 });
 
-  // Fora da janela: não é erro, é só não haver promoção.
+  // Fora da janela de ADESÃO: não é erro, é só não haver promoção.
   const agora = Date.now();
-  if (agora < PROMO_INICIO || agora > PROMO_FIM) {
+  if (agora < PROMO_INICIO || agora > PROMO_ADESAO_FIM) {
     return NextResponse.json({ ok: true, promo: false, motivo: "fora_da_janela" });
   }
 
