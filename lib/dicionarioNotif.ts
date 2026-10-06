@@ -51,6 +51,21 @@ export const NOTIF: Record<string, Entrada> = {
     fr: "Ton favori {nome} a perdu son dernier combat au {comp}. Bilan : {placar}. Vois le tableau en direct.",
     de: "Dein Favorit {nome} hat seinen letzten Kampf beim {comp} verloren. Bilanz: {placar}. Sieh den Live-Baum.",
   },
+  // --- SELO DE FUNDADOR: parabéns a quem entrou no lançamento (uma vez) ---
+  "fundadorSelo.titulo": {
+    pt: "🥋 És Fundador da Ippon League",
+    en: "🥋 You are a Founder of Ippon League",
+    es: "🥋 Eres Fundador de Ippon League",
+    fr: "🥋 Tu es Fondateur d'Ippon League",
+    de: "🥋 Du bist Gründer der Ippon League",
+  },
+  "fundadorSelo.corpo": {
+    pt: "Parabéns! Estás entre os Fundadores da Ippon League, e este selo é exclusivo de quem chegou no início. Estamos muito felizes por te ter nesta construção do maior fantasy de judô do mundo. O selo de Fundador fica contigo para sempre. Vê-o no teu perfil.",
+    en: "Congratulations! You are among the Founders of Ippon League, and this badge is exclusive to those who were here from the start. We are so glad to have you building the biggest judo fantasy game in the world. The Founder badge is yours forever. See it on your profile.",
+    es: "¡Felicidades! Estás entre los Fundadores de Ippon League, y este sello es exclusivo de quienes llegaron al principio. Estamos muy felices de tenerte construyendo el mayor fantasy de judo del mundo. El sello de Fundador es tuyo para siempre. Míralo en tu perfil.",
+    fr: "Félicitations ! Tu fais partie des Fondateurs d'Ippon League, et ce badge est réservé à ceux qui étaient là dès le début. Nous sommes très heureux de te compter dans la construction du plus grand fantasy de judo au monde. Le badge de Fondateur est à toi pour toujours. Vois-le sur ton profil.",
+    de: "Glückwunsch! Du gehörst zu den Gründern der Ippon League, und dieses Abzeichen ist denen vorbehalten, die von Anfang an dabei waren. Wir freuen uns sehr, dich beim Aufbau des größten Judo-Fantasy-Spiels der Welt dabeizuhaben. Das Gründer-Abzeichen bleibt für immer deins. Sieh es in deinem Profil.",
+  },
   "liga.pedidoTitulo": {
     pt: "Novo pedido na tua liga",
     en: "New request in your league",
