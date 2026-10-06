@@ -898,7 +898,7 @@ const DE: Conteudo = {
   ],
 };
 
-const CONTEUDO: Record<Lingua, Conteudo> = { pt: PT, en: EN, es: ES, fr: FR, de: DE };
+const CONTEUDO: Record<string, Conteudo> = { pt: PT, en: EN, es: ES, fr: FR, de: DE };
 
 export default function FAQ() {
   const t = useT();
