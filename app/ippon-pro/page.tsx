@@ -14,7 +14,7 @@ const MAX = "#7fb8f5"; // tom do Pro Max, para o distinguir do Pro (dourado)
 // Texto do consentimento no checkout — mapa por língua (mesmo padrão do resto
 // da app para conteúdo multilíngue que não vive no dicionário global).
 type TextoTermo = { antes: string; link: string; depois: string; erro: string };
-const TERMO: Record<Lingua, TextoTermo> = {
+const TERMO: Record<string, TextoTermo> = {
   pt: { antes: "Li e aceito o ", link: "Termo de Entrega e Consentimento", depois: " do Ippon Pro.", erro: "Para continuares, marca que leste e aceitas o termo." },
   en: { antes: "I have read and accept the ", link: "Delivery and Consent Terms", depois: " of Ippon Pro.", erro: "To continue, please tick that you have read and accept the terms." },
   es: { antes: "He leído y acepto los ", link: "Términos de Entrega y Consentimiento", depois: " de Ippon Pro.", erro: "Para continuar, marca que has leído y aceptas los términos." },
@@ -23,12 +23,22 @@ const TERMO: Record<Lingua, TextoTermo> = {
 };
 // Honestidade no momento de subscrever: o que acontece se um dia parares. Mapa
 // local por língua (mesmo padrão do TERMO).
-const AO_PARAR: Record<Lingua, { titulo: string; corpo: string }> = {
+const AO_PARAR: Record<string, { titulo: string; corpo: string }> = {
   pt: { titulo: "Enquanto Pro — e se um dia parares", corpo: "Enquanto és Pro, acumulas pontos nas ligas Mundial e Continental e podes disputar a Copa do Dôdo. Se deixares de ser Pro, essa pontuação zera e sais dessas ligas, sais da Copa em curso, e se tiveres mais ligas de amigos do que o limite gratuito terás de escolher quais manter. A tua conta, equipa e histórico ficam sempre guardados." },
   en: { titulo: "While Pro — and if you ever stop", corpo: "While you're Pro, you build up points in the World and Continental leagues and can play the Copa do Dôdo. If you stop being Pro, those points reset and you leave those leagues, you're out of any ongoing Copa, and if you have more friend leagues than the free limit you'll choose which to keep. Your account, team and history are always kept." },
   es: { titulo: "Mientras eres Pro — y si un día paras", corpo: "Mientras eres Pro, acumulas puntos en las ligas Mundial y Continental y puedes disputar la Copa do Dôdo. Si dejas de ser Pro, esa puntuación se pone a cero y sales de esas ligas, sales de la Copa en curso, y si tienes más ligas de amigos que el límite gratuito tendrás que elegir cuáles mantener. Tu cuenta, equipo e historial quedan siempre guardados." },
   fr: { titulo: "En tant que Pro — et si un jour tu arrêtes", corpo: "Tant que tu es Pro, tu accumules des points dans les ligues Mondiale et Continentale et tu peux disputer la Copa do Dôdo. Si tu cesses d'être Pro, ces points sont remis à zéro et tu sors de ces ligues, tu sors de la Copa en cours, et si tu as plus de ligues d'amis que la limite gratuite tu devras choisir lesquelles garder. Ton compte, ton équipe et ton historique sont toujours conservés." },
   de: { titulo: "Als Pro — und falls du irgendwann aufhörst", corpo: "Solange du Pro bist, sammelst du Punkte in der Welt- und Kontinentalliga und kannst die Copa do Dôdo spielen. Hörst du auf, Pro zu sein, werden diese Punkte auf null gesetzt und du verlässt diese Ligen, du bist raus aus einer laufenden Copa, und wenn du mehr Freundesligen als das Gratis-Limit hast, wählst du, welche du behältst. Dein Konto, Team und Verlauf bleiben immer erhalten." },
+};
+// LOJA DE JUDOCOINS na página do Pro. IMPORTANTE: os Judocoins NÃO são o Pro nem
+// dão vantagem competitiva — são orçamento da temporada, à venda para todos. Esta
+// nota deixa a distinção clara na página de venda do Pro (mapa local por língua).
+const LOJA_PRO: Record<string, { titulo: string; corpo: string; botao: string }> = {
+  pt: { titulo: "Judocoins não são o Pro", corpo: "Os Judocoins são orçamento para montares a equipa — à venda para toda a gente, Pro ou não. Não dão pontos nem vantagem: só te deixam contratar os atletas que quiseres.", botao: "Ir à loja" },
+  en: { titulo: "Judocoins aren't Pro", corpo: "Judocoins are budget to build your team — on sale to everyone, Pro or not. They give no points and no advantage: they just let you sign the athletes you want.", botao: "Go to store" },
+  es: { titulo: "Los Judocoins no son el Pro", corpo: "Los Judocoins son presupuesto para montar tu equipo — a la venta para todos, Pro o no. No dan puntos ni ventaja: solo te dejan fichar a los atletas que quieras.", botao: "Ir a la tienda" },
+  fr: { titulo: "Les Judocoins ne sont pas le Pro", corpo: "Les Judocoins sont du budget pour composer ton équipe — en vente pour tous, Pro ou non. Ils ne donnent ni points ni avantage : ils te laissent juste recruter les athlètes que tu veux.", botao: "Aller à la boutique" },
+  de: { titulo: "Judocoins sind nicht Pro", corpo: "Judocoins sind Budget, um dein Team zu bauen — für alle erhältlich, Pro oder nicht. Sie geben keine Punkte und keinen Vorteil: sie lassen dich nur die gewünschten Athleten verpflichten.", botao: "Zum Shop" },
 };
 // O que cada nível dá. Princípio: só informação e ferramentas — nunca decidir o
 // time pela pessoa, nunca prometer resultado. (Fase de testes: sem prémios.)
@@ -220,6 +230,15 @@ export default function IpponPro() {
     {t("pro.notaCopaSorteio")}
     </div>
     </div>
+    {/* Loja de Judocoins — orçamento, NÃO é o Pro (sem vantagem competitiva). */}
+    <a href="/loja" style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "#0f1411", border: `1px solid ${GOLD}`, borderRadius: 14, padding: "13px 14px", marginBottom: 16, textDecoration: "none" }}>
+    <span style={{ width: 30, height: 30, borderRadius: "50%", background: GOLD, color: "#1b211e", fontFamily: FD, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>JC</span>
+    <span style={{ flex: 1, minWidth: 0 }}>
+    <span style={{ display: "block", fontFamily: FD, fontSize: 13, fontWeight: 700, color: "#f1ede2", textTransform: "uppercase" }}>{LOJA_PRO[lingua]?.titulo ?? LOJA_PRO.pt.titulo}</span>
+    <span style={{ display: "block", fontSize: 12, color: "#a9b4ac", lineHeight: 1.55, marginTop: 4 }}>{LOJA_PRO[lingua]?.corpo ?? LOJA_PRO.pt.corpo}</span>
+    <span style={{ display: "inline-block", marginTop: 9, color: GOLD, fontFamily: FD, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>{LOJA_PRO[lingua]?.botao ?? LOJA_PRO.pt.botao} ›</span>
+    </span>
+    </a>
     <div style={{ fontSize: 12, color: "#7c8a82", textAlign: "center", lineHeight: 1.5 }}>
     {erro && <span style={{ display: "block", color: "#ef8d83", marginBottom: 8 }}>{erro}</span>}
     {t("pro.rodape")} · {PRECO.etiqueta.toLowerCase()} ({PRECO.duracaoDesconto}). 🥋
