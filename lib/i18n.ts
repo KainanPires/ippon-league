@@ -46,7 +46,7 @@
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 
-export type Lingua = "pt" | "en" | "es" | "fr" | "de";
+export type Lingua = "pt" | "en" | "es" | "fr" | "de" | "ja" | "ru";
 
 export const LINGUAS: { id: Lingua; nome: string; bandeira: string }[] = [
   { id: "pt", nome: "Português", bandeira: "🇵🇹" },
@@ -621,6 +621,10 @@ const PT: Dicionario = {
 
   // --- montra / precos.ts (acrescentado) ---
   "precos.etiqueta": "Promoção de lançamento",
+  "mk.estaADecorrer": "está a decorrer.",
+  "mk.rodadaTrancada": "Durante a rodada, a tua equipa fica trancada — não há compras nem vendas.",
+  "comp.rodada": "Rodada",
+  "comp.atual": "(atual)",
   "precos.periodo": "/mês",
   "inicio.classicoTag": "Clássico",
   "inicio.emAndamentoAqui": "Em andamento · acompanha aqui",
@@ -2509,6 +2513,10 @@ const EN: Dicionario = {
 
   // --- montra / precos.ts (acrescentado) ---
   "precos.etiqueta": "Launch offer",
+  "mk.estaADecorrer": "is underway.",
+  "mk.rodadaTrancada": "During the round your team is locked — no buying or selling.",
+  "comp.rodada": "Round",
+  "comp.atual": "(current)",
   "precos.periodo": "/month",
   "inicio.classicoTag": "Classic",
   "inicio.emAndamentoAqui": "Live now · follow here",
@@ -4378,6 +4386,10 @@ const ES: Dicionario = {
 
   // --- montra / precos.ts (acrescentado) ---
   "precos.etiqueta": "Promoción de lanzamiento",
+  "mk.estaADecorrer": "está en curso.",
+  "mk.rodadaTrancada": "Durante la ronda tu equipo queda bloqueado — no hay compras ni ventas.",
+  "comp.rodada": "Ronda",
+  "comp.atual": "(actual)",
   "precos.periodo": "/mes",
   "inicio.classicoTag": "Clásico",
   "inicio.emAndamentoAqui": "En curso · sigue aquí",
@@ -6247,6 +6259,10 @@ const FR: Dicionario = {
 
   // --- montra / precos.ts (acrescentado) ---
   "precos.etiqueta": "Offre de lancement",
+  "mk.estaADecorrer": "est en cours.",
+  "mk.rodadaTrancada": "Pendant la manche, ton équipe est verrouillée — ni achats ni ventes.",
+  "comp.rodada": "Manche",
+  "comp.atual": "(actuelle)",
   "precos.periodo": "/mois",
   "inicio.classicoTag": "Classique",
   "inicio.emAndamentoAqui": "En cours · suis ici",
@@ -8124,6 +8140,10 @@ const DE: Dicionario = {
 
   // --- montra / precos.ts (acrescentado) ---
   "precos.etiqueta": "Launch-Aktion",
+  "mk.estaADecorrer": "läuft gerade.",
+  "mk.rodadaTrancada": "Während der Runde ist dein Team gesperrt — kein Kaufen oder Verkaufen.",
+  "comp.rodada": "Runde",
+  "comp.atual": "(aktuell)",
   "precos.periodo": "/Monat",
   "inicio.classicoTag": "Klassiker",
   "inicio.emAndamentoAqui": "Läuft gerade · hier verfolgen",
@@ -9452,7 +9472,13 @@ const DE: Dicionario = {
   "chvh.invalido": "Ungültiges Datum/Uhrzeit.",
 };
 
-const DICIONARIOS: Record<Lingua, Dicionario> = { pt: PT, en: EN, es: ES, fr: FR, de: DE };
+// Japonês e russo: os dicionários estão a ser enchidos por lotes. Enquanto uma
+// chave não existir aqui, o `traduzir` recorre ao INGLÊS (ver abaixo), nunca ao
+// português — é o fallback mais aceitável para estas duas línguas. O seletor de
+// idioma (LINGUAS) só passa a oferecer ja/ru quando o núcleo estiver traduzido.
+const JA: Dicionario = {};
+const RU: Dicionario = {};
+const DICIONARIOS: Record<Lingua, Dicionario> = { pt: PT, en: EN, es: ES, fr: FR, de: DE, ja: JA, ru: RU };
 
 // ---------------------------------------------------------------------------
 // QUE LÍNGUA MOSTRAR
@@ -9546,8 +9572,12 @@ function preencher(texto: string, vars?: Record<string, string | number>): strin
 }
 
 export function traduzir(lingua: Lingua, chave: string, vars?: Record<string, string | number>): string {
-  // Recurso ao português quando falta tradução — nunca à chave crua.
-  const texto = DICIONARIOS[lingua][chave] ?? PT[chave] ?? chave;
+  // Recurso quando falta tradução — nunca à chave crua. Para ja/ru (dicionários
+  // em construção) o recurso é o INGLÊS; para as restantes, o português. A chave
+  // existe sempre no dicionário completo das 5 línguas originais, por isso este
+  // recurso só dispara para ja/ru enquanto não estiverem cheios.
+  const dict = DICIONARIOS[lingua] ?? PT;
+  const texto = dict[chave] ?? EN[chave] ?? PT[chave] ?? chave;
   return preencher(texto, vars);
 }
 
