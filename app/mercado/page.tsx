@@ -5,7 +5,7 @@ import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatu
 import { loadDraftFor, saveDraftFor, setAthletePool, loadSavedCloudFor, loadSavedFor } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
-import { focoMercado, nomeCompeticao, textoFecho, categoriaTrancada } from "@/lib/calendario";
+import { focoMercado, nomeCompeticao, textoFecho, categoriaTrancada, localizarNomeCompeticao } from "@/lib/calendario";
 import { supabase } from "@/lib/supabase";
 import { useNivel } from "@/lib/useNivel";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
@@ -18,7 +18,7 @@ import { track, aoTerConsentimento } from "@/lib/analytics";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 // Fase A (economia) — aviso de "equipa acima do orçamento". Texto local por
 // língua (mesmo padrão da janela). {x} = quantos JC a mais.
-const ORC_ACIMA: Record<Lingua, { chip: string; frase: string }> = {
+const ORC_ACIMA: Record<string, { chip: string; frase: string }> = {
   pt: { chip: "Acima do orçamento", frase: "Estás {x} JC acima do orçamento. Vende atletas até equilibrares — senão a tua equipa não pontua nesta rodada." },
   en: { chip: "Over budget", frase: "You're {x} JC over budget. Sell athletes until it balances — otherwise your team won't score this round." },
   es: { chip: "Por encima del presupuesto", frase: "Estás {x} JC por encima del presupuesto. Vende atletas hasta equilibrar — si no, tu equipo no puntúa esta ronda." },
@@ -27,7 +27,7 @@ const ORC_ACIMA: Record<Lingua, { chip: string; frase: string }> = {
 };
 // Loja de Judocoins (economia Fase B) — quando falta orçamento para contratar.
 // Comprar JC aumenta o orçamento da temporada. Mapa local por língua.
-const LOJA_MK: Record<Lingua, { curto: string; falta: string }> = {
+const LOJA_MK: Record<string, { curto: string; falta: string }> = {
   pt: { curto: "Comprar Judocoins", falta: "Pouco orçamento para contratar? Compra Judocoins." },
   en: { curto: "Buy Judocoins", falta: "Short on budget to sign athletes? Buy Judocoins." },
   es: { curto: "Comprar Judocoins", falta: "¿Poco presupuesto para fichar? Compra Judocoins." },
@@ -35,7 +35,7 @@ const LOJA_MK: Record<Lingua, { curto: string; falta: string }> = {
   de: { curto: "Judocoins kaufen", falta: "Wenig Budget für Verpflichtungen? Kaufe Judocoins." },
 };
 // MODO ROLLING (Mundial/Olimpíadas) — banner e rótulo do botão, por língua.
-const ROLLING_MK: Record<Lingua, { titulo: string; corpo: string; botaoTrancada: string }> = {
+const ROLLING_MK: Record<string, { titulo: string; corpo: string; botaoTrancada: string }> = {
   pt: { titulo: "Modo Mundial", corpo: "O Mundial dura a semana toda. Cada categoria fecha quando começa o seu dia — monta com as que ainda faltam. Quem entra a meio joga pela experiência e pontua nas categorias que restam.", botaoTrancada: "Já lutou" },
   en: { titulo: "Worlds mode", corpo: "The Worlds run all week. Each weight category closes when its day begins — build with the ones still ahead. Join mid-event to experience it and score in the remaining categories.", botaoTrancada: "Fought" },
   es: { titulo: "Modo Mundial", corpo: "El Mundial dura toda la semana. Cada categoría cierra cuando empieza su día — arma con las que aún faltan. Si entras a mitad, juegas por la experiencia y puntúas en las categorías restantes.", botaoTrancada: "Ya luchó" },
@@ -46,7 +46,7 @@ const ROLLING_MK: Record<Lingua, { titulo: string; corpo: string; botaoTrancada:
 // Guardados LOCALMENTE por língua (padrão já usado na FAQ/legal/consentimento),
 // para não inflar o lib/i18n.ts. Termos de produto (nomes de competição) entram
 // por interpolação e não se traduzem.
-const JANELA: Record<Lingua, {
+const JANELA: Record<string, {
   etiqueta: string; trancado: string; jaPodes: string;
   inscritosCedo: string; inscritosPerto: string;
 }> = {
@@ -382,7 +382,7 @@ function MercadoInner() {
             // por abrir. Aqui o mercado já fechou (é o que decorre), por isso o
             // nome sai por inteiro — mas passa pela função na mesma, para nunca
             // haver um caminho que mostre o nome cru.
-            setAoVivoNome(competicaoADecorrer ? nomeCompeticao(competicaoADecorrer) : (av.nome ?? null));
+            setAoVivoNome(competicaoADecorrer ? localizarNomeCompeticao(nomeCompeticao(competicaoADecorrer), t) : (av.nome ?? null));
           }
           setLoading(false);
           // NOTA: não limpamos aqui o rascunho dos atletas não-inscritos. Só ABRIR
@@ -468,7 +468,7 @@ function MercadoInner() {
       </div>
       <h2 style={{ fontFamily: FD, fontSize: 21, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>{t("mercado.fechado")}</h2>
       <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 8px" }}>
-      {focoAgora.aDecorrer ? <><strong style={{ color: "#f1ede2" }}>{nomeCompeticao(focoAgora.aDecorrer)}</strong> está a decorrer.</> : t("mk.haCompeticao")} Durante a rodada, a tua equipa fica trancada — não há compras nem vendas.
+      {focoAgora.aDecorrer ? <><strong style={{ color: "#f1ede2" }}>{localizarNomeCompeticao(nomeCompeticao(focoAgora.aDecorrer), t)}</strong> {t("mk.estaADecorrer")}</> : t("mk.haCompeticao")} {t("mk.rodadaTrancada")}
       </p>
       <p style={{ fontSize: 13, color: "#93a39a", lineHeight: 1.5, margin: "0 0 20px" }}>
       O mercado reabre para a próxima competição assim que esta terminar. Acompanha a tua equipa ao vivo entretanto!
@@ -626,7 +626,7 @@ function MercadoInner() {
         <div style={{ background: "linear-gradient(160deg,#16243a,#0d1116)", border: "1px solid #2a4d6e", borderLeft: "3px solid #7fb8f5", borderRadius: 10, padding: "9px 12px", marginBottom: 9 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
         <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#7fb8f5", flexShrink: 0 }} />
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#7fb8f5" }}>{txtRolling.titulo} · {nomeCompeticao(focoAgora.alvo)}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#7fb8f5" }}>{txtRolling.titulo} · {localizarNomeCompeticao(nomeCompeticao(focoAgora.alvo), t)}</span>
         </div>
         <div style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5 }}>{txtRolling.corpo}</div>
         </div>
@@ -635,10 +635,10 @@ function MercadoInner() {
         <div style={{ background: "linear-gradient(160deg,#1c3a2e,#10160f)", border: "1px solid #2a4d3e", borderLeft: "3px solid #d9a441", borderRadius: 10, padding: "9px 12px", marginBottom: 9 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
         <span className="ilvivo" style={{ width: 8, height: 8, borderRadius: "50%", background: "#e2655a", flexShrink: 0 }} />
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83" }}>{txtJanela.etiqueta} · {nomeCompeticao(competicaoADecorrer)}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83" }}>{txtJanela.etiqueta} · {localizarNomeCompeticao(nomeCompeticao(competicaoADecorrer), t)}</span>
         </div>
         <div style={{ fontSize: 12, color: "#c7d0c9", lineHeight: 1.45 }}>
-        {txtJanela.trancado} {txtJanela.jaPodes} <strong style={{ color: "#f1ede2" }}>{nomeCompeticao(focoAgora.alvo)}</strong> — {textoFecho(focoAgora.alvo, t)}.
+        {txtJanela.trancado} {txtJanela.jaPodes} <strong style={{ color: "#f1ede2" }}>{localizarNomeCompeticao(nomeCompeticao(focoAgora.alvo), t)}</strong> — {textoFecho(focoAgora.alvo, t)}.
         </div>
         <div style={{ fontSize: 11.5, color: "#93a39a", lineHeight: 1.4, marginTop: 5 }}>{notaInscritos}</div>
         </div>
