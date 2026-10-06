@@ -106,6 +106,9 @@ export async function GET(req: Request) {
       data_iso: data ? new Date(data).toISOString().slice(0, 10) : null,
       teste: data != null ? data < CORTE_TESTE : false,
       jogadores: jogadoresPorComp.get(id)!.size,
+      // ids de quem jogou (só admin): deixa o cliente cruzar QUALQUER seleção de
+      // competições (sobreposições, retenção à escolha) sem novas idas ao servidor.
+      jogadores_ids: [...jogadoresPorComp.get(id)!],
     };
   }).sort((a, b) => {
     if (a.data == null && b.data == null) return 0;
