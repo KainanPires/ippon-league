@@ -210,7 +210,7 @@ export function CartaoFaixa({
   );
 }
 
-function FaixaNode(p: {
+function FaixaNode({ innerRef, corNova, corVelha, corSeta, seta, temTransicao, exprNova, headline, motiv, topPct, pctSub, ranking, nomeNova, nomeVelha, periodoLabel, identity, fundador, fundadorLabel }: {
   innerRef: { current: HTMLDivElement | null };
   corNova: string; corVelha: string; corSeta: string; seta: string;
   temTransicao: boolean; exprNova: "comemorando" | "indicando" | "feliz";
@@ -230,46 +230,46 @@ function FaixaNode(p: {
   );
 
   return (
-    <div ref={p.innerRef} style={{
+    <div ref={innerRef} style={{
       position: "relative", width: 1080, height: 1350, borderRadius: 34, overflow: "hidden", boxSizing: "border-box",
       fontFamily: FONT, color: "#f1ede2",
       background: "linear-gradient(180deg,#141a17 0%,#10130f 50%,#0b0d0a 100%)",
-      boxShadow: `inset 0 0 0 8px ${p.corNova}`,
+      boxShadow: `inset 0 0 0 8px ${corNova}`,
     }}>
-      <div style={{ position: "absolute", top: -110, left: 0, right: 0, height: 700, background: `radial-gradient(60% 70% at 50% 22%, ${hexA(p.corNova, 0.30)} 0%, transparent 66%)`, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: -110, left: 0, right: 0, height: 700, background: `radial-gradient(60% 70% at 50% 22%, ${hexA(corNova, 0.30)} 0%, transparent 66%)`, pointerEvents: "none" }} />
       <div style={{ position: "absolute", inset: 0, zIndex: 2, padding: "70px 64px 56px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", boxSizing: "border-box" }}>
-        <div style={{ fontWeight: 700, fontSize: 28, letterSpacing: 11, textTransform: "uppercase", color: "#aab4ac" }}>{p.ranking}</div>
+        <div style={{ fontWeight: 700, fontSize: 28, letterSpacing: 11, textTransform: "uppercase", color: "#aab4ac" }}>{ranking}</div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 28, marginTop: 26 }}>
-          {p.temTransicao && (
+          {temTransicao && (
             <>
-              {medal(p.corVelha, "feliz", p.nomeVelha, false)}
-              <div style={{ fontSize: 70, lineHeight: 1, color: p.corSeta, fontWeight: 900, marginBottom: 34 }}>{p.seta}</div>
+              {medal(corVelha, "feliz", nomeVelha, false)}
+              <div style={{ fontSize: 70, lineHeight: 1, color: corSeta, fontWeight: 900, marginBottom: 34 }}>{seta}</div>
             </>
           )}
-          {medal(p.corNova, p.exprNova, p.nomeNova, true)}
+          {medal(corNova, exprNova, nomeNova, true)}
         </div>
 
-        <div style={{ fontWeight: 900, fontSize: 42, lineHeight: 1.1, letterSpacing: -0.5, textTransform: "uppercase", color: p.corNova, marginTop: 22, textShadow: `0 0 34px ${hexA(p.corNova, 0.38)}` }}>{p.headline}</div>
+        <div style={{ fontWeight: 900, fontSize: 42, lineHeight: 1.1, letterSpacing: -0.5, textTransform: "uppercase", color: corNova, marginTop: 22, textShadow: `0 0 34px ${hexA(corNova, 0.38)}` }}>{headline}</div>
 
-        {p.topPct && (
+        {topPct && (
           <>
-            <div style={{ fontWeight: 900, fontSize: 84, lineHeight: 1.05, letterSpacing: -2, color: p.corNova, marginTop: 22, textShadow: `0 0 30px ${hexA(p.corNova, 0.38)}` }}>{p.topPct}</div>
-            <div style={{ fontWeight: 600, fontSize: 29, lineHeight: 1.3, letterSpacing: 0.5, textTransform: "uppercase", color: "#cfd8d2", marginTop: 20 }}>{p.pctSub}</div>
+            <div style={{ fontWeight: 900, fontSize: 84, lineHeight: 1.05, letterSpacing: -2, color: corNova, marginTop: 22, textShadow: `0 0 30px ${hexA(corNova, 0.38)}` }}>{topPct}</div>
+            <div style={{ fontWeight: 600, fontSize: 29, lineHeight: 1.3, letterSpacing: 0.5, textTransform: "uppercase", color: "#cfd8d2", marginTop: 20 }}>{pctSub}</div>
           </>
         )}
 
-        <div style={{ fontWeight: 600, fontSize: 30, lineHeight: 1.45, color: "#e9e4d7", marginTop: 32, maxWidth: 860 }}>{p.motiv}</div>
-        {p.periodoLabel && <div style={{ fontWeight: 700, fontSize: 25, letterSpacing: 6, textTransform: "uppercase", color: GOLD, marginTop: 20 }}>{p.periodoLabel}</div>}
+        <div style={{ fontWeight: 600, fontSize: 30, lineHeight: 1.45, color: "#e9e4d7", marginTop: 32, maxWidth: 860 }}>{motiv}</div>
+        {periodoLabel && <div style={{ fontWeight: 700, fontSize: 25, letterSpacing: 6, textTransform: "uppercase", color: GOLD, marginTop: 20 }}>{periodoLabel}</div>}
 
         <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 22, justifyContent: "center" }}>
-            <div style={{ width: 86, height: 96, display: "grid", placeItems: "center", flexShrink: 0 }}><Escudo config={p.identity} size={86} /></div>
-            <div style={{ fontWeight: 700, fontSize: 44, letterSpacing: 0.3, textTransform: "uppercase", color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 760 }}>{p.identity.name}</div>
+            <div style={{ width: 86, height: 96, display: "grid", placeItems: "center", flexShrink: 0 }}><Escudo config={identity} size={86} /></div>
+            <div style={{ fontWeight: 700, fontSize: 44, letterSpacing: 0.3, textTransform: "uppercase", color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 760 }}>{identity.name}</div>
           </div>
-          {p.fundador && (
+          {fundador && (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 12, padding: "10px 30px", borderRadius: 999, background: hexA(GOLD, 0.14), border: `2px solid ${GOLD}`, color: "#f3dc9b", fontWeight: 700, fontSize: 26, letterSpacing: 5, textTransform: "uppercase" }}>
-              <span style={{ color: GOLD, fontSize: 28 }}>★</span><span>{p.fundadorLabel}</span>
+              <span style={{ color: GOLD, fontSize: 28 }}>★</span><span>{fundadorLabel}</span>
             </div>
           )}
           <div style={{ fontWeight: 700, fontSize: 40, letterSpacing: 8, textTransform: "uppercase", color: GOLD, marginTop: 6 }}>IPPON&nbsp;LEAGUE</div>
