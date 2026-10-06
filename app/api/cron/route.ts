@@ -511,13 +511,18 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
   // que gravaram a faixa com sucesso. Upsert por (user_id, mes) — re-correr o mês
   // não duplica. Extra: nunca bloqueia o recálculo.
   try {
+    // Posição no ranking MUNDIAL do mês (jogadores já vem ordenado por pontos
+    // desc) + total, para o cartão poder dizer "Top X%".
+    const posMap = new Map<string, number>();
+    jogadores.forEach((j, i) => posMap.set(j.user_id, i + 1));
+    const totalJog = jogadores.length;
     const hist = atualizacoes
       .filter((a) => !naoGravou.has(a.user_id))
       .map((a) => {
         const antes = faixaAntiga.get(a.user_id) ?? null;
         let situacao: "subiu" | "desceu" | "manteve" = "manteve";
         if (antes) situacao = ordemFaixa(a.faixa) > ordemFaixa(antes) ? "subiu" : ordemFaixa(a.faixa) < ordemFaixa(antes) ? "desceu" : "manteve";
-        return { user_id: a.user_id, mes, belt: a.faixa, belt_anterior: antes, situacao };
+        return { user_id: a.user_id, mes, belt: a.faixa, belt_anterior: antes, situacao, posicao: posMap.get(a.user_id) ?? null, total: totalJog };
       });
     for (let i = 0; i < hist.length; i += 500) {
       await supabaseAdmin.from("faixas_historico").upsert(hist.slice(i, i + 500), { onConflict: "user_id,mes" });
