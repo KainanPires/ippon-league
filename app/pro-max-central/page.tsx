@@ -33,7 +33,7 @@ const JC_GOLD = "#d9a441"; // dourado do JC (consistente com o resto da app)
 // Propaganda da Loja de Judocoins na central (economia Fase B). Os JC são
 // orçamento da temporada, NÃO um benefício do Pro Max — à venda para todos e
 // sem vantagem competitiva. Mapa local por língua.
-const LOJA_CENTRAL: Record<Lingua, { titulo: string; corpo: string; botao: string }> = {
+const LOJA_CENTRAL: Record<string, { titulo: string; corpo: string; botao: string }> = {
   pt: { titulo: "Loja de Judocoins", corpo: "Orçamento extra para montares a equipa que quiseres. À venda para todos — não dá pontos nem vantagem, só te deixa contratar quem quiseres.", botao: "Abrir loja" },
   en: { titulo: "Judocoins Store", corpo: "Extra budget to build the team you want. On sale to everyone — no points, no advantage, it just lets you sign who you want.", botao: "Open store" },
   es: { titulo: "Tienda de Judocoins", corpo: "Presupuesto extra para montar el equipo que quieras. A la venta para todos — no da puntos ni ventaja, solo te deja fichar a quien quieras.", botao: "Abrir tienda" },
