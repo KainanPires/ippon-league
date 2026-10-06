@@ -14,7 +14,7 @@ const MAX = "#7fb8f5"; // tom do Pro Max
 // Texto do consentimento no checkout — mapa por língua (mesmo padrão do resto
 // da app para conteúdo multilíngue que não vive no dicionário global).
 type TextoTermo = { antes: string; link: string; depois: string; erro: string };
-const TERMO: Record<Lingua, TextoTermo> = {
+const TERMO: Record<string, TextoTermo> = {
   pt: { antes: "Li e aceito o ", link: "Termo de Entrega e Consentimento", depois: " do Ippon Pro.", erro: "Para continuares, marca que leste e aceitas o termo." },
   en: { antes: "I have read and accept the ", link: "Delivery and Consent Terms", depois: " of Ippon Pro.", erro: "To continue, please tick that you have read and accept the terms." },
   es: { antes: "He leído y acepto los ", link: "Términos de Entrega y Consentimiento", depois: " de Ippon Pro.", erro: "Para continuar, marca que has leído y aceptas los términos." },
@@ -24,7 +24,7 @@ const TERMO: Record<Lingua, TextoTermo> = {
 // JC dourado (consistente com o resto da app) só para o selo da loja.
 const JC_GOLD = "#d9a441";
 // Loja de Judocoins — orçamento, NÃO é o Pro Max. Mapa local por língua.
-const LOJA_PMX: Record<Lingua, { titulo: string; corpo: string; botao: string }> = {
+const LOJA_PMX: Record<string, { titulo: string; corpo: string; botao: string }> = {
   pt: { titulo: "Judocoins não são o Pro", corpo: "Os Judocoins são orçamento para montares a equipa — à venda para toda a gente. Não dão pontos nem vantagem.", botao: "Ir à loja" },
   en: { titulo: "Judocoins aren't Pro", corpo: "Judocoins are budget to build your team — on sale to everyone. They give no points and no advantage.", botao: "Go to store" },
   es: { titulo: "Los Judocoins no son el Pro", corpo: "Los Judocoins son presupuesto para montar tu equipo — a la venta para todos. No dan puntos ni ventaja.", botao: "Ir a la tienda" },
