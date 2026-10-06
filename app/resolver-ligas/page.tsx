@@ -31,7 +31,7 @@ type Txt = {
   pontos: string; copas: string; manterAte: string;
   confirmar: string; aGuardar: string; erro: string; jaOk: string;
 };
-const TXT: Record<Lingua, Txt> = {
+const TXT: Record<string, Txt> = {
   pt: {
     titulo: "Resolve as tuas ligas", intro: "O teu plano mudou e ficaste acima do limite de ligas de amigos. Tens duas opções.",
     voltar: "Voltar ao Ippon Pro", voltarSub: "Mantém tudo — nada é removido. Vê os planos e promoções.",
