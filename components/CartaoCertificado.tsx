@@ -4,9 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Escudo, type Identity } from "@/components/Escudo";
 import { Mascot } from "@/components/Mascot";
-import { useT } from "@/lib/i18n";
+import { useT, useLingua } from "@/lib/i18n";
 
 const GOLD = "#d9a441";
+
+// Rótulo do selo de Fundador no certificado, por língua (mapa local; ja/ru no rollout).
+const FUNDADOR_LABEL: Record<string, string> = {
+  pt: "Fundador", en: "Founder", es: "Fundador", fr: "Fondateur", de: "Gründer",
+};
 
 // Posição no pódio. Cada uma tem a sua medalha, cor e título.
 export type PosicaoPodio = "campeao" | "vice" | "terceiro";
@@ -32,6 +37,8 @@ const CARD_CSS = `
 .ccard-sep{width:120px;height:4px;background:var(--cor);border-radius:2px;margin:40px 0 36px;opacity:0.7}
 .ccard-crest{width:200px;height:230px;display:grid;place-items:center;filter:drop-shadow(0 10px 22px rgba(0,0,0,0.5))}
 .ccard-team{font-weight:700;font-size:62px;line-height:1.04;letter-spacing:0.3px;text-transform:uppercase;color:#f1ede2;margin:22px 0 0;max-width:100%;overflow-wrap:break-word}
+.ccard-founder{display:inline-flex;align-items:center;gap:12px;margin:18px 0 0;padding:9px 28px;border-radius:999px;background:rgba(217,164,65,0.14);border:2px solid #d9a441;color:#f3dc9b;font-weight:700;font-size:26px;letter-spacing:5px;text-transform:uppercase;box-shadow:0 0 28px rgba(217,164,65,0.26)}
+.ccard-founder .fstar{color:#d9a441;font-size:28px;line-height:1}
 .ccard-copa{font-weight:500;font-size:34px;line-height:1.3;letter-spacing:0.5px;color:#aab4ac;margin:18px 0 0;max-width:100%}
 .ccard-part{margin-top:42px;padding:16px 38px;border:2px solid var(--cor);border-radius:999px;font-weight:700;font-size:34px;letter-spacing:1px;color:var(--cor)}
 .ccard-foot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -63,6 +70,7 @@ export function CartaoCertificado({
   nParticipantes,
   variante = "anual",
   tituloRodada,
+  fundador = false,
   onClose,
 }: {
   posicao: PosicaoPodio;
@@ -71,6 +79,7 @@ export function CartaoCertificado({
   nParticipantes: number;
   variante?: "anual" | "rodada";
   tituloRodada?: string;
+  fundador?: boolean;
   onClose: () => void;
 }) {
   const t = useT();
@@ -156,7 +165,7 @@ export function CartaoCertificado({
 
         <div ref={previewRef} style={{ width: "100%", aspectRatio: "1080 / 1350", borderRadius: 12, overflow: "hidden", marginBottom: 14, position: "relative", background: "#0b0d0a" }}>
           <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1350, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <CertificadoNode innerRef={cardRef} vars={cardVars} tema={tema} identity={identity} nomeCopa={nomeCopa} nParticipantes={nParticipantes} variante={variante} tituloRodada={tituloRodada} />
+            <CertificadoNode innerRef={cardRef} vars={cardVars} tema={tema} identity={identity} nomeCopa={nomeCopa} nParticipantes={nParticipantes} variante={variante} tituloRodada={tituloRodada} fundador={fundador} />
           </div>
         </div>
 
@@ -170,7 +179,7 @@ export function CartaoCertificado({
   );
 }
 
-function CertificadoNode({ innerRef, vars, tema, identity, nomeCopa, nParticipantes, variante, tituloRodada }: {
+function CertificadoNode({ innerRef, vars, tema, identity, nomeCopa, nParticipantes, variante, tituloRodada, fundador }: {
   innerRef: { current: HTMLDivElement | null };
   vars: CSSProperties;
   tema: TemaPosicao;
@@ -179,8 +188,10 @@ function CertificadoNode({ innerRef, vars, tema, identity, nomeCopa, nParticipan
   nParticipantes: number;
   variante: "anual" | "rodada";
   tituloRodada?: string;
+  fundador?: boolean;
 }) {
   const t = useT();
+  const { lingua } = useLingua();
   const ehRodada = variante === "rodada";
   const selo = ehRodada ? t("cc.melhorRodadaSelo") : t(tema.seloK);
   const titulo = ehRodada ? (tituloRodada || t("cc.melhorRodada")) : t(tema.tituloK);
@@ -195,6 +206,9 @@ function CertificadoNode({ innerRef, vars, tema, identity, nomeCopa, nParticipan
         <div className="ccard-sep" />
         <div className="ccard-crest"><Escudo config={identity} size={200} /></div>
         <div className="ccard-team">{identity.name}</div>
+        {fundador && (
+          <div className="ccard-founder"><span className="fstar">★</span><span>{FUNDADOR_LABEL[lingua] ?? FUNDADOR_LABEL.pt}</span></div>
+        )}
         <div className="ccard-copa">{nomeCopa}</div>
         <div className="ccard-part">{nParticipantes === 1 ? t("cc.entre1") : t("cc.entreN", { n: nParticipantes })}</div>
         <div className="ccard-foot">
