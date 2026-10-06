@@ -12,8 +12,8 @@
 // cliente: a ANTHROPIC_API_KEY ficaria exposta no browser.
 
 export type CamposNoticia = { titulo: string; resumo: string; corpo: string };
-export type LinguaAlvo = "en" | "es" | "fr" | "de";
-export const LINGUAS_ALVO: LinguaAlvo[] = ["en", "es", "fr", "de"];
+export type LinguaAlvo = "en" | "es" | "fr" | "de" | "ja" | "ru";
+export const LINGUAS_ALVO: LinguaAlvo[] = ["en", "es", "fr", "de", "ja", "ru"];
 export type TraducoesNoticia = Partial<Record<LinguaAlvo, CamposNoticia>>;
 
 const NOME_LINGUA: Record<LinguaAlvo, string> = {
@@ -21,6 +21,8 @@ const NOME_LINGUA: Record<LinguaAlvo, string> = {
   es: "Spanish (Spain)",
   fr: "French (France)",
   de: "German (Germany)",
+  ja: "Japanese",
+  ru: "Russian",
 };
 
 // Termos e nomes que NUNCA se traduzem — o glossário do judô e as marcas do
@@ -56,7 +58,7 @@ function construirPrompt(campos: CamposNoticia): string {
     ``,
     `Translate into: ${alvos}.`,
     `Return a JSON object shaped EXACTLY like:`,
-    `{"en":{"titulo":"...","resumo":"...","corpo":"..."},"es":{"titulo":"...","resumo":"...","corpo":"..."},"fr":{"titulo":"...","resumo":"...","corpo":"..."},"de":{"titulo":"...","resumo":"...","corpo":"..."}}`,
+    `{${LINGUAS_ALVO.map((l) => `"${l}":{"titulo":"...","resumo":"...","corpo":"..."}`).join(",")}}`,
   ].join("\n");
 }
 
@@ -91,7 +93,7 @@ export async function traduzirNoticia(campos: CamposNoticia): Promise<TraducoesN
       },
       body: JSON.stringify({
         model: modelo,
-        max_tokens: 4000,
+        max_tokens: 6000,
         temperature: 0,
         system: SISTEMA,
         messages: [{ role: "user", content: construirPrompt(campos) }],
