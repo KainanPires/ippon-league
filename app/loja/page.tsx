@@ -18,7 +18,7 @@ const GOLD = "#d9a441";
 
 // Texto local por língua (mesmo padrão da FAQ / legal / janela do mercado), para
 // não inflar o lib/i18n com strings de uma página só.
-const LOJA: Record<Lingua, {
+const LOJA: Record<string, {
   titulo: string; intro: string; saldo: string; expira: string; comprar: string;
   aAbrir: string; transpTitulo: string; transp: string;
   sucesso: string; cancelada: string; entrar: string; erro: string; voltar: string;
