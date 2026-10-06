@@ -84,13 +84,15 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, comp, nada: "Sem favoritos.", enviados: 0 });
   }
 
-  // 2) Só utilizadores Pro Max (é um benefício Pro Max).
+  // 2) Só utilizadores Pro Max (é um benefício Pro Max). Filtramos no PRÓPRIO
+  // SELECT (.eq("is_pro_max", true)) e só recolhemos os ids — não lemos o nível
+  // como propriedade em JS (consulta a `users`, que é a fonte de verdade).
   const userIds = [...new Set(favs.map((f) => f.user_id))];
   const promax = new Set<string>();
   for (let i = 0; i < userIds.length; i += 300) {
     const lote = userIds.slice(i, i + 300);
-    const { data: us } = await supabaseAdmin.from("users").select("id, is_pro_max").in("id", lote);
-    for (const u of us || []) if ((u as { is_pro_max?: boolean }).is_pro_max) promax.add(String(u.id));
+    const { data: us } = await supabaseAdmin.from("users").select("id").eq("is_pro_max", true).in("id", lote);
+    for (const u of us || []) promax.add(String(u.id));
   }
   const favsPro = favs.filter((f) => promax.has(f.user_id));
   if (favsPro.length === 0) {
