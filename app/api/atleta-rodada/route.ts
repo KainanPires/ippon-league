@@ -75,6 +75,16 @@ function custoShidosSofridos(n: number): number {
   return t;
 }
 
+// Shido A FAVOR (provocado no adversário) ACUMULA: +1, +2, +3... (igual ao motor
+// e ao ecrã "Como pontuas"). 2 shidos = +1+2 = +3 (não 2×1). Ao 3º, o adversário
+// perde por hansoku-make: +6 no total (1+2+3). Isto faz a linha do detalhe fechar
+// com o total da luta — antes mostrava o valor achatado (2×1) e não batia.
+function ganhoShidosProvocados(n: number): number {
+  let t = 0;
+  for (let k = 1; k <= n; k++) t += k;
+  return t;
+}
+
 const toInt = (v: unknown): number => {
   const x = parseInt(String(v ?? "0"), 10);
   return isNaN(x) ? 0 : x;
@@ -156,9 +166,11 @@ function rubricasDaLuta(f: IjfContest, side: "b" | "w", hansoku: boolean): Rubri
   if (shidosProvocados > 0) {
     const shidosSofridos = toInt((f as unknown as Record<string, unknown>)[`penalty_${side}`]);
     const venceuPorHansoku = hansoku && shidosSofridos < 3 && shidosProvocados >= 3;
-    const pts = shidosProvocados * (POINTS["shido_provocado"] ?? 1) * (venceuPorHansoku ? 2 : 1);
+    // ACUMULADO (+1, +2, +3...), igual ao motor. Para 3 shidos (hansoku) já dá +6,
+    // por isso não há "×2" nenhum — a soma crescente é que fecha com o total.
+    const pts = ganhoShidosProvocados(shidosProvocados);
     rubricas.push({
-      label: `${shidosProvocados > 1 ? `${shidosProvocados}× ` : ""}Shido provocado${venceuPorHansoku ? " (hansoku, ×2)" : ""}`,
+      label: `${shidosProvocados > 1 ? `${shidosProvocados}× ` : ""}Shido provocado${venceuPorHansoku ? " (hansoku-make)" : ""}`,
       quantidade: shidosProvocados,
       pontos: pts,
       negativo: false,
