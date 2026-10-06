@@ -14,6 +14,7 @@ import { AvisoEquipaGuardada } from "@/components/AvisoEquipaGuardada";
 import { useFaixa } from "@/lib/useFaixa";
 // Nível da tabela `users` (a mesma fonte do servidor), não do user_metadata.
 import { useNivel } from "@/lib/useNivel";
+import { useFundador } from "@/lib/useFundador";
 import { supabase } from "@/lib/supabase";
 import { PRECO } from "@/lib/precos";
 import { useT, useLingua, type Lingua } from "@/lib/i18n";
@@ -31,7 +32,7 @@ const IOC: Record<string, string> = {
 const code3 = (iso: string) => IOC[iso] || iso;
 const fmt = (n: number) => String(Math.round(n * 10) / 10);
 // Fase A (economia) — aviso de "equipa acima do orçamento" (5 línguas). {x} = JC a mais.
-const ORC_ACIMA: Record<Lingua, { chip: string; frase: string; titulo: string; corpo: string }> = {
+const ORC_ACIMA: Record<string, { chip: string; frase: string; titulo: string; corpo: string }> = {
   pt: { chip: "Acima do orçamento", frase: "Estás {x} JC acima do orçamento. Vende atletas até equilibrares.", titulo: "Equipa acima do orçamento", corpo: "A tua equipa vale {x} JC mais do que o teu património. Vende alguém para caber — senão, se o mercado fechar assim, ficas inativo nesta rodada (zero pontos)." },
   en: { chip: "Over budget", frase: "You're {x} JC over budget. Sell athletes until it balances.", titulo: "Team over budget", corpo: "Your team is worth {x} JC more than your wealth. Sell someone to fit — otherwise, if the market closes like this, you'll be inactive this round (zero points)." },
   es: { chip: "Por encima del presupuesto", frase: "Estás {x} JC por encima del presupuesto. Vende atletas hasta equilibrar.", titulo: "Equipo por encima del presupuesto", corpo: "Tu equipo vale {x} JC más que tu patrimonio. Vende a alguien para que quepa — si no, si el mercado cierra así, quedas inactivo esta ronda (cero puntos)." },
@@ -77,6 +78,7 @@ export default function CriarEquipa() {
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const [cloudWarn, setCloudWarn] = useState(false);
   const { ehPro: isPro } = useNivel();
+  const souFundador = useFundador();
   const [, bumpPool] = useState(0); // força um re-render quando a lista de atletas carrega
   const router = useRouter();
   const { lingua } = useLingua();
@@ -557,6 +559,7 @@ export default function CriarEquipa() {
         atletas={resolve(draft.ids)}
         capitao={draft.captain}
         pro={isPro}
+        fundador={souFundador}
         onClose={() => setModal(null)}
         />
       )}
