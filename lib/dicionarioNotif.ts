@@ -14,8 +14,8 @@
 // servidor (lib/i18nServidor.ts) usa `renderNotif` para escolher a língua de
 // quem recebe e preencher as variáveis.
 
-export type LinguaNotif = "pt" | "en" | "es" | "fr" | "de";
-export const LINGUAS_NOTIF: LinguaNotif[] = ["pt", "en", "es", "fr", "de"];
+export type LinguaNotif = "pt" | "en" | "es" | "fr" | "de" | "ja" | "ru";
+export const LINGUAS_NOTIF: LinguaNotif[] = ["pt", "en", "es", "fr", "de", "ja", "ru"];
 
 // Cada chave traz as 5 traduções. Termos de judô (ippon, waza-ari…) e nomes
 // próprios (Ippon League, Copa do Dôdo, Judocoins…) ficam iguais em todas.
@@ -29,6 +29,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥋 ¡{nome} ganó!",
     fr: "🥋 {nome} a gagné !",
     de: "🥋 {nome} hat gewonnen!",
+    ja: "🥋 {nome}が勝利！",
+    ru: "🥋 {nome} победил(а)!",
   },
   "favorito.venceuCorpo": {
     pt: "O teu favorito {nome} venceu a última luta no {comp}. Já está em {placar}. Acompanha ao vivo.",
@@ -36,6 +38,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Tu favorito {nome} ganó su último combate en el {comp}. Ya va {placar}. Sigue en directo.",
     fr: "Ton favori {nome} a gagné son dernier combat au {comp}. Déjà {placar}. Suis en direct.",
     de: "Dein Favorit {nome} hat seinen letzten Kampf beim {comp} gewonnen. Jetzt {placar}. Verfolge live.",
+    ja: "お気に入りの{nome}が{comp}で直近の試合に勝ちました。現在{placar}。ライブで追いかけよう。",
+    ru: "Твой фаворит {nome} выиграл последний бой на {comp}. Сейчас {placar}. Следи в прямом эфире.",
   },
   "favorito.perdeuTitulo": {
     pt: "{nome} perdeu",
@@ -43,6 +47,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "{nome} perdió",
     fr: "{nome} a perdu",
     de: "{nome} hat verloren",
+    ja: "{nome}が敗退",
+    ru: "{nome} проиграл(а)",
   },
   "favorito.perdeuCorpo": {
     pt: "O teu favorito {nome} perdeu a última luta no {comp}. Ficou em {placar}. Vê a chave ao vivo.",
@@ -50,6 +56,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Tu favorito {nome} perdió su último combate en el {comp}. Quedó en {placar}. Mira el cuadro en vivo.",
     fr: "Ton favori {nome} a perdu son dernier combat au {comp}. Bilan : {placar}. Vois le tableau en direct.",
     de: "Dein Favorit {nome} hat seinen letzten Kampf beim {comp} verloren. Bilanz: {placar}. Sieh den Live-Baum.",
+    ja: "お気に入りの{nome}が{comp}で直近の試合に負けました。結果は{placar}。ライブの組み合わせを見てみよう。",
+    ru: "Твой фаворит {nome} проиграл последний бой на {comp}. Счёт: {placar}. Смотри сетку в прямом эфире.",
   },
   // --- SELO DE FUNDADOR: parabéns a quem entrou no lançamento (uma vez) ---
   "fundadorSelo.titulo": {
@@ -58,6 +66,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥋 Eres Fundador de Ippon League",
     fr: "🥋 Tu es Fondateur d'Ippon League",
     de: "🥋 Du bist Gründer der Ippon League",
+    ja: "🥋 あなたはIppon Leagueの創設メンバーです",
+    ru: "🥋 Ты Основатель Ippon League",
   },
   "fundadorSelo.corpo": {
     pt: "Parabéns! Estás entre os Fundadores da Ippon League, e este selo é exclusivo de quem chegou no início. Estamos muito felizes por te ter nesta construção do maior fantasy de judô do mundo. O selo de Fundador fica contigo para sempre. Vê-o no teu perfil.",
@@ -65,6 +75,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Felicidades! Estás entre los Fundadores de Ippon League, y este sello es exclusivo de quienes llegaron al principio. Estamos muy felices de tenerte construyendo el mayor fantasy de judo del mundo. El sello de Fundador es tuyo para siempre. Míralo en tu perfil.",
     fr: "Félicitations ! Tu fais partie des Fondateurs d'Ippon League, et ce badge est réservé à ceux qui étaient là dès le début. Nous sommes très heureux de te compter dans la construction du plus grand fantasy de judo au monde. Le badge de Fondateur est à toi pour toujours. Vois-le sur ton profil.",
     de: "Glückwunsch! Du gehörst zu den Gründern der Ippon League, und dieses Abzeichen ist denen vorbehalten, die von Anfang an dabei waren. Wir freuen uns sehr, dich beim Aufbau des größten Judo-Fantasy-Spiels der Welt dabeizuhaben. Das Gründer-Abzeichen bleibt für immer deins. Sieh es in deinem Profil.",
+    ja: "おめでとうございます！あなたはIppon Leagueの創設メンバーの一人で、このバッジは最初から参加した人だけのものです。世界最大の柔道ファンタジーを一緒に築いてくれて、本当にうれしいです。創設メンバーのバッジはずっとあなたのものです。プロフィールで確認できます。",
+    ru: "Поздравляем! Ты среди Основателей Ippon League, и этот значок — только для тех, кто был с нами с самого начала. Мы очень рады, что ты помогаешь строить крупнейшую в мире фэнтези-игру по дзюдо. Значок Основателя остаётся твоим навсегда. Посмотри его в профиле.",
   },
   "liga.pedidoTitulo": {
     pt: "Novo pedido na tua liga",
@@ -72,6 +84,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Nueva solicitud en tu liga",
     fr: "Nouvelle demande dans ta ligue",
     de: "Neue Anfrage in deiner Liga",
+    ja: "リーグに新しい参加申請",
+    ru: "Новая заявка в твою лигу",
   },
   "liga.pedidoCorpo": {
     pt: "Alguém quer entrar na liga \"{liga}\". Vê os pedidos para aprovar ou recusar.",
@@ -79,6 +93,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Alguien quiere entrar en la liga \"{liga}\". Revisa las solicitudes para aceptar o rechazar.",
     fr: "Quelqu'un veut rejoindre la ligue \"{liga}\". Consulte les demandes pour accepter ou refuser.",
     de: "Jemand möchte der Liga \"{liga}\" beitreten. Sieh dir die Anfragen an, um zu bestätigen oder abzulehnen.",
+    ja: "誰かがリーグ「{liga}」への参加を希望しています。申請を確認して承認または却下してください。",
+    ru: "Кто-то хочет вступить в лигу «{liga}». Проверь заявки, чтобы принять или отклонить.",
   },
   "liga.recusadoTitulo": {
     pt: "Pedido de liga não aceite",
@@ -86,6 +102,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Solicitud de liga no aceptada",
     fr: "Demande de ligue non acceptée",
     de: "Liga-Anfrage nicht angenommen",
+    ja: "リーグ参加申請は承認されませんでした",
+    ru: "Заявка в лигу не принята",
   },
   "liga.recusadoCorpo": {
     pt: "O teu pedido para a liga \"{liga}\" não foi aceite desta vez. Há muitas outras ligas para entrares!",
@@ -93,6 +111,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Tu solicitud para la liga \"{liga}\" no fue aceptada esta vez. ¡Hay muchas otras ligas para entrar!",
     fr: "Ta demande pour la ligue \"{liga}\" n'a pas été acceptée cette fois. Il y a plein d'autres ligues à rejoindre !",
     de: "Deine Anfrage für die Liga \"{liga}\" wurde diesmal nicht angenommen. Es gibt viele andere Ligen zum Beitreten!",
+    ja: "今回は「{liga}」への参加申請が承認されませんでした。参加できるリーグは他にもたくさんあります！",
+    ru: "Твою заявку на вступление в «{liga}» в этот раз не приняли. Есть много других лиг, куда можно вступить!",
   },
   "liga.aprovadoTitulo": {
     pt: "Entraste na liga!",
@@ -100,6 +120,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Entraste en la liga!",
     fr: "Tu es dans la ligue !",
     de: "Du bist in der Liga!",
+    ja: "リーグに参加しました！",
+    ru: "Ты в лиге!",
   },
   "liga.aprovadoCorpo": {
     pt: "O teu pedido para a liga \"{liga}\" foi aceite. Boa sorte na competição!",
@@ -107,6 +129,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Tu solicitud para la liga \"{liga}\" fue aceptada. ¡Buena suerte en la competición!",
     fr: "Ta demande pour la ligue \"{liga}\" a été acceptée. Bonne chance dans la compétition !",
     de: "Deine Anfrage für die Liga \"{liga}\" wurde angenommen. Viel Erfolg im Wettkampf!",
+    ja: "「{liga}」への参加申請が承認されました。大会での健闘を祈ります！",
+    ru: "Твою заявку на вступление в «{liga}» приняли. Удачи в соревновании!",
   },
   "copa.bronze3Titulo": {
     pt: "3º lugar na Copa Ippon 🥉",
@@ -114,6 +138,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "3.º puesto en la Copa Ippon 🥉",
     fr: "3e place dans la Copa Ippon 🥉",
     de: "3. Platz in der Copa Ippon 🥉",
+    ja: "Copa Ipponで3位 🥉",
+    ru: "3-е место в Copa Ippon 🥉",
   },
   "copa.bronzeAutoCorpo": {
     pt: "Subiste ao pódio da Copa \"{liga}\". Não houve ninguém para disputar o bronze do teu lado da chave, por isso o 3º lugar é teu. Grande campanha!",
@@ -121,6 +147,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Subiste al podio de la Copa \"{liga}\". No hubo nadie para disputar el bronce en tu lado del cuadro, así que el 3.º puesto es tuyo. ¡Gran campaña!",
     fr: "Tu montes sur le podium de la Copa \"{liga}\". Personne ne pouvait disputer le bronze de ton côté du tableau, donc la 3e place est à toi. Belle campagne !",
     de: "Du stehst auf dem Podium der Copa \"{liga}\". Auf deiner Seite des Baums gab es niemanden für Bronze, also gehört der 3. Platz dir. Starke Kampagne!",
+    ja: "Copa「{liga}」で表彰台に上がりました。あなたの側の組み合わせでは銅メダルを争う相手がいなかったため、3位はあなたのものです。見事な戦いでした！",
+    ru: "Ты поднялся на подиум Copa «{liga}». На твоей стороне сетки не было соперника за бронзу, так что 3-е место твоё. Отличный путь!",
   },
   "copa.campeaoTitulo": {
     pt: "És o CAMPEÃO da Copa Ippon! 🏆",
@@ -128,6 +156,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Eres el CAMPEÓN de la Copa Ippon! 🏆",
     fr: "Tu es le CHAMPION de la Copa Ippon ! 🏆",
     de: "Du bist der CHAMPION der Copa Ippon! 🏆",
+    ja: "Copa Ipponのチャンピオンです！ 🏆",
+    ru: "Ты ЧЕМПИОН Copa Ippon! 🏆",
   },
   "copa.campeaoCorpo": {
     pt: "Venceste a final e és o campeão da Copa \"{liga}\". Que conquista!",
@@ -135,6 +165,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Ganaste la final y eres el campeón de la Copa \"{liga}\". ¡Qué logro!",
     fr: "Tu as gagné la finale et tu es le champion de la Copa \"{liga}\". Quel exploit !",
     de: "Du hast das Finale gewonnen und bist der Champion der Copa \"{liga}\". Was für ein Erfolg!",
+    ja: "決勝に勝ち、Copa「{liga}」のチャンピオンになりました。素晴らしい偉業です！",
+    ru: "Ты выиграл финал и стал чемпионом Copa «{liga}». Какое достижение!",
   },
   "copa.viceTitulo": {
     pt: "Vice-campeão da Copa Ippon 🥈",
@@ -142,6 +174,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Subcampeón de la Copa Ippon 🥈",
     fr: "Finaliste de la Copa Ippon 🥈",
     de: "Vizemeister der Copa Ippon 🥈",
+    ja: "Copa Ipponの準優勝 🥈",
+    ru: "Финалист Copa Ippon 🥈",
   },
   "copa.viceCorpo": {
     pt: "Chegaste à final da Copa \"{liga}\" e ficaste em 2º. Grande campanha!",
@@ -149,6 +183,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Llegaste a la final de la Copa \"{liga}\" y quedaste 2.º. ¡Gran campaña!",
     fr: "Tu as atteint la finale de la Copa \"{liga}\" et terminé 2e. Belle campagne !",
     de: "Du hast das Finale der Copa \"{liga}\" erreicht und wurdest 2. Starke Kampagne!",
+    ja: "Copa「{liga}」の決勝に進み、2位になりました。見事な戦いでした！",
+    ru: "Ты дошёл до финала Copa «{liga}» и занял 2-е место. Отличный путь!",
   },
   "copa.bronzeVencidoCorpo": {
     pt: "Venceste a disputa do bronze na Copa \"{liga}\". Subiste ao pódio!",
@@ -156,6 +192,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Ganaste la disputa del bronce en la Copa \"{liga}\". ¡Subiste al podio!",
     fr: "Tu as gagné le match pour le bronze dans la Copa \"{liga}\". Tu montes sur le podium !",
     de: "Du hast das Spiel um Bronze in der Copa \"{liga}\" gewonnen. Du bist aufs Podium gekommen!",
+    ja: "Copa「{liga}」の3位決定戦に勝ちました。表彰台に上がりました！",
+    ru: "Ты выиграл матч за бронзу в Copa «{liga}». Ты на подиуме!",
   },
   "copa.portasPodioTitulo": {
     pt: "Às portas do pódio",
@@ -163,6 +201,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "A las puertas del podio",
     fr: "Aux portes du podium",
     de: "Knapp am Podium vorbei",
+    ja: "あと一歩で表彰台",
+    ru: "Чуть-чуть не до подиума",
   },
   "copa.portasPodioCorpo": {
     pt: "Perdeste a disputa do bronze na Copa \"{liga}\", mas chegaste muito longe. Que campanha!",
@@ -170,6 +210,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Perdiste la disputa del bronce en la Copa \"{liga}\", pero llegaste muy lejos. ¡Qué campaña!",
     fr: "Tu as perdu le match pour le bronze dans la Copa \"{liga}\", mais tu es allé très loin. Quelle campagne !",
     de: "Du hast das Spiel um Bronze in der Copa \"{liga}\" verloren, bist aber sehr weit gekommen. Was für eine Kampagne!",
+    ja: "Copa「{liga}」の3位決定戦には負けましたが、ここまで大きく勝ち進みました。見事な戦いでした！",
+    ru: "Ты проиграл матч за бронзу в Copa «{liga}», но прошёл долгий путь. Какой турнир!",
   },
   "copa.repescagemVenceuTitulo": {
     pt: "Venceste na repescagem! 🔁",
@@ -177,6 +219,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Ganaste en la repesca! 🔁",
     fr: "Tu as gagné au repêchage ! 🔁",
     de: "Du hast in der Trostrunde gewonnen! 🔁",
+    ja: "敗者復活戦で勝ちました！ 🔁",
+    ru: "Ты выиграл в утешительном раунде! 🔁",
   },
   "copa.repescagemVenceuCorpo": {
     pt: "Ganhaste o teu confronto de repescagem na Copa \"{liga}\" e segues para a disputa do bronze. A segunda chance é tua!",
@@ -184,6 +228,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Ganaste tu enfrentamiento de repesca en la Copa \"{liga}\" y avanzas a la disputa del bronce. ¡La segunda oportunidad es tuya!",
     fr: "Tu as gagné ton match de repêchage dans la Copa \"{liga}\" et tu passes au match pour le bronze. La seconde chance est à toi !",
     de: "Du hast dein Trostrunden-Duell in der Copa \"{liga}\" gewonnen und ziehst ins Spiel um Bronze ein. Die zweite Chance gehört dir!",
+    ja: "Copa「{liga}」の敗者復活戦に勝ち、3位決定戦に進みます。セカンドチャンスはあなたのものです！",
+    ru: "Ты выиграл утешительный матч в Copa «{liga}» и выходишь в бой за бронзу. Второй шанс твой!",
   },
   "copa.repescagemPerdeuTitulo": {
     pt: "Eliminado na repescagem",
@@ -191,6 +237,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Eliminado en la repesca",
     fr: "Éliminé au repêchage",
     de: "In der Trostrunde ausgeschieden",
+    ja: "敗者復活戦で敗退",
+    ru: "Вылет в утешительном раунде",
   },
   "copa.repescagemPerdeuCorpo": {
     pt: "Perdeste o confronto de repescagem na Copa \"{liga}\". Foi uma boa campanha — para a próxima, a revanche é tua!",
@@ -198,6 +246,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Perdiste el enfrentamiento de repesca en la Copa \"{liga}\". Fue una buena campaña — ¡la próxima, la revancha es tuya!",
     fr: "Tu as perdu ton match de repêchage dans la Copa \"{liga}\". Belle campagne — la prochaine fois, la revanche est à toi !",
     de: "Du hast dein Trostrunden-Duell in der Copa \"{liga}\" verloren. Es war eine gute Kampagne — nächstes Mal gehört die Revanche dir!",
+    ja: "Copa「{liga}」の敗者復活戦に負けました。良い戦いでした。次回はリベンジを！",
+    ru: "Ты проиграл утешительный матч в Copa «{liga}». Хороший путь — в следующий раз реванш за тобой!",
   },
   "copa.avancouTitulo": {
     pt: "Avançaste na Copa! ⚔️",
@@ -205,6 +255,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Avanzaste en la Copa! ⚔️",
     fr: "Tu as avancé dans la Copa ! ⚔️",
     de: "Du bist in der Copa weiter! ⚔️",
+    ja: "Copaで勝ち進みました！ ⚔️",
+    ru: "Ты прошёл дальше в Copa! ⚔️",
   },
   "copa.avancouCorpo": {
     pt: "Venceste o teu confronto na Copa \"{liga}\". Segues em frente — prepara a próxima ronda!",
@@ -212,6 +264,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Ganaste tu enfrentamiento en la Copa \"{liga}\". Avanzas — ¡prepárate para la próxima ronda!",
     fr: "Tu as gagné ton match dans la Copa \"{liga}\". Tu continues — prépare le prochain tour !",
     de: "Du hast dein Duell in der Copa \"{liga}\" gewonnen. Du kommst weiter — mach dich bereit für die nächste Runde!",
+    ja: "Copa「{liga}」の試合に勝ちました。次に進みます。次のラウンドに備えよう！",
+    ru: "Ты выиграл свой матч в Copa «{liga}». Проходишь дальше — готовься к следующему раунду!",
   },
   "copa.paraRepescagemTitulo": {
     pt: "Perdeste este confronto — mas não acabou! 🔁",
@@ -219,6 +273,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Perdiste este enfrentamiento — ¡pero no se acabó! 🔁",
     fr: "Tu as perdu ce match — mais ce n'est pas fini ! 🔁",
     de: "Du hast dieses Duell verloren — aber es ist nicht vorbei! 🔁",
+    ja: "この試合は負け、でもまだ終わっていません！ 🔁",
+    ru: "Этот матч проигран — но это не конец! 🔁",
   },
   "copa.paraRepescagemCorpo": {
     pt: "Foste eliminado deste confronto na Copa \"{liga}\", mas a tua campanha continua: ainda podes lutar pelo 3º lugar. Não desanimes — vamos a essa repescagem!",
@@ -226,6 +282,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Fuiste eliminado de este enfrentamiento en la Copa \"{liga}\", pero tu campaña continúa: aún puedes luchar por el 3.º puesto. ¡No te desanimes — a por la repesca!",
     fr: "Tu as été éliminé de ce match dans la Copa \"{liga}\", mais ta campagne continue : tu peux encore te battre pour la 3e place. Ne baisse pas les bras — direction le repêchage !",
     de: "Du bist aus diesem Duell in der Copa \"{liga}\" ausgeschieden, aber deine Kampagne geht weiter: Du kannst noch um Platz 3 kämpfen. Kopf hoch — ab in die Trostrunde!",
+    ja: "Copa「{liga}」のこの試合で敗れましたが、まだ戦いは続きます。3位を目指して戦えます。あきらめないで、敗者復活戦へ！",
+    ru: "Ты выбыл из этого матча в Copa «{liga}», но твой путь продолжается: ты ещё можешь побороться за 3-е место. Не сдавайся — вперёд, в утешительный раунд!",
   },
   "copa.eliminadoTitulo": {
     pt: "Eliminado da Copa",
@@ -233,6 +291,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Eliminado de la Copa",
     fr: "Éliminé de la Copa",
     de: "Aus der Copa ausgeschieden",
+    ja: "Copaから敗退",
+    ru: "Вылет из Copa",
   },
   "copa.eliminadoCorpo": {
     pt: "Foste eliminado da Copa \"{liga}\". Foi uma boa campanha — para a próxima, a revanche é tua!",
@@ -240,6 +300,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Fuiste eliminado de la Copa \"{liga}\". Fue una buena campaña — ¡la próxima, la revancha es tuya!",
     fr: "Tu es éliminé de la Copa \"{liga}\". Belle campagne — la prochaine fois, la revanche est à toi !",
     de: "Du bist aus der Copa \"{liga}\" ausgeschieden. Es war eine gute Kampagne — nächstes Mal gehört die Revanche dir!",
+    ja: "Copa「{liga}」から敗退しました。良い戦いでした。次回はリベンジを！",
+    ru: "Ты выбыл из Copa «{liga}». Хороший путь — в следующий раз реванш за тобой!",
   },
   "comp.mundial1Titulo": {
     pt: "👑 És o nº1 do {comp}!",
@@ -247,6 +309,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "👑 ¡Eres el nº1 del {comp}!",
     fr: "👑 Tu es le nº1 du {comp} !",
     de: "👑 Du bist die Nr. 1 beim {comp}!",
+    ja: "👑 {comp}で1位！",
+    ru: "👑 Ты №1 на {comp}!",
   },
   "comp.mundial1Corpo": {
     pt: "Ficaste em 1º lugar numa competição de nível {nivel}, com {pontos} pts. Estás entre os melhores do mundo na Ippon League. Que feito histórico!",
@@ -254,6 +318,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Terminaste 1.º en una competición de nivel {nivel}, con {pontos} pts. Estás entre los mejores del mundo en la Ippon League. ¡Qué logro histórico!",
     fr: "Tu as terminé 1er dans une compétition de niveau {nivel}, avec {pontos} pts. Tu es parmi les meilleurs du monde sur l'Ippon League. Quel exploit historique !",
     de: "Du wurdest 1. in einem Wettkampf der Stufe {nivel} mit {pontos} Pkt. Du gehörst zu den Besten der Welt in der Ippon League. Was für ein historischer Erfolg!",
+    ja: "{nivel}レベルの大会で{pontos}ポイントを獲得し1位になりました。Ippon Leagueで世界トップクラスです。歴史に残る偉業です！",
+    ru: "Ты занял 1-е место в соревновании уровня {nivel} с {pontos} очк. Ты среди лучших в мире в Ippon League. Какое историческое достижение!",
   },
   "comp.mundial2Titulo": {
     pt: "🥈 Vice-campeão do {comp}!",
@@ -261,6 +327,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥈 ¡Subcampeón del {comp}!",
     fr: "🥈 Finaliste du {comp} !",
     de: "🥈 Vizemeister beim {comp}!",
+    ja: "🥈 {comp}で準優勝！",
+    ru: "🥈 Второе место на {comp}!",
   },
   "comp.mundial2Corpo": {
     pt: "Que feito! Ficaste em 2º lugar numa competição de nível {nivel}, com {pontos} pts. Estás no pódio dos melhores do mundo — falta tão pouco para o topo!",
@@ -268,6 +336,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Qué logro! Terminaste 2.º en una competición de nivel {nivel}, con {pontos} pts. Estás en el podio de los mejores del mundo — ¡te falta tan poco para la cima!",
     fr: "Quel exploit ! Tu as terminé 2e dans une compétition de niveau {nivel}, avec {pontos} pts. Tu es sur le podium des meilleurs du monde — si près du sommet !",
     de: "Was für eine Leistung! Du wurdest 2. in einem Wettkampf der Stufe {nivel} mit {pontos} Pkt. Du stehst auf dem Podium der Weltbesten — so nah an der Spitze!",
+    ja: "素晴らしい結果です！{nivel}レベルの大会で{pontos}ポイントを獲得し2位になりました。世界最高峰の表彰台、頂点まであと一歩です！",
+    ru: "Какой результат! Ты занял 2-е место в соревновании уровня {nivel} с {pontos} очк. Ты на подиуме лучших в мире — так близко к вершине!",
   },
   "comp.mundial3Titulo": {
     pt: "🥉 No pódio do {comp}!",
@@ -275,6 +345,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥉 ¡En el podio del {comp}!",
     fr: "🥉 Sur le podium du {comp} !",
     de: "🥉 Auf dem Podium beim {comp}!",
+    ja: "🥉 {comp}で表彰台！",
+    ru: "🥉 На подиуме на {comp}!",
   },
   "comp.mundial3Corpo": {
     pt: "Brilhante! 3º lugar numa competição de nível {nivel}, com {pontos} pts. Subiste ao pódio mundial da Ippon League — orgulha-te disso!",
@@ -282,6 +354,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Brillante! 3.º puesto en una competición de nivel {nivel}, con {pontos} pts. Subiste al podio mundial de la Ippon League — ¡siéntete orgulloso!",
     fr: "Brillant ! 3e place dans une compétition de niveau {nivel}, avec {pontos} pts. Tu es monté sur le podium mondial de l'Ippon League — sois-en fier !",
     de: "Brillant! 3. Platz in einem Wettkampf der Stufe {nivel} mit {pontos} Pkt. Du hast das Weltpodium der Ippon League erreicht — sei stolz darauf!",
+    ja: "見事です！{nivel}レベルの大会で{pontos}ポイントを獲得し3位。Ippon Leagueの世界表彰台に上がりました。誇りに思ってください！",
+    ru: "Блестяще! 3-е место в соревновании уровня {nivel} с {pontos} очк. Ты попал на мировой подиум Ippon League — гордись этим!",
   },
   "comp.venceu1Titulo": {
     pt: "🥇 Venceste a {rotulo}!",
@@ -289,6 +363,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥇 ¡Ganaste la {rotulo}!",
     fr: "🥇 Tu as gagné la {rotulo} !",
     de: "🥇 Du hast die {rotulo} gewonnen!",
+    ja: "🥇 {rotulo}で優勝！",
+    ru: "🥇 Ты выиграл {rotulo}!",
   },
   "comp.venceu1Corpo": {
     pt: "Ficaste em 1º lugar no {comp} com {pontos} pts. Que rodada! Vê como ficou a tua liga.",
@@ -296,6 +372,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Terminaste 1.º en el {comp} con {pontos} pts. ¡Qué ronda! Mira cómo quedó tu liga.",
     fr: "Tu as terminé 1er au {comp} avec {pontos} pts. Quelle journée ! Regarde le classement de ta ligue.",
     de: "Du wurdest 1. beim {comp} mit {pontos} Pkt. Was für eine Runde! Sieh dir an, wie deine Liga steht.",
+    ja: "{comp}で{pontos}ポイントを獲得し1位になりました。素晴らしいラウンドです！あなたのリーグの結果を見てみよう。",
+    ru: "Ты занял 1-е место на {comp} с {pontos} очк. Какой тур! Посмотри, как сложилась твоя лига.",
   },
   "comp.lugar2Titulo": {
     pt: "🥈 2º lugar na {rotulo}!",
@@ -303,6 +381,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥈 ¡2.º puesto en la {rotulo}!",
     fr: "🥈 2e place dans la {rotulo} !",
     de: "🥈 2. Platz in der {rotulo}!",
+    ja: "🥈 {rotulo}で2位！",
+    ru: "🥈 2-е место в {rotulo}!",
   },
   "comp.lugar2Corpo": {
     pt: "Grande rodada no {comp}: {pontos} pts e o vice-pódio. Vê a tua liga.",
@@ -310,6 +390,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Gran ronda en el {comp}: {pontos} pts y el subcampeonato. Mira tu liga.",
     fr: "Belle journée au {comp} : {pontos} pts et la place de finaliste. Regarde ta ligue.",
     de: "Starke Runde beim {comp}: {pontos} Pkt und der Vizeplatz. Sieh dir deine Liga an.",
+    ja: "{comp}で素晴らしいラウンド：{pontos}ポイントで準優勝。あなたのリーグを確認しよう。",
+    ru: "Отличный тур на {comp}: {pontos} очк и второе место. Проверь свою лигу.",
   },
   "comp.lugar3Titulo": {
     pt: "🥉 3º lugar na {rotulo}!",
@@ -317,6 +399,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥉 ¡3.º puesto en la {rotulo}!",
     fr: "🥉 3e place dans la {rotulo} !",
     de: "🥉 3. Platz in der {rotulo}!",
+    ja: "🥉 {rotulo}で3位！",
+    ru: "🥉 3-е место в {rotulo}!",
   },
   "comp.lugar3Corpo": {
     pt: "Subiste ao pódio no {comp} com {pontos} pts. Vê a tua liga.",
@@ -324,6 +408,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Subiste al podio en el {comp} con {pontos} pts. Mira tu liga.",
     fr: "Tu es monté sur le podium au {comp} avec {pontos} pts. Regarde ta ligue.",
     de: "Du bist beim {comp} aufs Podium gekommen mit {pontos} Pkt. Sieh dir deine Liga an.",
+    ja: "{comp}で{pontos}ポイントを獲得し表彰台に上がりました。あなたのリーグを確認しよう。",
+    ru: "Ты попал на подиум на {comp} с {pontos} очк. Проверь свою лигу.",
   },
   "comp.resultadoTitulo": {
     pt: "Resultado da {rotulo}",
@@ -331,6 +417,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Resultado de la {rotulo}",
     fr: "Résultat de la {rotulo}",
     de: "Ergebnis der {rotulo}",
+    ja: "{rotulo}の結果",
+    ru: "Результат {rotulo}",
   },
   "comp.resultadoCorpo": {
     pt: "O {comp} terminou. Fizeste {pontos} pts — vê a tua posição na liga.",
@@ -338,6 +426,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "El {comp} terminó. Hiciste {pontos} pts — mira tu posición en la liga.",
     fr: "Le {comp} est terminé. Tu as fait {pontos} pts — vois ta position dans la ligue.",
     de: "Der {comp} ist vorbei. Du hast {pontos} Pkt gemacht — sieh dir deine Position in der Liga an.",
+    ja: "{comp}が終了しました。{pontos}ポイントを獲得。リーグでの順位を見てみよう。",
+    ru: "{comp} завершился. Ты набрал {pontos} очк — посмотри своё место в лиге.",
   },
   "mercado.abertoTitulo": {
     pt: "🥋 Mercado aberto: {comp}",
@@ -345,6 +435,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥋 Mercado abierto: {comp}",
     fr: "🥋 Marché ouvert : {comp}",
     de: "🥋 Markt offen: {comp}",
+    ja: "🥋 マーケット開設：{comp}",
+    ru: "🥋 Рынок открыт: {comp}",
   },
   "mercado.abertoCorpo": {
     pt: "Já podes montar a tua equipa para o {comp}. O mercado fecha em {tempo} — escala os teus 8 atletas e o capitão antes de fechar!",
@@ -352,6 +444,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Ya puedes montar tu equipo para el {comp}. El mercado cierra en {tempo} — ¡alinea a tus 8 atletas y al capitán antes del cierre!",
     fr: "Tu peux maintenant constituer ton équipe pour le {comp}. Le marché ferme dans {tempo} — aligne tes 8 athlètes et ton capitaine avant la fermeture !",
     de: "Du kannst jetzt dein Team für {comp} aufstellen. Der Markt schließt in {tempo} — stell deine 8 Athleten und den Kapitän auf, bevor er schließt!",
+    ja: "{comp}に向けてチームを編成できます。マーケットは{tempo}で締め切ります。締切前に8人の選手とキャプテンを揃えよう！",
+    ru: "Теперь можно собрать команду на {comp}. Рынок закроется через {tempo} — выставь 8 атлетов и капитана до закрытия!",
   },
   "mercado.ajustarTitulo": {
     pt: "⏰ Última chance para ajustar: {comp}",
@@ -359,6 +453,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "⏰ Última oportunidad para ajustar: {comp}",
     fr: "⏰ Dernière chance pour ajuster : {comp}",
     de: "⏰ Letzte Chance zum Anpassen: {comp}",
+    ja: "⏰ 調整の最後のチャンス：{comp}",
+    ru: "⏰ Последний шанс на правки: {comp}",
   },
   "mercado.ajustarCorpo": {
     pt: "O mercado do {comp} fecha em {tempo}. Ainda dá para trocar atletas ou mudar o capitão — confere a tua equipa antes de fechar!",
@@ -366,6 +462,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "El mercado del {comp} cierra en {tempo}. Aún puedes cambiar atletas o al capitán — ¡revisa tu equipo antes del cierre!",
     fr: "Le marché du {comp} ferme dans {tempo}. Tu peux encore changer d'athlètes ou de capitaine — vérifie ton équipe avant la fermeture !",
     de: "Der Markt für {comp} schließt in {tempo}. Du kannst noch Athleten oder den Kapitän tauschen — prüfe dein Team, bevor er schließt!",
+    ja: "{comp}のマーケットは{tempo}で締め切ります。まだ選手の入れ替えやキャプテンの変更ができます。締切前にチームを確認しよう！",
+    ru: "Рынок {comp} закроется через {tempo}. Ты ещё можешь поменять атлетов или капитана — проверь команду до закрытия!",
   },
   "mercado.orcamentoTitulo": {
     pt: "⚠️ Equipa acima do orçamento: {comp}",
@@ -373,6 +471,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "⚠️ Equipo por encima del presupuesto: {comp}",
     fr: "⚠️ Équipe au-dessus du budget : {comp}",
     de: "⚠️ Team über dem Budget: {comp}",
+    ja: "⚠️ チームが予算オーバー：{comp}",
+    ru: "⚠️ Команда превышает бюджет: {comp}",
   },
   "mercado.orcamentoCorpo": {
     pt: "O mercado do {comp} fecha em {tempo} e a tua equipa vale {jc} JC mais do que o teu orçamento. Vende alguém antes do fecho — senão ficas inativo nesta rodada (0 pontos).",
@@ -380,6 +480,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "El mercado del {comp} cierra en {tempo} y tu equipo vale {jc} JC más que tu presupuesto. Vende a alguien antes del cierre — si no, quedas inactivo esta ronda (0 puntos).",
     fr: "Le marché du {comp} ferme dans {tempo} et ton équipe vaut {jc} JC de plus que ton budget. Vends quelqu'un avant la fermeture — sinon tu seras inactif cette manche (0 point).",
     de: "Der Markt für {comp} schließt in {tempo} und dein Team ist {jc} JC mehr wert als dein Budget. Verkaufe jemanden vor Schluss — sonst bist du diese Runde inaktiv (0 Punkte).",
+    ja: "{comp}のマーケットは{tempo}で締め切り、あなたのチームは予算を{jc} JC超えています。締切前に誰かを売らないと、このラウンドは不参加（0ポイント）になります。",
+    ru: "Рынок {comp} закроется через {tempo}, а твоя команда дороже бюджета на {jc} JC. Продай кого-нибудь до закрытия — иначе этот тур пройдёт без тебя (0 очков).",
   },
   "mercado.fechadoJogoTitulo": {
     pt: "Mercado fechado: {comp} vai começar",
@@ -387,6 +489,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Mercado cerrado: {comp} va a empezar",
     fr: "Marché fermé : {comp} va commencer",
     de: "Markt geschlossen: {comp} beginnt gleich",
+    ja: "マーケット締切：{comp}がまもなく開始",
+    ru: "Рынок закрыт: {comp} вот-вот начнётся",
   },
   "mercado.fechadoJogoCorpo": {
     pt: "A tua equipa está escalada e em jogo no {comp}. Boa sorte! Acompanha a pontuação ao vivo.",
@@ -394,6 +498,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Tu equipo está alineado y en juego en el {comp}. ¡Buena suerte! Sigue la puntuación en directo.",
     fr: "Ton équipe est alignée et en jeu au {comp}. Bonne chance ! Suis les points en direct.",
     de: "Dein Team ist aufgestellt und im Spiel beim {comp}. Viel Glück! Verfolge die Punkte live.",
+    ja: "あなたのチームは{comp}に出場します。健闘を祈ります！ライブで得点を追いかけよう。",
+    ru: "Твоя команда выставлена и в игре на {comp}. Удачи! Следи за очками в прямом эфире.",
   },
   "mercado.fechadoForaTitulo": {
     pt: "Mercado fechado: {comp}",
@@ -401,6 +507,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Mercado cerrado: {comp}",
     fr: "Marché fermé : {comp}",
     de: "Markt geschlossen: {comp}",
+    ja: "マーケット締切：{comp}",
+    ru: "Рынок закрыт: {comp}",
   },
   "mercado.fechadoForaCorpo": {
     pt: "O mercado fechou e não montaste equipa para o {comp}. Ficaste de fora desta rodada — prepara-te para a próxima!",
@@ -408,6 +516,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "El mercado cerró y no montaste equipo para el {comp}. Te quedaste fuera de esta ronda — ¡prepárate para la próxima!",
     fr: "Le marché a fermé et tu n'as pas constitué d'équipe pour le {comp}. Tu es hors-jeu cette journée — prépare-toi pour la prochaine !",
     de: "Der Markt hat geschlossen und du hast kein Team für {comp} aufgestellt. Du bist diese Runde raus — mach dich bereit für die nächste!",
+    ja: "マーケットが締め切られ、{comp}のチームを編成しませんでした。このラウンドは不参加です。次に備えよう！",
+    ru: "Рынок закрылся, а ты не собрал команду на {comp}. В этом туре тебя нет — готовься к следующему!",
   },
   "dodo.sorteadoTitulo": {
     pt: "🏆 Entraste na {numero}ª Copa do Dôdo!",
@@ -415,6 +525,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🏆 ¡Entraste en la {numero}.ª Copa do Dôdo!",
     fr: "🏆 Tu es dans la {numero}e Copa do Dôdo !",
     de: "🏆 Du bist in der {numero}. Copa do Dôdo!",
+    ja: "🏆 Copa do Dôdo #{numero}に当選！",
+    ru: "🏆 Ты в Copa do Dôdo #{numero}!",
   },
   "dodo.sorteadoCorpo": {
     pt: "Parabéns — a tua vaga saiu no sorteio. És um dos {n} em prova e, a partir de agora, cada rodada elimina metade. Fica atento às competições seguintes: os pontos da tua equipa contam a sério e não há segunda hipótese. Vais representar o teu país e o teu continente. Boa sorte, campeão!",
@@ -422,6 +534,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Enhorabuena! — tu plaza salió en el sorteo. Eres uno de {n} en competición y, a partir de ahora, cada ronda elimina a la mitad. Atento a las próximas competiciones: los puntos de tu equipo cuentan de verdad y no hay segunda oportunidad. Representarás a tu país y a tu continente. ¡Buena suerte, campeón!",
     fr: "Félicitations — ta place est sortie au tirage. Tu es l'un des {n} en lice et, à partir de maintenant, chaque tour élimine la moitié. Reste attentif aux prochaines compétitions : les points de ton équipe comptent pour de vrai et il n'y a pas de seconde chance. Tu représenteras ton pays et ton continent. Bonne chance, champion !",
     de: "Glückwunsch — dein Platz kam bei der Auslosung. Du bist einer von {n} im Rennen und ab jetzt scheidet in jeder Runde die Hälfte aus. Behalte die kommenden Wettkämpfe im Auge: Die Punkte deines Teams zählen wirklich und es gibt keine zweite Chance. Du vertrittst dein Land und deinen Kontinent. Viel Glück, Champion!",
+    ja: "おめでとうございます。抽選であなたの枠が決まりました。{n}人の出場者の一人で、ここからは各ラウンドで半数が脱落します。今後の大会に注目を：あなたのチームのポイントが本番で加算され、敗者復活はありません。あなたは自国と自大陸を代表します。健闘を祈ります、チャンピオン！",
+    ru: "Поздравляем — твоё место выпало в жеребьёвке. Ты один из {n} участников, и с этого момента каждый раунд выбывает половина. Следи за ближайшими соревнованиями: очки твоей команды идут в зачёт по-настоящему, и второго шанса нет. Ты представишь свою страну и свой континент. Удачи, чемпион!",
   },
   "dodo.naoSorteadoTitulo": {
     pt: "A tua vaga não saiu no sorteio",
@@ -429,6 +543,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Tu plaza no salió en el sorteo",
     fr: "Ta place n'est pas sortie au tirage",
     de: "Dein Platz kam nicht bei der Auslosung",
+    ja: "抽選で枠が当たりませんでした",
+    ru: "Твоё место не выпало в жеребьёвке",
   },
   "dodo.naoSorteadoCorpo": {
     pt: "Houve mais inscritos do que lugares na {numero}ª Copa do Dôdo e o sorteio decidiu. Não teve nada a ver com o teu desempenho — foi mesmo sorte. A próxima edição volta a abrir com todas as vagas em jogo, e podes acompanhar esta Copa na mesma. Até lá, há as ligas Mundial e Continental a correr.",
@@ -436,6 +552,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Hubo más inscritos que plazas en la {numero}.ª Copa do Dôdo y el sorteo decidió. No tuvo nada que ver con tu rendimiento — fue pura suerte. La próxima edición vuelve a abrir con todas las plazas en juego, y puedes seguir esta Copa igualmente. Hasta entonces, están las ligas Mundial y Continental en marcha.",
     fr: "Il y a eu plus d'inscrits que de places dans la {numero}e Copa do Dôdo, et le tirage a décidé. Cela n'a rien à voir avec ta performance — c'était de la pure chance. La prochaine édition rouvre avec toutes les places en jeu, et tu peux suivre cette Copa quand même. D'ici là, les ligues Mondiale et Continentale sont en cours.",
     de: "Es gab mehr Anmeldungen als Plätze in der {numero}. Copa do Dôdo, und die Auslosung hat entschieden. Es hatte nichts mit deiner Leistung zu tun — es war reines Glück. Die nächste Ausgabe öffnet wieder mit allen Plätzen, und du kannst diese Copa trotzdem verfolgen. Bis dahin laufen die Welt- und Kontinentalligen.",
+    ja: "Copa do Dôdo #{numero}は枠より応募者が多く、抽選で決まりました。あなたの成績とは関係なく、純粋な運です。次回はすべての枠が再び開放され、今回のCopaも引き続き観戦できます。それまでは世界リーグと大陸リーグが開催中です。",
+    ru: "Желающих оказалось больше, чем мест в Copa do Dôdo #{numero}, и решила жеребьёвка. Это никак не связано с твоими результатами — чистая удача. Следующий выпуск снова откроется со всеми местами, а за этой Copa ты можешь продолжать следить. А пока идут Мировая и Континентальная лиги.",
   },
   "dodo.inscricaoTitulo": {
     pt: "Inscrição feita na {numero}ª Copa do Dôdo",
@@ -443,6 +561,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Inscripción hecha en la {numero}.ª Copa do Dôdo",
     fr: "Inscription faite à la {numero}e Copa do Dôdo",
     de: "Anmeldung für die {numero}. Copa do Dôdo erledigt",
+    ja: "Copa do Dôdo #{numero}に申込完了",
+    ru: "Ты записан в Copa do Dôdo #{numero}",
   },
   "dodo.inscricaoCorpo": {
     pt: "Estás no sorteio, a concorrer pelas vagas do teu continente ({cont}). O sorteio sai a {data}, na véspera da competição que abre a Copa, e avisamos-te aqui no momento. Não é por ordem de chegada: teres-te inscrito hoje ou no último dia dá exatamente a mesma hipótese.",
@@ -450,6 +570,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Estás en el sorteo, compitiendo por las plazas de tu continente ({cont}). El sorteo se hace el {data}, la víspera de la competición que abre la Copa, y te avisamos aquí en el momento. No es por orden de llegada: inscribirte hoy o el último día te da exactamente la misma oportunidad.",
     fr: "Tu es dans le tirage, en lice pour les places de ton continent ({cont}). Le tirage a lieu le {data}, la veille de la compétition qui ouvre la Copa, et on te prévient ici à ce moment-là. Ce n'est pas premier arrivé, premier servi : t'inscrire aujourd'hui ou le dernier jour te donne exactement la même chance.",
     de: "Du bist in der Auslosung und kämpfst um die Plätze deines Kontinents ({cont}). Die Auslosung findet am {data} statt, am Vorabend des Wettkampfs, der die Copa eröffnet, und wir sagen dir hier sofort Bescheid. Es gilt nicht: wer zuerst kommt — ob du dich heute oder am letzten Tag anmeldest, gibt dir genau dieselbe Chance.",
+    ja: "あなたは抽選に参加し、自大陸の枠（{cont}）を争います。抽選はCopaを開幕する大会の前日、{data}に行われ、その時ここでお知らせします。先着順ではありません。今日申し込んでも最終日に申し込んでも、当選確率はまったく同じです。",
+    ru: "Ты в жеребьёвке и борешься за места своего континента ({cont}). Жеребьёвка пройдёт {data}, накануне соревнования, которое открывает Copa, и мы сообщим тебе прямо здесь. Это не по принципу «кто первый»: записаться сегодня или в последний день — шанс абсолютно одинаковый.",
   },
   "subscricao.terminouTitulo": {
     pt: "A tua subscrição terminou",
@@ -457,6 +579,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Tu suscripción terminó",
     fr: "Ton abonnement a pris fin",
     de: "Dein Abo ist beendet",
+    ja: "サブスクリプションが終了しました",
+    ru: "Твоя подписка закончилась",
   },
   "subscricao.terminouCorpo": {
     pt: "O acesso Pro acabou. A tua conta, equipa e histórico ficam guardados. Enquanto não voltares ao Pro: a pontuação nas ligas Mundial e Continental foi zerada e saíste delas; se estavas numa Copa do Dôdo, foste eliminado; e se tens mais ligas de amigos do que o limite gratuito, a app vai pedir-te para escolheres quais manter.",
@@ -464,6 +588,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "El acceso Pro terminó. Tu cuenta, equipo e historial quedan guardados. Hasta que vuelvas a Pro: tu puntuación en las ligas Mundial y Continental se puso a cero y saliste de ellas; si estabas en una Copa do Dôdo, fuiste eliminado; y si tienes más ligas de amigos que el límite gratuito, la app te pedirá cuáles mantener.",
     fr: "Ton accès Pro a pris fin. Ton compte, ton équipe et ton historique sont conservés. Tant que tu ne repasses pas Pro : tes points dans les ligues Mondiale et Continentale ont été remis à zéro et tu en es sorti ; si tu étais dans une Copa do Dôdo, tu as été éliminé ; et si tu as plus de ligues d'amis que la limite gratuite, l'app te demandera lesquelles garder.",
     de: "Dein Pro-Zugang ist beendet. Dein Konto, Team und Verlauf bleiben erhalten. Bis du wieder Pro bist: deine Punkte in der Welt- und Kontinentalliga wurden auf null gesetzt und du bist raus; warst du in einer Copa do Dôdo, bist du ausgeschieden; und wenn du mehr Freundesligen als das Gratis-Limit hast, fragt dich die App, welche du behalten willst.",
+    ja: "Proアクセスが終了しました。アカウント、チーム、履歴は保持されます。再びProになるまで：世界リーグと大陸リーグのポイントはリセットされ、そこから外れました。Copa do Dôdoに参加していた場合は脱退となりました。無料枠を超えるフレンドリーグがある場合は、どれを残すかアプリが尋ねます。",
+    ru: "Твой доступ к Pro закончился. Аккаунт, команда и история сохранены. Пока ты снова не оформишь Pro: очки в Мировой и Континентальной лигах сброшены, и ты из них вышел; если ты участвовал в Copa do Dôdo, ты выбыл; а если у тебя больше дружеских лиг, чем в бесплатном лимите, приложение попросит выбрать, какие оставить.",
   },
   "subscricao.pagamentoFalhouTitulo": {
     pt: "Não conseguimos cobrar a tua subscrição",
@@ -471,6 +597,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "No pudimos cobrar tu suscripción",
     fr: "Nous n'avons pas pu débiter ton abonnement",
     de: "Wir konnten dein Abo nicht abbuchen",
+    ja: "サブスクリプションの決済ができませんでした",
+    ru: "Не удалось списать оплату за подписку",
   },
   "subscricao.pagamentoFalhouCorpo": {
     pt: "O pagamento não passou. Continuas com acesso e vamos tentar de novo nos próximos dias — se o cartão mudou, atualiza-o no teu perfil. Se não se resolver e perderes o Pro, a tua pontuação nas ligas Mundial e Continental zera e sais da Copa do Dôdo.",
@@ -478,6 +606,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "El pago no pasó. Sigues con acceso y lo intentaremos de nuevo en los próximos días — si cambió la tarjeta, actualízala en tu perfil. Si no se resuelve y pierdes el Pro, tu puntuación en las ligas Mundial y Continental se pone a cero y sales de la Copa do Dôdo.",
     fr: "Le paiement n'est pas passé. Tu gardes l'accès et nous réessaierons dans les prochains jours — si ta carte a changé, mets-la à jour dans ton profil. Si ce n'est pas réglé et que tu perds le Pro, tes points dans les ligues Mondiale et Continentale sont remis à zéro et tu sors de la Copa do Dôdo.",
     de: "Die Zahlung ging nicht durch. Du behältst den Zugang und wir versuchen es in den nächsten Tagen erneut — falls sich deine Karte geändert hat, aktualisiere sie im Profil. Wird es nicht gelöst und verlierst du Pro, werden deine Punkte in der Welt- und Kontinentalliga auf null gesetzt und du verlässt die Copa do Dôdo.",
+    ja: "決済が通りませんでした。アクセスはまだ有効で、今後数日の間に再試行します。カードが変わった場合はプロフィールで更新してください。解決せずProを失うと、世界リーグと大陸リーグのポイントがリセットされ、Copa do Dôdoから外れます。",
+    ru: "Платёж не прошёл. Доступ пока сохраняется, и мы повторим попытку в ближайшие дни — если карта изменилась, обнови её в профиле. Если это не решится и ты потеряешь Pro, очки в Мировой и Континентальной лигах сбросятся, и ты выйдешь из Copa do Dôdo.",
   },
   "escudo.revertidoTitulo": {
     pt: "O teu escudo voltou à versão gratuita",
@@ -485,6 +615,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Tu escudo volvió a la versión gratuita",
     fr: "Ton blason est revenu à la version gratuite",
     de: "Dein Wappen ist wieder in der Gratis-Version",
+    ja: "エンブレムが無料版に戻りました",
+    ru: "Твой герб вернулся к бесплатной версии",
   },
   "escudo.revertidoCorpo": {
     pt: "Como o Ippon Pro terminou, as formas, estampas, símbolos e cores exclusivos do teu escudo foram trocados pelos equivalentes gratuitos mais próximos. Volta ao Pro para personalizares o escudo à vontade outra vez.",
@@ -492,6 +624,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Como Ippon Pro terminó, las formas, estampados, símbolos y colores exclusivos de tu escudo se cambiaron por los equivalentes gratuitos más cercanos. Vuelve a Pro para personalizar tu escudo a tu gusto otra vez.",
     fr: "Comme Ippon Pro a pris fin, les formes, motifs, symboles et couleurs exclusifs de ton blason ont été remplacés par les équivalents gratuits les plus proches. Repasse Pro pour personnaliser ton blason à volonté.",
     de: "Da Ippon Pro beendet ist, wurden die exklusiven Formen, Muster, Symbole und Farben deines Wappens durch die nächstgelegenen Gratis-Varianten ersetzt. Werde wieder Pro, um dein Wappen frei zu gestalten.",
+    ja: "Ippon Proが終了したため、エンブレムの限定の形・模様・シンボル・色が、最も近い無料版に置き換えられました。再びProになると、エンブレムを完全にカスタマイズできます。",
+    ru: "Поскольку Ippon Pro закончился, эксклюзивные формы, узоры, символы и цвета твоего герба заменены ближайшими бесплатными аналогами. Оформи Pro снова, чтобы полностью настроить герб.",
   },
   "liga.bastaoRecebidoTitulo": {
     pt: "🎖️ És o novo admin da liga",
@@ -499,6 +633,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🎖️ Eres el nuevo admin de la liga",
     fr: "🎖️ Tu es le nouvel admin de la ligue",
     de: "🎖️ Du bist der neue Liga-Admin",
+    ja: "🎖️ あなたが新しいリーグ管理者です",
+    ru: "🎖️ Ты новый администратор лиги",
   },
   "liga.bastaoRecebidoCorpo": {
     pt: "Recebeste o bastão da liga \"{liga}\". Agora és tu que a geres — a liga continua de onde parou, com toda a pontuação. Mantém o Ippon Pro para a liga continuar viva.",
@@ -506,6 +642,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Recibiste el mando de la liga \"{liga}\". Ahora la gestionas tú — la liga sigue donde estaba, con toda su puntuación. Mantén Ippon Pro para que la liga siga viva.",
     fr: "Tu as reçu le flambeau de la ligue \"{liga}\". C'est toi l'admin maintenant — la ligue reprend où elle en était, avec tous ses points. Garde Ippon Pro pour que la ligue reste en vie.",
     de: "Du hast die Leitung der Liga \"{liga}\" übernommen. Jetzt bist du Admin — die Liga macht dort weiter, wo sie stand, mit allen Punkten. Behalte Ippon Pro, damit die Liga bestehen bleibt.",
+    ja: "「{liga}」のバトンを引き継ぎました。あなたが管理者です。リーグはすべてのポイントを保ったまま、そのまま続きます。リーグを維持するにはIppon Proを継続してください。",
+    ru: "Тебе передали эстафету в «{liga}». Теперь ты администратор — лига продолжается с того же места, со всеми очками. Сохраняй Ippon Pro, чтобы лига жила.",
   },
   "liga.encerradaSemProTitulo": {
     pt: "Uma liga foi encerrada",
@@ -513,6 +651,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Una liga se cerró",
     fr: "Une ligue a été fermée",
     de: "Eine Liga wurde geschlossen",
+    ja: "あるリーグが閉鎖されました",
+    ru: "Лига закрылась",
   },
   "liga.encerradaSemProCorpo": {
     pt: "A liga \"{liga}\" foi encerrada porque o admin deixou de ter Ippon Pro e não havia nenhum membro Pro para assumir. Com o Ippon Pro podes criar a tua própria liga e trazer o grupo de volta.",
@@ -520,6 +660,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "La liga \"{liga}\" se cerró porque el admin dejó de tener Ippon Pro y no había ningún miembro Pro para asumir. Con Ippon Pro puedes crear tu propia liga y traer al grupo de vuelta.",
     fr: "La ligue \"{liga}\" a été fermée car l'Ippon Pro de son admin a pris fin et aucun membre Pro ne pouvait reprendre. Avec Ippon Pro, tu peux créer ta propre ligue et ramener le groupe.",
     de: "Die Liga \"{liga}\" wurde geschlossen, weil das Ippon Pro des Admins endete und kein Pro-Mitglied übernehmen konnte. Mit Ippon Pro kannst du deine eigene Liga starten und die Gruppe zurückholen.",
+    ja: "リーグ「{liga}」は、管理者のIppon Proが終了し、引き継げるProメンバーがいなかったため閉鎖されました。Ippon Proがあれば、自分のリーグを作ってグループを呼び戻せます。",
+    ru: "Лига «{liga}» закрылась, потому что у её администратора закончился Ippon Pro и никто из Pro-участников не смог её принять. С Ippon Pro ты можешь создать свою лигу и вернуть группу.",
   },
   "dodo.conviteTitulo": {
     pt: "🏆 Faltam {dias} dias para a {numero}ª Copa do Dôdo",
@@ -527,6 +669,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🏆 Faltan {dias} días para la {numero}.ª Copa do Dôdo",
     fr: "🏆 Plus que {dias} jours pour la {numero}e Copa do Dôdo",
     de: "🏆 Noch {dias} Tage bis zur {numero}. Copa do Dôdo",
+    ja: "🏆 Copa do Dôdo #{numero}まであと{dias}日",
+    ru: "🏆 До Copa do Dôdo #{numero} осталось {dias} дн.",
   },
   "dodo.conviteCorpo": {
     pt: "És Pro, por isso podes entrar na Copa do Dôdo — o mata-mata mundial entre continentes. Faltam {dias} dias para fecharem as inscrições. Não é por ordem de chegada: é um sorteio de vagas por continente, e inscreveres-te hoje ou no último dia dá exatamente a mesma hipótese. Não mexe nas tuas outras ligas. Toca para te inscreveres.",
@@ -534,6 +678,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Eres Pro, así que puedes entrar en la Copa do Dôdo — el mata-mata mundial entre continentes. Faltan {dias} días para que cierren las inscripciones. No es por orden de llegada: es un sorteo de plazas por continente, e inscribirte hoy o el último día te da exactamente la misma oportunidad. No afecta a tus otras ligas. Toca para inscribirte.",
     fr: "Tu es Pro, donc tu peux entrer dans la Copa do Dôdo — le tournoi à élimination mondial entre continents. Plus que {dias} jours avant la clôture des inscriptions. Ce n'est pas premier arrivé, premier servi : c'est un tirage de places par continent, et t'inscrire aujourd'hui ou le dernier jour te donne exactement la même chance. Ça ne touche pas tes autres ligues. Touche pour t'inscrire.",
     de: "Du bist Pro, also kannst du an der Copa do Dôdo teilnehmen — dem weltweiten K.-o.-Turnier zwischen den Kontinenten. Noch {dias} Tage bis zum Anmeldeschluss. Es gilt nicht: wer zuerst kommt — es ist eine Auslosung der Plätze nach Kontinent, und ob du dich heute oder am letzten Tag anmeldest, gibt dir genau dieselbe Chance. Es betrifft deine anderen Ligen nicht. Tippe, um teilzunehmen.",
+    ja: "あなたはProなので、Copa do Dôdo（大陸対抗の世界トーナメント）に参加できます。応募締切まであと{dias}日。先着順ではなく、大陸ごとの枠の抽選です。今日でも最終日でも当選確率は同じで、他のリーグには影響しません。タップして応募。",
+    ru: "Ты Pro, поэтому можешь войти в Copa do Dôdo — мировой плей-офф между континентами. До закрытия заявок {dias} дн. Это не «кто первый»: жеребьёвка мест по континентам, и записаться сегодня или в последний день — шанс одинаковый. На другие твои лиги это не влияет. Нажми, чтобы записаться.",
   },
   "dodo.conviteHojeTitulo": {
     pt: "🚨 Último dia para a {numero}ª Copa do Dôdo",
@@ -541,6 +687,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🚨 Último día para la {numero}.ª Copa do Dôdo",
     fr: "🚨 Dernier jour pour la {numero}e Copa do Dôdo",
     de: "🚨 Letzter Tag für die {numero}. Copa do Dôdo",
+    ja: "🚨 Copa do Dôdo #{numero}の応募は本日まで",
+    ru: "🚨 Последний день для Copa do Dôdo #{numero}",
   },
   "dodo.conviteHojeCorpo": {
     pt: "As inscrições da Copa do Dôdo fecham hoje. És Pro e ainda vais a tempo — é um sorteio de vagas por continente e não afeta as tuas outras ligas. Toca para entrar antes do sorteio.",
@@ -548,6 +696,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Las inscripciones de la Copa do Dôdo cierran hoy. Eres Pro y aún estás a tiempo — es un sorteo de plazas por continente y no afecta a tus otras ligas. Toca para entrar antes del sorteo.",
     fr: "Les inscriptions de la Copa do Dôdo ferment aujourd'hui. Tu es Pro et il est encore temps — c'est un tirage de places par continent et ça ne touche pas tes autres ligues. Touche pour entrer avant le tirage.",
     de: "Die Anmeldung für die Copa do Dôdo schließt heute. Du bist Pro und noch rechtzeitig dran — es ist eine Auslosung der Plätze nach Kontinent und betrifft deine anderen Ligen nicht. Tippe, um vor der Auslosung teilzunehmen.",
+    ja: "Copa do Dôdoの応募は本日締め切りです。あなたはProでまだ間に合います。大陸ごとの枠の抽選で、他のリーグには影響しません。抽選前にタップして応募を。",
+    ru: "Заявки в Copa do Dôdo закрываются сегодня. Ты Pro и ещё успеваешь — это жеребьёвка мест по континентам, и на другие твои лиги она не влияет. Нажми, чтобы записаться до жеребьёвки.",
   },
   "faixa.subiuTitulo": {
     pt: "🥋 Subiste para a faixa {faixa}!",
@@ -555,6 +705,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥋 ¡Subiste al cinturón {faixa}!",
     fr: "🥋 Tu es passé à la ceinture {faixa} !",
     de: "🥋 Du bist auf den {faixa} Gürtel aufgestiegen!",
+    ja: "🥋 {faixa}帯に昇格しました！",
+    ru: "🥋 Ты поднялся до пояса {faixa}!",
   },
   "faixa.subiuCorpo": {
     pt: "Parabéns! O teu desempenho levou-te à faixa {faixa}. Estás entre os melhores — continua assim e vai mais longe!",
@@ -562,6 +714,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Enhorabuena! Tu rendimiento te llevó al cinturón {faixa}. Estás entre los mejores — ¡sigue así y llega más lejos!",
     fr: "Félicitations ! Ta performance t'a mené à la ceinture {faixa}. Tu es parmi les meilleurs — continue comme ça et va encore plus loin !",
     de: "Glückwunsch! Deine Leistung hat dich auf den {faixa} Gürtel gebracht. Du gehörst zu den Besten — weiter so und komm noch weiter!",
+    ja: "おめでとうございます！あなたの成績が{faixa}帯へと導きました。トップクラスです。この調子でさらに上を目指そう！",
+    ru: "Поздравляем! Твои результаты вывели тебя на пояс {faixa}. Ты среди лучших — продолжай в том же духе и иди ещё дальше!",
   },
   "faixa.desceuTitulo": {
     pt: "Faixa {faixa} — a próxima é tua",
@@ -569,6 +723,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Cinturón {faixa} — el próximo es tuyo",
     fr: "Ceinture {faixa} — la prochaine est à toi",
     de: "{faixa} Gürtel — der nächste gehört dir",
+    ja: "{faixa}帯 — 次はあなたのものです",
+    ru: "Пояс {faixa} — следующий будет твоим",
   },
   "faixa.desceuCorpo": {
     pt: "Desta vez desceste para a faixa {faixa}, mas isto faz parte do jogo. Monta uma boa equipa na próxima rodada e recupera o teu lugar — acreditamos em ti!",
@@ -576,6 +732,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Esta vez bajaste al cinturón {faixa}, pero eso es parte del juego. Monta un buen equipo en la próxima ronda y recupera tu lugar — ¡creemos en ti!",
     fr: "Cette fois tu es redescendu à la ceinture {faixa}, mais ça fait partie du jeu. Constitue une bonne équipe à la prochaine journée et reprends ta place — on croit en toi !",
     de: "Diesmal bist du auf den {faixa} Gürtel abgestiegen, aber das gehört zum Spiel. Stell in der nächsten Runde ein gutes Team auf und hol dir deinen Platz zurück — wir glauben an dich!",
+    ja: "今回は{faixa}帯に下がりましたが、これもゲームのうち。次のラウンドで良いチームを組んで、自分の位置を取り戻そう。信じています！",
+    ru: "В этот раз ты опустился до пояса {faixa}, но это часть игры. Собери хорошую команду в следующем туре и верни своё место — мы в тебя верим!",
   },
   "faixa.mantidaTitulo": {
     pt: "🥋 Mantiveste a faixa {faixa}",
@@ -583,6 +741,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥋 Mantuviste el cinturón {faixa}",
     fr: "🥋 Tu as gardé la ceinture {faixa}",
     de: "🥋 Du hast den {faixa} Gürtel gehalten",
+    ja: "🥋 {faixa}帯を維持しました",
+    ru: "🥋 Ты сохранил пояс {faixa}",
   },
   "faixa.mantidaTopoCorpo": {
     pt: "Fechaste o mês na faixa {faixa} — o topo da Ippon League. Agora é aguentar lá em cima: no próximo mês há quem venha atrás do teu lugar.",
@@ -590,6 +750,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Cerraste el mes en el cinturón {faixa} — la cima de la Ippon League. Ahora toca aguantar ahí arriba: el próximo mes habrá quien venga a por tu lugar.",
     fr: "Tu as terminé le mois sur la ceinture {faixa} — le sommet de l'Ippon League. Maintenant il faut tenir là-haut : le mois prochain, d'autres viendront pour ta place.",
     de: "Du hast den Monat auf dem {faixa} Gürtel beendet — der Spitze der Ippon League. Jetzt heißt es, oben zu bleiben: Nächsten Monat kommen andere für deinen Platz.",
+    ja: "今月は{faixa}帯で終えました。Ippon Leagueの頂点です。これからはそこを守る番です。来月は他の人があなたの座を狙ってきます。",
+    ru: "Ты закончил месяц на поясе {faixa} — на вершине Ippon League. Теперь задача — удержаться наверху: в следующем месяце другие будут идти за твоим местом.",
   },
   "faixa.mantidaPortaCorpo": {
     pt: "Fechaste o mês na faixa {faixa}, mesmo à porta da seguinte. No próximo mês é tua.",
@@ -597,6 +759,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Cerraste el mes en el cinturón {faixa}, justo a las puertas del siguiente. El próximo mes es tuyo.",
     fr: "Tu as terminé le mois sur la ceinture {faixa}, juste aux portes de la suivante. Le mois prochain, elle est à toi.",
     de: "Du hast den Monat auf dem {faixa} Gürtel beendet, direkt vor dem nächsten. Nächsten Monat gehört er dir.",
+    ja: "今月は{faixa}帯で終えました。次の帯まであと一歩です。来月はあなたのものです。",
+    ru: "Ты закончил месяц на поясе {faixa}, прямо на пороге следующего. В следующем месяце он твой.",
   },
   "faixa.mantidaFaltaCorpo": {
     pt: "Fechaste o mês na faixa {faixa}. Faltaram {falta} pontos para a {faixaAcima} — dá para ir buscá-los no próximo mês!",
@@ -604,6 +768,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Cerraste el mes en el cinturón {faixa}. Te faltaron {falta} puntos para el {faixaAcima} — ¡puedes ir a por ellos el próximo mes!",
     fr: "Tu as terminé le mois sur la ceinture {faixa}. Il t'a manqué {falta} points pour la {faixaAcima} — tu peux aller les chercher le mois prochain !",
     de: "Du hast den Monat auf dem {faixa} Gürtel beendet. Dir fehlten {falta} Punkte für den {faixaAcima} — die kannst du dir nächsten Monat holen!",
+    ja: "今月は{faixa}帯で終えました。{faixaAcima}まであと{falta}ポイントでした。来月は取りに行こう！",
+    ru: "Ты закончил месяц на поясе {faixa}. Тебе не хватило {falta} очк. до {faixaAcima} — в следующем месяце можешь их добрать!",
   },
   "melhorRodada.mundialTitulo": {
     pt: "🥇 És o Melhor da Rodada — Mundial!",
@@ -611,6 +777,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥇 ¡Eres el Mejor de la Ronda — Mundial!",
     fr: "🥇 Tu es le Meilleur de la Journée — Mondial !",
     de: "🥇 Du bist der Beste der Runde — Welt!",
+    ja: "🥇 ラウンドのベスト — 世界！",
+    ru: "🥇 Ты Лучший в туре — Мир!",
   },
   "melhorRodada.mundialMaisTitulo": {
     pt: "🥇 És o Melhor da Rodada — Mundial + {cont}!",
@@ -618,6 +786,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥇 ¡Eres el Mejor de la Ronda — Mundial + {cont}!",
     fr: "🥇 Tu es le Meilleur de la Journée — Mondial + {cont} !",
     de: "🥇 Du bist der Beste der Runde — Welt + {cont}!",
+    ja: "🥇 ラウンドのベスト — 世界 + {cont}！",
+    ru: "🥇 Ты Лучший в туре — Мир + {cont}!",
   },
   "melhorRodada.continentalTitulo": {
     pt: "🥇 És o Melhor da Rodada — {cont}!",
@@ -625,6 +795,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥇 ¡Eres el Mejor de la Ronda — {cont}!",
     fr: "🥇 Tu es le Meilleur de la Journée — {cont} !",
     de: "🥇 Du bist der Beste der Runde — {cont}!",
+    ja: "🥇 ラウンドのベスト — {cont}！",
+    ru: "🥇 Ты Лучший в туре — {cont}!",
   },
   "melhorRodada.mundialCorpo": {
     pt: "Parabéns! Foste o nº1 do mundo em {comp}. Vê e partilha o teu certificado na liga oficial.",
@@ -632,6 +804,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Enhorabuena! Fuiste el nº1 del mundo en {comp}. Mira y comparte tu certificado en la liga oficial.",
     fr: "Félicitations ! Tu as été le nº1 du monde au {comp}. Vois et partage ton certificat dans la ligue officielle.",
     de: "Glückwunsch! Du warst die Nr. 1 der Welt beim {comp}. Sieh dir dein Zertifikat an und teile es in der offiziellen Liga.",
+    ja: "おめでとうございます！{comp}で世界1位でした。公式リーグで証明書を見て、シェアしよう。",
+    ru: "Поздравляем! Ты был №1 в мире на {comp}. Посмотри и поделись своим сертификатом в официальной лиге.",
   },
   "melhorRodada.continentalCorpo": {
     pt: "Parabéns! Foste o nº1 de {cont} em {comp}. Vê e partilha o teu certificado na liga oficial.",
@@ -639,6 +813,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Enhorabuena! Fuiste el nº1 de {cont} en {comp}. Mira y comparte tu certificado en la liga oficial.",
     fr: "Félicitations ! Tu as été le nº1 de {cont} au {comp}. Vois et partage ton certificat dans la ligue officielle.",
     de: "Glückwunsch! Du warst die Nr. 1 von {cont} beim {comp}. Sieh dir dein Zertifikat an und teile es in der offiziellen Liga.",
+    ja: "おめでとうございます！{comp}で{cont}の1位でした。公式リーグで証明書を見て、シェアしよう。",
+    ru: "Поздравляем! Ты был №1 в {cont} на {comp}. Посмотри и поделись своим сертификатом в официальной лиге.",
   },
   "evento.aniversarioTitulo": {
     pt: "Parabéns!",
@@ -646,6 +822,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Feliz cumpleaños!",
     fr: "Joyeux anniversaire !",
     de: "Alles Gute zum Geburtstag!",
+    ja: "お誕生日おめでとう！",
+    ru: "С днём рождения!",
   },
   "evento.aniversarioCorpo": {
     pt: "Hoje é o teu dia, e nós cá da Ippon League queremos celebrá-lo contigo! 🥋 Estamos muito felizes por fazeres parte desta comunidade de apaixonados pelo judô. Que este novo ano te traga muitas alegrias, conquistas no tatame e fora dele — e que continues a crescer e a divertir-te connosco. Um grande abraço, e parabéns! 🎂",
@@ -653,6 +831,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Hoy es tu día, y en la Ippon League queremos celebrarlo contigo! 🥋 Estamos muy felices de que formes parte de esta comunidad de apasionados por el judo. Que este nuevo año te traiga muchas alegrías, logros en el tatame y fuera de él — y que sigas creciendo y divirtiéndote con nosotros. ¡Un fuerte abrazo y feliz cumpleaños! 🎂",
     fr: "Aujourd'hui, c'est ton jour, et toute l'équipe de l'Ippon League veut le célébrer avec toi ! 🥋 Nous sommes très heureux que tu fasses partie de cette communauté de passionnés de judo. Que cette nouvelle année t'apporte plein de joies, des victoires sur le tatame et en dehors — et que tu continues à grandir et à t'amuser avec nous. Une grosse accolade, et joyeux anniversaire ! 🎂",
     de: "Heute ist dein Tag, und wir alle bei der Ippon League wollen ihn mit dir feiern! 🥋 Wir freuen uns sehr, dass du Teil dieser Gemeinschaft von Judo-Fans bist. Möge dir dieses neue Jahr viel Freude bringen, Erfolge auf dem Tatame und darüber hinaus — und mögest du weiter mit uns wachsen und Spaß haben. Eine große Umarmung und alles Gute zum Geburtstag! 🎂",
+    ja: "今日はあなたの日。Ippon League一同、一緒にお祝いしたいです！🥋 柔道を愛するこのコミュニティの一員でいてくれて、とてもうれしいです。この一年が、畳の上でもその外でも、たくさんの喜びと勝利で満ちますように。これからも一緒に成長して楽しみましょう。心を込めて、お誕生日おめでとう！🎂",
+    ru: "Сегодня твой день, и мы все в Ippon League хотим отпраздновать его с тобой! 🥋 Мы очень рады, что ты часть этого сообщества любителей дзюдо. Пусть этот новый год принесёт тебе много радости, побед на татами и за его пределами — и пусть ты продолжаешь расти и получать удовольствие вместе с нами. Крепко обнимаем, и с днём рождения! 🎂",
   },
   "evento.diaDoJudoTitulo": {
     pt: "Dia Mundial do Judô",
@@ -660,6 +840,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Día Mundial del Judo",
     fr: "Journée mondiale du judo",
     de: "Welt-Judo-Tag",
+    ja: "世界柔道の日",
+    ru: "Всемирный день дзюдо",
   },
   "evento.diaDoJudoCorpo": {
     pt: "Hoje é o Dia Mundial do Judô! Parabéns a todos os que amam este desporto. Que tal homenagear a data com uma escalação de respeito?",
@@ -667,6 +849,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Hoy es el Día Mundial del Judo! Enhorabuena a todos los que aman este deporte. ¿Qué tal homenajear la fecha con una alineación de respeto?",
     fr: "Aujourd'hui, c'est la Journée mondiale du judo ! Félicitations à tous ceux qui aiment ce sport. Et si tu rendais hommage à cette date avec une composition de respect ?",
     de: "Heute ist der Welt-Judo-Tag! Glückwunsch an alle, die diesen Sport lieben. Wie wäre es, den Tag mit einer Aufstellung zu ehren, die sich sehen lassen kann?",
+    ja: "今日は世界柔道の日！このスポーツを愛するすべての人、おめでとうございます。誇れるメンバー編成でこの日を祝ってみては？",
+    ru: "Сегодня Всемирный день дзюдо! Поздравляем всех, кто любит этот спорт. Как насчёт отметить день составом, которым можно гордиться?",
   },
 
   // --- EMAIL de confirmação de conta (app/api/verificar-email) ---
@@ -678,6 +862,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Confirma tu correo — Ippon League",
     fr: "Confirme ton e-mail — Ippon League",
     de: "Bestätige deine E-Mail — Ippon League",
+    ja: "メールを確認してください — Ippon League",
+    ru: "Подтверди свою почту — Ippon League",
   },
   "email.confirmarFallbackNome": {
     pt: "Campeão",
@@ -685,6 +871,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Campeón",
     fr: "Champion",
     de: "Champion",
+    ja: "チャンピオン",
+    ru: "чемпион",
   },
   "email.confirmarSaudacao": {
     pt: "Olá, {nome}!",
@@ -692,6 +880,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "¡Hola, {nome}!",
     fr: "Salut, {nome} !",
     de: "Hallo, {nome}!",
+    ja: "こんにちは、{nome}さん！",
+    ru: "Привет, {nome}!",
   },
   "email.confirmarFrase": {
     pt: "Falta um passo para a tua conta na {marca} ficar completa: confirmar que este email é mesmo teu.",
@@ -699,6 +889,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Falta un paso para completar tu cuenta en la {marca}: confirmar que este correo es realmente tuyo.",
     fr: "Il reste une étape pour finaliser ton compte sur l'{marca} : confirmer que cet e-mail est bien le tien.",
     de: "Nur noch ein Schritt, um dein Konto bei der {marca} abzuschließen: bestätigen, dass diese E-Mail wirklich dir gehört.",
+    ja: "{marca}アカウントの作成まであと一歩です。このメールが本当にあなたのものであることを確認するだけです。",
+    ru: "Остался один шаг, чтобы завершить твой аккаунт {marca}: подтвердить, что эта почта действительно твоя.",
   },
   "email.confirmarBotao": {
     pt: "Confirmar o meu email",
@@ -706,6 +898,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Confirmar mi correo",
     fr: "Confirmer mon e-mail",
     de: "Meine E-Mail bestätigen",
+    ja: "メールを確認する",
+    ru: "Подтвердить почту",
   },
   "email.confirmarValidade": {
     pt: "Serve durante {horas} horas. Se expirar, pedes outro dentro da app.",
@@ -713,6 +907,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Sirve durante {horas} horas. Si caduca, pide otro dentro de la app.",
     fr: "Valable {horas} heures. S'il expire, demandes-en un autre dans l'appli.",
     de: "Gültig für {horas} Stunden. Wenn er abläuft, fordere in der App einen neuen an.",
+    ja: "このリンクは{horas}時間有効です。期限が切れたら、アプリ内でもう一度リクエストしてください。",
+    ru: "Ссылка действует {horas} ч. Если истечёт, запроси новую в приложении.",
   },
   "email.confirmarIgnora": {
     pt: "Se não foste tu que te registaste, ignora este email — sem confirmação, nada acontece.",
@@ -720,6 +916,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Si no fuiste tú quien se registró, ignora este correo — sin confirmación, no pasa nada.",
     fr: "Si ce n'est pas toi qui t'es inscrit, ignore cet e-mail — sans confirmation, rien ne se passe.",
     de: "Wenn du dich nicht registriert hast, ignoriere diese E-Mail einfach — ohne Bestätigung passiert nichts.",
+    ja: "登録した覚えがない場合は、このメールを無視してください。確認しなければ何も起こりません。",
+    ru: "Если ты не регистрировался, просто проигнорируй это письмо — без подтверждения ничего не произойдёт.",
   },
   // Linha final comum a todos os emails ("é automático, não respondas").
   "email.naoResponder": {
@@ -728,6 +926,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Este correo es automático — no necesitas responder.",
     fr: "Cet e-mail est automatique — pas besoin de répondre.",
     de: "Diese E-Mail ist automatisch — du musst nicht antworten.",
+    ja: "これは自動送信メールです。返信は不要です。",
+    ru: "Это автоматическое письмо — отвечать не нужно.",
   },
   // REENGAJAMENTO (email de véspera do fecho, a quem ainda não montou equipa).
   // {comp} = nome da competição; {tempo} = quanto falta para o fecho.
@@ -737,6 +937,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "El mercado del {comp} cierra pronto — ¡monta tu equipo! 🥋",
     fr: "Le marché du {comp} ferme bientôt — compose ton équipe ! 🥋",
     de: "Der {comp}-Markt schließt bald — stell dein Team auf! 🥋",
+    ja: "{comp}のマーケットがまもなく締め切り — チームを組もう！ 🥋",
+    ru: "Рынок {comp} скоро закроется — собери команду! 🥋",
   },
   "email.reengajarIntro": {
     pt: "O mercado do {comp} fecha em {tempo} e ainda não montaste a tua equipa. Monta os teus 8 atletas, escolhe o capitão e entra na competição — se não montares, ficas de fora desta rodada.",
@@ -744,6 +946,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "El mercado del {comp} cierra en {tempo} y aún no has montado tu equipo. Monta tus 8 atletas, elige a tu capitán y entra en la competición — si no lo haces, te quedas fuera de esta ronda.",
     fr: "Le marché du {comp} ferme dans {tempo} et tu n'as pas encore composé ton équipe. Choisis tes 8 athlètes et ton capitaine et entre dans la compétition — sinon, tu manques cette manche.",
     de: "Der {comp}-Markt schließt in {tempo} und du hast dein Team noch nicht aufgestellt. Wähle deine 8 Athleten und deinen Kapitän und sei dabei — sonst verpasst du diese Runde.",
+    ja: "{comp}のマーケットは{tempo}で締め切りますが、まだチームを組んでいません。8人の選手を選び、キャプテンを決めて大会に参加しよう。組まないとこのラウンドを逃します。",
+    ru: "Рынок {comp} закроется через {tempo}, а ты ещё не собрал команду. Выбери 8 атлетов, назначь капитана и вступай в соревнование — иначе пропустишь этот тур.",
   },
   "email.reengajarBotao": {
     pt: "Montar a minha equipa",
@@ -751,6 +955,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Montar mi equipo",
     fr: "Composer mon équipe",
     de: "Mein Team aufstellen",
+    ja: "チームを組む",
+    ru: "Собрать команду",
   },
   "email.reengajarRodape": {
     pt: "Recebes este email porque tens conta na Ippon League. Cada competição começa com a equipa em branco — é só montar.",
@@ -758,6 +964,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Recibes este correo porque tienes cuenta en la Ippon League. Cada competición empieza con el equipo en blanco — solo tienes que montarlo.",
     fr: "Tu reçois cet e-mail parce que tu as un compte Ippon League. Chaque compétition commence avec une équipe vide — il suffit de la composer.",
     de: "Du erhältst diese E-Mail, weil du ein Ippon-League-Konto hast. Jeder Wettkampf beginnt mit einem leeren Team — stell es einfach auf.",
+    ja: "このメールはIppon Leagueのアカウントをお持ちだからお届けしています。どの大会も空のチームから始まります。あとは組むだけです。",
+    ru: "Ты получаешь это письмо, потому что у тебя есть аккаунт Ippon League. Каждое соревнование начинается с пустой команды — просто собери её.",
   },
 
   // --- CONTAS INATIVAS (app/api/contas-inativas) — email + sino ---
@@ -769,6 +977,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Tu cuenta será eliminada en {dias} días",
     fr: "Ton compte sera supprimé dans {dias} jours",
     de: "Dein Konto wird in {dias} Tagen gelöscht",
+    ja: "あなたのアカウントは{dias}日後に削除されます",
+    ru: "Твой аккаунт будет удалён через {dias} дн.",
   },
   "inativa.emailFrase1": {
     pt: "Há quase um ano que não entras na <strong>Ippon League</strong>, e a tua conta{time} será apagada dentro de <strong>{dias} dias</strong>.",
@@ -776,6 +986,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Hace casi un año que no entras en la <strong>Ippon League</strong>, y tu cuenta{time} será eliminada dentro de <strong>{dias} días</strong>.",
     fr: "Cela fait presque un an que tu n'es pas venu sur l'<strong>Ippon League</strong>, et ton compte{time} sera supprimé dans <strong>{dias} jours</strong>.",
     de: "Du warst seit fast einem Jahr nicht mehr bei der <strong>Ippon League</strong>, und dein Konto{time} wird in <strong>{dias} Tagen</strong> gelöscht.",
+    ja: "もうすぐ1年、<strong>Ippon League</strong>にお越しがありません。あなたのアカウント{time}は<strong>{dias}日後</strong>に削除されます。",
+    ru: "Ты почти год не заходил в <strong>Ippon League</strong>, и твой аккаунт{time} будет удалён через <strong>{dias} дн.</strong>.",
   },
   "inativa.emailFrase2": {
     pt: "Se voltares, fica tudo como estava — e a contagem recomeça. Basta abrir a app uma vez.",
@@ -783,6 +995,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Si vuelves, todo queda como estaba — y la cuenta atrás se reinicia. Solo tienes que abrir la app una vez.",
     fr: "Si tu reviens, tout reste comme avant — et le compte à rebours repart. Il suffit d'ouvrir l'appli une fois.",
     de: "Wenn du zurückkommst, bleibt alles, wie es war — und der Countdown beginnt von vorn. Öffne die App einfach einmal.",
+    ja: "戻ってくれば、すべて元のまま、カウントダウンもリセットされます。アプリを一度開くだけです。",
+    ru: "Если ты вернёшься, всё останется как было — и отсчёт обнулится. Просто открой приложение один раз.",
   },
   "inativa.emailBotao": {
     pt: "Voltar ao dojo",
@@ -790,6 +1004,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Volver al dojo",
     fr: "Retour au dojo",
     de: "Zurück ins Dojo",
+    ja: "道場に戻る",
+    ru: "Вернуться в додзё",
   },
   "inativa.emailRodape": {
     pt: "Se preferires não continuar, não precisas de fazer nada. O nome do teu time volta a ficar disponível para outra pessoa.",
@@ -797,6 +1013,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Si prefieres no continuar, no necesitas hacer nada. El nombre de tu time vuelve a quedar disponible para otra persona.",
     fr: "Si tu préfères ne pas continuer, tu n'as rien à faire. Le nom de ton équipe redevient disponible pour quelqu'un d'autre.",
     de: "Wenn du lieber nicht weitermachst, musst du nichts tun. Der Name deines Teams wird wieder für jemand anderen frei.",
+    ja: "続けないほうがよければ、何もする必要はありません。あなたのチーム名は他の人が使えるようになります。",
+    ru: "Если ты не хочешь продолжать, ничего делать не нужно. Имя твоей команды станет доступно кому-то другому.",
   },
   "inativa.sinoCorpo": {
     pt: "Há quase um ano que não entras. Abre a app uma vez para manteres tudo como está.",
@@ -804,6 +1022,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Hace casi un año que no entras. Abre la app una vez para mantener todo como está.",
     fr: "Cela fait presque un an que tu n'es pas venu. Ouvre l'appli une fois pour tout garder comme c'est.",
     de: "Du warst seit fast einem Jahr nicht mehr hier. Öffne die App einmal, um alles so zu behalten, wie es ist.",
+    ja: "もうすぐ1年、お越しがありません。アプリを一度開けば、すべて今のまま保たれます。",
+    ru: "Ты почти год здесь не был. Открой приложение один раз, чтобы всё осталось как есть.",
   },
 
   // --- CHAVEAMENTO (app/api/chaveamento) — notificação "Chave oficial" ---
@@ -814,6 +1034,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "🥋 Cuadro oficial disponible: {comp}",
     fr: "🥋 Tableau officiel disponible : {comp}",
     de: "🥋 Offizieller Baum verfügbar: {comp}",
+    ja: "🥋 公式の組み合わせ公開：{comp}",
+    ru: "🥋 Доступна официальная сетка: {comp}",
   },
   "chave.notifCorpo": {
     pt: "Já podes ver o chaveamento do {comp}. Descobre contra quem os teus atletas vão lutar e prepara a tua estratégia.",
@@ -821,6 +1043,8 @@ export const NOTIF: Record<string, Entrada> = {
     es: "Ya puedes ver el cuadro del {comp}. Descubre contra quién van a luchar tus atletas y prepara tu estrategia.",
     fr: "Tu peux maintenant voir le tableau du {comp}. Découvre contre qui tes athlètes vont combattre et prépare ta stratégie.",
     de: "Du kannst jetzt den Baum für {comp} sehen. Finde heraus, gegen wen deine Athleten kämpfen, und plane deine Strategie.",
+    ja: "{comp}の組み合わせが見られるようになりました。あなたの選手が誰と対戦するかを確認し、戦略を立てよう。",
+    ru: "Теперь можно посмотреть сетку {comp}. Узнай, с кем встретятся твои атлеты, и спланируй стратегию.",
   },
 };
 
