@@ -24,7 +24,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, contestActions } from "@/lib/ijf";
-import { focoMercado } from "@/lib/calendario";
+import { focoMercado, competicaoRollingAtiva } from "@/lib/calendario";
 import { lerLutasManuais, indexarManuaisPorAtleta, aplicarManuaisAoVivo } from "@/lib/lutasManuais";
 import { registarCorrida } from "@/lib/cronLog";
 
@@ -158,6 +158,12 @@ export async function GET(req: Request) {
   let comp = (searchParams.get("comp") || "").trim();
   if (!comp) {
     try { comp = String(focoMercado()?.aDecorrer?.idCompeticao || ""); } catch { /* sem foco */ }
+  }
+  // Modo ROLLING (ex.: Mundial): focoMercado devolve aDecorrer:null de propósito
+  // (o mercado fecha categoria a categoria, não de uma vez). Sem este recurso o
+  // maestro ficava cego durante toda a semana do Mundial e não pontuava nada.
+  if (!comp) {
+    try { comp = String(competicaoRollingAtiva()?.idCompeticao || ""); } catch { /* sem rolling */ }
   }
   if (!comp) {
     return NextResponse.json({ ok: true, comp: null, nada: "Nenhuma competição a decorrer." });

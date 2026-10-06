@@ -46,7 +46,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, contestActions } from "@/lib/ijf";
-import { focoMercado } from "@/lib/calendario";
+import { focoMercado, competicaoRollingAtiva } from "@/lib/calendario";
 import { lerLutasManuais, indexarManuaisPorAtleta, aplicarManuaisAoVivo } from "@/lib/lutasManuais";
 import { registarCorrida } from "@/lib/cronLog";
 export const dynamic = "force-dynamic";
@@ -120,6 +120,12 @@ export async function GET(req: Request) {
       const foco = focoMercado();
       comp = String(foco?.aDecorrer?.idCompeticao || "");
     } catch { /* sem foco */ }
+  }
+  // Modo ROLLING (ex.: Mundial): focoMercado devolve aDecorrer:null de propósito.
+  // Sem este recurso, a auto-deteção (sem &comp= no URL) ficava cega na semana
+  // do Mundial.
+  if (!comp) {
+    try { comp = String(competicaoRollingAtiva()?.idCompeticao || ""); } catch { /* sem rolling */ }
   }
   if (!comp) {
     return NextResponse.json({ ok: true, comp: null, nada: "Nenhuma competição a decorrer." });
