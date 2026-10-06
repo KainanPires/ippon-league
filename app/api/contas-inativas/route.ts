@@ -56,7 +56,7 @@ const MAIL_FROM = process.env.MAIL_FROM || "Ippon League <support@ipponleague.co
 /** Normaliza o valor de users.lingua para uma das 5 línguas (fallback pt). */
 function normLingua(v: unknown): LinguaNotif {
   const s = String(v || "").toLowerCase();
-  return (["pt", "en", "es", "fr", "de"].includes(s) ? s : "pt") as LinguaNotif;
+  return (["pt", "en", "es", "fr", "de", "ja", "ru"].includes(s) ? s : "pt") as LinguaNotif;
 }
 
 const E_AMP = String.fromCharCode(38) + "amp;";

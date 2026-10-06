@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartão de Faixa Mundial</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#07090a; color:#e9e4d7; font-family: system-ui,-apple-system,"Segoe UI",Arial,sans-serif; padding:24px 16px 48px; }
+  .wrap { max-width:860px; margin:0 auto; }
+  h1 { font-size:18px; letter-spacing:.04em; text-transform:uppercase; color:#d9a441; margin:0 0 4px; }
+  .lead { font-size:13.5px; color:#9aa39b; line-height:1.55; margin:0 0 22px; }
+  .cards { display:flex; gap:26px; flex-wrap:wrap; justify-content:center; }
+  .case { text-align:center; }
+  .case h2 { font-size:12.5px; letter-spacing:.1em; text-transform:uppercase; color:#9aa39b; margin:0 0 10px; }
+
+  /* Palco: largura fixa 360, cartão real 1080x1350 escalado a 0.33333 */
+  .stage { width:360px; height:450px; position:relative; }
+  .scale { position:absolute; top:0; left:0; width:1080px; height:1350px; transform:scale(.33333); transform-origin:top left; }
+
+  .card {
+    width:1080px; height:1350px; border-radius:34px; overflow:hidden; position:relative; box-sizing:border-box;
+    background:linear-gradient(180deg,#141a17 0%,#10130f 50%,#0b0d0a 100%);
+    box-shadow: inset 0 0 0 8px var(--new);
+    font-family:"Arial Narrow","Helvetica Neue",Arial,sans-serif; color:#f1ede2;
+  }
+  .glow { position:absolute; top:-110px; left:0; right:0; height:700px;
+    background:radial-gradient(60% 70% at 50% 22%, color-mix(in srgb, var(--new) 32%, transparent) 0%, transparent 66%); pointer-events:none; }
+  .inner { position:absolute; inset:0; z-index:2; padding:70px 64px 56px; display:flex; flex-direction:column; align-items:center; text-align:center; box-sizing:border-box; }
+
+  .eyebrow { font-weight:700; font-size:28px; letter-spacing:11px; text-transform:uppercase; color:#aab4ac; }
+
+  .trans { display:flex; align-items:center; justify-content:center; gap:28px; margin-top:26px; }
+  .dodo { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .dodo.old { opacity:.8; }
+  .medal { width:190px; height:190px; border-radius:50%; display:grid; place-items:center;
+    background:radial-gradient(circle at 50% 38%, color-mix(in srgb,var(--c) 26%, transparent) 0%, rgba(12,14,13,0) 64%); }
+  .dodo.new .medal { box-shadow:0 0 0 4px color-mix(in srgb,var(--new) 60%, transparent), 0 0 46px color-mix(in srgb,var(--new) 45%, transparent); }
+  .medal svg { width:150px; height:150px; }
+  .blabel { font-weight:700; font-size:26px; letter-spacing:2px; text-transform:uppercase; color:var(--c); }
+  .arrow { font-size:70px; line-height:1; color:var(--arrow); margin-bottom:34px; font-weight:900; }
+
+  .headline { font-weight:900; font-size:42px; line-height:1.1; letter-spacing:-.5px; text-transform:uppercase; color:var(--new); margin-top:22px;
+    text-shadow:0 0 34px color-mix(in srgb,var(--new) 38%, transparent); }
+  .pct { font-weight:900; font-size:84px; line-height:1.05; letter-spacing:-2px; color:var(--new); margin-top:22px;
+    text-shadow:0 0 30px color-mix(in srgb,var(--new) 38%, transparent); }
+  .pct-sub { font-weight:600; font-size:29px; line-height:1.3; letter-spacing:.5px; color:#cfd8d2; text-transform:uppercase; margin-top:20px; }
+  .motiv { font-weight:600; font-size:30px; line-height:1.45; color:#e9e4d7; margin-top:32px; max-width:860px; }
+  .motiv b { color:#d9a441; }
+  .period { font-weight:700; font-size:25px; letter-spacing:6px; text-transform:uppercase; color:#d9a441; margin-top:20px; }
+
+  .foot { margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:14px; width:100%; }
+  .idrow { display:flex; align-items:center; gap:22px; justify-content:center; }
+  .crest { width:86px; height:96px; display:grid; place-items:center; flex-shrink:0; }
+  .team { font-weight:700; font-size:44px; letter-spacing:.3px; text-transform:uppercase; color:#f1ede2; white-space:nowrap; }
+  .founder { display:inline-flex; align-items:center; gap:12px; padding:10px 30px; border-radius:999px;
+    background:rgba(217,164,65,.14); border:2px solid #d9a441; color:#f3dc9b; font-weight:700; font-size:26px; letter-spacing:5px; text-transform:uppercase; }
+  .founder .st { color:#d9a441; font-size:28px; }
+  .brand { font-weight:700; font-size:40px; letter-spacing:8px; text-transform:uppercase; color:#d9a441; margin-top:6px; }
+  .link { font-family:"Courier New",monospace; font-size:24px; letter-spacing:1px; color:#e8cf8f; }
+
+  .note { margin-top:24px; font-size:12.5px; color:#9aa39b; line-height:1.6; }
+  .note b { color:#cfd8d2; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cartão de faixa mundial — mockup v3</h1>
+  <p class="lead">Desenhado no tamanho real (1080×1350) e escalado, por isso o que vês é o que sai. Seta verde quando sobe, vermelha quando desce. Nada sobreposto. Dois exemplos: subida e descida.</p>
+
+  <div class="cards">
+
+    <!-- SUBIU -->
+    <div class="case">
+      <h2>Subiu de faixa (seta verde)</h2>
+      <div class="stage"><div class="scale">
+        <div class="card" style="--new:#9b6cc9; --arrow:#4fc27a">
+          <div class="glow"></div>
+          <div class="inner">
+            <div class="eyebrow">Ranking Mundial</div>
+            <div class="trans">
+              <div class="dodo old" style="--c:#3f9f5a">
+                <div class="medal" style="--c:#3f9f5a">
+                  <svg viewBox="0 0 100 100"><path d="M30 44 L50 34 L70 44 L66 92 L34 92 Z" fill="#ece7da"/><path d="M50 34 L40 54 L50 50 L60 54 Z" fill="#dcd6c7"/><rect x="31" y="66" width="38" height="9" fill="#3f9f5a"/><circle cx="50" cy="22" r="13" fill="#6a8f3e"/><ellipse cx="50" cy="30" rx="10" ry="5" fill="#b9792f"/><circle cx="45" cy="20" r="1.8" fill="#15210f"/><circle cx="55" cy="20" r="1.8" fill="#15210f"/></svg>
+                </div><div class="blabel" style="--c:#3f9f5a">Verde</div>
+              </div>
+              <div class="arrow">&#8599;</div>
+              <div class="dodo new" style="--c:#9b6cc9">
+                <div class="medal" style="--c:#9b6cc9">
+                  <svg viewBox="0 0 100 100"><path d="M30 44 L50 34 L70 44 L66 92 L34 92 Z" fill="#ece7da"/><path d="M50 34 L40 54 L50 50 L60 54 Z" fill="#dcd6c7"/><rect x="31" y="66" width="38" height="9" fill="#9b6cc9"/><circle cx="50" cy="22" r="13" fill="#6a8f3e"/><ellipse cx="50" cy="30" rx="10" ry="5" fill="#b9792f"/><circle cx="45" cy="20" r="1.8" fill="#15210f"/><circle cx="55" cy="20" r="1.8" fill="#15210f"/></svg>
+                </div><div class="blabel" style="--c:#9b6cc9">Roxa</div>
+              </div>
+            </div>
+            <div class="headline">Subi de faixa</div>
+            <div class="pct">Top 15%</div>
+            <div class="pct-sub">de todos os jogadores do mundo</div>
+            <div class="motiv">No topo está a <b>faixa preta</b>, os 5% melhores do mundo. Continua a subir. 🥋</div>
+            <div class="period">Outubro 2026</div>
+            <div class="foot">
+              <div class="idrow">
+                <div class="crest"><svg viewBox="0 0 48 54" width="100%"><path d="M24 2 L46 10 V30 C46 42 36 50 24 53 C12 50 2 42 2 30 V10 Z" fill="#1c3a2e" stroke="#d9a441" stroke-width="2"/><text x="24" y="34" text-anchor="middle" font-size="22" fill="#d9a441" font-family="Arial" font-weight="700">K</text></svg></div>
+                <div class="team">Dojo do Kainan</div>
+              </div>
+              <div class="founder"><span class="st">★</span><span>Fundador</span></div>
+              <div class="brand">Ippon&nbsp;League</div>
+              <div class="link">www.ipponleague.com</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- DESCEU -->
+    <div class="case">
+      <h2>Desceu de faixa (seta vermelha)</h2>
+      <div class="stage"><div class="scale">
+        <div class="card" style="--new:#3f9f5a; --arrow:#ef6a5f">
+          <div class="glow"></div>
+          <div class="inner">
+            <div class="eyebrow">Ranking Mundial</div>
+            <div class="trans">
+              <div class="dodo old" style="--c:#9b6cc9">
+                <div class="medal" style="--c:#9b6cc9">
+                  <svg viewBox="0 0 100 100"><path d="M30 44 L50 34 L70 44 L66 92 L34 92 Z" fill="#ece7da"/><path d="M50 34 L40 54 L50 50 L60 54 Z" fill="#dcd6c7"/><rect x="31" y="66" width="38" height="9" fill="#9b6cc9"/><circle cx="50" cy="22" r="13" fill="#6a8f3e"/><ellipse cx="50" cy="30" rx="10" ry="5" fill="#b9792f"/><circle cx="45" cy="20" r="1.8" fill="#15210f"/><circle cx="55" cy="20" r="1.8" fill="#15210f"/></svg>
+                </div><div class="blabel" style="--c:#9b6cc9">Roxa</div>
+              </div>
+              <div class="arrow">&#8600;</div>
+              <div class="dodo new" style="--c:#3f9f5a">
+                <div class="medal" style="--c:#3f9f5a">
+                  <svg viewBox="0 0 100 100"><path d="M30 44 L50 34 L70 44 L66 92 L34 92 Z" fill="#ece7da"/><path d="M50 34 L40 54 L50 50 L60 54 Z" fill="#dcd6c7"/><rect x="31" y="66" width="38" height="9" fill="#3f9f5a"/><circle cx="50" cy="22" r="13" fill="#6a8f3e"/><ellipse cx="50" cy="30" rx="10" ry="5" fill="#b9792f"/><circle cx="45" cy="20" r="1.8" fill="#15210f"/><circle cx="55" cy="20" r="1.8" fill="#15210f"/></svg>
+                </div><div class="blabel" style="--c:#3f9f5a">Verde</div>
+              </div>
+            </div>
+            <div class="headline">Desci de faixa</div>
+            <div class="pct">Top 38%</div>
+            <div class="pct-sub">de todos os jogadores do mundo</div>
+            <div class="motiv">É só um mês. Volta a subir, recupera o teu lugar e segue rumo à <b>faixa preta</b>. 🥋</div>
+            <div class="period">Novembro 2026</div>
+            <div class="foot">
+              <div class="idrow">
+                <div class="crest"><svg viewBox="0 0 48 54" width="100%"><path d="M24 2 L46 10 V30 C46 42 36 50 24 53 C12 50 2 42 2 30 V10 Z" fill="#1c3a2e" stroke="#d9a441" stroke-width="2"/><text x="24" y="34" text-anchor="middle" font-size="22" fill="#d9a441" font-family="Arial" font-weight="700">K</text></svg></div>
+                <div class="team">Dojo do Kainan</div>
+              </div>
+              <div class="founder"><span class="st">★</span><span>Fundador</span></div>
+              <div class="brand">Ippon&nbsp;League</div>
+              <div class="link">www.ipponleague.com</div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <p class="note">
+    <b>Frases por situação (sempre a apontar para a preta):</b><br>
+    • <b>Subiu:</b> "No topo está a faixa preta, os 5% melhores do mundo. Continua a subir."<br>
+    • <b>Desceu:</b> "É só um mês. Volta a subir, recupera o teu lugar e segue rumo à faixa preta." (seta vermelha, mas tom encorajador)<br>
+    • <b>Manteve:</b> "Seguras a tua faixa. Rumo à preta, o topo do mundo." (um só Dôdo, sem seta)<br>
+    • <b>Preta:</b> "És faixa preta: estás entre os 5% melhores do mundo."<br>
+    <br>Faixa e Top % são <b>sempre mundiais</b>, entre todos os jogadores (grátis incluídos).
+  </p>
+</div>
+</body>
+</html>

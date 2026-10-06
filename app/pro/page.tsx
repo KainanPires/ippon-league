@@ -25,6 +25,8 @@ const LOJA_CENTRAL: Record<string, { titulo: string; corpo: string; botao: strin
   es: { titulo: "Tienda de Judocoins", corpo: "Presupuesto extra para montar el equipo que quieras. A la venta para todos — no da puntos ni ventaja, solo te deja fichar a quien quieras.", botao: "Abrir tienda" },
   fr: { titulo: "Boutique de Judocoins", corpo: "Du budget en plus pour composer l'équipe que tu veux. En vente pour tous — ni points ni avantage, juste de quoi recruter qui tu veux.", botao: "Ouvrir la boutique" },
   de: { titulo: "Judocoins-Shop", corpo: "Extra-Budget, um dein Wunschteam zu bauen. Für alle erhältlich — keine Punkte, kein Vorteil, du kannst nur verpflichten, wen du willst.", botao: "Shop öffnen" },
+  ja: { titulo: "Judocoins ストア", corpo: "好きなチームを編成するための追加予算です。誰でも購入できます — ポイントも優位性もなく、好きな選手を獲得できるだけです。", botao: "ストアを開く" },
+  ru: { titulo: "Магазин Judocoins", corpo: "Дополнительный бюджет, чтобы собрать команду, которую хочешь. В продаже для всех — ни очков, ни преимущества, просто возможность подписать кого хочешь.", botao: "Открыть магазин" },
 };
 // NOTA: o cartão da comunidade NÃO vive aqui. Esta é a central do Pro
 // simples — um Pro Max nunca chega a esta página, porque o /pro-central o

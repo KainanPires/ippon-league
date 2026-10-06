@@ -17,7 +17,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const VALIDAS = ["pt", "en", "es", "fr", "de"];
+const VALIDAS = ["pt", "en", "es", "fr", "de", "ja", "ru"];
 
 async function uidDoPedido(req: Request): Promise<string | null> {
   try {

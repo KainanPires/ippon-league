@@ -62,6 +62,8 @@ const SELO_FUNDADOR: Record<string, { rotulo: string; nota: string }> = {
   es: { rotulo: "Fundador", nota: "Estuviste desde el principio. Este sello es tuyo para siempre." },
   fr: { rotulo: "Fondateur", nota: "Tu étais là dès le début. Ce badge est à toi pour toujours." },
   de: { rotulo: "Gründer", nota: "Du warst von Anfang an dabei. Dieses Abzeichen bleibt für immer deins." },
+  ja: { rotulo: "創設メンバー", nota: "最初から参加していました。このバッジは永遠にあなたのものです。" },
+  ru: { rotulo: "Основатель", nota: "Ты был здесь с самого начала. Эта эмблема твоя навсегда." },
 };
 // Secção "Faixas da época" no perfil, por língua (mapa local; ja/ru no rollout).
 const SECAO_FAIXAS: Record<string, { titulo: string; partilharAtual: string; vazio: string }> = {
@@ -70,8 +72,10 @@ const SECAO_FAIXAS: Record<string, { titulo: string; partilharAtual: string; vaz
   es: { titulo: "Cinturones de la temporada", partilharAtual: "Compartir mi cinturón", vazio: "Tu recorrido de cinturones aparecerá aquí, mes a mes, desde noviembre." },
   fr: { titulo: "Ceintures de la saison", partilharAtual: "Partager ma ceinture", vazio: "Ton parcours de ceintures apparaîtra ici, mois après mois, dès novembre." },
   de: { titulo: "Gürtel dieser Saison", partilharAtual: "Meinen Gürtel teilen", vazio: "Dein Gürtel-Verlauf erscheint hier, Monat für Monat, ab November." },
+  ja: { titulo: "今シーズンの帯", partilharAtual: "自分の帯を共有する", vazio: "あなたの帯の歩みが、11月から月ごとにここに表示されます。" },
+  ru: { titulo: "Пояса этого сезона", partilharAtual: "Поделиться моим поясом", vazio: "Твой путь по поясам будет показан здесь, месяц за месяцем, начиная с ноября." },
 };
-const LOCALE_MES: Record<string, string> = { pt: "pt-PT", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE" };
+const LOCALE_MES: Record<string, string> = { pt: "pt-PT", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE", ja: "ja-JP", ru: "ru-RU" };
 // Top X% a partir da posição/total do mês (1 = topo). Null se não houver dados.
 function pctDe(pos?: number | null, tot?: number | null): number | null {
   if (!pos || !tot || tot <= 0) return null;
@@ -90,6 +94,8 @@ const CANCEL_PERDE: Record<string, string> = {
   es: "Cuando el acceso termine: tu puntuación en las ligas Mundial y Continental se pone a cero y sales de ellas, sales de cualquier Copa do Dôdo en curso, y si tienes más ligas de amigos que el límite gratuito tendrás que elegir cuáles mantener.",
   fr: "Quand ton accès prendra fin : tes points dans les ligues Mondiale et Continentale sont remis à zéro et tu en sors, tu sors de toute Copa do Dôdo en cours, et si tu as plus de ligues d'amis que la limite gratuite tu devras choisir lesquelles garder.",
   de: "Wenn dein Zugang endet: deine Punkte in der Welt- und Kontinentalliga werden auf null gesetzt und du verlässt sie, du bist raus aus einer laufenden Copa do Dôdo, und wenn du mehr Freundesligen als das Gratis-Limit hast, wählst du, welche du behältst.",
+  ja: "アクセスが終了すると、世界リーグと大陸リーグでのあなたのポイントはリセットされ、それらのリーグから外れます。進行中の Copa do Dôdo からも外れ、無料枠の上限を超える友達リーグを持っている場合は、どれを残すか選ぶ必要があります。",
+  ru: "Когда твой доступ закончится: твои очки в Мировой и Континентальной лигах обнуляются, и ты выходишь из них, ты выбываешь из любой идущей Copa do Dôdo, а если у тебя больше лиг с друзьями, чем бесплатный лимит, тебе придётся выбрать, какие оставить.",
 };
 export default function Perfil() {
   const t = useT();

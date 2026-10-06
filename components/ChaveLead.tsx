@@ -71,6 +71,20 @@ const T: Record<string, Tx> = {
     criarBtn: "Kostenloses Konto erstellen", entrarBtn: "Anmelden",
     gratis: "Kostenlos — in unter einer Minute.", jaTens: "Schon ein Konto?",
   },
+  ja: {
+    sub: "抽選とライブ結果を、一試合ごとに追いましょう。",
+    lockTitulo: "完全なトーナメント表をライブで見る",
+    lockSub: "無料アカウントを作成すると、すべての階級、完全な抽選、リアルタイムの結果を見られます。",
+    criarBtn: "無料アカウントを作成", entrarBtn: "ログイン",
+    gratis: "無料です — 1分もかかりません。", jaTens: "すでにアカウントをお持ちですか？",
+  },
+  ru: {
+    sub: "Следи за жеребьёвкой и результатами вживую, схватка за схваткой.",
+    lockTitulo: "Смотри полную сетку вживую",
+    lockSub: "Создай бесплатный аккаунт, чтобы увидеть все весовые категории, полную жеребьёвку и результаты в реальном времени.",
+    criarBtn: "Создать бесплатный аккаунт", entrarBtn: "Войти",
+    gratis: "Это бесплатно — меньше минуты.", jaTens: "Уже есть аккаунт?",
+  },
 };
 
 export function ChaveLead() {

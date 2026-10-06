@@ -20,6 +20,8 @@ const TERMO: Record<string, TextoTermo> = {
   es: { antes: "He leído y acepto los ", link: "Términos de Entrega y Consentimiento", depois: " de Ippon Pro.", erro: "Para continuar, marca que has leído y aceptas los términos." },
   fr: { antes: "J'ai lu et j'accepte les ", link: "Conditions de livraison et de consentement", depois: " d'Ippon Pro.", erro: "Pour continuer, cochez que vous avez lu et accepté les conditions." },
   de: { antes: "Ich habe die ", link: "Liefer- und Einwilligungsbedingungen", depois: " von Ippon Pro gelesen und akzeptiere sie.", erro: "Um fortzufahren, bestätige, dass du die Bedingungen gelesen und akzeptiert hast." },
+  ja: { antes: "Ippon Pro の", link: "配送・同意規約", depois: "を読み、同意します。", erro: "続けるには、規約を読んで同意したことにチェックを入れてください。" },
+  ru: { antes: "Я прочитал и принимаю ", link: "Условия доставки и согласия", depois: " Ippon Pro.", erro: "Чтобы продолжить, отметь, что прочитал и принимаешь условия." },
 };
 // Honestidade no momento de subscrever: o que acontece se um dia parares. Mapa
 // local por língua (mesmo padrão do TERMO).
@@ -29,6 +31,8 @@ const AO_PARAR: Record<string, { titulo: string; corpo: string }> = {
   es: { titulo: "Mientras eres Pro — y si un día paras", corpo: "Mientras eres Pro, acumulas puntos en las ligas Mundial y Continental y puedes disputar la Copa do Dôdo. Si dejas de ser Pro, esa puntuación se pone a cero y sales de esas ligas, sales de la Copa en curso, y si tienes más ligas de amigos que el límite gratuito tendrás que elegir cuáles mantener. Tu cuenta, equipo e historial quedan siempre guardados." },
   fr: { titulo: "En tant que Pro — et si un jour tu arrêtes", corpo: "Tant que tu es Pro, tu accumules des points dans les ligues Mondiale et Continentale et tu peux disputer la Copa do Dôdo. Si tu cesses d'être Pro, ces points sont remis à zéro et tu sors de ces ligues, tu sors de la Copa en cours, et si tu as plus de ligues d'amis que la limite gratuite tu devras choisir lesquelles garder. Ton compte, ton équipe et ton historique sont toujours conservés." },
   de: { titulo: "Als Pro — und falls du irgendwann aufhörst", corpo: "Solange du Pro bist, sammelst du Punkte in der Welt- und Kontinentalliga und kannst die Copa do Dôdo spielen. Hörst du auf, Pro zu sein, werden diese Punkte auf null gesetzt und du verlässt diese Ligen, du bist raus aus einer laufenden Copa, und wenn du mehr Freundesligen als das Gratis-Limit hast, wählst du, welche du behältst. Dein Konto, Team und Verlauf bleiben immer erhalten." },
+  ja: { titulo: "Pro の間 — そしていつかやめたら", corpo: "Pro の間は、世界リーグと大陸リーグでポイントを積み重ね、Copa do Dôdo に参加できます。Pro をやめると、そのポイントはリセットされ、これらのリーグから外れ、進行中の Copa からも外れます。無料枠より多くの友達リーグがある場合は、どれを残すか選ぶことになります。アカウント、チーム、履歴は常に保存されます。" },
+  ru: { titulo: "Пока ты Pro — и если однажды бросишь", corpo: "Пока ты Pro, ты набираешь очки в Мировой и Континентальной лигах и можешь играть в Copa do Dôdo. Если перестанешь быть Pro, эти очки обнулятся, и ты выйдешь из этих лиг, выйдешь из текущего Copa, а если у тебя больше лиг с друзьями, чем бесплатный лимит, тебе придётся выбрать, какие оставить. Твой аккаунт, команда и история всегда сохраняются." },
 };
 // LOJA DE JUDOCOINS na página do Pro. IMPORTANTE: os Judocoins NÃO são o Pro nem
 // dão vantagem competitiva — são orçamento da temporada, à venda para todos. Esta
@@ -39,6 +43,8 @@ const LOJA_PRO: Record<string, { titulo: string; corpo: string; botao: string }>
   es: { titulo: "Los Judocoins no son el Pro", corpo: "Los Judocoins son presupuesto para montar tu equipo — a la venta para todos, Pro o no. No dan puntos ni ventaja: solo te dejan fichar a los atletas que quieras.", botao: "Ir a la tienda" },
   fr: { titulo: "Les Judocoins ne sont pas le Pro", corpo: "Les Judocoins sont du budget pour composer ton équipe — en vente pour tous, Pro ou non. Ils ne donnent ni points ni avantage : ils te laissent juste recruter les athlètes que tu veux.", botao: "Aller à la boutique" },
   de: { titulo: "Judocoins sind nicht Pro", corpo: "Judocoins sind Budget, um dein Team zu bauen — für alle erhältlich, Pro oder nicht. Sie geben keine Punkte und keinen Vorteil: sie lassen dich nur die gewünschten Athleten verpflichten.", botao: "Zum Shop" },
+  ja: { titulo: "Judocoins は Pro ではありません", corpo: "Judocoins はチームを編成するための予算です — Pro かどうかに関わらず、誰でも購入できます。ポイントも優位性も与えません。好きな選手を獲得できるだけです。", botao: "ストアへ" },
+  ru: { titulo: "Judocoins — это не Pro", corpo: "Judocoins — это бюджет для сборки твоей команды, в продаже для всех, Pro или нет. Они не дают ни очков, ни преимущества: они просто позволяют тебе подписать нужных атлетов.", botao: "В магазин" },
 };
 // O que cada nível dá. Princípio: só informação e ferramentas — nunca decidir o
 // time pela pessoa, nunca prometer resultado. (Fase de testes: sem prémios.)

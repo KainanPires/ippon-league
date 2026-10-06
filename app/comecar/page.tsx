@@ -66,6 +66,8 @@ const COMO_CONHECESTE: Record<string, BlocoOrigem> = {
   es: { label: "¿Cómo nos conociste? (opcional)", placeholder: "Selecciona una opción", opcoes: { amigo: "Amigo o recomendación", treinador: "Entrenador o club", evento: "Evento o competición", social: "Redes sociales", google: "Búsqueda en Google", outro: "Otro" } },
   fr: { label: "Comment nous as-tu connus ? (optionnel)", placeholder: "Choisis une option", opcoes: { amigo: "Ami ou recommandation", treinador: "Entraîneur ou club", evento: "Événement ou compétition", social: "Réseaux sociaux", google: "Recherche Google", outro: "Autre" } },
   de: { label: "Wie hast du von uns erfahren? (optional)", placeholder: "Wähle eine Option", opcoes: { amigo: "Freund oder Empfehlung", treinador: "Trainer oder Verein", evento: "Event oder Wettkampf", social: "Soziale Medien", google: "Google-Suche", outro: "Sonstiges" } },
+  ja: { label: "どこで知りましたか？（任意）", placeholder: "選択してください", opcoes: { amigo: "友人・紹介", treinador: "コーチ・クラブ", evento: "イベント・大会", social: "SNS", google: "Google 検索", outro: "その他" } },
+  ru: { label: "Откуда ты о нас узнал? (необязательно)", placeholder: "Выбери вариант", opcoes: { amigo: "Друг или рекомендация", treinador: "Тренер или клуб", evento: "Событие или соревнование", social: "Соцсети", google: "Поиск в Google", outro: "Другое" } },
 };
 
 // CONSENTIMENTO DE EMAIL DE MARKETING (opcional, opt-in) — exigido no RGPD/GDPR
@@ -80,6 +82,8 @@ const CONSENT_EMAIL: Record<string, string> = {
   es: "Quiero recibir novedades, consejos de las rondas y promociones por email.",
   fr: "Je souhaite recevoir les actualités, les conseils des tournois et les offres par email.",
   de: "Ich möchte Neuigkeiten, Runden-Tipps und Angebote per E-Mail erhalten.",
+  ja: "ニュース、ラウンドのヒント、お得な情報をメールで受け取りたいです。",
+  ru: "Хочу получать новости, советы по турам и предложения по email.",
 };
 
 export default function Comecar() {

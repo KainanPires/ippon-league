@@ -20,6 +20,8 @@ const TERMO: Record<string, TextoTermo> = {
   es: { antes: "He leído y acepto los ", link: "Términos de Entrega y Consentimiento", depois: " de Ippon Pro.", erro: "Para continuar, marca que has leído y aceptas los términos." },
   fr: { antes: "J'ai lu et j'accepte les ", link: "Conditions de livraison et de consentement", depois: " d'Ippon Pro.", erro: "Pour continuer, cochez que vous avez lu et accepté les conditions." },
   de: { antes: "Ich habe die ", link: "Liefer- und Einwilligungsbedingungen", depois: " von Ippon Pro gelesen und akzeptiere sie.", erro: "Um fortzufahren, bestätige, dass du die Bedingungen gelesen und akzeptiert hast." },
+  ja: { antes: "Ippon Pro の", link: "配送・同意規約", depois: "を読み、同意します。", erro: "続けるには、規約を読んで同意したことにチェックを入れてください。" },
+  ru: { antes: "Я прочитал и принимаю ", link: "Условия доставки и согласия", depois: " Ippon Pro.", erro: "Чтобы продолжить, отметь, что прочитал и принимаешь условия." },
 };
 // JC dourado (consistente com o resto da app) só para o selo da loja.
 const JC_GOLD = "#d9a441";
@@ -30,6 +32,8 @@ const LOJA_PMX: Record<string, { titulo: string; corpo: string; botao: string }>
   es: { titulo: "Los Judocoins no son el Pro", corpo: "Los Judocoins son presupuesto para montar tu equipo — a la venta para todos. No dan puntos ni ventaja.", botao: "Ir a la tienda" },
   fr: { titulo: "Les Judocoins ne sont pas le Pro", corpo: "Les Judocoins sont du budget pour composer ton équipe — en vente pour tous. Ni points ni avantage.", botao: "Aller à la boutique" },
   de: { titulo: "Judocoins sind nicht Pro", corpo: "Judocoins sind Budget, um dein Team zu bauen — für alle erhältlich. Keine Punkte, kein Vorteil.", botao: "Zum Shop" },
+  ja: { titulo: "Judocoins は Pro ではありません", corpo: "Judocoins はチームを編成するための予算です — 誰でも購入できます。ポイントも優位性も与えません。", botao: "ストアへ" },
+  ru: { titulo: "Judocoins — это не Pro", corpo: "Judocoins — это бюджет для сборки твоей команды, в продаже для всех. Они не дают ни очков, ни преимущества.", botao: "В магазин" },
 };
 // Página dedicada SÓ ao Pro Max. Quem chega aqui já é Pro (vem da central /pro),
 // por isso falamos só do upgrade — não repetimos o cartão do Pro. Mostra o preço

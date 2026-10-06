@@ -28,6 +28,8 @@ const ORC_ACIMA: Record<string, { chip: string; frase: string }> = {
   es: { chip: "Por encima del presupuesto", frase: "Tu equipo vale {x} JC más que tu patrimonio. Vende a alguien en el mercado hasta equilibrar — si no, quedas inactivo esta ronda." },
   fr: { chip: "Au-dessus du budget", frase: "Ton équipe vaut {x} JC de plus que ton patrimoine. Vends quelqu'un au marché jusqu'à l'équilibre — sinon tu seras inactif cette manche." },
   de: { chip: "Über dem Budget", frase: "Dein Team ist {x} JC mehr wert als dein Vermögen. Verkaufe jemanden im Markt, bis es ausgeglichen ist — sonst bist du in dieser Runde inaktiv." },
+  ja: { chip: "予算オーバー", frase: "あなたのチームは資産より {x} JC 分だけ価値が高くなっています。釣り合うまでマーケットで誰かを売ってください — そうしないと、このラウンドは非アクティブになります。" },
+  ru: { chip: "Превышен бюджет", frase: "Твоя команда стоит на {x} JC больше твоего капитала. Продай кого-нибудь на рынке, пока не выровняешь — иначе в этом туре ты будешь неактивен." },
 };
 // Loja de Judocoins (economia Fase B). No Meu Time serve de atalho e, quando a
 // equipa está acima do orçamento, de alternativa a vender: comprar JC aumenta o
@@ -38,6 +40,8 @@ const LOJA_MT: Record<string, { atalho: string; ouCompra: string }> = {
   es: { atalho: "Tienda de Judocoins", ouCompra: "o compra Judocoins" },
   fr: { atalho: "Boutique de Judocoins", ouCompra: "ou achète des Judocoins" },
   de: { atalho: "Judocoins-Shop", ouCompra: "oder kaufe Judocoins" },
+  ja: { atalho: "Judocoinsストア", ouCompra: "またはJudocoinsを買う" },
+  ru: { atalho: "Магазин Judocoins", ouCompra: "или купи Judocoins" },
 };
 // Valorização AO VIVO (parcial) durante a competição a decorrer. Por atleta
 // mostra-se a variação de preço (JC) e, por baixo do tatame, a variação de
@@ -49,6 +53,8 @@ const VALOR_MT: Record<string, { patTitulo: string; parcial: string; custo: stri
   es: { patTitulo: "Patrimonio en esta ronda", parcial: "parcial · se cierra al final", custo: "Coste del equipo", sobra: "Resto" },
   fr: { patTitulo: "Patrimoine cette manche", parcial: "partiel · définitif à la fin", custo: "Coût de l'équipe", sobra: "Reste" },
   de: { patTitulo: "Vermögen diese Runde", parcial: "vorläufig · endgültig am Ende", custo: "Teamkosten", sobra: "Rest" },
+  ja: { patTitulo: "このラウンドの資産", parcial: "暫定 · 大会終了時に確定", custo: "チームのコスト", sobra: "残り" },
+  ru: { patTitulo: "Капитал в этом туре", parcial: "предварительно · закрывается по завершении соревнования", custo: "Стоимость команды", sobra: "Остаток" },
 };
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";

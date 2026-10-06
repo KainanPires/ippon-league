@@ -38,6 +38,8 @@ const PRO_LOCK: Record<string, { pro: string; titulo: string; texto: string; cta
   es: { pro: "Pro", titulo: "Desbloquea con Ippon Pro", texto: "Esta opción es parte de Ippon Pro. Suscríbete para desbloquear todas las formas, estampados, símbolos y colores de tu escudo.", cta: "Descubrir Ippon Pro" },
   fr: { pro: "Pro", titulo: "Débloque avec Ippon Pro", texto: "Cette option fait partie d'Ippon Pro. Abonne-toi pour débloquer toutes les formes, motifs, symboles et couleurs de ton blason.", cta: "Découvrir Ippon Pro" },
   de: { pro: "Pro", titulo: "Mit Ippon Pro freischalten", texto: "Diese Option gehört zu Ippon Pro. Abonniere, um alle Formen, Muster, Symbole und Farben für dein Wappen freizuschalten.", cta: "Ippon Pro entdecken" },
+  ja: { pro: "Pro", titulo: "Ippon Pro で解除", texto: "このオプションは Ippon Pro の一部です。登録すると、エンブレムのすべての形・模様・シンボル・色を解除できます。", cta: "Ippon Pro を見る" },
+  ru: { pro: "Pro", titulo: "Открой с Ippon Pro", texto: "Эта опция входит в Ippon Pro. Оформи подписку, чтобы открыть все формы, узоры, символы и цвета для своей эмблемы.", cta: "Узнать об Ippon Pro" },
 };
 
 export default function EscudoEditorPage() {

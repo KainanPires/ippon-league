@@ -37,6 +37,14 @@ const TXT: Record<string, { texto: string; aceitar: string; recusar: string; pol
     texto: "Wir nutzen Produktanalyse, um zu verstehen, wie das Spiel genutzt wird, und es zu verbessern. Deinen Namen, deine E-Mail oder personenbezogene Daten speichern wir dafür nie.",
     aceitar: "Akzeptieren", recusar: "Ablehnen", politica: "Datenschutzerklärung",
   },
+  ja: {
+    texto: "ゲームの使われ方を把握して改善するために、プロダクト分析を利用しています。このために、お名前、メールアドレス、個人データを保存することは一切ありません。",
+    aceitar: "同意する", recusar: "拒否する", politica: "プライバシーポリシー",
+  },
+  ru: {
+    texto: "Мы используем продуктовую аналитику, чтобы понять, как используется игра, и улучшать её. Мы никогда не храним для этого твоё имя, почту или личные данные.",
+    aceitar: "Принять", recusar: "Отклонить", politica: "Политика конфиденциальности",
+  },
 };
 
 export function ConsentimentoAnalytics() {

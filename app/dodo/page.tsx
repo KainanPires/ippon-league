@@ -63,6 +63,8 @@ const TRANQUILIZA: Record<string, { titulo: string; corpo: string }> = {
   es: { titulo: "Inscribirse es solo un sorteo", corpo: "Entrar no gasta Judocoins ni afecta a tus otras ligas ni a tu ranking. Es un sorteo de plazas por continente — inscribirte hoy o el último día te da exactamente la misma oportunidad." },
   fr: { titulo: "L'inscription n'est qu'un tirage", corpo: "S'inscrire ne coûte aucun Judocoin et n'affecte pas tes autres ligues ni ton classement. C'est un tirage de places par continent — t'inscrire aujourd'hui ou le dernier jour te donne exactement la même chance." },
   de: { titulo: "Die Anmeldung ist nur eine Auslosung", corpo: "Die Teilnahme kostet keine Judocoins und beeinflusst deine anderen Ligen oder dein Ranking nicht. Es ist eine Auslosung der Plätze nach Kontinent — ob du dich heute oder am letzten Tag anmeldest, gibt dir genau dieselbe Chance." },
+  ja: { titulo: "参加は抽選だけです", corpo: "参加してもJudocoinsは消費されず、他のリーグやランキングにも影響しません。大陸ごとの枠の抽選です。今日申し込んでも最終日に申し込んでも、当選のチャンスはまったく同じです。" },
+  ru: { titulo: "Участие — это просто жеребьёвка", corpo: "Участие не тратит Judocoins и не влияет на твои другие лиги или твой рейтинг. Это жеребьёвка мест по континентам — подашь заявку сегодня или в последний день, шанс у тебя будет ровно такой же." },
 };
 interface EuEstado {
   inscrito: boolean;

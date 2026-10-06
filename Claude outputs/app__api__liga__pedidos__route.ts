@@ -1,0 +1,90 @@
+// app/api/liga/pedidos/route.ts
+//
+// PEDIDOS PENDENTES DE UMA LIGA (servidor, chave secreta).
+//
+// Só o DONO da liga pode ver os pedidos. Recebe (GET):
+//   ?league_id=<uuid>   + Authorization: Bearer <token da sessão>
+// Devolve:
+//   { ok:true, pedidos: [{ request_id, user_id, nome, time, created_at }] }
+//   { ok:false, erro }  se não for o dono ou a liga não existir
+//
+// O nome de cada candidato vem do user_metadata do Auth; o nome do TIME vem da
+// tabela `equipas` — para o dono reconhecer o jogador como ele aparece na liga.
+//
+// SEGURANÇA (identidade pelo token, não pela query): o "dono" que a rota
+// verifica vinha do ?user_id= da query — falsificável, deixava ler os pedidos
+// de ligas alheias. Agora o uid vem do TOKEN da sessão. Ver
+// claude/seguranca-auditoria-rotas.md (Lote 1a).
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { nomeDoUtilizador, nomeDoTime } from "@/lib/notificacoesServidor";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+/** Quem está a pedir, a partir do token da sessão. null = sem sessão válida. */
+async function uidDoPedido(req: Request): Promise<string | null> {
+  try {
+    const auth = req.headers.get("authorization") || "";
+    const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+    if (!token) return null;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+    if (!url || !pub) return null;
+    const sb = createClient(url, pub, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await sb.auth.getUser();
+    if (error) return null;
+    return data?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(req: Request) {
+  if (!supabaseAdmin) {
+    return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
+  }
+  const { searchParams } = new URL(req.url);
+  const league_id = (searchParams.get("league_id") || "").trim();
+  const user_id = await uidDoPedido(req);
+  if (!user_id) return NextResponse.json({ ok: false, erro: "Entra na tua conta." }, { status: 401 });
+  if (!league_id) {
+    return NextResponse.json({ ok: false, erro: "Faltam parâmetros." }, { status: 400 });
+  }
+  // 1) Confirma que quem pergunta é o DONO da liga.
+  const { data: liga } = await supabaseAdmin
+    .from("leagues")
+    .select("id, created_by")
+    .eq("id", league_id)
+    .maybeSingle();
+  if (!liga) return NextResponse.json({ ok: false, erro: "Liga não encontrada." }, { status: 404 });
+  if (liga.created_by !== user_id) {
+    return NextResponse.json({ ok: false, erro: "Só o dono vê os pedidos." }, { status: 403 });
+  }
+  // 2) Pedidos pendentes desta liga (mais antigos primeiro).
+  const { data: pedidos } = await supabaseAdmin
+    .from("league_requests")
+    .select("id, user_id, created_at")
+    .eq("league_id", league_id)
+    .eq("estado", "pendente")
+    .order("created_at", { ascending: true });
+  const lista = pedidos || [];
+  if (lista.length === 0) return NextResponse.json({ ok: true, pedidos: [] });
+  // 3) Resolve o nome e o TIME de cada candidato (em paralelo por pedido).
+  const saida = [];
+  for (const p of lista) {
+    const [nome, time] = await Promise.all([nomeDoUtilizador(p.user_id), nomeDoTime(p.user_id)]);
+    saida.push({
+      request_id: p.id,
+      user_id: p.user_id,
+      nome: nome === "Alguém" ? "Jogador" : nome,
+      time: time ?? null,
+      created_at: p.created_at,
+    });
+  }
+  return NextResponse.json({ ok: true, pedidos: saida });
+}

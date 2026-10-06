@@ -69,6 +69,22 @@ const L: Record<string, {
     motMantive: "Du hältst deinen Gürtel. Auf zum schwarzen, der Spitze der Welt. 🥋",
     motPreta: "Du bist schwarzer Gürtel. Du gehörst zu den besten 5% der Welt. 🥋",
   },
+  ja: {
+    ranking: "世界ランキング", pctSub: "世界のすべてのプレイヤーの中で", fundador: "創設メンバー",
+    hSubi: "帯が上がりました", hDesci: "帯が下がりました", hMantive: "帯を維持しました", hAtual: "私の帯",
+    motSubi: "頂点には黒帯、世界の上位5%がいます。登り続けましょう。🥋",
+    motDesci: "たった1か月です。また登って、自分の場所を取り戻し、黒帯を目指し続けましょう。🥋",
+    motMantive: "帯を守っています。黒帯へ、世界の頂点へ。🥋",
+    motPreta: "あなたは黒帯です。世界の上位5%に入っています。🥋",
+  },
+  ru: {
+    ranking: "Мировой рейтинг", pctSub: "среди всех игроков мира", fundador: "Основатель",
+    hSubi: "Я поднялся на пояс выше", hDesci: "Я опустился на пояс ниже", hMantive: "Я сохранил свой пояс", hAtual: "Мой пояс",
+    motSubi: "На вершине — чёрный пояс, лучшие 5% в мире. Продолжай подниматься. 🥋",
+    motDesci: "Это всего один месяц. Поднимись снова, займи своё место и продолжай идти к чёрному поясу. 🥋",
+    motMantive: "Ты держишь свой пояс. К чёрному — на вершину мира. 🥋",
+    motPreta: "Ты чёрный пояс. Ты среди лучших 5% в мире. 🥋",
+  },
 };
 
 let _h2iPromise: Promise<unknown> | null = null;

@@ -67,6 +67,20 @@ const TXT: Record<string, Txt> = {
     pontos: "Punkteligen", copas: "K.-o.-Turniere (Cups)", manterAte: "Behalte bis zu {n}",
     confirmar: "Bestätigen und die anderen verlassen", aGuardar: "Speichern…", erro: "Konnte nicht speichern. Versuch es erneut.", jaOk: "Alles in Ordnung.",
   },
+  ja: {
+    titulo: "リーグを整理する", intro: "プランが変わり、フレンドリーグの上限を超えています。2つの選択肢があります。",
+    voltar: "Ippon Pro に戻る", voltarSub: "すべて維持 — 何も削除されません。プランやキャンペーンを見る。",
+    ou: "または維持するものを選ぶ（残りからは抜けます）",
+    pontos: "勝ち点制リーグ", copas: "トーナメント戦（カップ）", manterAte: "最大 {n} 件まで維持",
+    confirmar: "確定して残りから抜ける", aGuardar: "保存中…", erro: "保存できませんでした。もう一度お試しください。", jaOk: "すべて問題ありません。",
+  },
+  ru: {
+    titulo: "Разберись со своими лигами", intro: "Твой план изменился, и ты превысил лимит дружеских лиг. У тебя есть два варианта.",
+    voltar: "Вернуться к Ippon Pro", voltarSub: "Оставь всё — ничего не удаляется. Посмотри планы и предложения.",
+    ou: "или выбери, какие оставить (из остальных ты выйдешь)",
+    pontos: "Лиги по очкам", copas: "Плей-офф (Кубки)", manterAte: "Оставь до {n}",
+    confirmar: "Подтвердить и выйти из остальных", aGuardar: "Сохранение…", erro: "Не удалось сохранить. Попробуй ещё раз.", jaOk: "Всё в порядке.",
+  },
 };
 
 // Definido FORA do componente (a regra react-hooks/static-components proíbe

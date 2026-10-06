@@ -1,0 +1,327 @@
+/**
+ * Ippon League — Motor do jogo (Fase 3)
+ * --------------------------------------
+ * Funções puras (sem banco de dados) para:
+ *   1. Pontuação por ações       -> scoreAthlete()
+ *   2. Valorização / preço        -> computeNewPrice()
+ *   3. Faixas por percentil       -> assignBeltsForRanking() / beltForUser()
+ *
+ * Tudo isto está pronto para ligar ao Supabase depois:
+ * lês os dados da base, passas para estas funções, gravas o resultado.
+ *
+ * Os números foram validados contra os exemplos do documento mestre.
+ */
+/* =========================================================================
+ * 1. PONTUAÇÃO POR AÇÕES
+ * ========================================================================= */
+/** Tipos de ação que podem acontecer numa luta. */
+export type ActionType =
+  | "ippon_feito"
+  | "waza_ari_feito"
+  | "yuko_feito"
+  | "shido_provocado"        // shido provocado no adversário (positivo)
+  | "ippon_sofrido"
+  | "waza_ari_sofrido"
+  | "yuko_sofrido"
+  | "shido_recebido"
+  | "hansoku_make_recebido";
+/** Tabela de pontos por ação (do documento mestre). */
+export const POINTS: Record<ActionType, number> = {
+  ippon_feito: 10,
+  waza_ari_feito: 4,
+  yuko_feito: 2,
+  shido_provocado: 1,
+  ippon_sofrido: -5,
+  waza_ari_sofrido: -2,
+  yuko_sofrido: -1,
+  shido_recebido: -2,
+  hansoku_make_recebido: -10,
+};
+/** Arredonda a 1 casa decimal (0,1 JC / 0,1 ponto). */
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+/**
+ * Soma os pontos de uma lista de ações.
+ * As ações são acumulativas: yuko + waza-ari + ippon = 2 + 4 + 10 = 16.
+ *
+ * NOTA: os SHIDOS já não passam por aqui. Tanto SOFRER como PROVOCAR shido têm
+ * valor CRESCENTE (sofrer: 1.º -2, 2.º -3, 3.º -4; provocar: 1.º +1, 2.º +2,
+ * 3.º +3) — regras que um valor fixo por ação não exprime. Esse cálculo vive em
+ * scoreShidosSofridos() / scoreShidosProvocados() e na camada do JudoBase
+ * (lib/ijf.ts -> scoreContestSide), não na lista de ações.
+ */
+export function scoreActions(actions: ActionType[]): number {
+  return actions.reduce((total, a) => total + (POINTS[a] ?? 0), 0);
+}
+/**
+ * Custo (negativo) de SOFRER `n` shidos, de forma CRESCENTE.
+ *   1.º shido = -2, 2.º = -3, 3.º = -4, ...  (o k-ésimo custa -(k+1))
+ * Total de 3 shidos (hansoku-make) = -(2+3+4) = -9.
+ *
+ * Devolve 0 para n <= 0. É puro e não sabe nada de vitória/derrota — quem
+ * decide o resto (ignorar o ippon fantasma do hansoku-make) é o ijf.ts.
+ */
+export function scoreShidosSofridos(n: number): number {
+  let total = 0;
+  for (let k = 1; k <= n; k++) total += -(k + 1);
+  return total;
+}
+/**
+ * Bónus (positivo) de PROVOCAR `n` shidos no adversário, de forma CRESCENTE.
+ *   1.º shido = +1, 2.º = +2, 3.º = +3, ...  (o k-ésimo vale +k)
+ * Total de 3 shidos (o adversário perde por hansoku-make) = +1+2+3 = +6.
+ *
+ * É o ESPELHO de scoreShidosSofridos: quem provoca ganha na mesma cadência em
+ * que quem sofre perde, um degrau abaixo (provocar o 1.º vale +1, sofrer o 1.º
+ * custa -2). Devolve 0 para n <= 0.
+ */
+export function scoreShidosProvocados(n: number): number {
+  let total = 0;
+  for (let k = 1; k <= n; k++) total += k;
+  return total;
+}
+/**
+ * Pontuação final de um atleta numa rodada.
+ * Se for capitão, a pontuação total é multiplicada por 2.
+ */
+export function scoreAthlete(actions: ActionType[], isCaptain = false): number {
+  const base = scoreActions(actions);
+  return isCaptain ? base * 2 : base;
+}
+/* =========================================================================
+ * 2. VALORIZAÇÃO / DESVALORIZAÇÃO  (preço dos atletas)
+ * ========================================================================= */
+/** Preço mínimo absoluto: nenhum atleta vale menos que 2 JC. */
+export const MIN_PRICE = 2;
+
+/**
+ * Topo da escala INICIAL. O documento mestre define a elite mundial em
+ * "15 a 20 JC": 20 é onde um atleta de elite COMEÇA o ano (via precoDeExpectativa
+ * em lib/forma). NÃO é um teto de valorização — ao longo do ano, um atleta que
+ * supere sempre a sua expectativa PODE ultrapassar os 20 (ver TETO_PRECO).
+ */
+export const MAX_PRICE = 20;
+
+/**
+ * Teto ABSOLUTO de valorização — rede de segurança, NÃO muro de jogo.
+ *
+ * Decisão (com o Kainan): os 20 JC deixam de ser um muro. Um atleta valoriza
+ * enquanto superar a própria expectativa — e como a expectativa SOBE a cada boa
+ * competição, cada repetição rende metade da anterior (fez 40: +10, depois +5,
+ * depois +2,5…). O atleta aproxima-se de um teto SOZINHO, sem muro. É isto que
+ * dá "finança" ao jogo e premeia quem aposta cedo num atleta em ascensão.
+ *
+ * Este número só existe como rede contra dados corrompidos (um preço a fugir
+ * para o infinito seria património real a inflar por engano). 50 JC = metade do
+ * orçamento de 100 para 8 atletas: acima disto um atleta é quase impossível de
+ * encaixar numa equipa, por isso a procura auto-limita-se muito antes. Para dar
+ * ainda mais corda às estrelas, sobe só este número.
+ */
+export const TETO_PRECO = 50;
+
+/**
+ * Quanto um preço pode mexer numa ÚNICA rodada, em percentagem.
+ *
+ * O amortecedor de metade não chegava: um atleta com expectativa 3 que faça 50
+ * pontos dá +1567% bruto, +783% aplicado. Metade de um número absurdo continua
+ * absurdo — o problema é a expectativa pequena no denominador, não o fator.
+ *
+ * Com 50%, um atleta de 5 JC precisa de várias boas competições para chegar ao
+ * topo. Isso é melhor para o jogo, não pior: premeia quem o descobre cedo, e o
+ * mercado passa a ter uma história em vez de saltos.
+ *
+ * NOTA sobre o dinheiro dos jogadores: não é preciso um segundo limite para o
+ * ganho. O que o jogador ganha é o `delta` — a diferença de preço. Limitar o
+ * preço limita o delta pela mesma conta. Se ninguém passa de 20 JC, ninguém
+ * ganha mais do que a distância até 20.
+ */
+export const MAX_VARIACAO_PCT = 50;
+/** Pesos da expectativa de desempenho (70% / 30%). */
+export const WEIGHT_12M = 0.7;
+export const WEIGHT_LAST3 = 0.3;
+/**
+ * Expectativa de desempenho do atleta.
+ *   70% da média dos últimos 12 meses + 30% da média das últimas 3 competições.
+ *
+ * @param avg12m   Média de pontuação dos últimos 12 meses
+ * @param avgLast3 Média de pontuação das últimas 3 competições
+ */
+export function expectedPerformance(avg12m: number, avgLast3: number): number {
+  return WEIGHT_12M * avg12m + WEIGHT_LAST3 * avgLast3;
+}
+export interface PriceResult {
+  oldPrice: number;
+  newPrice: number;
+  /** Variação bruta calculada (%), antes do amortecedor. */
+  rawVariationPct: number;
+  /** Variação efetivamente aplicada ao preço (%) = metade da bruta. */
+  appliedVariationPct: number;
+  /** Quanto o patrimônio de quem escalou ganha (+) ou perde (-), em JC. */
+  delta: number;
+}
+/**
+ * Calcula o novo preço de um atleta depois de uma competição.
+ *
+ * MODELO v2 — "PONTOS − PREÇO" (decidido com o Kainan, época = ano civil):
+ *   D = pontos − preço atual
+ *   novo preço = preço + 50% × D
+ *
+ * Ou seja: o atleta VALORIZA quando faz mais pontos do que o seu preço em JC, e
+ * DESVALORIZA quando faz menos. É simples de explicar ao jogador ("faz mais
+ * pontos do que custas") e não depende da expectativa 70/30.
+ *
+ * A expectativa 70/30 deixou de mover o preço DURANTE a época: agora só decide
+ *   (a) o preço INICIAL de um atleta novo (via lib/forma -> calcularForma), e
+ *   (b) o re-preço no início de cada ano (re-ancoragem na escala 2–20 JC).
+ * Por isso o parâmetro `expected` é aceite por compatibilidade mas já NÃO entra
+ * no cálculo do movimento. Os chamadores podem continuar a passá-lo.
+ *
+ * Sem MURO superior na época — só a rede de segurança TETO_PRECO (ver a nota
+ * dessa constante). Piso sempre em MIN_PRICE (2 JC).
+ *
+ * Exemplos validados (spec da Economia v2):
+ *   preço 15, real 35  ->  D=20  -> 15 + 10 = 25,0 JC   (delta +10)
+ *   preço 25, real 45  ->  D=20  -> 25 + 10 = 35,0 JC   (delta +10, passou dos 20)
+ *   preço 35, real  5  ->  D=-30 -> 35 - 15 = 20,0 JC   (delta -15)
+ *   preço 20, real 44  ->  D=24  -> 20 + 12 = 32,0 JC   (delta +12)
+ *
+ * NOTA sobre o património de quem escala: o que se grava aqui em `delta` é a
+ * variação REAL de preço do atleta (o que o mercado mostra). O ganho/perda de
+ * património do JOGADOR é ASSIMÉTRICO (ganha metade da subida, perde a descida
+ * inteira) e é aplicado em lib/congelar (pontuarUtilizadoresDaCompeticao), não
+ * aqui — para o motor de preço ficar puro e sem saber de equipas.
+ *
+ * @param currentPrice Preço atual em JC
+ * @param expected     (compat) Expectativa 70/30 — já não usada no movimento
+ * @param actual       Pontuação real (SIMPLES) obtida nesta competição
+ */
+export function computeNewPrice(
+  currentPrice: number,
+  expected: number,
+  actual: number
+): PriceResult {
+  // v2: a expectativa já não move o preço na época (só o preço inicial / reset).
+  void expected;
+
+  // D = pontos − preço. Metade de D é o movimento do preço.
+  const D = actual - currentPrice;
+  let newPrice = currentPrice + 0.5 * D;
+
+  // Limites absolutos: nunca abaixo de 2 JC, nunca acima do TETO_PRECO (rede de
+  // segurança contra dados corrompidos, NÃO muro de jogo — ver TETO_PRECO).
+  newPrice = round1(Math.min(TETO_PRECO, Math.max(MIN_PRICE, newPrice)));
+
+  // Variação em % do preço, DEPOIS dos limites — é a que o jogador vê no ▲/▼ e
+  // tem de bater certo com a diferença de preço.
+  const pct = currentPrice > 0 ? round1(((newPrice - currentPrice) / currentPrice) * 100) : 0;
+  return {
+    oldPrice: currentPrice,
+    newPrice,
+    rawVariationPct: pct,
+    appliedVariationPct: pct,
+    delta: round1(newPrice - currentPrice),
+  };
+}
+/* =========================================================================
+ * 3. FAIXAS  (por percentil mensal entre jogadores ativos)
+ * ========================================================================= */
+/** Faixas da melhor para a pior. Índice menor = faixa melhor. */
+export const BELTS = [
+  "preta",
+  "marrom",
+  "roxa",
+  "verde",
+  "amarela",
+  "azul",
+  "branca",
+] as const;
+export type Belt = (typeof BELTS)[number];
+/**
+ * Recebe a "fração de topo" (0 = melhor jogador, 1 = pior) e devolve a faixa.
+ * Cortes do documento: Preta 5% · Marrom 10% · Roxa 15% · Verde 20% ·
+ * Amarela 20% · Azul 20% · Branca o resto.
+ */
+export function beltFromTopFraction(topFraction: number): Belt {
+  if (topFraction <= 0.05) return "preta";
+  if (topFraction <= 0.15) return "marrom";
+  if (topFraction <= 0.3) return "roxa";
+  if (topFraction <= 0.5) return "verde";
+  if (topFraction <= 0.7) return "amarela";
+  if (topFraction <= 0.9) return "azul";
+  return "branca";
+}
+/**
+ * Faixa de um jogador, comparado com todos os jogadores ativos.
+ * Empates ficam com a mesma faixa (a melhor do empate).
+ *
+ * @param allScores Pontuação mensal de TODOS os jogadores ativos
+ * @param userScore Pontuação mensal deste jogador
+ */
+export function beltForUser(allScores: number[], userScore: number): Belt {
+  const n = allScores.length;
+  if (n === 0) return "branca";
+  const better = allScores.filter((s) => s > userScore).length;
+  return beltFromTopFraction((better + 1) / n);
+}
+export interface RankedUser {
+  id: string;
+  score: number;
+}
+export interface BeltedUser extends RankedUser {
+  position: number; // 1 = primeiro
+  belt: Belt;
+}
+/**
+ * Atribui posição + faixa a uma lista inteira de jogadores de uma vez.
+ * Útil para recalcular o ranking mensal e as faixas num só passo.
+ */
+export function assignBeltsForRanking(users: RankedUser[]): BeltedUser[] {
+  const n = users.length;
+  const sorted = [...users].sort((a, b) => b.score - a.score);
+  return sorted.map((u, i) => {
+    const better = sorted.filter((x) => x.score > u.score).length;
+    return {
+      ...u,
+      position: i + 1,
+      belt: beltFromTopFraction((better + 1) / n),
+    };
+  });
+}
+/* =========================================================================
+ * 4. TRANSIÇÃO DE FAIXA  (para animações e mensagens)
+ * ========================================================================= */
+export type BeltDirection = "subiu" | "manteve" | "desceu";
+export interface BeltTransition {
+  from: Belt;
+  to: Belt;
+  direction: BeltDirection;
+  message: string;
+}
+const BELT_LABEL: Record<Belt, string> = {
+  preta: "Preta",
+  marrom: "Marrom",
+  roxa: "Roxa",
+  verde: "Verde",
+  amarela: "Amarela",
+  azul: "Azul",
+  branca: "Branca",
+};
+/**
+ * Compara a faixa anterior com a nova e devolve o que mudou,
+ * com uma mensagem pronta para mostrar ao jogador.
+ */
+export function beltTransition(prev: Belt, next: Belt): BeltTransition {
+  const pi = BELTS.indexOf(prev);
+  const ni = BELTS.indexOf(next);
+  let direction: BeltDirection = "manteve";
+  let message = `Mantiveste a Faixa ${BELT_LABEL[next]}. Vamos à próxima rodada.`;
+  if (ni < pi) {
+    direction = "subiu";
+    message = `Parabéns! Alcançaste a Faixa ${BELT_LABEL[next]}.`;
+  } else if (ni > pi) {
+    direction = "desceu";
+    message = `Caíste para a Faixa ${BELT_LABEL[next]}. Recupera a tua posição na próxima rodada.`;
+  }
+  return { from: prev, to: next, direction, message };
+}

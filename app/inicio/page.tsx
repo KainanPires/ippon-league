@@ -48,6 +48,8 @@ const LOJA_ATALHO: Record<string, { titulo: string; sub: string; botao: string }
   es: { titulo: "Tienda de Judocoins", sub: "Presupuesto extra para montar el equipo que quieras.", botao: "Abrir" },
   fr: { titulo: "Boutique de Judocoins", sub: "Du budget en plus pour composer l'équipe que tu veux.", botao: "Ouvrir" },
   de: { titulo: "Judocoins-Shop", sub: "Extra-Budget, um dein Wunschteam zu bauen.", botao: "Öffnen" },
+  ja: { titulo: "Judocoins ストア", sub: "好きなチームを編成するための追加予算です。", botao: "開く" },
+  ru: { titulo: "Магазин Judocoins", sub: "Дополнительный бюджет, чтобы собрать команду, какую ты хочешь.", botao: "Открыть" },
 };
 // CHAVES, não texto. Um array fora do componente é avaliado uma vez, no
 // arranque do módulo — não tem acesso ao `t`, que vive no contexto do React.
@@ -164,7 +166,7 @@ function pctDe(pos?: number | null, tot?: number | null): number | null {
   if (!pos || !tot || tot <= 0) return null;
   return Math.max(1, Math.ceil((pos / tot) * 100));
 }
-const LOCALE_MES: Record<string, string> = { pt: "pt-PT", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE" };
+const LOCALE_MES: Record<string, string> = { pt: "pt-PT", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE", ja: "ja-JP", ru: "ru-RU" };
 function rotuloMes(mes: string, lingua: string): string {
   const m = /^(\d{4})-(\d{2})$/.exec(mes);
   if (!m) return mes;
@@ -199,6 +201,16 @@ const MUDANCA_MODAL: Record<string, { subiu: { titulo: string; texto: string }; 
     subiu: { titulo: "Du bist einen Gürtel aufgestiegen", texto: "Dein Gürtel ist jetzt {faixa}. Das ist dein Platz unter allen Spielern der Welt. Mach weiter, bis zum schwarzen Gürtel." },
     desceu: { titulo: "Dein Gürtel hat sich geändert", texto: "Dein Gürtel ist jetzt {faixa}. Es ist nur ein Monat. Steig wieder auf, hol dir deinen Platz zurück und weiter Richtung schwarzer Gürtel." },
     ver: "Ansehen und teilen", fechar: "Schließen",
+  },
+  ja: {
+    subiu: { titulo: "帯が上がりました", texto: "あなたの帯は {faixa} になりました。これは世界中のプレイヤーの中でのあなたの順位です。黒帯を目指して、この調子で続けましょう。" },
+    desceu: { titulo: "帯が変わりました", texto: "あなたの帯は {faixa} になりました。たった1か月のことです。もう一度上がって、自分の順位を取り戻し、黒帯を目指し続けましょう。" },
+    ver: "見て共有する", fechar: "閉じる",
+  },
+  ru: {
+    subiu: { titulo: "Ты поднялся на пояс выше", texto: "Теперь твой пояс — {faixa}. Это твоё место среди всех игроков мира. Продолжай в том же духе, до самого чёрного пояса." },
+    desceu: { titulo: "Твой пояс изменился", texto: "Теперь твой пояс — {faixa}. Это всего один месяц. Поднимись обратно, верни своё место и продолжай идти к чёрному поясу." },
+    ver: "Посмотреть и поделиться", fechar: "Закрыть",
   },
 };
 export default function Inicio() {
@@ -1270,6 +1282,8 @@ const FUNDADOR_MODAL: Record<string, { selo: string; titulo: string; texto: stri
   es: { selo: "Fundador", titulo: "Bienvenido, Fundador", texto: "Estás entre los Fundadores de Ippon League. Este sello es exclusivo de quienes llegaron al principio, y es tuyo para siempre. Gracias por ayudar a construir el mayor fantasy de judo del mundo.", botao: "Vamos allá" },
   fr: { selo: "Fondateur", titulo: "Bienvenue, Fondateur", texto: "Tu fais partie des Fondateurs d'Ippon League. Ce badge est réservé à ceux qui étaient là dès le début, et il est à toi pour toujours. Merci d'aider à construire le plus grand fantasy de judo au monde.", botao: "C'est parti" },
   de: { selo: "Gründer", titulo: "Willkommen, Gründer", texto: "Du gehörst zu den Gründern der Ippon League. Dieses Abzeichen ist nur für jene, die von Anfang an dabei waren, und es bleibt für immer deins. Danke, dass du hilfst, das größte Judo-Fantasy-Spiel der Welt aufzubauen.", botao: "Los geht's" },
+  ja: { selo: "創設メンバー", titulo: "ようこそ、創設メンバー", texto: "あなたは Ippon League の創設メンバーの一員です。このバッジは最初から参加していた人だけのもので、永遠にあなたのものです。世界最大の柔道ファンタジーゲームづくりに力を貸してくださり、ありがとうございます。", botao: "さあ始めましょう" },
+  ru: { selo: "Основатель", titulo: "Добро пожаловать, Основатель", texto: "Ты среди Основателей Ippon League. Эта эмблема принадлежит только тем, кто был здесь с самого начала, и она твоя навсегда. Спасибо, что помогаешь строить крупнейшую дзюдо-фэнтези-игру в мире.", botao: "Поехали" },
 };
 function ModalFundador({ onClose, cor, lingua }: { onClose: () => void; cor: string; lingua: Lingua }) {
   const m = FUNDADOR_MODAL[lingua] ?? FUNDADOR_MODAL.pt;
@@ -1354,6 +1368,8 @@ const CONSENT_MODAL: Record<string, { titulo: string; texto: string; sim: string
   es: { titulo: "¿Quieres recibir las novedades?", texto: "Consejos de la ronda, scout, avisos de tu oferta y novedades de Ippon League, directo a tu e-mail. Puedes desactivarlo cuando quieras.", sim: "Sí, quiero recibir", nao: "Ahora no" },
   fr: { titulo: "Tu veux les nouveautés ?", texto: "Conseils du tour, scout, alertes de ton offre et nouveautés d'Ippon League, directement dans ton e-mail. Tu peux désactiver quand tu veux.", sim: "Oui, je veux bien", nao: "Pas maintenant" },
   de: { titulo: "Möchtest du die Neuigkeiten?", texto: "Runden-Tipps, Scout, Hinweise zu deinem Angebot und Neuigkeiten der Ippon League, direkt in deine E-Mail. Du kannst es jederzeit abschalten.", sim: "Ja, gerne", nao: "Jetzt nicht" },
+  ja: { titulo: "お知らせを受け取りますか？", texto: "ラウンドのヒント、スカウト、あなたのオファーのお知らせ、そして Ippon League の最新情報を、メールで直接お届けします。いつでも解除できます。", sim: "はい、受け取ります", nao: "今はしない" },
+  ru: { titulo: "Хочешь получать новости?", texto: "Советы тура, скаут, оповещения о твоём предложении и новости Ippon League — прямо на твою почту. Ты можешь отключить это в любой момент.", sim: "Да, хочу получать", nao: "Не сейчас" },
 };
 function ModalConsentimento({ lingua, cor, onAceitar, onRecusar }: {
   lingua: Lingua;

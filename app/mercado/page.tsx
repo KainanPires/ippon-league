@@ -24,6 +24,8 @@ const ORC_ACIMA: Record<string, { chip: string; frase: string }> = {
   es: { chip: "Por encima del presupuesto", frase: "Estás {x} JC por encima del presupuesto. Vende atletas hasta equilibrar — si no, tu equipo no puntúa esta ronda." },
   fr: { chip: "Au-dessus du budget", frase: "Tu es à {x} JC au-dessus du budget. Vends des athlètes jusqu'à l'équilibre — sinon ton équipe ne marque pas cette manche." },
   de: { chip: "Über dem Budget", frase: "Du bist {x} JC über dem Budget. Verkaufe Athleten, bis es ausgeglichen ist — sonst punktet dein Team in dieser Runde nicht." },
+  ja: { chip: "予算オーバー", frase: "予算を {x} JC 超えています。釣り合うまで選手を売ってください — そうしないと、このラウンドはチームが得点しません。" },
+  ru: { chip: "Превышен бюджет", frase: "Ты превысил бюджет на {x} JC. Продавай атлетов, пока не выровняешь — иначе твоя команда не наберёт очков в этом туре." },
 };
 // Loja de Judocoins (economia Fase B) — quando falta orçamento para contratar.
 // Comprar JC aumenta o orçamento da temporada. Mapa local por língua.
@@ -33,6 +35,8 @@ const LOJA_MK: Record<string, { curto: string; falta: string }> = {
   es: { curto: "Comprar Judocoins", falta: "¿Poco presupuesto para fichar? Compra Judocoins." },
   fr: { curto: "Acheter des Judocoins", falta: "Peu de budget pour recruter ? Achète des Judocoins." },
   de: { curto: "Judocoins kaufen", falta: "Wenig Budget für Verpflichtungen? Kaufe Judocoins." },
+  ja: { curto: "Judocoinsを買う", falta: "選手を獲得する予算が足りませんか？Judocoinsを買いましょう。" },
+  ru: { curto: "Купить Judocoins", falta: "Не хватает бюджета на атлетов? Купи Judocoins." },
 };
 // MODO ROLLING (Mundial/Olimpíadas) — banner e rótulo do botão, por língua.
 const ROLLING_MK: Record<string, { titulo: string; corpo: string; botaoTrancada: string }> = {
@@ -41,6 +45,8 @@ const ROLLING_MK: Record<string, { titulo: string; corpo: string; botaoTrancada:
   es: { titulo: "Modo Mundial", corpo: "El Mundial dura toda la semana. Cada categoría cierra cuando empieza su día — arma con las que aún faltan. Si entras a mitad, juegas por la experiencia y puntúas en las categorías restantes.", botaoTrancada: "Ya luchó" },
   fr: { titulo: "Mode Mondiaux", corpo: "Les Mondiaux durent toute la semaine. Chaque catégorie ferme au début de sa journée — compose avec celles qui restent. En arrivant en cours, tu joues pour l'expérience et marques dans les catégories restantes.", botaoTrancada: "A combattu" },
   de: { titulo: "WM-Modus", corpo: "Die WM läuft die ganze Woche. Jede Gewichtsklasse schließt zu Beginn ihres Tages — stelle mit den noch offenen auf. Wer mitten einsteigt, spielt für das Erlebnis und punktet in den verbleibenden Klassen.", botaoTrancada: "Gekämpft" },
+  ja: { titulo: "世界選手権モード", corpo: "World Championshipsは一週間続きます。各階級はその日が始まると締め切られます — まだ残っている階級で編成してください。途中から参加しても、体験を楽しみながら残りの階級で得点できます。", botaoTrancada: "試合済み" },
+  ru: { titulo: "Режим чемпионата мира", corpo: "World Championships идут всю неделю. Каждая весовая категория закрывается, когда начинается её день — собирай состав из тех, что ещё впереди. Присоединившись в середине, ты играешь ради впечатлений и набираешь очки в оставшихся категориях.", botaoTrancada: "Уже выступил" },
 };
 // Fase I — textos da experiência "monta para a próxima" (janela entre competições).
 // Guardados LOCALMENTE por língua (padrão já usado na FAQ/legal/consentimento),
@@ -84,6 +90,20 @@ const JANELA: Record<string, {
     jaPodes: "Du kannst dein Team schon für den nächsten aufstellen:",
     inscritosCedo: "Die Meldungen können sich bis kurz vor Beginn noch ändern — schau näher am Tag nochmal.",
     inscritosPerto: "Letzte Meldungen bestätigt. Prüfe deine Aufstellung!",
+  },
+  ja: {
+    etiqueta: "ライブ開催中",
+    trancado: "この大会のマーケットはラウンド中はロックされています。",
+    jaPodes: "次の大会に向けて、もうチームを編成できます：",
+    inscritosCedo: "エントリーは開始直前まで変わる可能性があります — 大会が近づいたら再度確認してください。",
+    inscritosPerto: "最終エントリーが確定しました。スタメンをもう一度確認してください！",
+  },
+  ru: {
+    etiqueta: "Идёт сейчас",
+    trancado: "Рынок этого соревнования заблокирован на время тура.",
+    jaPodes: "Ты уже можешь собрать команду на следующее:",
+    inscritosCedo: "Заявки ещё могут измениться ближе к старту — загляни ближе к дню соревнования.",
+    inscritosPerto: "Окончательные заявки подтверждены. Перепроверь свой состав!",
   },
 };
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
