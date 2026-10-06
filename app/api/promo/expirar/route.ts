@@ -14,7 +14,11 @@
 //
 // CONFIGURAR no cron-job.org (uma vez por dia):
 //   URL: https://www.ipponleague.com/api/promo/expirar?key=SEGREDO
-//   (com o www., senão dá 308). Só começa a rebaixar a partir de 1/11.
+//   (com o www., senão dá 308). PENHASCO: com a decisão de 06/10/2026 (Pro Max
+//   grátis para TODOS até ao início do ano), todas as contas têm
+//   promo_lancamento_ate = 01/01/2027 — por isso este cron só começa a rebaixar
+//   a partir de 1/1/2027. A lógica abaixo é guiada pela data de cada conta; não
+//   muda com a decisão, só os dados (as datas) mudaram.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
