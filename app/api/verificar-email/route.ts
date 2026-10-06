@@ -45,7 +45,7 @@ const MAIL_FROM = process.env.MAIL_FROM || "Ippon League <support@ipponleague.co
 /** Normaliza o valor de users.lingua para uma das 5 línguas (fallback pt). */
 function normLingua(v: unknown): LinguaNotif {
   const s = String(v || "").toLowerCase();
-  return (["pt", "en", "es", "fr", "de"].includes(s) ? s : "pt") as LinguaNotif;
+  return (["pt", "en", "es", "fr", "de", "ja", "ru"].includes(s) ? s : "pt") as LinguaNotif;
 }
 
 // Texto do email de confirmação, com tom caloroso, por língua. Mapa local (mesmo
@@ -105,6 +105,24 @@ const EMAIL: Record<LinguaNotif, TxtEmail> = {
     validade: (h) => `Dieser Link ist ${h} Stunden gültig.`,
     ignora: "Falls du dieses Konto nicht erstellt hast, ignoriere diese E-Mail einfach.",
     naoResponder: "Diese E-Mail ist automatisch — du musst nicht antworten.",
+  },
+  ja: {
+    assunto: "メールを確認してください — Ippon League",
+    saud: (nome) => (nome ? `こんにちは、${nome}さん！ご参加ありがとうございます。` : "こんにちは！ご参加ありがとうございます。"),
+    frase: "柔道ファンの公式ゲーム <strong>Ippon League</strong> にあなたを迎えられて、とてもうれしいです。メールを確認してアカウントを保護し、次の大会を見逃さないようにしましょう。",
+    botao: "メールを確認",
+    validade: (h) => `このリンクは${h}時間有効です。`,
+    ignora: "このアカウントを作成した覚えがない場合は、このメールを無視してください。",
+    naoResponder: "これは自動送信メールです。返信は不要です。",
+  },
+  ru: {
+    assunto: "Подтверди свою почту — Ippon League",
+    saud: (nome) => (nome ? `Привет, ${nome}! Рады, что ты с нами.` : "Привет! Рады, что ты с нами."),
+    frase: "Мы очень рады видеть тебя в <strong>Ippon League</strong>, официальной игре для фанатов дзюдо. Подтверди свою почту, чтобы защитить аккаунт и ничего не упустить в ближайших соревнованиях.",
+    botao: "Подтвердить почту",
+    validade: (h) => `Ссылка действует ${h} ч.`,
+    ignora: "Если ты не создавал этот аккаунт, просто проигнорируй это письмо.",
+    naoResponder: "Это автоматическое письмо — отвечать не нужно.",
   },
 };
 
