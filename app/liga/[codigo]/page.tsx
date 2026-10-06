@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
-import { focoMercado, CALENDARIO_2026, numeroDaRodada, nomeCompeticao, localizarNomeCompeticao, type SemanaCalendario } from "@/lib/calendario";
+import { focoMercado, CALENDARIO_TODAS, numeroDaRodada, nomeCompeticao, localizarNomeCompeticao, type SemanaCalendario } from "@/lib/calendario";
 import { competicaoPorId } from "@/lib/copa";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
 import { useFundador } from "@/lib/useFundador";
@@ -126,7 +126,9 @@ function dataDaSemana(s: SemanaCalendario): Date {
   // dropdown começar pelas últimas). Ligas sem janela (antigas) → todas as já
 // começadas até hoje. A competição que decorre agora também entra (é "a atual").
 function rodadasDaLiga(liga: LigaInfo, idAtual: string): SemanaCalendario[] {
-  const ordenado = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
+  // Cronológica por data (não por nº de semana): uma liga pode atravessar o ano,
+  // e a semana reinicia em janeiro — ordenar por `de` mantém 2026→2027 na ordem certa.
+  const ordenado = [...CALENDARIO_TODAS].sort((a, b) => a.de.localeCompare(b.de));
   // Limites da janela (se a liga os tiver).
   const compIni = competicaoPorId(String(liga.liga_competicao_inicial || ""));
   const iniDate = compIni ? dataDaSemana(compIni) : null;

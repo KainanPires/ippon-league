@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes, type IjfContest } from "@/lib/ijf";
 import { calcularForma, janelaDoAnoCivil, EXPECTATIVA_TOPO, EXPECTATIVA_TOPO_CLASSICO, type JanelaForma } from "@/lib/forma";
 import { MIN_PRICE } from "@/lib/engine";
-import { CALENDARIO_2026 } from "@/lib/calendario";
+import { CALENDARIO_TODAS } from "@/lib/calendario";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import type { Athlete, AthleteStatus } from "@/lib/athletes";
 // Trabalhador do 3D-3: calcula preços/forma REAIS de UMA categoria e atualiza o cache.
@@ -161,7 +161,7 @@ export async function GET(req: Request) {
 
   // JANELA DE CÁLCULO: só os clássicos a têm. Para um clássico de 2018, os
   // atletas são avaliados pela média DE 2018 — ver a explicação no topo.
-  const semana = CALENDARIO_2026.find((s) => s.idCompeticao === comp);
+  const semana = CALENDARIO_TODAS.find((s) => s.idCompeticao === comp);
   const janela: JanelaForma | undefined =
     semana?.classico && semana.anoOriginal ? janelaDoAnoCivil(semana.anoOriginal) : undefined;
 

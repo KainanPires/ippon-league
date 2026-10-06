@@ -19,7 +19,7 @@
 // resultado de CADA competição/rodada.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
-import { CALENDARIO_2026, rotuloRodada, type Nivel } from "@/lib/calendario";
+import { CALENDARIO_TODAS, rotuloRodada, type Nivel } from "@/lib/calendario";
 
 // Idempotência: marca o evento "fim_competicao:<id>" para não repetir.
 async function reservarEvento(chave: string): Promise<boolean> {
@@ -39,7 +39,7 @@ export async function notificarFimDeCompeticao(idComp: string): Promise<void> {
   if (!(await reservarEvento(`fim_competicao:${idComp}`))) return;
 
   // Dados da competição (nome + nível) a partir do calendário.
-  const sem = CALENDARIO_2026.find((c) => c.idCompeticao === String(idComp));
+  const sem = CALENDARIO_TODAS.find((c) => c.idCompeticao === String(idComp));
   const nomeComp = sem?.nome || "a competição";
   const nivel: Nivel | null = sem?.nivel ?? null;
   const rotulo = rotuloRodada(idComp) || "rodada";

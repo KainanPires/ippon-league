@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { useT, useLingua } from "@/lib/i18n";
-import { CALENDARIO_2026, nomeCompeticaoPorId, localizarNomeCompeticao, rotuloNivel } from "@/lib/calendario";
+import { CALENDARIO_TODAS, nomeCompeticaoPorId, localizarNomeCompeticao, rotuloNivel } from "@/lib/calendario";
 
 const GOLD = "#d9a441";
 const BG = "#0c0e0d";
@@ -108,7 +108,7 @@ export function ChaveLead() {
     return () => { vivo = false; };
   }, []);
 
-  const entrada = CALENDARIO_2026.find((c) => c.idCompeticao === comp);
+  const entrada = CALENDARIO_TODAS.find((c) => c.idCompeticao === comp);
   const nomeComp = comp ? (localizarNomeCompeticao(nomeCompeticaoPorId(comp) || "", t) || "") : "";
   const nivel = entrada ? rotuloNivel(entrada.nivel, t) : "";
   const teaser = cats.slice(0, 2);

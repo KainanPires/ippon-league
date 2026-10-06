@@ -12,7 +12,7 @@
 // decorrer ou a próxima com mercado aberto — focoMercado().alvo).
 import { useEffect, useRef } from "react";
 import {
-  CALENDARIO_2026,
+  calendarioDoAno,
   estadoMercado,
   competicaoFechada,
   focoMercado,
@@ -41,7 +41,7 @@ export default function CalendarioPage() {
   const t = useT();
   const foco = focoMercado();
   const alvoId = foco.alvo.idCompeticao;
-  const lista = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
+  const lista = [...calendarioDoAno(new Date().getFullYear())].sort((a, b) => a.semana - b.semana);
   // Cartão-alvo do scroll: o PRIMEIRO que ainda não terminou (em ordem
   // cronológica = o que está a decorrer ou o próximo). Se já tudo terminou, o último.
   let idxAlvo = lista.findIndex((s) => !competicaoFechada(s));

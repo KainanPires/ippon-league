@@ -23,7 +23,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { avaliar, piorEstado, type Estado, type Leitura } from "@/lib/referencias";
-import { CALENDARIO_2026, competicaoRollingAtiva, focoMercado } from "@/lib/calendario";
+import { CALENDARIO_TODAS, competicaoRollingAtiva, focoMercado } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -88,7 +88,7 @@ export async function GET(req: Request) {
       if (foco?.aDecorrer?.idCompeticao) { if (!comp) comp = String(foco.aDecorrer.idCompeticao); aoVivo = true; }
     } catch { /* segue */ }
   }
-  const nomeComp = comp ? (CALENDARIO_2026.find((c) => c.idCompeticao === comp)?.nome || `Competição ${comp}`) : null;
+  const nomeComp = comp ? (CALENDARIO_TODAS.find((c) => c.idCompeticao === comp)?.nome || `Competição ${comp}`) : null;
 
   const ctx = { aoVivo };
   const leiturasPainel: Leitura[] = [];

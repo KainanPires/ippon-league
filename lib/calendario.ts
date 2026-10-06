@@ -164,6 +164,94 @@ export const CALENDARIO_2026: SemanaCalendario[] = [
   { semana: 52, idCompeticao: "2284", nome: "Grand Slam 2022 — Clássico", nomeCompleto: "Grand Slam Tel Aviv 2022 — Clássico", nivel: "Grand Slam", de: "2026/12/26", classico: true, anoOriginal: 2022 },
 ];
 
+// ===========================================================================
+// CALENDÁRIO 2027 — construído a partir do calendário oficial da IJF (PDF de
+// 29/09/2026). A IJF ainda só publicou os grandes eventos (Grand Slams, Grand
+// Prix e o Mundial de Astana); as restantes semanas são CLÁSSICOS do banco
+// (usadoEm:2027). Quando a IJF acrescentar provas ao longo do ano, substituem-se
+// os clássicos pelas reais (re-busca no calendário da IJF).
+// ===========================================================================
+export const CALENDARIO_2027: SemanaCalendario[] = [
+  { semana: 1, idCompeticao: "2883", nome: "Grand Slam 2025 — Clássico", nomeCompleto: "Abu Dhabi Grand Slam 2025 — Clássico", nivel: "Grand Slam", de: "2027/01/09", classico: true, anoOriginal: 2025 },
+  { semana: 2, idCompeticao: "2879", nome: "Grand Slam 2025 — Clássico", nomeCompleto: "Ulaanbaatar Grand Slam 2025 — Clássico", nivel: "Grand Slam", de: "2027/01/16", classico: true, anoOriginal: 2025 },
+  { semana: 3, idCompeticao: "2876", nome: "Grand Slam 2025 — Clássico", nomeCompleto: "Qazaqstan Barysy Grand Slam 2025 — Clássico", nivel: "Grand Slam", de: "2027/01/23", classico: true, anoOriginal: 2025 },
+  { semana: 4, idCompeticao: "2873", nome: "Grand Slam 2025 — Clássico", nomeCompleto: "Dushanbe Grand Slam 2025 — Clássico", nivel: "Grand Slam", de: "2027/01/30", classico: true, anoOriginal: 2025 },
+  { semana: 5, idCompeticao: "3376", nome: "Paris Grand Slam 2027", nivel: "Grand Slam", de: "2027/02/05", classico: false },
+  { semana: 6, idCompeticao: "2874", nome: "Grand Slam 2025 — Clássico", nomeCompleto: "Tbilisi Grand Slam 2025 — Clássico", nivel: "Grand Slam", de: "2027/02/13", classico: true, anoOriginal: 2025 },
+  { semana: 7, idCompeticao: "3378", nome: "Baku Grand Slam 2027", nivel: "Grand Slam", de: "2027/02/19", classico: false },
+  { semana: 8, idCompeticao: "2871", nome: "Grand Slam 2025 — Clássico", nomeCompleto: "Tashkent Grand Slam 2025 — Clássico", nivel: "Grand Slam", de: "2027/02/27", classico: true, anoOriginal: 2025 },
+  { semana: 9, idCompeticao: "3377", nome: "Tashkent Grand Slam 2027", nivel: "Grand Slam", de: "2027/03/05", classico: false },
+  { semana: 10, idCompeticao: "3379", nome: "Grand Prix Upper Austria 2027", nivel: "Grand Prix", de: "2027/03/12", classico: false },
+  { semana: 11, idCompeticao: "2870", nome: "Grand Slam 2025 — Clássico", nomeCompleto: "Baku Grand Slam 2025 — Clássico", nivel: "Grand Slam", de: "2027/03/20", classico: true, anoOriginal: 2025 },
+  { semana: 12, idCompeticao: "3380", nome: "Tbilisi Grand Slam 2027", nivel: "Grand Slam", de: "2027/03/26", classico: false },
+  { semana: 13, idCompeticao: "2885", nome: "Grand Prix 2025 — Clássico", nomeCompleto: "Zagreb Grand Prix 2025 — Clássico", nivel: "Grand Prix", de: "2027/04/03", classico: true, anoOriginal: 2025 },
+  { semana: 14, idCompeticao: "3081", nome: "Grand Prix 2025 — Clássico", nomeCompleto: "Guadalajara Grand Prix 2025 — Clássico", nivel: "Grand Prix", de: "2027/04/10", classico: true, anoOriginal: 2025 },
+  { semana: 15, idCompeticao: "3086", nome: "Grand Prix 2025 — Clássico", nomeCompleto: "Lima Grand Prix 2025 — Clássico", nivel: "Grand Prix", de: "2027/04/17", classico: true, anoOriginal: 2025 },
+  { semana: 16, idCompeticao: "3085", nome: "Grand Prix 2025 — Clássico", nomeCompleto: "Qingdao Grand Prix 2025 — Clássico", nivel: "Grand Prix", de: "2027/04/24", classico: true, anoOriginal: 2025 },
+  { semana: 17, idCompeticao: "3381", nome: "Dushanbe Grand Slam 2027", nivel: "Grand Slam", de: "2027/04/30", classico: false },
+  { semana: 18, idCompeticao: "2872", nome: "Grand Prix 2025 — Clássico", nomeCompleto: "Grand Prix Upper Austria 2025 — Clássico", nivel: "Grand Prix", de: "2027/05/08", classico: true, anoOriginal: 2025 },
+  { semana: 19, idCompeticao: "2857", nome: "Grand Slam 2024 — Clássico", nomeCompleto: "Tokyo Grand Slam 2024 — Clássico", nivel: "Grand Slam", de: "2027/05/15", classico: true, anoOriginal: 2024 },
+  { semana: 20, idCompeticao: "2657", nome: "Grand Slam 2024 — Clássico", nomeCompleto: "Abu Dhabi Grand Slam 2024 — Clássico", nivel: "Grand Slam", de: "2027/05/22", classico: true, anoOriginal: 2024 },
+  { semana: 21, idCompeticao: "2651", nome: "Grand Slam 2024 — Clássico", nomeCompleto: "Qazaqstan Barysy Grand Slam 2024 — Clássico", nivel: "Grand Slam", de: "2027/05/29", classico: true, anoOriginal: 2024 },
+  { semana: 22, idCompeticao: "2650", nome: "Grand Slam 2024 — Clássico", nomeCompleto: "Dushanbe Grand Slam 2024 — Clássico", nivel: "Grand Slam", de: "2027/06/05", classico: true, anoOriginal: 2024 },
+  { semana: 23, idCompeticao: "3390", nome: "Mundial de Astana (Individuais)",         nivel: "Mundial",       de: "2027/06/07", classico: false,
+    rolling: {
+      // ESTIMATIVA: a IJF ainda não publicou que categoria luta em cada dia. Padrão do
+      // Baku 2026 (2 categorias/dia, da mais leve à mais pesada), fecho ~09:00 de Astana
+      // (UTC+5 = 04:00Z). A AFINAR quando sair o horário oficial por categoria.
+      fecho: {
+        "-60": "2027-06-07T04:00:00Z", "-48": "2027-06-07T04:00:00Z",
+        "-66": "2027-06-08T04:00:00Z", "-52": "2027-06-08T04:00:00Z",
+        "-73": "2027-06-09T04:00:00Z", "-57": "2027-06-09T04:00:00Z",
+        "-81": "2027-06-10T04:00:00Z", "-63": "2027-06-10T04:00:00Z",
+        "-90": "2027-06-11T04:00:00Z", "-70": "2027-06-11T04:00:00Z",
+        "-100": "2027-06-12T04:00:00Z", "-78": "2027-06-12T04:00:00Z",
+        "+100": "2027-06-13T04:00:00Z", "+78": "2027-06-13T04:00:00Z",
+      },
+      fim: "2027-06-14T00:00:00Z",
+    } },
+  { semana: 25, idCompeticao: "3382", nome: "Ulaanbaatar Grand Slam 2027", nivel: "Grand Slam", de: "2027/06/25", classico: false },
+  { semana: 26, idCompeticao: "3383", nome: "Qingdao Grand Prix 2027", nivel: "Grand Prix", de: "2027/07/02", classico: false },
+  { semana: 27, idCompeticao: "2649", nome: "Grand Slam 2024 — Clássico", nomeCompleto: "Antalya Grand Slam 2024 — Clássico", nivel: "Grand Slam", de: "2027/07/10", classico: true, anoOriginal: 2024 },
+  { semana: 28, idCompeticao: "2648", nome: "Grand Slam 2024 — Clássico", nomeCompleto: "Tbilisi Grand Slam 2024 — Clássico", nivel: "Grand Slam", de: "2027/07/17", classico: true, anoOriginal: 2024 },
+  { semana: 29, idCompeticao: "2658", nome: "Grand Slam 2024 — Clássico", nomeCompleto: "Baku Grand Slam 2024 — Clássico", nivel: "Grand Slam", de: "2027/07/24", classico: true, anoOriginal: 2024 },
+  { semana: 30, idCompeticao: "2656", nome: "Grand Prix 2024 — Clássico", nomeCompleto: "Zagreb Grand Prix 2024 — Clássico", nivel: "Grand Prix", de: "2027/07/31", classico: true, anoOriginal: 2024 },
+  { semana: 31, idCompeticao: "2647", nome: "Grand Prix 2024 — Clássico", nomeCompleto: "Grand Prix Upper Austria 2024 — Clássico", nivel: "Grand Prix", de: "2027/08/07", classico: true, anoOriginal: 2024 },
+  { semana: 32, idCompeticao: "2643", nome: "Grand Prix 2024 — Clássico", nomeCompleto: "Grand Prix Portugal 2024 — Clássico", nivel: "Grand Prix", de: "2027/08/14", classico: true, anoOriginal: 2024 },
+  { semana: 33, idCompeticao: "2453", nome: "Grand Slam 2023 — Clássico", nomeCompleto: "Abu Dhabi Grand Slam 2023 — Clássico", nivel: "Grand Slam", de: "2027/08/21", classico: true, anoOriginal: 2023 },
+  { semana: 34, idCompeticao: "3384", nome: "Lausanne Grand Slam 2027", nivel: "Grand Slam", de: "2027/08/27", classico: false },
+  { semana: 35, idCompeticao: "2445", nome: "Grand Slam 2023 — Clássico", nomeCompleto: "Ulaanbaatar Grand Slam 2023 — Clássico", nivel: "Grand Slam", de: "2027/09/04", classico: true, anoOriginal: 2023 },
+  { semana: 36, idCompeticao: "2615", nome: "Grand Slam 2023 — Clássico", nomeCompleto: "Qazaqstan Barysy Grand Slam 2023 — Clássico", nivel: "Grand Slam", de: "2027/09/11", classico: true, anoOriginal: 2023 },
+  { semana: 37, idCompeticao: "3386", nome: "Lima Grand Prix 2027", nivel: "Grand Prix", de: "2027/09/17", classico: false },
+  { semana: 38, idCompeticao: "2461", nome: "Grand Slam 2023 — Clássico", nomeCompleto: "Tashkent Grand Slam 2023 — Clássico", nivel: "Grand Slam", de: "2027/09/25", classico: true, anoOriginal: 2023 },
+  { semana: 39, idCompeticao: "3385", nome: "Hungary Grand Slam 2027", nivel: "Grand Slam", de: "2027/10/01", classico: false },
+  { semana: 40, idCompeticao: "2439", nome: "Grand Slam 2023 — Clássico", nomeCompleto: "Tel Aviv Grand Slam 2023 — Clássico", nivel: "Grand Slam", de: "2027/10/09", classico: true, anoOriginal: 2023 },
+  { semana: 41, idCompeticao: "2466", nome: "Grand Prix 2023 — Clássico", nomeCompleto: "Zagreb Grand Prix 2023 — Clássico", nivel: "Grand Prix", de: "2027/10/16", classico: true, anoOriginal: 2023 },
+  { semana: 42, idCompeticao: "3387", nome: "Abu Dhabi Grand Slam 2027", nivel: "Grand Slam", de: "2027/10/22", classico: false },
+  { semana: 43, idCompeticao: "2512", nome: "Grand Prix 2023 — Clássico", nomeCompleto: "Dushanbe Grand Prix 2023 — Clássico", nivel: "Grand Prix", de: "2027/10/30", classico: true, anoOriginal: 2023 },
+  { semana: 44, idCompeticao: "2564", nome: "Grand Prix 2023 — Clássico", nomeCompleto: "Grand Prix Upper Austria 2023 — Clássico", nivel: "Grand Prix", de: "2027/11/06", classico: true, anoOriginal: 2023 },
+  { semana: 45, idCompeticao: "3388", nome: "Zagreb Grand Prix 2027", nivel: "Grand Prix", de: "2027/11/12", classico: false },
+  { semana: 46, idCompeticao: "2437", nome: "Grand Prix 2023 — Clássico", nomeCompleto: "Grand Prix Portugal 2023 — Clássico", nivel: "Grand Prix", de: "2027/11/20", classico: true, anoOriginal: 2023 },
+  { semana: 47, idCompeticao: "2315", nome: "Grand Slam 2022 — Clássico", nomeCompleto: "Tokyo Grand Slam 2022 — Clássico", nivel: "Grand Slam", de: "2027/11/27", classico: true, anoOriginal: 2022 },
+  { semana: 48, idCompeticao: "3389", nome: "Tokyo Grand Slam 2027", nivel: "Grand Slam", de: "2027/12/04", classico: false },
+  { semana: 49, idCompeticao: "2311", nome: "Grand Slam 2022 — Clássico", nomeCompleto: "Baku Grand Slam 2022 — Clássico", nivel: "Grand Slam", de: "2027/12/11", classico: true, anoOriginal: 2022 },
+  { semana: 50, idCompeticao: "2309", nome: "Grand Slam 2022 — Clássico", nomeCompleto: "Abu Dhabi Grand Slam 2022 — Clássico", nivel: "Grand Slam", de: "2027/12/18", classico: true, anoOriginal: 2022 },
+  { semana: 51, idCompeticao: "2296", nome: "Grand Slam 2022 — Clássico", nomeCompleto: "Grand Slam Hungary 2022 — Clássico", nivel: "Grand Slam", de: "2027/12/25", classico: true, anoOriginal: 2022 },
+  { semana: 52, idCompeticao: "2364", nome: "Grand Slam 2022 — Clássico", nomeCompleto: "Ulaanbaatar Grand Slam 2022 — Clássico", nivel: "Grand Slam", de: "2027/12/31", classico: true, anoOriginal: 2022 },
+];
+
+// UNIÃO DE TODOS OS ANOS — usada nas buscas por ID (nome, nº da rodada, fuso,
+// pontos visíveis, rolling). Assim uma competição de qualquer ano é encontrada.
+export const CALENDARIO_TODAS: SemanaCalendario[] = [...CALENDARIO_2026, ...CALENDARIO_2027];
+
+/**
+ * A lista do ANO pedido. 2026 e 2027 têm calendário próprio; anos posteriores
+ * reutilizam o de 2027 até alguém montar o seu (tal como antes de 2027 existir).
+ */
+export function calendarioDoAno(ano: number): SemanaCalendario[] {
+  return ano <= 2026 ? CALENDARIO_2026 : CALENDARIO_2027;
+}
+
 /** Devolve a semana ISO (1..53) de uma data. */
 export function semanaISO(d: Date): number {
   const data = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -173,25 +261,35 @@ export function semanaISO(d: Date): number {
   return Math.ceil((((data.getTime() - inicioAno.getTime()) / 86400000) + 1) / 7);
 }
 
-/** A competição da semana atual; se já passou, a próxima a contar. */
+/** A competição da semana atual; se já passou, a próxima a contar. CONSCIENTE DO
+ *  ANO: usa o calendário do ano de `hoje`; na última semana do ano salta para a
+ *  1ª do ano seguinte, para uma liga/mata-mata não parar na viragem do ano. */
 export function competicaoDaSemana(hoje: Date = new Date()): SemanaCalendario {
   const wk = semanaISO(hoje);
-  const ordenado = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
+  const ano = hoje.getFullYear();
+  const ordenado = [...calendarioDoAno(ano)].sort((a, b) => a.semana - b.semana);
   // a competição desta semana, ou a primeira semana à frente que exista
   const atualOuProxima = ordenado.find((s) => s.semana >= wk);
-  return atualOuProxima || ordenado[ordenado.length - 1];
+  if (atualOuProxima) return atualOuProxima;
+  // já passou a última semana deste ano -> a 1ª competição do ano seguinte.
+  const proxAno = [...calendarioDoAno(ano + 1)].sort((a, b) => a.semana - b.semana);
+  return proxAno[0] || ordenado[ordenado.length - 1];
 }
 
-/** A competição seguinte a uma dada (a próxima semana com competição). */
+/** A competição seguinte a uma dada (a próxima no tempo). Ordena por data (`de`),
+ *  por isso ATRAVESSA O ANO: a seguir à última de 2026 vem a 1ª de 2027. */
 export function proximaDepoisDe(atual: SemanaCalendario): SemanaCalendario {
-  const ordenado = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
-  const seguinte = ordenado.find((s) => s.semana > atual.semana);
-  return seguinte || ordenado[0]; // se for a última do ano, volta ao início
+  const ordenado = [...CALENDARIO_TODAS].sort((a, b) => a.de.localeCompare(b.de));
+  const i = ordenado.findIndex((s) => s.idCompeticao === atual.idCompeticao && s.de === atual.de);
+  if (i >= 0 && ordenado[i + 1]) return ordenado[i + 1];
+  return ordenado[0]; // se for a última de tudo, volta ao início
 }
 
-/** Lista só das competições reais (não-clássicas) — útil para o cron. */
+/** Lista das competições reais (não-clássicas) de TODOS os anos, ordenada por
+ *  data. Quem precisa de um ano específico filtra por `de` (ex.: a liga oficial
+ *  anual). Inclui 2026 e 2027. */
 export function competicoesReais(): SemanaCalendario[] {
-  return CALENDARIO_2026.filter((s) => !s.classico);
+  return [...CALENDARIO_TODAS].filter((s) => !s.classico).sort((a, b) => a.de.localeCompare(b.de));
 }
 
 // NÚMERO DA RODADA — cada competição do ano é uma rodada numerada, do início de
@@ -199,7 +297,7 @@ export function competicoesReais(): SemanaCalendario[] {
 // rodada é o número da semana (1..52). Conta TODAS as competições, clássicos
 // incluídos. Devolve null se o id não estiver no calendário.
 export function numeroDaRodada(idCompeticao: string): number | null {
-  const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
+  const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === String(idCompeticao));
   return s ? s.semana : null;
 }
 
@@ -274,7 +372,7 @@ export function aplicarHorarios(map: Record<string, string | null | undefined>):
 
 /** O início efetivo (override manual, senão o do calendário). undefined se nenhum. */
 export function horarioEfetivo(idCompeticao: string): string | undefined {
-  const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
+  const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === String(idCompeticao));
   return OVERRIDES[String(idCompeticao)] || s?.inicioUTC;
 }
 
@@ -349,7 +447,7 @@ function dentroJanelaRolling(s: SemanaCalendario, agora: Date): boolean {
 
 /** O evento rolling ATIVO neste instante (o Mundial durante a sua semana), se houver. */
 export function competicaoRollingAtiva(agora: Date = new Date()): SemanaCalendario | null {
-  return CALENDARIO_2026.find((s) => dentroJanelaRolling(s, agora)) || null;
+  return CALENDARIO_TODAS.find((s) => dentroJanelaRolling(s, agora)) || null;
 }
 
 /**
@@ -587,7 +685,7 @@ export function nomeCompeticao(s: SemanaCalendario, agora: Date = new Date()): s
 
 /** O mesmo, mas a partir do id da competição. "" se o id não estiver no calendário. */
 export function nomeCompeticaoPorId(idCompeticao: string, agora: Date = new Date()): string {
-  const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
+  const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === String(idCompeticao));
   return s ? nomeCompeticao(s, agora) : "";
 }
 
@@ -619,7 +717,7 @@ export function pontosVisiveis(s: SemanaCalendario, agora: Date = new Date()): b
 
 /** O mesmo, pelo id da competição. Desconhecida => false (fecha por omissão). */
 export function pontosVisiveisPorId(idCompeticao: string, agora: Date = new Date()): boolean {
-  const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
+  const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === String(idCompeticao));
   return s ? pontosVisiveis(s, agora) : false;
 }
 
@@ -629,7 +727,7 @@ export function pontosVisiveisPorId(idCompeticao: string, agora: Date = new Date
  * Serve o editor de horários: a cidade -> fuso é automática.
  */
 export function fusoDaCompeticao(idCompeticao: string): number | null {
-  const s = CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao));
+  const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === String(idCompeticao));
   if (!s) return null;
   const f = FUSO_POR_CIDADE[chaveCidade(s.nome)];
   return f === undefined ? null : f;

@@ -19,7 +19,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, type IjfContest } from "@/lib/ijf";
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
-import { CALENDARIO_2026, pontosVisiveis } from "@/lib/calendario";
+import { CALENDARIO_TODAS, pontosVisiveis } from "@/lib/calendario";
 import { hidratarHorarios } from "@/lib/horarios";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -52,7 +52,7 @@ export async function GET(req: Request) {
   // porta para as espreitar e ir afinando a equipa até maximizar a pontuação.
   // Competições fora do calendário passam à frente (não são rodadas geridas aqui).
   await hidratarHorarios();
-  const semanaComp = CALENDARIO_2026.find((c) => c.idCompeticao === comp);
+  const semanaComp = CALENDARIO_TODAS.find((c) => c.idCompeticao === comp);
   // "Esconder os pontos?" — rolling-aware (igual ao /api/resultados). No rolling,
   // o mercado fica "aberto" a semana toda mas os pontos das categorias já travadas
   // aparecem (pontosVisiveis rolling=true). Normal: só com o mercado FECHADO.

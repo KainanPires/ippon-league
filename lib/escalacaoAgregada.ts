@@ -21,7 +21,7 @@
 // `resultados_atletas` usam `id_competicao` (português). É assim na base — não
 // é gralha.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { CALENDARIO_2026 } from "@/lib/calendario";
+import { CALENDARIO_TODAS } from "@/lib/calendario";
 
 export interface AtletaMeta { name: string; countryIso: string; category: string; gender: string }
 
@@ -52,14 +52,14 @@ export interface AgregadoEscalacao {
 /** ids de competições do calendário cujo `de` cai num ano. */
 export function compsDoAno(ano: number): string[] {
   const pref = `${ano}/`;
-  return CALENDARIO_2026.filter((c) => c.de.startsWith(pref)).map((c) => c.idCompeticao);
+  return CALENDARIO_TODAS.filter((c) => c.de.startsWith(pref)).map((c) => c.idCompeticao);
 }
 
 /** ids de competições do calendário cujo `de` cai num mês (AAAA-MM). */
 export function compsDoMes(anoMes: string): string[] {
   const [ano, mes] = anoMes.split("-");
   const pref = `${ano}/${mes}/`;
-  return CALENDARIO_2026.filter((c) => c.de.startsWith(pref)).map((c) => c.idCompeticao);
+  return CALENDARIO_TODAS.filter((c) => c.de.startsWith(pref)).map((c) => c.idCompeticao);
 }
 
 /** Mapa id->meta a partir dos atletas_cache das competições dadas. */

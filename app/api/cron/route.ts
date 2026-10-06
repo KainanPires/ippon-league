@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { competicaoDaSemana, competicaoFechada, focoMercado, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
+import { competicaoDaSemana, competicaoFechada, focoMercado, CALENDARIO_TODAS, type SemanaCalendario } from "@/lib/calendario";
 import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes } from "@/lib/ijf";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { congelarCompeticao } from "@/lib/congelar";
@@ -286,7 +286,7 @@ type ResumoCongelamento = { comp: string; nome: string; processados: number; fal
 async function congelarRecentes(hoje: Date, t0: number): Promise<{ feitos: ResumoCongelamento[]; parouPorTempo: boolean }> {
   const agora = hoje.getTime();
   const janelaMs = JANELA_DIAS * 24 * 60 * 60 * 1000;
-  const candidatas = CALENDARIO_2026.filter((s) => {
+  const candidatas = CALENDARIO_TODAS.filter((s) => {
       const inicio = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
       const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
       return dentroDaJanela && competicaoFechada(s, hoje); // só as JÁ TERMINADAS (60h)
@@ -958,7 +958,7 @@ export async function GET(req: Request) {
   if (soDiag) {
     const agora = hoje.getTime();
     const janelaMs = JANELA_DIAS * 24 * 60 * 60 * 1000;
-    const linhas = CALENDARIO_2026.map((s) => {
+    const linhas = CALENDARIO_TODAS.map((s) => {
         const inicio = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
         const horas = Math.round(((agora - inicio) / 3600000) * 10) / 10;
         const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
@@ -1006,7 +1006,7 @@ export async function GET(req: Request) {
       await supabaseAdmin.from("resultados_atletas").delete().eq("id_competicao", recongelarId);
       await supabaseAdmin.from("resultados_rodada").delete().eq("id_competicao", recongelarId);
     }
-    const s = CALENDARIO_2026.find((c) => c.idCompeticao === recongelarId);
+    const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === recongelarId);
     const mes = s ? s.de.slice(0, 7).replace("/", "-") : new Date().toISOString().slice(0, 7);
     const anoEpoca = s ? parseInt(s.de.slice(0, 4), 10) : hoje.getUTCFullYear();
     const r = await congelarCompeticao(recongelarId, mes, anoEpoca);
@@ -1015,7 +1015,7 @@ export async function GET(req: Request) {
   // Disparo manual de congelamento de UMA competição (teste): ?congelar=ID
   const congelarId = (searchParams.get("congelar") || "").trim();
   if (congelarId) {
-    const s = CALENDARIO_2026.find((c) => c.idCompeticao === congelarId);
+    const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === congelarId);
     const mes = s ? s.de.slice(0, 7).replace("/", "-") : new Date().toISOString().slice(0, 7);
     const anoEpoca = s ? parseInt(s.de.slice(0, 4), 10) : hoje.getUTCFullYear();
     const r = await congelarCompeticao(congelarId, mes, anoEpoca);
@@ -1044,7 +1044,7 @@ export async function GET(req: Request) {
     if (refazer && supabaseAdmin) {
       await supabaseAdmin.from("melhores_rodada").delete().eq("id_competicao", soMelhores);
     }
-    const s = CALENDARIO_2026.find((c) => c.idCompeticao === soMelhores);
+    const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === soMelhores);
     const nome = s ? s.nome : soMelhores;
     let r: { gravados: number; jaExistia: boolean; push: number } = { gravados: 0, jaExistia: false, push: 0 };
     // Disparo MANUAL: o erro tem de aparecer. Num catch vazio, a resposta vem

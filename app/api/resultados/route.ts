@@ -35,7 +35,7 @@
 // à mão (/api/resultados?comp=1598&persons=...) contornaria qualquer bloqueio de
 // interface. Mesma regra e mesmo espírito do /api/equipa-na-rodada.
 //
-// Competições fora do CALENDARIO_2026 passam à frente: não são rodadas geridas
+// Competições fora do CALENDARIO_TODAS passam à frente: não são rodadas geridas
 // pelo jogo, não há mercado para respeitar.
 // ---------------------------------------------------------------------------
 //
@@ -52,7 +52,7 @@ import {
   isHansokuMake,
   type IjfContest,
 } from "@/lib/ijf";
-import { CALENDARIO_2026, pontosVisiveisPorId } from "@/lib/calendario";
+import { CALENDARIO_TODAS, pontosVisiveisPorId } from "@/lib/calendario";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -117,7 +117,7 @@ export async function GET(req: Request) {
 
   // PORTÃO ANTI-ESPREITADELA: mercado ainda aberto -> não há pontos para ver.
   // (Ver a explicação no cabeçalho. Competições fora do calendário passam.)
-  const noCalendario = CALENDARIO_2026.some((c) => c.idCompeticao === comp);
+  const noCalendario = CALENDARIO_TODAS.some((c) => c.idCompeticao === comp);
   if (noCalendario && !pontosVisiveisPorId(comp)) {
     return NextResponse.json({
       comp,

@@ -19,7 +19,7 @@
 // ---------------------------------------------------------------------------
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { CALENDARIO_2026, nomeCompeticao, competicaoFechada, numeroDaRodada } from "@/lib/calendario";
+import { CALENDARIO_TODAS, calendarioDoAno, nomeCompeticao, competicaoFechada, numeroDaRodada } from "@/lib/calendario";
 import { NOME_CONTINENTE, type Continente } from "@/lib/continentes";
 import {
   noticiaMelhorRodada, noticiaAtletaDestaque, noticiaValorizacao,
@@ -59,8 +59,8 @@ export async function GET(req: Request) {
   const agora = new Date();
   // Que competições noticiar: a forçada, ou as que terminaram há pouco.
   const semanas = compForcada
-    ? CALENDARIO_2026.filter((s) => s.idCompeticao === compForcada)
-    : CALENDARIO_2026.filter((s) => {
+    ? CALENDARIO_TODAS.filter((s) => s.idCompeticao === compForcada)
+    : CALENDARIO_TODAS.filter((s) => {
         const ini = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
         const dias = (agora.getTime() - ini) / 86400000;
         return dias >= 0 && dias <= JANELA_DIAS && competicaoFechada(s, agora);
@@ -333,7 +333,7 @@ export async function GET(req: Request) {
         return { nome: String(data?.nome || ""), escudo: data?.escudo ?? null };
       };
       // Quantas rodadas teve o ano, para dizer a média por rodada.
-      const rodadasDoAno = CALENDARIO_2026.length;
+      const rodadasDoAno = calendarioDoAno(new Date().getFullYear()).length;
       // Agrupa por âmbito: mundial, e um por continente.
       const porAmbito = new Map<string, typeof podios>();
       for (const p of podios || []) {

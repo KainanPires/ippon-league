@@ -22,7 +22,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { competicaoDaSemana, CALENDARIO_2026 } from "@/lib/calendario";
+import { competicaoDaSemana, CALENDARIO_TODAS } from "@/lib/calendario";
 import {
   calcularEscalacoes, lerAgregado, guardarAgregado,
   compsDoAno, compsDoMes, type AgregadoEscalacao, type LinhaEscalacao,
@@ -91,7 +91,7 @@ export async function GET(req: Request) {
     chave = `mes:${mes}`; rotulo = mes; comps = compsDoMes(mes);
   } else {
     const comp = (searchParams.get("comp") || "").trim() || competicaoDaSemana(hoje).idCompeticao;
-    const entrada = CALENDARIO_2026.find((c) => c.idCompeticao === comp);
+    const entrada = CALENDARIO_TODAS.find((c) => c.idCompeticao === comp);
     chave = `comp:${comp}`;
     rotulo = entrada?.nome || `Competição ${comp}`;
     comps = [comp];

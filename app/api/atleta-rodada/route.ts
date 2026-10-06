@@ -55,7 +55,7 @@ import {
 import { getCompetitorResults } from "@/lib/scout";
 import { estadoDoAtleta, textoEstado, type EstadoAtleta } from "@/lib/estado-atleta";
 import { POINTS, type ActionType } from "@/lib/engine";
-import { CALENDARIO_2026, pontosVisiveisPorId } from "@/lib/calendario";
+import { CALENDARIO_TODAS, pontosVisiveisPorId } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -216,7 +216,7 @@ export async function GET(req: Request) {
   // PORTÃO ANTI-ESPREITADELA: com o mercado aberto, não se vê nada. Devolve a
   // MESMA forma de um atleta sem lutas, para o cliente não precisar de saber
   // nada de novo (mostra "ainda não tem lutas registadas").
-  const noCalendario = CALENDARIO_2026.some((c) => c.idCompeticao === comp);
+  const noCalendario = CALENDARIO_TODAS.some((c) => c.idCompeticao === comp);
   if (noCalendario && !pontosVisiveisPorId(comp)) {
     return NextResponse.json({
       comp,

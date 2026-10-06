@@ -7,7 +7,7 @@ import { loadSavedFor, loadDraftFor, saveDraftFor, loadDraftTsFor, commitSavedFo
 import { type Athlete } from "@/lib/athletes";
 import { computeNewPrice } from "@/lib/engine";
 import { supabase } from "@/lib/supabase";
-import { focoMercado, numeroDaRodada, nomeCompeticao, pontosVisiveisPorId, categoriaTrancada, CALENDARIO_2026, localizarNomeCompeticao } from "@/lib/calendario";
+import { focoMercado, numeroDaRodada, nomeCompeticao, pontosVisiveisPorId, categoriaTrancada, CALENDARIO_TODAS, localizarNomeCompeticao } from "@/lib/calendario";
 import { CartaoEquipa } from "@/components/CartaoEquipa";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, deveMostrarTutorial, type TutKey } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
@@ -215,7 +215,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   const { cor: corFaixa, nome: nomeFaixa } = useFaixa();
   const foco = focoMercado();
   // Rolling-aware: no Mundial o aDecorrer é null, mas a competição está a decorrer.
-  const semanaDoComp = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
+  const semanaDoComp = CALENDARIO_TODAS.find((s) => s.idCompeticao === idComp);
   const aDecorrerAgora = foco.aDecorrer?.idCompeticao === idComp || !!semanaDoComp?.rolling;
   // No rolling (Mundial), o atleta do rival só aparece quando a categoria dele já
   // fechou (já compete, não dá para copiar). As categorias ainda abertas vêm
@@ -226,7 +226,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   // mostramo-la como DD/MM/AAAA. rodadaNum é o nº da rodada (1..52) ou null.
   const rodadaNum = numeroDaRodada(idComp);
   const dataRodada = (() => {
-      const ent = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
+      const ent = CALENDARIO_TODAS.find((s) => s.idCompeticao === idComp);
       if (!ent || !ent.de) return "";
       const partes = ent.de.split("/"); // [AAAA, MM, DD]
       if (partes.length !== 3) return "";
@@ -237,7 +237,7 @@ function DojoVisita({ alvoUserId, idComp }: { alvoUserId: string; idComp: string
   // por abrir. Importa sobretudo no ecrã "mercado ainda aberto" — seria absurdo
   // dizer "ainda não podes ver" e no mesmo fôlego revelar a cidade de 2018.
   const nomeCompMostrar = (() => {
-      const ent = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
+      const ent = CALENDARIO_TODAS.find((s) => s.idCompeticao === idComp);
       return localizarNomeCompeticao(ent ? nomeCompeticao(ent) : nomeComp, t);
     })();
   // 1) Sessão (exige login) + equipa do alvo (servidor) + pool da competição.
@@ -805,7 +805,7 @@ function MeuTimeInner() {
       buscarPontos();
       // Atualiza ao vivo também no rolling (Mundial): o mercado fica "aberto" mas
       // as categorias travadas estão a pontuar e os pontos têm de subir sozinhos.
-      const semanaAtual = CALENDARIO_2026.find((s) => s.idCompeticao === idComp);
+      const semanaAtual = CALENDARIO_TODAS.find((s) => s.idCompeticao === idComp);
       const aDecorrerAgora = (emAndamento && idComp === atual.idCompeticao) || !!semanaAtual?.rolling;
       if (!aDecorrerAgora) {
         return () => { active = false; };

@@ -23,7 +23,7 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useT, useLingua } from "@/lib/i18n";
 import { SeletorLingua } from "@/components/SeletorLingua";
-import { CALENDARIO_2026, nomeCompeticaoPorId, localizarNomeCompeticao, rotuloNivel } from "@/lib/calendario";
+import { CALENDARIO_TODAS, nomeCompeticaoPorId, localizarNomeCompeticao, rotuloNivel } from "@/lib/calendario";
 // Reaproveita o TUTORIAL de instalação que já existe (passo a passo iPhone/Android),
 // só com uma chamada puxada pelo interesse, nesta página do funil.
 import { TutorialInstalar } from "@/components/InstalarApp";
@@ -187,7 +187,7 @@ export default function EventoPage() {
   }, [comp]);
 
   // Nome + nível da competição, do calendário (localizados).
-  const entrada = CALENDARIO_2026.find((c) => c.idCompeticao === comp);
+  const entrada = CALENDARIO_TODAS.find((c) => c.idCompeticao === comp);
   const nomeComp = localizarNomeCompeticao(nomeCompeticaoPorId(comp) || "", t) || `#${comp}`;
   const nivel = entrada ? rotuloNivel(entrada.nivel, t) : "";
 

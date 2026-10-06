@@ -9,13 +9,13 @@
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { CALENDARIO_2026 } from "@/lib/calendario";
+import { CALENDARIO_TODAS } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 function nomeCompeticao(idComp: string): string {
-  const s = CALENDARIO_2026.find((c) => c.idCompeticao === idComp);
+  const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === idComp);
   return s ? s.nome : `Competição ${idComp}`;
 }
 

@@ -44,7 +44,7 @@
 // Uso: /api/equipa-na-rodada?user=<uuid>&comp=<id_competicao>
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { CALENDARIO_2026, estadoMercado, nomeCompeticao, categoriaTrancada } from "@/lib/calendario";
+import { CALENDARIO_TODAS, estadoMercado, nomeCompeticao, categoriaTrancada } from "@/lib/calendario";
 import { hidratarHorarios } from "@/lib/horarios";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +52,7 @@ export const runtime = "nodejs";
 
 // Nome a MOSTRAR desta competição (cidade escondida se for clássico por abrir).
 function nomeParaMostrar(id: string): string {
-  const s = CALENDARIO_2026.find((c) => c.idCompeticao === id);
+  const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === id);
   return s ? nomeCompeticao(s) : `Competição ${id}`;
 }
 
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
   // (Se a competição não estiver no calendário, não há "mercado" gerido aqui;
   // nesse caso seguimos em frente — só os ids do calendário valem como rodadas.)
   await hidratarHorarios();
-  const semana = CALENDARIO_2026.find((c) => c.idCompeticao === comp);
+  const semana = CALENDARIO_TODAS.find((c) => c.idCompeticao === comp);
   const rolling = !!semana?.rolling;
   if (semana && !rolling && estadoMercado(semana).estado === "aberto") {
     return NextResponse.json({

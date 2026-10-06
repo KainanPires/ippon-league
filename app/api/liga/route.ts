@@ -33,12 +33,12 @@
 // PORTAO ANTI-ESPREITADELA: com o mercado ainda ABERTO esta rota nao devolve
 // pontos, pela mesma razao do /api/resultados - nos classicos as lutas ja
 // existem no JudoBase, e o ranking da liga era uma forma de as espreitar sem
-// passar pelo Meu Time. Competicoes fora do CALENDARIO_2026 passam a frente.
+// passar pelo Meu Time. Competicoes fora do CALENDARIO_TODAS passam a frente.
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getCompetitorContests, scoreContestForPerson, type IjfContest } from "@/lib/ijf";
-import { CALENDARIO_2026, pontosVisiveisPorId } from "@/lib/calendario";
+import { CALENDARIO_TODAS, pontosVisiveisPorId } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -110,7 +110,7 @@ export async function GET(req: Request) {
 
   // 4) Mercado ainda aberto? Entao ninguem ve pontos. Devolve a lista com quem
   //    ja escalou, tudo a zero.
-  const noCalendario = CALENDARIO_2026.some((c) => c.idCompeticao === comp);
+  const noCalendario = CALENDARIO_TODAS.some((c) => c.idCompeticao === comp);
   const bloqueado = noCalendario && !pontosVisiveisPorId(comp);
 
   // 5) Pontuacao por atleta. So se buscam os atletas que alguem escalou, e cada

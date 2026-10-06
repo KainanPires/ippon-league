@@ -16,13 +16,13 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Mascot } from "@/components/Mascot";
 import { useT } from "@/lib/i18n";
-import { CALENDARIO_2026, competicaoDaSemana, proximaDepoisDe, fusoDaCompeticao } from "@/lib/calendario";
+import { CALENDARIO_TODAS, competicaoDaSemana, proximaDepoisDe, fusoDaCompeticao } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
 
-const COMPS = CALENDARIO_2026.filter((s) => !s.classico).sort((a, b) => a.semana - b.semana);
+const COMPS = CALENDARIO_TODAS.filter((s) => !s.classico).sort((a, b) => a.de.localeCompare(b.de));
 const CATS_M = ["-60", "-66", "-73", "-81", "-90", "-100", "+100"];
 const CATS_F = ["-48", "-52", "-57", "-63", "-70", "-78", "+78"];
 const POOLS = ["A", "B", "C", "D"] as const;
@@ -32,7 +32,7 @@ function compPorOmissao(): string {
   const atual = competicaoDaSemana(new Date());
   if (!atual.classico) return atual.idCompeticao;
   let s = atual;
-  for (let i = 0; i < CALENDARIO_2026.length; i++) {
+  for (let i = 0; i < CALENDARIO_TODAS.length; i++) {
     s = proximaDepoisDe(s);
     if (!s.classico) return s.idCompeticao;
   }
@@ -170,7 +170,7 @@ export default function EditorChave() {
       // Horário: override guardado, senão o do calendário (se houver).
       const mapa = (rHor?.horarios && typeof rHor.horarios === "object" ? rHor.horarios : {}) as Record<string, string>;
       setHorariosMap(mapa);
-      const doCalendario = CALENDARIO_2026.find((s) => s.idCompeticao === idc)?.inicioUTC || "";
+      const doCalendario = CALENDARIO_TODAS.find((s) => s.idCompeticao === idc)?.inicioUTC || "";
       const stored = mapa[idc] || doCalendario;
       setHorarioLocal(stored ? stored.slice(0, 16) : "");
     } finally {

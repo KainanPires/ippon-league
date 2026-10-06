@@ -22,7 +22,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { montarChaveDaBase } from "@/lib/montarChave";
-import { focoMercado, CALENDARIO_2026 } from "@/lib/calendario";
+import { focoMercado, CALENDARIO_TODAS } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -66,7 +66,7 @@ function escolherCompeticao(idsComMolduras: Set<string>): string {
   //    Ordena as entradas do calendário que têm molduras por data desc e escolhe
   //    a primeira cuja data de início já passou. Se nenhuma tiver começado (caso
   //    raro), escolhe a mais recente à mesma.
-  const comMoldura = CALENDARIO_2026
+  const comMoldura = CALENDARIO_TODAS
     .filter((c) => idsComMolduras.has(String(c.idCompeticao)))
     .map((c) => ({ id: String(c.idCompeticao), ms: dataMs(c.de) }))
     .sort((a, b) => b.ms - a.ms);
@@ -83,7 +83,7 @@ function escolherCompeticao(idsComMolduras: Set<string>): string {
 
 // Nome legível da competição (do calendário), para a página mostrar no rótulo.
 function nomeDaCompeticao(id: string): string | null {
-  const c = CALENDARIO_2026.find((x) => String(x.idCompeticao) === String(id));
+  const c = CALENDARIO_TODAS.find((x) => String(x.idCompeticao) === String(id));
   return c ? c.nome : null;
 }
 

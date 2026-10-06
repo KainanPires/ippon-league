@@ -33,7 +33,7 @@ import { useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { useFaixa } from "@/lib/useFaixa";
 import { marcarTutorialVisto } from "@/lib/tutorials";
-import { focoMercado, nomeCompeticao, numeroDaRodada, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
+import { focoMercado, nomeCompeticao, numeroDaRodada, CALENDARIO_TODAS, type SemanaCalendario } from "@/lib/calendario";
 import { useT } from "@/lib/i18n";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
@@ -73,7 +73,7 @@ export function AvisoEquipaGuardada({
 
   // Competição para a qual se acabou de escalar. Por omissão, a alvo do momento.
   const alvo = idCompeticao
-    ? (CALENDARIO_2026.find((c) => c.idCompeticao === String(idCompeticao)) ?? focoMercado().alvo)
+    ? (CALENDARIO_TODAS.find((c) => c.idCompeticao === String(idCompeticao)) ?? focoMercado().alvo)
     : focoMercado().alvo;
 
   const nome = nomeProp ?? nomeCompeticao(alvo);

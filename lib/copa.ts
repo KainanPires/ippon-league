@@ -10,7 +10,7 @@
 // — eliminação + repescagem em cadeia (4 cadeias) + cruzamento diagonal + 2
 // bronzes + final por pontos ACUMULADOS. Funções puras, prontas para o apurar
 // ser migrado para este modelo (Fase 3). NÃO removem nem alteram o que está acima.
-import { proximaDepoisDe, CALENDARIO_2026, type SemanaCalendario } from "@/lib/calendario";
+import { proximaDepoisDe, CALENDARIO_TODAS, type SemanaCalendario } from "@/lib/calendario";
 // Um confronto da 1ª ronda, pronto para gravar em copa_confrontos.
 export interface ConfrontoInicial {
   ronda: number;        // 1
@@ -137,7 +137,7 @@ export function gerarPrimeiraRonda(
 }
 // Encontra a competição inicial no calendário pelo id. (Para validar e encadear.)
 export function competicaoPorId(id: string): SemanaCalendario | null {
-  return CALENDARIO_2026.find((s) => s.idCompeticao === id) ?? null;
+  return CALENDARIO_TODAS.find((s) => s.idCompeticao === id) ?? null;
 }
 // Dado o id de uma competição, devolve o id da SEGUINTE (para a próxima ronda).
 // Usado na Fase C, mas vive aqui porque é lógica de copa.

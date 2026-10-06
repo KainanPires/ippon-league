@@ -30,7 +30,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { enviarPushPara } from "@/lib/pushServer";
 import { renderNotif, agruparPorLingua, type LinguaNotif } from "@/lib/i18nServidor";
-import { CALENDARIO_2026, competicaoRollingAtiva, focoMercado } from "@/lib/calendario";
+import { CALENDARIO_TODAS, competicaoRollingAtiva, focoMercado } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
   if (!comp) {
     return NextResponse.json({ ok: true, comp: null, nada: "Nenhuma competição a decorrer." });
   }
-  const nomeComp = CALENDARIO_2026.find((c) => c.idCompeticao === comp)?.nome || `Competição ${comp}`;
+  const nomeComp = CALENDARIO_TODAS.find((c) => c.idCompeticao === comp)?.nome || `Competição ${comp}`;
 
   // 1) Favoritos (global, por atleta). Base pequena.
   const { data: favRows } = await supabaseAdmin

@@ -23,7 +23,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { CALENDARIO_2026 } from "@/lib/calendario";
+import { CALENDARIO_TODAS } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -54,13 +54,13 @@ async function ehAdmin(req: Request): Promise<boolean> {
 }
 
 function dataDaComp(id: string): number | null {
-  const c = CALENDARIO_2026.find((x) => x.idCompeticao === id);
+  const c = CALENDARIO_TODAS.find((x) => x.idCompeticao === id);
   if (!c?.de) return null;
   const t = Date.parse(String(c.de).replace(/\//g, "-") + "T00:00:00Z");
   return Number.isFinite(t) ? t : null;
 }
 function nomeDaComp(id: string): string {
-  return CALENDARIO_2026.find((x) => x.idCompeticao === id)?.nome || `Competição ${id}`;
+  return CALENDARIO_TODAS.find((x) => x.idCompeticao === id)?.nome || `Competição ${id}`;
 }
 
 export async function GET(req: Request) {

@@ -74,7 +74,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { CALENDARIO_2026, nomeCompeticao } from "@/lib/calendario";
+import { CALENDARIO_TODAS, nomeCompeticao } from "@/lib/calendario";
 import { simularChave, POOLS, type PoolId, type MolduraPools, type ResultadoAtleta } from "@/lib/simularChave";
 
 export const dynamic = "force-dynamic";
@@ -207,7 +207,7 @@ export async function GET(req: Request) {
   }
 
   const ids = Object.keys(m.fichas);
-  const semana = CALENDARIO_2026.find((s) => s.idCompeticao === comp);
+  const semana = CALENDARIO_TODAS.find((s) => s.idCompeticao === comp);
 
   // ---- 1) RANKING FACTUAL (Pro e Pro Max): V-D entre os inscritos ----
   // Não é previsão nenhuma — é o que aconteceu. Por isso pode ir para o Pro.

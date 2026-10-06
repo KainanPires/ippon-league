@@ -14,7 +14,7 @@
 
 import { useEffect, useRef } from "react";
 import {
-  CALENDARIO_2026,
+  calendarioDoAno,
   estadoMercado,
   competicaoFechada,
   focoMercado,
@@ -38,7 +38,7 @@ type Estado = "passada" | "aDecorrer" | "proxima" | "futura";
 export function CalendarioConteudo() {
   const foco = focoMercado();
   const alvoId = foco.alvo.idCompeticao;
-  const lista = [...CALENDARIO_2026].sort((a, b) => a.semana - b.semana);
+  const lista = [...calendarioDoAno(new Date().getFullYear())].sort((a, b) => a.semana - b.semana);
 
   // Cartão-alvo do scroll: o PRIMEIRO que ainda não terminou (em ordem
   // cronológica = o que está a decorrer ou o próximo). Pela própria lista, para
