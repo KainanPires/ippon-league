@@ -22,6 +22,35 @@ export const LINGUAS_NOTIF: LinguaNotif[] = ["pt", "en", "es", "fr", "de"];
 type Entrada = Record<LinguaNotif, string>;
 
 export const NOTIF: Record<string, Entrada> = {
+  // --- FAVORITOS (Pro Max): o teu atleta favorito lutou no evento ao vivo ---
+  "favorito.venceuTitulo": {
+    pt: "🥋 {nome} venceu!",
+    en: "🥋 {nome} won!",
+    es: "🥋 ¡{nome} ganó!",
+    fr: "🥋 {nome} a gagné !",
+    de: "🥋 {nome} hat gewonnen!",
+  },
+  "favorito.venceuCorpo": {
+    pt: "O teu favorito {nome} venceu a última luta no {comp}. Já está em {placar}. Acompanha ao vivo.",
+    en: "Your favorite {nome} won their last fight at {comp}. Now {placar}. Follow live.",
+    es: "Tu favorito {nome} ganó su último combate en el {comp}. Ya va {placar}. Sigue en directo.",
+    fr: "Ton favori {nome} a gagné son dernier combat au {comp}. Déjà {placar}. Suis en direct.",
+    de: "Dein Favorit {nome} hat seinen letzten Kampf beim {comp} gewonnen. Jetzt {placar}. Verfolge live.",
+  },
+  "favorito.perdeuTitulo": {
+    pt: "{nome} perdeu",
+    en: "{nome} lost",
+    es: "{nome} perdió",
+    fr: "{nome} a perdu",
+    de: "{nome} hat verloren",
+  },
+  "favorito.perdeuCorpo": {
+    pt: "O teu favorito {nome} perdeu a última luta no {comp}. Ficou em {placar}. Vê a chave ao vivo.",
+    en: "Your favorite {nome} lost their last fight at {comp}. Record: {placar}. See the live bracket.",
+    es: "Tu favorito {nome} perdió su último combate en el {comp}. Quedó en {placar}. Mira el cuadro en vivo.",
+    fr: "Ton favori {nome} a perdu son dernier combat au {comp}. Bilan : {placar}. Vois le tableau en direct.",
+    de: "Dein Favorit {nome} hat seinen letzten Kampf beim {comp} verloren. Bilanz: {placar}. Sieh den Live-Baum.",
+  },
   "liga.pedidoTitulo": {
     pt: "Novo pedido na tua liga",
     en: "New request in your league",
