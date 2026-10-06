@@ -92,6 +92,7 @@ export async function POST(req: Request) {
     is_pro_max: true,
     promo_lancamento_ate: PROMO_FIM_ISO,
     renova_automaticamente: false,
+    fundador: true, // selo permanente da coorte de lançamento (fica para sempre)
   };
 
   // A linha em `users` é criada no registo; pode não estar pronta no instante
