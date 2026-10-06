@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Entregáveis do Cowork/Claude e media de marketing — não fazem parte da app
+/Claude outputs/
+/Maquina de Conteudo/
