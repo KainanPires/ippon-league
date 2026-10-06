@@ -33,7 +33,7 @@ export type LegalDoc = {
 
 export const VERSAO_OFICIAL = "1.0";
 
-export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
+export const PRIVACIDADE: Record<string, LegalDoc> = {
   "pt": {
     "titulo": "Política de Privacidade — Ippon League",
     "atualizado": "11 de setembro de 2026",
@@ -1071,7 +1071,7 @@ export const PRIVACIDADE: Record<Lingua, LegalDoc> = {
   }
 };
 
-export const TERMOS: Record<Lingua, LegalDoc> = {
+export const TERMOS: Record<string, LegalDoc> = {
   "pt": {
     "titulo": "Termos de Utilização — Ippon League",
     "atualizado": "10 de setembro de 2026",
@@ -1900,7 +1900,7 @@ export const IDADE_MINIMA = 13;
 
 // Frases de interface das páginas legais e a mensagem de idade no registo.
 // Vivem aqui (e não no i18n) para todo o conteúdo legal ficar num só ficheiro.
-export const LEGAL_UI: Record<Lingua, {
+export const LEGAL_UI: Record<string, {
   atualizado: string;
   versao: string;
   desatualizada: string;
