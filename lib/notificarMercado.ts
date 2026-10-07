@@ -243,9 +243,15 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
           });
         }
       }
-      // REENGAJAMENTO por email: a quem NÃO montou (todos, decisão do Kainan),
-      // a puxá-lo a montar antes do fecho. Best-effort; não bloqueia o resto.
-      try { await reengajarNaoMontaram(foco.alvo.idCompeticao, foco.alvo.nome, restante, montaram); } catch {}
+      // REENGAJAMENTO por email: DESLIGADO por omissão (decisão Kainan, 07/10/2026
+      // — evitar emails em massa desnecessários e o teto diário do Resend). Isto
+      // disparava um email a TODA a gente que não montou, de uma vez (100-200 de
+      // uma assentada). O push de véspera (acima) continua a ir a quem montou, e
+      // push não gasta email. Para reativar quando fizer sentido, basta pôr
+      // REENGAJAR_EMAIL_ATIVO=1 no ambiente (sem novo deploy).
+      if (process.env.REENGAJAR_EMAIL_ATIVO === "1") {
+        try { await reengajarNaoMontaram(foco.alvo.idCompeticao, foco.alvo.nome, restante, montaram); } catch {}
+      }
       vespera = foco.alvo.idCompeticao;
     }
   }

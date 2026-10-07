@@ -11,7 +11,10 @@
 //
 // Em troca, enquanto não confirmar:
 //   • vê uma faixa na app
-//   • recebe um lembrete POR DIA (um só — ver o cron)
+//   • recebe ALGUNS lembretes espaçados (a cada ~3 dias) e só nos primeiros 10
+//     dias após o registo — não todos os dias nem para sempre (decisão Kainan,
+//     07/10/2026: cortar envios desnecessários / o teto diário do Resend). Contas
+//     antigas que nunca confirmaram deixam de receber (eram o maior gasto).
 //
 // PORQUE NÃO SE USA A CONFIRMAÇÃO DO SUPABASE: com ela ligada, a pessoa não
 // entra até confirmar. É o oposto do que se quer. E com ela desligada, o
@@ -295,11 +298,18 @@ export async function POST(req: Request) {
     if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
       return NextResponse.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
     }
-    const limite = new Date(Date.now() - 20 * 3600 * 1000).toISOString();
+    // Lembrete ESPAÇADO e com FIM: no máximo um a cada ~3 dias (guarda de 72h), e
+    // só a quem se registou nos últimos 10 dias. Assim, por conta, saem ~3 lembretes
+    // (dias ~3, ~6, ~9) e depois para. Contas antigas por confirmar — a maior fonte
+    // de gasto no Resend — deixam de ser contactadas (first_seen_at fora da janela,
+    // ou nulo, cai fora do filtro). O email inicial vai no registo, como antes.
+    const limite = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
+    const janelaRegisto = new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString();
     const { data: porVerificar } = await supabaseAdmin
       .from("users")
       .select("id, email, name, lingua, ultimo_lembrete_email")
       .is("email_verificado_em", null)
+      .gte("first_seen_at", janelaRegisto)
       .or(`ultimo_lembrete_email.is.null,ultimo_lembrete_email.lt.${limite}`)
       .limit(100);
 
