@@ -53,6 +53,7 @@ import {
   type IjfContest,
 } from "@/lib/ijf";
 import { getCompetitorResults } from "@/lib/scout";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { estadoDoAtleta, textoEstado, type EstadoAtleta } from "@/lib/estado-atleta";
 import { POINTS, type ActionType } from "@/lib/engine";
 import { CALENDARIO_TODAS, pontosVisiveisPorId } from "@/lib/calendario";
@@ -246,6 +247,33 @@ export async function GET(req: Request) {
   // Só as lutas desta competição.
   const contests = (todas || []).filter((f) => String(f.id_competition) === comp);
 
+  // ADVERSÁRIOS: resolve id -> { nome, país } a partir do cache de atletas desta
+  // competição (mesma fonte do chave-maestro). Para cada luta mostrarmos "venceu
+  // QUEM" no detalhe. Se um id não estiver no cache, fica sem nome (graceful).
+  const identAdv = new Map<string, { nome: string; pais: string }>();
+  try {
+    if (supabaseAdmin && contests.length > 0) {
+      const { data: cacheRow } = await supabaseAdmin
+        .from("atletas_cache").select("atletas").eq("id_competition", comp).maybeSingle();
+      const lista = Array.isArray(cacheRow?.atletas) ? (cacheRow!.atletas as Array<Record<string, unknown>>) : [];
+      for (const a of lista) {
+        const id = a?.id != null ? String(a.id) : "";
+        if (!id) continue;
+        identAdv.set(id, {
+          nome: a?.name ? String(a.name) : "",
+          pais: a?.countryIso ? String(a.countryIso) : "",
+        });
+      }
+    }
+  } catch { /* segue sem nomes de adversário */ }
+  const adversarioDaLuta = (f: IjfContest, side: "b" | "w"): { nome: string; pais: string } | null => {
+    const oppId = String(side === "b" ? (f.id_person_white ?? "") : (f.id_person_blue ?? "")).trim();
+    if (!oppId) return null;
+    const info = identAdv.get(oppId);
+    if (!info || !info.nome) return null;
+    return { nome: info.nome, pais: info.pais };
+  };
+
   if (contests.length === 0) {
     return NextResponse.json({ comp, person, tem_resultados: false, total: 0, n_lutas: 0, lutas: [], estado: "a_aguardar", estado_texto: textoEstado("a_aguardar"), place: null });
   }
@@ -257,6 +285,7 @@ export async function GET(req: Request) {
     hansoku: boolean;
     pontos: number;
     rubricas: Rubrica[];
+    adversario: { nome: string; pais: string } | null;
   }[] = [];
 
   let total = 0;
@@ -299,6 +328,7 @@ export async function GET(req: Request) {
       hansoku,
       pontos: Math.round(pontosLuta * 10) / 10,
       rubricas: rubricasDaLuta(f, side, hansoku),
+      adversario: adversarioDaLuta(f, side),
     });
   }
 

@@ -1444,6 +1444,7 @@ interface LutaDetalhe {
   hansoku: boolean;
   pontos: number;
   rubricas: Rubrica[];
+  adversario?: { nome: string; pais: string } | null;
 }
 type EstadoDetalhe =
 | { fase: "carregando" }
@@ -1620,6 +1621,13 @@ function DetalheLutas({ estado, captain }: { estado: EstadoDetalhe; captain: boo
           </div>
           {/* Rubricas (ações) da luta. */}
           <div style={{ padding: "8px 12px", display: "flex", flexDirection: "column", gap: 5 }}>
+          {l.adversario && l.adversario.nome && (
+              <div style={{ fontSize: 11.5, color: "#8a9a91", marginBottom: 2, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+              <span style={{ color: "#5f6f67" }}>{t("mt.vs")}</span>
+              <span style={{ color: "#cfd8d2", fontWeight: 600 }}>{l.adversario.nome}</span>
+              {l.adversario.pais && <span style={{ color: "#5f6f67" }}>({l.adversario.pais.toUpperCase()})</span>}
+              </div>
+            )}
           {l.rubricas.length === 0 ? (
               <div style={{ fontSize: 11.5, color: "#5f6f67", fontStyle: "italic" }}>{t("mt.semAcoes")}</div>
             ) : (
