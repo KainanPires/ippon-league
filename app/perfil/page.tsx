@@ -3,6 +3,8 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Mascot } from "@/components/Mascot";
 import { useJudogui, type JudoguiCor } from "@/components/JudoguiProvider";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
+import { loadIdentityCloudFor } from "@/lib/team";
+import { focoMercado } from "@/lib/calendario";
 import { LinhaInstalarApp } from "@/components/InstalarApp";
 import { BotaoNotificacoes } from "@/components/NotificacoesPush";
 import { supabase } from "@/lib/supabase";
@@ -196,6 +198,21 @@ export default function Perfil() {
                 faixaJudo: String(m.faixa || "").trim() || "Branca",
                 isPro: Boolean(m.is_pro),
               });
+            // IDENTIDADE (nome + escudo da equipa) é da CONTA, guardada na nuvem
+            // (tabela `equipas`). O localStorage pode estar por omissão neste
+            // aparelho/sessão — sem este overlay, o Perfil e o cartão da faixa
+            // mostravam "A minha equipa" em vez do nome real. Igual ao Início/Meu Time.
+            try {
+              const cloud = await loadIdentityCloudFor(focoMercado().alvo.idCompeticao);
+              if (active && cloud && (cloud.name || cloud.escudo)) {
+                const doEscudo = (cloud.escudo && typeof cloud.escudo === "object") ? (cloud.escudo as Partial<Identity>) : {};
+                setIdentity((prev) => {
+                  const merged: Identity = { ...prev, ...doEscudo } as Identity;
+                  if (cloud.name) merged.name = cloud.name;
+                  return merged;
+                });
+              }
+            } catch { /* fica a identidade local */ }
             try {
               const { data: row } = await supabase.from("users").select("belt, fundador").eq("id", u.id).maybeSingle();
               if (active) { setFaixaJogo(normalizarFaixa(row?.belt)); setFundador(!!row?.fundador); }
