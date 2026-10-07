@@ -259,6 +259,9 @@ export default function UtmPage() {
           </div>
         )}
       </div>
+
+      {/* ---- Registos por dia (meta) ---- */}
+      <PainelDiario token={token} />
     </Moldura>
   );
 }
@@ -326,6 +329,234 @@ function Campo({ rot, children }: { rot: string; children: React.ReactNode }) {
     </label>
   );
 }
+// ===================== PAINEL DIARIO (registos por dia + meta) =====================
+
+interface DiaLinha { dia: string; registos: number; ativaram: number; pro: number; fontes: { chave: string; n: number }[] }
+interface Diaria {
+  ok: boolean;
+  erro?: string;
+  detalhe?: string;
+  dias?: number;
+  hoje?: string;
+  total?: { registos: number; ativaram: number; pro: number };
+  totalGeral?: number;
+  porDia?: DiaLinha[];
+}
+
+const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+// "YYYY-MM-DD" -> { label: "Ter 07/10", semana: 2 } (interpreta como data civil, sem fuso).
+function rotuloDia(iso: string): { label: string; dow: number } {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  const dow = dt.getDay();
+  return { label: `${DIAS_SEMANA[dow]} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`, dow };
+}
+// Dias civis entre duas datas "YYYY-MM-DD" (b - a), imune a DST (meio-dia UTC).
+function difDias(a: string, b: string): number {
+  const ms = new Date(`${b}T12:00:00Z`).getTime() - new Date(`${a}T12:00:00Z`).getTime();
+  return Math.round(ms / 86400000);
+}
+
+function lerNum(chave: string, fallback: number): number {
+  try { const v = localStorage.getItem(chave); if (v != null && v !== "") { const n = Number(v); if (Number.isFinite(n)) return n; } } catch {}
+  return fallback;
+}
+function lerStr(chave: string, fallback: string): string {
+  try { const v = localStorage.getItem(chave); if (v != null) return v; } catch {}
+  return fallback;
+}
+function guardar(chave: string, v: string) { try { localStorage.setItem(chave, v); } catch {} }
+
+function PainelDiario({ token }: { token: () => Promise<string> }) {
+  const [dias, setDias] = useState(30);
+  const [dados, setDados] = useState<Diaria | null>(null);
+  const [aCarregar, setACarregar] = useState(false);
+
+  // Meta (guardada no navegador deste admin).
+  const [metaFixa, setMetaFixa] = useState<number>(() => lerNum("il_meta_fixa", 10));
+  const [metaTotal, setMetaTotal] = useState<string>(() => lerStr("il_meta_total", ""));
+  const [metaData, setMetaData] = useState<string>(() => lerStr("il_meta_data", ""));
+
+  useEffect(() => { guardar("il_meta_fixa", String(metaFixa)); }, [metaFixa]);
+  useEffect(() => { guardar("il_meta_total", metaTotal); }, [metaTotal]);
+  useEffect(() => { guardar("il_meta_data", metaData); }, [metaData]);
+
+  const carregar = useCallback(async (d: number) => {
+    setACarregar(true);
+    try {
+      const tk = await token();
+      const tz = -new Date().getTimezoneOffset(); // minutos a este de UTC
+      const r = await fetch(`/api/admin/aquisicao-diaria?dias=${d}&tz=${tz}`, { cache: "no-store", headers: { Authorization: `Bearer ${tk}` } });
+      setDados(await r.json() as Diaria);
+    } catch (e) {
+      setDados({ ok: false, erro: "Falha de rede.", detalhe: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setACarregar(false);
+    }
+  }, [token]);
+
+  useEffect(() => { void carregar(dias); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  const porDia = dados?.ok ? (dados.porDia || []) : [];
+  const metaOk = metaFixa > 0 ? metaFixa : 0;
+
+  // Derivados: maximo, media, melhor, bateram, maior seca (dias abaixo da meta).
+  const maxReg = Math.max(1, ...porDia.map((x) => x.registos));
+  const totalReg = dados?.total?.registos ?? 0;
+  const media = porDia.length > 0 ? totalReg / porDia.length : 0;
+  const melhor = porDia.reduce((m, x) => (x.registos > m ? x.registos : m), 0);
+  const bateram = metaOk > 0 ? porDia.filter((x) => x.registos >= metaOk).length : 0;
+
+  // Maior seca = corrida mais longa de dias ABAIXO da meta (ou sem registos se meta=0).
+  let secaLen = 0, secaIni = "", secaFim = "", curLen = 0, curIni = "";
+  for (const x of porDia) {
+    const falhou = metaOk > 0 ? x.registos < metaOk : x.registos === 0;
+    if (falhou) {
+      if (curLen === 0) curIni = x.dia;
+      curLen += 1;
+      if (curLen > secaLen) { secaLen = curLen; secaIni = curIni; secaFim = x.dia; }
+    } else { curLen = 0; }
+  }
+
+  // Ritmo atual = media dos ultimos 7 dias (ou menos).
+  const ultimos = porDia.slice(-Math.min(7, porDia.length));
+  const ritmo = ultimos.length > 0 ? ultimos.reduce((s, x) => s + x.registos, 0) / ultimos.length : 0;
+
+  // Meta-alvo total.
+  const alvo = Number(metaTotal) || 0;
+  const geral = dados?.totalGeral ?? 0;
+  const hoje = dados?.hoje || new Date().toISOString().slice(0, 10);
+  let pacing: null | { restam: number; diasRestam: number; precisaDia: number; noCaminho: boolean; passado: boolean } = null;
+  if (alvo > 0 && metaData) {
+    const diasRestam = difDias(hoje, metaData);
+    const restam = Math.max(0, alvo - geral);
+    const precisaDia = diasRestam > 0 ? restam / diasRestam : restam;
+    pacing = { restam, diasRestam, precisaDia, noCaminho: ritmo >= precisaDia && restam > 0, passado: diasRestam < 0 };
+  }
+
+  const lista = [...porDia].reverse(); // mais recente primeiro
+
+  return (
+    <div style={{ ...caixa, marginTop: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        <div style={titulo}>Registos por dia (meta)</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[15, 30, 60, 90].map((d) => (
+            <button key={d} onClick={() => { setDias(d); void carregar(d); }}
+              style={{ background: dias === d ? GOLD : "transparent", color: dias === d ? "#141110" : GOLD, border: `1px solid ${GOLD}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Meta: numero/dia + alvo total ate uma data */}
+      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 1fr", marginTop: 4 }}>
+        <Campo rot="Meta por dia (registos)">
+          <input type="number" min={0} value={metaFixa} onChange={(e) => setMetaFixa(Math.max(0, Math.floor(Number(e.target.value) || 0)))} style={input} />
+        </Campo>
+        <div />
+        <Campo rot="Alvo total de registos">
+          <input type="number" min={0} inputMode="numeric" placeholder="ex.: 1000" value={metaTotal} onChange={(e) => setMetaTotal(e.target.value)} style={input} />
+        </Campo>
+        <Campo rot="...ate ao dia">
+          <input type="date" value={metaData} onChange={(e) => setMetaData(e.target.value)} style={input} />
+        </Campo>
+      </div>
+
+      {aCarregar && <p style={{ color: "#9a938c", fontSize: 13, marginTop: 10 }}>A carregar...</p>}
+      {dados && !dados.ok && (
+        <div style={{ marginTop: 10 }}>
+          <p style={{ color: "#ef8d83", margin: 0, fontWeight: 700 }}>{dados.erro}</p>
+          {dados.detalhe && <p style={{ color: "#9a938c", fontSize: 12 }}>{dados.detalhe}</p>}
+        </div>
+      )}
+
+      {dados && dados.ok && (
+        <div style={{ marginTop: 12 }}>
+          {/* Resumo do periodo */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <Stat rot="Registos (periodo)" val={String(totalReg)} sub={`${dados.total?.ativaram ?? 0}A - ${dados.total?.pro ?? 0}P`} />
+            <Stat rot="Media/dia" val={media.toFixed(1)} />
+            <Stat rot="Melhor dia" val={String(melhor)} />
+            {metaOk > 0 && <Stat rot="Bateram a meta" val={`${bateram}/${porDia.length}`} />}
+          </div>
+
+          {/* Meta-alvo total: pacing */}
+          {pacing && (
+            <div style={{ background: "#0e0c0b", border: `1px solid ${pacing.passado ? "#5a4a2c" : pacing.noCaminho ? "#2f5a44" : "#5a2f2c"}`, borderRadius: 10, padding: "11px 13px", marginBottom: 10 }}>
+              {pacing.passado ? (
+                <div style={{ fontSize: 13, color: "#e0c58a" }}>A data do alvo ja passou. Atualiza a data para recalcular o ritmo.</div>
+              ) : pacing.restam === 0 ? (
+                <div style={{ fontSize: 13.5, color: VERDE, fontWeight: 700 }}>Alvo de {alvo} registos atingido ({geral} no total). 🎉</div>
+              ) : (
+                <div style={{ fontSize: 13, color: "#c8c0b8", lineHeight: 1.5 }}>
+                  Faltam <b style={{ color: "#efeadd" }}>{pacing.restam}</b> registos para <b style={{ color: "#efeadd" }}>{alvo}</b> em <b style={{ color: "#efeadd" }}>{pacing.diasRestam}</b> dias &rarr; precisas de{" "}
+                  <b style={{ color: GOLD }}>{Math.ceil(pacing.precisaDia)}</b>/dia.{" "}
+                  Ritmo atual (7d): <b style={{ color: pacing.noCaminho ? VERDE : "#ef8d83" }}>{ritmo.toFixed(1)}</b>/dia &mdash;{" "}
+                  <b style={{ color: pacing.noCaminho ? VERDE : "#ef8d83" }}>{pacing.noCaminho ? "no caminho" : "abaixo do ritmo"}</b>.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Maior seca */}
+          {secaLen >= 2 && (
+            <p style={{ fontSize: 12, color: "#ef8d83", margin: "0 0 10px", lineHeight: 1.5 }}>
+              Maior seca: <b>{secaLen} dias</b> {metaOk > 0 ? "abaixo da meta" : "sem registos"} ({rotuloDia(secaIni).label} &rarr; {rotuloDia(secaFim).label}). Boa altura para uma acao.
+            </p>
+          )}
+
+          {/* Lista dia a dia (mais recente primeiro) */}
+          <div style={{ display: "grid", gap: 6 }}>
+            {lista.map((x) => {
+              const bateu = metaOk > 0 ? x.registos >= metaOk : x.registos > 0;
+              const vazio = x.registos === 0;
+              const ehHoje = x.dia === hoje;
+              const larg = Math.max(2, Math.round((x.registos / maxReg) * 100));
+              const cor = vazio ? "#3a2c2a" : bateu ? VERDE : "#c97a54";
+              return (
+                <div key={x.dia} style={{ background: "#0e0c0b", border: `1px solid ${ehHoje ? GOLD : BORDA}`, borderRadius: 9, padding: "8px 11px", opacity: vazio ? 0.72 : 1 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "88px 1fr auto", gap: 10, alignItems: "center" }}>
+                    <div style={{ fontSize: 12, color: ehHoje ? GOLD : "#b7afa6", fontWeight: ehHoje ? 700 : 400, fontFamily: "var(--font-geist-mono), monospace" }}>
+                      {rotuloDia(x.dia).label}
+                    </div>
+                    {/* barra */}
+                    <div style={{ height: 8, background: "#1a1613", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${larg}%`, background: cor, borderRadius: 4 }} />
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", textAlign: "right", minWidth: 86 }}>
+                      <span style={{ color: vazio ? "#8b7a72" : "#efeadd" }}>{x.registos}R</span>
+                      <span style={{ color: "#5f5850", fontWeight: 400 }}> &middot; </span>
+                      <span style={{ color: VERDE }}>{x.ativaram}A</span>
+                      <span style={{ color: "#5f5850", fontWeight: 400 }}> &middot; </span>
+                      <span style={{ color: GOLD }}>{x.pro}P</span>
+                    </div>
+                  </div>
+                  {/* fontes do dia (automatico por UTM) */}
+                  {x.fontes.length > 0 && (
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 7 }}>
+                      {x.fontes.map((f) => (
+                        <span key={f.chave} style={{ fontSize: 10.5, color: "#b7afa6", background: "#17130f", border: `1px solid ${BORDA}`, borderRadius: 6, padding: "2px 6px", whiteSpace: "nowrap" }}>
+                          {f.chave} <b style={{ color: "#efeadd" }}>{f.n}</b>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: 11, color: "#8b8079", marginTop: 10, lineHeight: 1.5 }}>
+            <b style={{ color: VERDE }}>Verde</b> = bateu a meta do dia; <b style={{ color: "#c97a54" }}>laranja</b> = abaixo; cinza esbatido = dia sem registos.
+            As etiquetas por dia sao as fontes (UTM) de onde vieram os registos &mdash; so captam o que tem link com etiqueta. Meta e alvo ficam guardados neste navegador.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Moldura({ children }: { children: React.ReactNode }) {
   return (
     <main style={{ minHeight: "100vh", background: FUNDO, padding: "28px 16px" }}>
