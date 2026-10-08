@@ -14,6 +14,7 @@ import type { Metadata, Viewport } from "next";
 import { Oswald, Manrope } from "next/font/google";
 import "./globals.css";
 import { RegistarServiceWorker } from "@/components/RegistarServiceWorker";
+import { RepaintOnRestore } from "@/components/RepaintOnRestore";
 import { CarregarHorarios } from "@/components/CarregarHorarios";
 import { JudoguiProvider } from "@/components/JudoguiProvider";
 import { TatameProvider } from "@/components/TatameProvider";
@@ -69,6 +70,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <RegistarServiceWorker />
+        <RepaintOnRestore />
         <CarregarHorarios />
         {/* <<< VOLTAR >>> <BarraTopo /> */}
         {/* O LinguaProvider envolve TUDO. O PostHogProvider fica DENTRO dele
