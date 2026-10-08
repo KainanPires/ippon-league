@@ -10,9 +10,11 @@
 //   • O `chave-maestro` já mantém a tabela `resultados_atletas` fresca de minuto
 //     a minuto, com vitórias/derrotas e o nº de lutas de cada atleta na
 //     competição ao vivo. Esta rota LÊ daí — é rápido e não gasta chamadas à API.
-//   • Guardamos, por (user, atleta, comp), quantas lutas já tínhamos visto
-//     (tabela `favoritos_notif_estado`). Se o nº subiu, o atleta lutou de novo
-//     -> mandamos UM push sobre a última luta.
+//   • Guardamos, por (user, atleta, comp), o PLACAR que já tínhamos visto
+//     (vitórias e derrotas, na tabela `favoritos_notif_estado`). Se as derrotas
+//     subiram -> "perdeu"; se as vitórias subiram -> "venceu". Não dependemos da
+//     ordem da lista de lutas (ver lib/favoritoAviso.ts — foi essa a origem do
+//     bug "perdeu mas o push disse que venceu").
 //
 // ANTI-SPAM (importante):
 //   • Na PRIMEIRA vez que vemos um par (user, atleta) só gravamos o número atual
@@ -31,6 +33,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { enviarPushPara } from "@/lib/pushServer";
 import { renderNotif, agruparPorLingua, type LinguaNotif } from "@/lib/i18nServidor";
 import { CALENDARIO_TODAS, competicaoRollingAtiva, focoMercado } from "@/lib/calendario";
+import { decidirAviso, type TipoAviso } from "@/lib/favoritoAviso";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -130,7 +133,7 @@ export async function GET(req: Request) {
     }
   }
 
-  // 4) Estado anterior (quantas lutas já tínhamos visto por user+atleta).
+  // 4) Estado anterior (placar já visto por user+atleta, codificado em ultimas_lutas).
   const estado = new Map<string, number>(); // chave `${user}|${person}` -> ultimas_lutas
   {
     const { data: est } = await supabaseAdmin
@@ -144,35 +147,32 @@ export async function GET(req: Request) {
   // 5) Decide, por atleta, quem notificar (e quem apenas semear).
   const agora = new Date().toISOString();
   const upserts: { user_id: string; id_person: string; id_competicao: string; ultimas_lutas: number; atualizado_em: string }[] = [];
-  // Agrupa por atleta -> conjunto de users a notificar (todos recebem o MESMO texto desse atleta).
-  const notificar: { atleta: Resultado; users: string[] }[] = [];
+  // Agrupa por atleta + resultado -> users a notificar (recebem o MESMO texto).
+  const notificar: { atleta: Resultado; aviso: TipoAviso; users: string[] }[] = [];
 
   for (const [atletaId, users] of favsByAtleta) {
     const r = resultadoDe.get(atletaId);
-    const nAtual = r ? r.n_lutas : 0;
-    const paraNotificar: string[] = [];
+    const placarAtual = { vitorias: r?.vitorias ?? 0, derrotas: r?.derrotas ?? 0, lutas: r?.lutas ?? [] };
+    const porAviso: Record<TipoAviso, string[]> = { venceu: [], perdeu: [] };
     for (const uid of users) {
-      const chave = `${uid}|${atletaId}`;
-      const prev = estado.get(chave);
-      if (prev === undefined) {
-        // Primeira vez que vemos este par: SEED, sem notificar.
-        upserts.push({ user_id: uid, id_person: atletaId, id_competicao: comp, ultimas_lutas: nAtual, atualizado_em: agora });
-      } else if (nAtual > prev) {
-        // O atleta lutou de novo desde a última vez -> notificar + atualizar.
-        paraNotificar.push(uid);
-        upserts.push({ user_id: uid, id_person: atletaId, id_competicao: comp, ultimas_lutas: nAtual, atualizado_em: agora });
+      const d = decidirAviso(estado.get(`${uid}|${atletaId}`), placarAtual);
+      if (d.novoEstado !== null) {
+        upserts.push({ user_id: uid, id_person: atletaId, id_competicao: comp, ultimas_lutas: d.novoEstado, atualizado_em: agora });
       }
-      // nAtual === prev (ou menor, impossível): nada a fazer.
+      if (d.aviso) porAviso[d.aviso].push(uid);
     }
-    if (r && paraNotificar.length > 0) notificar.push({ atleta: r, users: paraNotificar });
+    if (!r) continue;
+    for (const aviso of ["venceu", "perdeu"] as const) {
+      if (porAviso[aviso].length > 0) notificar.push({ atleta: r, aviso, users: porAviso[aviso] });
+    }
   }
 
   // 6) Envia, por atleta, agrupando os destinatários por língua.
   let enviados = 0;
   const errosEnvio: string[] = [];
-  for (const { atleta, users } of notificar) {
+  for (const { atleta, aviso, users } of notificar) {
     if (enviados >= MAX_ENVIOS) break;
-    const venceu = atleta.lutas.length > 0 ? atleta.lutas[atleta.lutas.length - 1].venceu === true : true;
+    const venceu = aviso === "venceu";
     const nome = (atleta.nome || "").trim() || "O teu favorito";
     const placar = `${atleta.vitorias}-${atleta.derrotas}`;
     const vars = { nome, comp: nomeComp, placar };

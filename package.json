@@ -7,7 +7,7 @@
     "build": "eslint && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx --yes tsx tests/engine.caracterizacao.ts"
+    "test": "npx --yes tsx tests/engine.caracterizacao.ts && npx --yes tsx tests/favoritoAviso.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

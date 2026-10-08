@@ -77,7 +77,10 @@ async function vivoDoAtleta(idPerson: string, comp: string) {
     const azul = String(f.id_person_blue ?? "");
     const branco = String(f.id_person_white ?? "");
     if (azul !== idPerson && branco !== idPerson) continue;
-    const venc = String(f.id_winner ?? "");
+    // Luta ainda sem vencedor: o JudoBase pode devolver vazio OU "0". Nenhum dos
+    // dois é uma derrota (senão contava derrota — e avisava "perdeu" — antes do fim).
+    const vencCru = String(f.id_winner ?? "").trim();
+    const venc = vencCru === "0" ? "" : vencCru;
     const adversario = azul === idPerson ? branco : azul;
     if (venc === idPerson) { vitorias++; if (adversario) vencidos.push(adversario); }
     else if (venc) derrotas++;
