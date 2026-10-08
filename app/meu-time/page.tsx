@@ -881,13 +881,30 @@ function MeuTimeInner() {
   // Património = quanto vale ao todo (equipa + saldo). Evolui a cada rodada.
   // Saldo = quanto sobra para gastar agora.
   const saldo = jcLeft(team, patrimonio ?? 100);
-  const acimaDoOrcamento = saldo < 0;
   // CUSTO DE COMPRA da equipa (o que se pagou ao contratar) e SOBRA de património
   // (património − custo). Só se mostra quando temos o preço de compra de TODOS os
   // atletas da equipa — na dúvida não mostramos, para não somar um custo parcial.
   const temCustoCompra = team.ids.length > 0 && team.ids.every((id) => Number.isFinite(Number(precosCompra[id])));
   const custoCompra = Math.round(team.ids.reduce((s, id) => s + (Number(precosCompra[id]) || 0), 0) * 10) / 10;
   const sobraPatrimonio = Math.round(((patrimonio ?? 100) - custoCompra) * 10) / 10;
+  // "ACIMA DO ORÇAMENTO" (correto): o que decide se a equipa cabe no orçamento é o
+  // CUSTO de a montar — o que JÁ pagaste (precosCompra) por quem tens, e o preço
+  // ATUAL por quem acabaste de escolher (comprar paga-se ao preço do momento) —
+  // NÃO o valor AO VIVO. Antes usava-se `saldo < 0` (valor ao vivo), o que fazia
+  // uma equipa já trancada dentro do orçamento parecer "acima" só porque os
+  // atletas valorizaram DURANTE a competição, mandando vender sem necessidade
+  // (bug reportado pelo Kainan, 08/10/2026). Folga de 0.05 igual ao servidor
+  // (lib/congelar / lib/notificarMercado), para um resto de arredondamento não
+  // marcar "acima".
+  const precoAtualPorId = new Map<string, number>(athletes.map((a) => [a.id, a.priceJc]));
+  const custoEfetivo = Math.round(team.ids.reduce((s, id) => {
+    const pc = Number(precosCompra[id]);
+    if (Number.isFinite(pc)) return s + pc;                 // já comprado: paga o que pagaste
+    const atual = precoAtualPorId.get(id);                  // novo: paga o preço de agora
+    return s + (Number.isFinite(atual as number) ? (atual as number) : 0);
+  }, 0) * 10) / 10;
+  const excedenteOrc = Math.round((custoEfetivo - (patrimonio ?? 100)) * 10) / 10;
+  const acimaDoOrcamento = excedenteOrc > 0.05;
   const txtOrc = ORC_ACIMA[lingua] ?? ORC_ACIMA.pt;
   const txtLojaMt = LOJA_MT[lingua] ?? LOJA_MT.pt;
   const scoreOf = (a: Athlete) => {
@@ -1121,7 +1138,7 @@ function MeuTimeInner() {
             Com a competição a decorrer a equipa está trancada — mostrar "saldo
             negativo" aqui confundia (ver a nota do banner abaixo). */}
         {editavel && (
-          <div style={{ fontSize: 10, color: acimaDoOrcamento ? "#ef8d83" : "#7c8a82", marginTop: 2 }}>{t("mt.saldoJC", { v: fmt(saldo) })}</div>
+          <div style={{ fontSize: 10, color: acimaDoOrcamento ? "#ef8d83" : "#7c8a82", marginTop: 2 }}>{t("mt.saldoJC", { v: fmt(temCustoCompra ? sobraPatrimonio : saldo) })}</div>
         )}
         {/* Com a competição a decorrer, mostra o CUSTO da equipa (o que se pagou a
             contratar) e a SOBRA de património (património − custo). */}
@@ -1141,7 +1158,7 @@ function MeuTimeInner() {
         {acimaDoOrcamento && editavel && (
             <div style={{ background: "#2a1f1c", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 12, padding: "10px 13px", margin: "0 0 12px" }}>
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83", marginBottom: 4 }}>{txtOrc.chip}</div>
-            <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5 }}>{txtOrc.frase.replace("{x}", fmt(Math.abs(saldo)))}</div>
+            <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5 }}>{txtOrc.frase.replace("{x}", fmt(Math.abs(excedenteOrc)))}</div>
             <a href="/loja" style={{ display: "inline-block", marginTop: 9, background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.03em", padding: "7px 13px", borderRadius: 9, textDecoration: "none" }}>{txtLojaMt.ouCompra}</a>
             </div>
           )}
