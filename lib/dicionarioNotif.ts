@@ -59,6 +59,37 @@ export const NOTIF: Record<string, Entrada> = {
     ja: "お気に入りの{nome}が{comp}で直近の試合に負けました。結果は{placar}。ライブの組み合わせを見てみよう。",
     ru: "Твой фаворит {nome} проиграл последний бой на {comp}. Счёт: {placar}. Смотри сетку в прямом эфире.",
   },
+  // VENCEU com adversário + método ({adv} = "Nome (PAÍS)"; {metodo} = termo de
+  // judo universal: Ippon / 2 Waza-ari / Waza-ari / Yuko). O "por/by/par" é da frase.
+  "favorito.venceuCorpoAdv": {
+    pt: "O teu favorito {nome} venceu {adv} por {metodo} no {comp}. Já está em {placar}. Acompanha ao vivo.",
+    en: "Your favorite {nome} beat {adv} by {metodo} at {comp}. Now {placar}. Follow live.",
+    es: "Tu favorito {nome} venció a {adv} por {metodo} en el {comp}. Ya va {placar}. Sigue en directo.",
+    fr: "Ton favori {nome} a battu {adv} par {metodo} au {comp}. Déjà {placar}. Suis en direct.",
+    de: "Dein Favorit {nome} besiegte {adv} durch {metodo} beim {comp}. Jetzt {placar}. Verfolge live.",
+    ja: "お気に入りの{nome}が{comp}で{adv}に{metodo}で勝ちました。現在{placar}。ライブで追いかけよう。",
+    ru: "Твой фаворит {nome} победил(а) {adv} — {metodo} на {comp}. Сейчас {placar}. Следи в прямом эфире.",
+  },
+  // VENCEU com adversário mas SEM método (ganhou por shidos/decisão — sem pontuação registada).
+  "favorito.venceuCorpoAdvSemMetodo": {
+    pt: "O teu favorito {nome} venceu {adv} no {comp}. Já está em {placar}. Acompanha ao vivo.",
+    en: "Your favorite {nome} beat {adv} at {comp}. Now {placar}. Follow live.",
+    es: "Tu favorito {nome} venció a {adv} en el {comp}. Ya va {placar}. Sigue en directo.",
+    fr: "Ton favori {nome} a battu {adv} au {comp}. Déjà {placar}. Suis en direct.",
+    de: "Dein Favorit {nome} besiegte {adv} beim {comp}. Jetzt {placar}. Verfolge live.",
+    ja: "お気に入りの{nome}が{comp}で{adv}に勝ちました。現在{placar}。ライブで追いかけよう。",
+    ru: "Твой фаворит {nome} победил(а) {adv} на {comp}. Сейчас {placar}. Следи в прямом эфире.",
+  },
+  // PERDEU com adversário (o método do adversário não está guardado).
+  "favorito.perdeuCorpoAdv": {
+    pt: "O teu favorito {nome} perdeu para {adv} no {comp}. Ficou em {placar}. Vê a chave ao vivo.",
+    en: "Your favorite {nome} lost to {adv} at {comp}. Record: {placar}. See the live bracket.",
+    es: "Tu favorito {nome} perdió ante {adv} en el {comp}. Quedó en {placar}. Mira el cuadro en vivo.",
+    fr: "Ton favori {nome} a perdu contre {adv} au {comp}. Bilan : {placar}. Vois le tableau en direct.",
+    de: "Dein Favorit {nome} verlor gegen {adv} beim {comp}. Bilanz: {placar}. Sieh den Live-Baum.",
+    ja: "お気に入りの{nome}が{comp}で{adv}に敗れました。結果は{placar}。ライブの組み合わせを見てみよう。",
+    ru: "Твой фаворит {nome} проиграл {adv} на {comp}. Счёт: {placar}. Смотри сетку в прямом эфире.",
+  },
   // --- SELO DE FUNDADOR: parabéns a quem entrou no lançamento (uma vez) ---
   "fundadorSelo.titulo": {
     pt: "🥋 És Fundador da Ippon League",

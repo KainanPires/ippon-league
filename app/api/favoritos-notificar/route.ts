@@ -43,7 +43,23 @@ export const maxDuration = 60;
 // muitas vezes, por isso se sobrar fica para a próxima volta).
 const MAX_ENVIOS = 800;
 
-type LutaDL = { adv?: string; venceu?: boolean };
+// O maestro grava, por luta: adversário (id), se venceu, e as ações do PRÓPRIO
+// atleta (i=ippon, w=waza-ari, y=yuko feitos; s=shidos sofridos). Com isto damos
+// "venceu QUEM e por QUÊ" no push. (Numa derrota, o método do adversário não está
+// guardado — por isso aí só dizemos contra quem.)
+type LutaDL = { adv?: string; venceu?: boolean; i?: number; w?: number; y?: number; s?: number };
+
+// Método da vitória pelas ações do PRÓPRIO atleta nessa luta. Termos de judô são
+// universais (iguais em todas as línguas). null quando não há pontuação registada
+// (ganhou por shidos/decisão) — aí o push não cita método.
+function metodoVitoria(l: LutaDL): string | null {
+  const i = Number(l.i) || 0, w = Number(l.w) || 0, y = Number(l.y) || 0;
+  if (i >= 1) return "Ippon";
+  if (w >= 2) return "2 Waza-ari";   // dois waza-ari = vitória (ippon técnico)
+  if (w === 1) return "Waza-ari";
+  if (y >= 1) return "Yuko";
+  return null;
+}
 interface Resultado {
   id_person: string;
   nome: string | null;
@@ -133,6 +149,20 @@ export async function GET(req: Request) {
     }
   }
 
+  // 3b) Nome + país dos atletas desta competição (cache), para resolver o
+  //     ADVERSÁRIO (o `adv` guardado em cada luta é só o id).
+  const identAtleta = new Map<string, { nome: string; pais: string }>();
+  try {
+    const { data: cacheRow } = await supabaseAdmin
+      .from("atletas_cache").select("atletas").eq("id_competition", comp).maybeSingle();
+    const lista = Array.isArray(cacheRow?.atletas) ? (cacheRow!.atletas as Array<Record<string, unknown>>) : [];
+    for (const a of lista) {
+      const id = a?.id != null ? String(a.id) : "";
+      if (!id) continue;
+      identAtleta.set(id, { nome: a?.name ? String(a.name) : "", pais: a?.countryIso ? String(a.countryIso) : "" });
+    }
+  } catch { /* sem cache: o push sai sem nome de adversário */ }
+
   // 4) Estado anterior (placar já visto por user+atleta, codificado em ultimas_lutas).
   const estado = new Map<string, number>(); // chave `${user}|${person}` -> ultimas_lutas
   {
@@ -175,10 +205,27 @@ export async function GET(req: Request) {
     const venceu = aviso === "venceu";
     const nome = (atleta.nome || "").trim() || "O teu favorito";
     const placar = `${atleta.vitorias}-${atleta.derrotas}`;
-    const vars = { nome, comp: nomeComp, placar };
     const link = `/chave-atletas?comp=${encodeURIComponent(comp)}${atleta.weight_category ? `&cat=${encodeURIComponent(atleta.weight_category)}` : ""}`;
+
+    // ADVERSÁRIO (nome + país) da última luta + MÉTODO da vitória → "venceu Fulano
+    // (PAÍS) por Ippon" em vez de só "venceu". Sem adversário conhecido, cai no
+    // texto genérico antigo.
+    const ultima = atleta.lutas.length > 0 ? atleta.lutas[atleta.lutas.length - 1] : null;
+    const advInfo = ultima?.adv ? identAtleta.get(String(ultima.adv)) : undefined;
+    const advTxt = advInfo && advInfo.nome ? `${advInfo.nome}${advInfo.pais ? ` (${advInfo.pais})` : ""}` : null;
+    const metodo = venceu && ultima ? metodoVitoria(ultima) : null;
+
     const chaveTitulo = venceu ? "favorito.venceuTitulo" : "favorito.perdeuTitulo";
-    const chaveCorpo = venceu ? "favorito.venceuCorpo" : "favorito.perdeuCorpo";
+    const vars: Record<string, string> = { nome, comp: nomeComp, placar };
+    let chaveCorpo: string;
+    if (venceu) {
+      if (advTxt && metodo) { chaveCorpo = "favorito.venceuCorpoAdv"; vars.adv = advTxt; vars.metodo = metodo; }
+      else if (advTxt) { chaveCorpo = "favorito.venceuCorpoAdvSemMetodo"; vars.adv = advTxt; }
+      else { chaveCorpo = "favorito.venceuCorpo"; }
+    } else {
+      if (advTxt) { chaveCorpo = "favorito.perdeuCorpoAdv"; vars.adv = advTxt; }
+      else { chaveCorpo = "favorito.perdeuCorpo"; }
+    }
 
     let grupos: Record<string, string[]> = {};
     try { grupos = await agruparPorLingua(users); } catch { grupos = { pt: users }; }

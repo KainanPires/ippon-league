@@ -113,6 +113,15 @@ export default function CriarEquipa() {
   // MODO ROLLING (Mundial/Olimpíadas): a equipa pode ter menos de 8 atletas.
   const emRolling = !!foco.alvo?.rolling;
   const alvo = foco.alvo; // a competição para a qual se ESCALA agora
+  // REGRA DE EQUIPA COMPLETA (Kainan, 09/10/2026): só se guarda uma equipa com os
+  // 8 atletas (4M + 4F). Antes, no rolling, permitia-se guardar parcial (basta 1
+  // atleta) — e houve quem montasse 6/5/3 para "economizar" e apanhar só as peças
+  // caras, matando a gestão de orçamento. Agora exige-se equipa COMPLETA também no
+  // rolling. EXCEÇÃO (grandfather): o Mundial de Baku (3151), que já está a decorrer
+  // com equipas parciais guardadas, mantém a regra antiga — "para essa já é o que é".
+  // Para as próximas competições (inclusive rolling), exige-se sempre 8.
+  const COMPS_PARCIAL_OK = new Set<string>(["3151"]);
+  const relaxarRolling = emRolling && COMPS_PARCIAL_OK.has(alvo.idCompeticao);
   const rodadaAlvo = numeroDaRodada(alvo.idCompeticao); // nº da rodada no calendário (1..52) ou null
   // Nomes a MOSTRAR (cidade escondida nos clássicos com mercado aberto).
   const nomeAlvo = nomeCompeticao(alvo);
@@ -249,7 +258,7 @@ export default function CriarEquipa() {
   }
   async function save() {
     if (!(await temSessao())) { setModal({ kind: "login" }); return; }
-    if (!isComplete(draft, emRolling)) { setModal({ kind: "missing" }); return; }
+    if (!isComplete(draft, relaxarRolling)) { setModal({ kind: "missing" }); return; }
     // FASE A: não se guarda uma equipa acima do orçamento — tem de vender alguém.
     if (jcLeft(draft, orcamentoBase) < 0) { setModal({ kind: "acima" }); return; }
     setSavingCloud(true);
@@ -470,7 +479,7 @@ export default function CriarEquipa() {
         <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "4px 0 8px" }}>{t("mt.faltaPouco")}</h2>
         <p style={{ fontSize: 13, color: "#c7d0c9", margin: "0 0 12px" }}>{t("mt.paraGuardar")}</p>
         <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 7, marginBottom: 18 }}>
-        {missing(draft, emRolling).map((m) => (
+        {missing(draft, relaxarRolling).map((m) => (
               <div key={m} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
               <span style={{ color: "#ef8d83", fontWeight: 700 }}>•</span>
               <span style={{ fontSize: 13, color: "#f1ede2" }}>{m}</span>
