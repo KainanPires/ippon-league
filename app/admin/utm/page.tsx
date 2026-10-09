@@ -29,8 +29,13 @@ const ACOES: { v: string; r: string }[] = [
   { v: "reels", r: "Reels / video curto" },
   { v: "dm", r: "Inbox / DM (automacao)" },
   { v: "ads", r: "Trafego pago" },
+  { v: "email", r: "E-mail (newsletter / direto)" },
+  { v: "parceria", r: "Parceria / collab (creator, marca)" },
   { v: "perfil", r: "Perfil (generico)" },
 ];
+// Acoes em que o utm_content guarda a IDENTIDADE (nome do parceiro, campanha de
+// email) em vez do assunto do criativo. Mudam a ajuda do campo "content".
+const ACOES_IDENTIDADE = new Set(["email", "parceria"]);
 const REDES: { v: string; r: string }[] = [
   { v: "ig", r: "Instagram" },
   { v: "tiktok", r: "TikTok" },
@@ -59,6 +64,39 @@ interface Aquisicao {
 // dados limpos). Acentos/espacos/simbolos viram hifen.
 function limpa(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+// Extrai, dos dados ja carregados, as linhas de um canal (e-mail ou parceria) e
+// relabela-as com o NOME (o utm_content), que e o que interessa: qual parceiro /
+// qual envio trouxe gente. Junta o resto sem nome numa linha "(sem nome)".
+function itensDoCanal(aq: Aquisicao | null, prefixo: string): Item[] {
+  if (!aq || !aq.ok) return [];
+  const bate = (src: string) => src === prefixo || src.startsWith(`${prefixo}-`);
+  const nomeadas: Item[] = [];
+  let somaNomeadas = 0;
+  for (const it of aq.porConteudo || []) {
+    const [src, ...resto] = it.chave.split(" / ");
+    if (!bate(src)) continue;
+    const nome = resto.join(" / ") || src;
+    nomeadas.push({ ...it, chave: nome });
+    somaNomeadas += it.registos;
+  }
+  // Total do canal (todas as fontes que batem), para saber quanto ficou sem nome.
+  const totalCanal = (aq.porFonte || [])
+    .filter((it) => bate(it.chave))
+    .reduce((acc, it) => ({
+      chave: prefixo,
+      registos: acc.registos + it.registos,
+      ativaram: acc.ativaram + it.ativaram,
+      pro: acc.pro + it.pro,
+    }), { chave: prefixo, registos: 0, ativaram: 0, pro: 0 });
+  const semNome = totalCanal.registos - somaNomeadas;
+  nomeadas.sort((a, b) => b.registos - a.registos);
+  if (semNome > 0) {
+    // Nao sabemos o split exato de A/P do "sem nome"; mostramos so os registos.
+    nomeadas.push({ chave: "(sem nome)", registos: semNome, ativaram: 0, pro: 0 });
+  }
+  return nomeadas;
 }
 
 export default function UtmPage() {
@@ -138,6 +176,11 @@ export default function UtmPage() {
     try { await navigator.clipboard.writeText(link); setCopiado(true); setTimeout(() => setCopiado(false), 1500); } catch { /* sem clipboard */ }
   }
 
+  // Canais que o Kainan rastreia a parte: e-mails enviados e parcerias/collabs.
+  const emailItens = useMemo(() => itensDoCanal(aq, "email"), [aq]);
+  const parceriaItens = useMemo(() => itensDoCanal(aq, "parceria"), [aq]);
+  const totalCanal = (itens: Item[]) => itens.reduce((s, i) => s + i.registos, 0);
+
   if (acesso === "...") return <Moldura><p style={{ color: "#9a938c" }}>A carregar...</p></Moldura>;
   if (acesso === "nao") {
     return <Moldura><h1 style={{ color: GOLD, fontSize: 20, margin: 0 }}>Sem acesso</h1><p style={{ color: "#9a938c" }}>Esta pagina e so para administradores.</p></Moldura>;
@@ -156,7 +199,16 @@ export default function UtmPage() {
         <div style={titulo}>Construtor de links</div>
         <div style={{ display: "grid", gap: 12 }}>
           <Campo rot="Acao (o que voce fez)">
-            <select value={acao} onChange={(e) => setAcao(e.target.value)} style={input}>
+            <select
+              value={acao}
+              onChange={(e) => {
+                const v = e.target.value;
+                setAcao(v);
+                // E-mail nao tem rede social: a fonte fica so "email".
+                if (v === "email") setRede("");
+              }}
+              style={input}
+            >
               {ACOES.map((a) => <option key={a.v} value={a.v}>{a.r}</option>)}
             </select>
           </Campo>
@@ -168,9 +220,29 @@ export default function UtmPage() {
           <Campo rot="Fonte final (utm_source) -- editavel: p/ atleta use o nome, p/ Dodo acrescente -dodo">
             <input value={fonte} onChange={(e) => setFonte(e.target.value)} style={input} />
           </Campo>
-          <Campo rot="Assunto/criativo (utm_content) -- ex.: apresentacao-app, favoritos (opcional)">
-            <input value={conteudo} onChange={(e) => setConteudo(e.target.value)} style={input} />
+          <Campo
+            rot={
+              acao === "parceria"
+                ? "Nome do parceiro (utm_content) -- ex.: joao-judoca, judo-br (p/ rastrear CADA collab)"
+                : acao === "email"
+                ? "Campanha de e-mail (utm_content) -- ex.: newsletter-1, convite-mundial (p/ rastrear CADA envio)"
+                : "Assunto/criativo (utm_content) -- ex.: apresentacao-app, favoritos (opcional)"
+            }
+          >
+            <input
+              value={conteudo}
+              onChange={(e) => setConteudo(e.target.value)}
+              placeholder={acao === "parceria" ? "nome-do-parceiro" : acao === "email" ? "nome-da-campanha" : ""}
+              style={input}
+            />
           </Campo>
+          {ACOES_IDENTIDADE.has(acao) && !conteudo.trim() && (
+            <p style={{ fontSize: 11.5, color: "#e0c58a", margin: "-4px 0 0", lineHeight: 1.5 }}>
+              {acao === "parceria"
+                ? "Dica: preenche o nome do parceiro em cima. Sem ele, todas as collabs ficam juntas numa so linha e nao da para ver qual trouxe gente."
+                : "Dica: da um nome a cada envio em cima. Sem ele, todos os e-mails ficam juntos numa so linha."}
+            </p>
+          )}
           <Campo rot="Campanha (utm_campaign) -- a fase atual">
             <input value={campanha} onChange={(e) => setCampanha(e.target.value)} style={input} />
           </Campo>
@@ -211,6 +283,7 @@ export default function UtmPage() {
           <Leg termo="(referrer) ..." txt="Vieram de um site externo que linkou, mas sem UTM." />
           <Leg termo="Por fonte" txt="Agrupa por acao-rede (bio-ig, story-ig, ads-ig...). E aqui que ves qual ACAO rende mais." />
           <Leg termo="Por mensagem" txt="Quebra a fonte pelo assunto do criativo (fonte / utm_content)." />
+          <Leg termo="E-mails e parcerias" txt="Secao propria mais abaixo: junta os registos que vieram por e-mail ou por collab, cada envio/parceiro numa linha. Usa a acao 'E-mail' ou 'Parceria' no construtor e poe o nome no utm_content." />
           <Leg termo="Canal declarado" txt="O que a pessoa respondeu no 'Como nos conheceste?' ao criar a conta." />
         </div>
       </div>
@@ -257,6 +330,33 @@ export default function UtmPage() {
               <Tabela titulo="Canal declarado (como nos conheceste)" itens={aq.porDeclarada} />
             )}
           </div>
+        )}
+      </div>
+
+      {/* ---- E-mails e parcerias (canais rastreados a parte) ---- */}
+      <div style={{ ...caixa, marginTop: 18 }}>
+        <div style={titulo}>E-mails e parcerias</div>
+        <p style={{ fontSize: 12.5, color: "#c8c0b8", marginTop: 0, lineHeight: 1.5 }}>
+          Gera o link em cima com a acao <b>E-mail</b> ou <b>Parceria / collab</b> e poe o <b>nome</b> (campanha
+          ou parceiro) no campo de baixo. Cada nome vira uma linha aqui &mdash; e so assim da para ver qual
+          e-mail ou qual collab trouxe gente. Segue o mesmo periodo escolhido em cima.
+        </p>
+        {!aq?.ok ? (
+          <p style={{ color: "#9a938c", fontSize: 13 }}>Carrega o funil em cima primeiro.</p>
+        ) : emailItens.length === 0 && parceriaItens.length === 0 ? (
+          <p style={{ color: "#9a938c", fontSize: 13, lineHeight: 1.5 }}>
+            Ainda nao chegou ninguem por e-mail ou parceria neste periodo. Assim que alguem criar conta
+            por um link com acao <b>E-mail</b> ou <b>Parceria</b>, aparece aqui.
+          </p>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
+              <Stat rot="Por e-mail" val={String(totalCanal(emailItens))} />
+              <Stat rot="Por parceria" val={String(totalCanal(parceriaItens))} />
+            </div>
+            <Tabela titulo="E-mails (por campanha)" itens={emailItens} />
+            <Tabela titulo="Parcerias / collabs (por parceiro)" itens={parceriaItens} />
+          </>
         )}
       </div>
 

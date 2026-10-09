@@ -20,6 +20,7 @@ import { JudoguiProvider } from "@/components/JudoguiProvider";
 import { TatameProvider } from "@/components/TatameProvider";
 // <<< VOLTAR >>> import { BarraTopo } from "@/components/BarraTopo";
 import { LinguaProvider } from "@/lib/i18n";
+import { SeletorLinguaInicial } from "@/components/SeletorLinguaInicial";
 import { PostHogProvider } from "@/components/PostHogProvider";
 
 const geistSans = Manrope({
@@ -77,6 +78,9 @@ export default function RootLayout({
             porque o banner de consentimento usa useLingua() para sair no idioma
             da pessoa. */}
         <LinguaProvider>
+          {/* A PRIMEIRA coisa ao chegar: escolher o idioma (bloqueia até escolher,
+              aparece em qualquer página, só na primeira visita). */}
+          <SeletorLinguaInicial />
           <PostHogProvider>
             <JudoguiProvider>
               <TatameProvider>
