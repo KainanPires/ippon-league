@@ -132,10 +132,16 @@ export default function CriarEquipa() {
   // mostra o ecrã "trancado durante a rodada". null = ainda a verificar. Fora de
   // uma competição a decorrer, montar é sempre livre (não há nada a decidir).
   const [temEquipaCiclo, setTemEquipaCiclo] = useState<boolean | null>(null);
+  // Para onde reencaminhar quem JÁ tem equipa (durante uma competição a decorrer):
+  //   • tem equipa da que está A DECORRER (ex.: Mundial) → /meu-time: continua a
+  //     VER o seu time ao vivo (é o pedido do Kainan — quem montou vê o Mundial).
+  //   • só montou a PRÓXIMA (o clássico) → /mercado: ecrã "trancado / analisar".
+  // Quem NÃO tem equipa nenhuma fica no Dojo e monta para a próxima competição.
+  const [destinoOcupado, setDestinoOcupado] = useState<string | null>(null);
   const idDecorrer = foco.aDecorrer?.idCompeticao ?? null;
   const idAlvoCiclo = alvo.idCompeticao;
   useEffect(() => {
-      if (!emAndamento || !idDecorrer) { setTemEquipaCiclo(false); return; }
+      if (!emAndamento || !idDecorrer) { setTemEquipaCiclo(false); setDestinoOcupado(null); return; }
       let vivo = true;
       (async () => {
         // Servidor (tabela `equipas`) é a verdade; se não responder, cai no local.
@@ -145,16 +151,21 @@ export default function CriarEquipa() {
         ]);
         const temDec = (decCloud?.ids.length ?? 0) > 0 || loadSavedFor(idDecorrer).ids.length > 0;
         const temAlvo = (alvoCloud?.ids.length ?? 0) > 0 || loadSavedFor(idAlvoCiclo).ids.length > 0;
-        if (vivo) setTemEquipaCiclo(temDec || temAlvo);
+        if (!vivo) return;
+        setTemEquipaCiclo(temDec || temAlvo);
+        // Quem está a jogar a competição a decorrer vê o seu time ao vivo (meu-time);
+        // quem só montou a próxima vai analisar no mercado.
+        setDestinoOcupado(temDec ? "/meu-time" : temAlvo ? "/mercado" : null);
       })();
       return () => { vivo = false; };
       // Deps são IDs (primitivos) e não os objetos do calendário (novos a cada render).
     }, [emAndamento, idDecorrer, idAlvoCiclo]);
   useEffect(() => {
-      // Já tem equipa e há competição a decorrer: o lugar é o mercado (ecrã de
-      // "trancado / só analisar"), não o Dojo. replace para não deixar histórico.
-      if (emAndamento && temEquipaCiclo === true) router.replace("/mercado");
-    }, [emAndamento, temEquipaCiclo, router]);
+      // Já tem equipa e há competição a decorrer: não é no Dojo que fica. Quem tem
+      // equipa a decorrer vai VER o seu time (/meu-time); quem só montou a próxima
+      // vai ao mercado (ecrã "trancado"). replace para não deixar histórico.
+      if (emAndamento && temEquipaCiclo === true && destinoOcupado) router.replace(destinoOcupado);
+    }, [emAndamento, temEquipaCiclo, destinoOcupado, router]);
   useEffect(() => {
       let active = true;
       const idAlvo = alvo.idCompeticao;
