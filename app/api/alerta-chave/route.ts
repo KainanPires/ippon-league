@@ -276,6 +276,16 @@ export async function GET(req: Request) {
   if (!aDecorrer) {
     return NextResponse.json({ ok: true, a_decorrer: null, nota: "Sem competição a decorrer.", ms: Date.now() - t0 });
   }
+  // EVENTO ROLLING (Mundial/Olimpíadas): tranca e sorteia POR CATEGORIA, não tem
+  // um único momento de "chave pronta". Este alerta (favorito está na chave) é
+  // feito para competições normais. Desde 10/10/2026, na fase final do rolling o
+  // foco.aDecorrer passa a apontar para o próprio evento — por isso saímos aqui,
+  // senão enviávamos de uma vez um alerta por cada favorito de TODAS as
+  // categorias (muitas já terminadas). As categorias do Mundial são tratadas
+  // pelos crons ao vivo (chave-maestro / favoritos-notificar), não por aqui.
+  if (aDecorrer.rolling) {
+    return NextResponse.json({ ok: true, a_decorrer: aDecorrer.idCompeticao, nota: "Evento rolling: alertas de chave por categoria não se aplicam aqui.", ms: Date.now() - t0 });
+  }
   const comp = aDecorrer.idCompeticao;
   // Nome COMPLETO: a competição está a decorrer, logo o mercado já fechou e a
   // cidade pode aparecer. (Com `.nome` cru sairia o nome curto dos clássicos —

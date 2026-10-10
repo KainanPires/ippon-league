@@ -493,7 +493,23 @@ export function focoMercado(agora: Date = new Date()): FocoMercado {
   const rolling = competicaoRollingAtiva(agora);
   if (rolling) {
     const est = estadoMercado(rolling, agora);
-    return { atual: rolling, alvo: rolling, aDecorrer: null, estadoAtual: est, estadoAlvo: est };
+    // FASE FINAL DO ROLLING (Kainan, 10/10/2026): enquanto AINDA há categorias por
+    // trancar, o alvo é o próprio evento — monta-se nele e cada categoria tranca no
+    // seu instante. Mas no ÚLTIMO dia, quando a última categoria já trancou (ex.: o
+    // peso pesado do Mundial), já NÃO dá para montar nada neste evento: quem chega
+    // novo ficava sem conseguir montar equipa nenhuma. Nesse caso o mercado de
+    // MONTAGEM passa para a próxima competição (o clássico, mercado aberto), mas o
+    // evento continua A DECORRER (a ser pontuado e visto no "meu time") até ao fim.
+    //   • alvo      -> próxima competição (onde se monta agora)
+    //   • aDecorrer -> o evento rolling (ainda a jogar-se)
+    // Nota: com aDecorrer preenchido, o notificarMercado NÃO anuncia "mercado
+    // aberto" da seguinte (é guardado por !aDecorrer) — logo não há blast.
+    const aindaAbre = proximoFechoRolling(rolling, agora) !== null;
+    if (aindaAbre) {
+      return { atual: rolling, alvo: rolling, aDecorrer: null, estadoAtual: est, estadoAlvo: est };
+    }
+    const alvoProx = proximaDepoisDe(rolling);
+    return { atual: rolling, alvo: alvoProx, aDecorrer: rolling, estadoAtual: est, estadoAlvo: estadoMercado(alvoProx, agora) };
   }
   const atual = competicaoDaSemana(agora);
   const estadoAtual = estadoMercado(atual, agora);
