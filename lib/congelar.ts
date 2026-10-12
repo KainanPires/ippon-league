@@ -117,18 +117,26 @@ async function pontuarAtletasDaCompeticao(
   }
   // Quais já estão REALMENTE congelados (para retomar sem repetir).
   //
-  // CUIDADO (bug corrigido): os crons da chave ao vivo (chave-viva / chave-maestro)
-  // escrevem nesta MESMA tabela durante a competição — com os pontos, mas SEM os
-  // preços/valorização. Se contássemos qualquer linha como "já feito", o
-  // congelamento saltava todos os atletas que a chave ao vivo já tinha inserido,
-  // e a valorização (variacao_jc) nunca era calculada — ficava tudo a +0 JC, e o
-  // património dos jogadores não mexia. Por isso só contam como feitos os que têm
-  // `congelado_em` preenchido — a marca que SÓ o congelamento põe.
+  // CUIDADO (bug): os crons da chave ao vivo (chave-viva / chave-maestro) escrevem
+  // nesta MESMA tabela durante a competição — com os pontos, mas SEM os preços/
+  // valorização (preco_antes/preco_novo/variacao_jc ficam a NULL). Descobriu-se
+  // (Mundial de Baku, out/2026) que essas linhas TAMBÉM trazem `congelado_em`
+  // preenchido, por isso filtrar só por `congelado_em` deixava-as passar por
+  // "feitas": o congelamento saltava-as (atletasProcessados:0) e a valorização
+  // nunca era calculada — tudo a +0 JC, e o património dos jogadores não mexia.
+  //
+  // Correção robusta: uma linha só conta como feita quando tem `congelado_em` E
+  // `variacao_jc` preenchidos. O `variacao_jc` é escrito SÓ pelo motor de preço
+  // (computeNewPrice, mais abaixo), nunca pela chave ao vivo — por isso distingue
+  // com segurança uma linha realmente congelada de uma inserida ao vivo. Assim o
+  // congelamento reprocessa sozinho as linhas da chave ao vivo, em qualquer
+  // competição, sem ser preciso recongelar à mão.
   const { data: jaFeitos } = await supabaseAdmin
   .from("resultados_atletas")
   .select("id_person")
   .eq("id_competicao", idComp)
-  .not("congelado_em", "is", null);
+  .not("congelado_em", "is", null)
+  .not("variacao_jc", "is", null);
   const feitos = new Set((jaFeitos || []).map((r) => String(r.id_person)));
 
   // Quantos falharam A GRAVAR. Não é o mesmo que "faltam por processar": estes
