@@ -1247,7 +1247,7 @@ const PT: Dicionario = {
   // --- início ---
   "inicio.entrarParaJogar": "Entrar para jogar",
   "inicio.criarEquipa": "Cria a tua equipa",
-  "inicio.criarEquipaSub": "Monta 8 atletas com 100 Judocoins e escolhe o teu capitão.",
+  "inicio.criarEquipaSub": "Monta 8 atletas com {jc} Judocoins e escolhe o teu capitão.",
   "inicio.criarEquipaBtn": "Criar a minha equipa",
   "inicio.minhaEquipa": "A minha equipa",
   "inicio.verEquipa": "Ver a minha equipa",
@@ -3123,7 +3123,7 @@ const EN: Dicionario = {
   // --- home ---
   "inicio.entrarParaJogar": "Sign in to play",
   "inicio.criarEquipa": "Build your team",
-  "inicio.criarEquipaSub": "Pick 8 athletes with 100 Judocoins and choose your captain.",
+  "inicio.criarEquipaSub": "Pick 8 athletes with {jc} Judocoins and choose your captain.",
   "inicio.criarEquipaBtn": "Build my team",
   "inicio.minhaEquipa": "My team",
   "inicio.verEquipa": "View my team",
@@ -4997,7 +4997,7 @@ const ES: Dicionario = {
   // --- inicio ---
   "inicio.entrarParaJogar": "Entrar para jugar",
   "inicio.criarEquipa": "Crea tu equipo",
-  "inicio.criarEquipaSub": "Elige 8 atletas con 100 Judocoins y escoge tu capitán.",
+  "inicio.criarEquipaSub": "Elige 8 atletas con {jc} Judocoins y escoge tu capitán.",
   "inicio.criarEquipaBtn": "Crear mi equipo",
   "inicio.minhaEquipa": "Mi equipo",
   "inicio.verEquipa": "Ver mi equipo",
@@ -6871,7 +6871,7 @@ const FR: Dicionario = {
   // --- accueil ---
   "inicio.entrarParaJogar": "Se connecter pour jouer",
   "inicio.criarEquipa": "Compose ton équipe",
-  "inicio.criarEquipaSub": "Choisis 8 athlètes avec 100 Judocoins et désigne ton capitaine.",
+  "inicio.criarEquipaSub": "Choisis 8 athlètes avec {jc} Judocoins et désigne ton capitaine.",
   "inicio.criarEquipaBtn": "Composer mon équipe",
   "inicio.minhaEquipa": "Mon équipe",
   "inicio.verEquipa": "Voir mon équipe",
@@ -8755,7 +8755,7 @@ const DE: Dicionario = {
   // --- Start ---
   "inicio.entrarParaJogar": "Zum Spielen anmelden",
   "inicio.criarEquipa": "Stelle dein Team auf",
-  "inicio.criarEquipaSub": "Wähle 8 Athleten mit 100 Judocoins und bestimme deinen Kapitän.",
+  "inicio.criarEquipaSub": "Wähle 8 Athleten mit {jc} Judocoins und bestimme deinen Kapitän.",
   "inicio.criarEquipaBtn": "Mein Team aufstellen",
   "inicio.minhaEquipa": "Mein Team",
   "inicio.verEquipa": "Mein Team ansehen",
@@ -9607,7 +9607,7 @@ const JA: Dicionario = {
   "faixa.rotulo": "{faixa}帯",
   "inicio.entrarParaJogar": "ログインしてプレイ",
   "inicio.criarEquipa": "チームを組む",
-  "inicio.criarEquipaSub": "100 Judocoins で8人の選手を選び、キャプテンを決めよう。",
+  "inicio.criarEquipaSub": "{jc} Judocoins で8人の選手を選び、キャプテンを決めよう。",
   "inicio.criarEquipaBtn": "チームを組む",
   "inicio.minhaEquipa": "マイチーム",
   "inicio.verEquipa": "マイチームを見る",
@@ -11427,7 +11427,7 @@ const RU: Dicionario = {
   "faixa.rotulo": "пояс {faixa}",
   "inicio.entrarParaJogar": "Войди, чтобы играть",
   "inicio.criarEquipa": "Собери команду",
-  "inicio.criarEquipaSub": "Выбери 8 атлетов за 100 Judocoins и назначь капитана.",
+  "inicio.criarEquipaSub": "Выбери 8 атлетов за {jc} Judocoins и назначь капитана.",
   "inicio.criarEquipaBtn": "Собрать команду",
   "inicio.minhaEquipa": "Моя команда",
   "inicio.verEquipa": "Посмотреть команду",

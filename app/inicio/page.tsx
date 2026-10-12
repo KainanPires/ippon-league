@@ -860,7 +860,7 @@ export default function Inicio() {
         </a>
       )}
     <div ref={teamRef} className={glow("team")}>
-    {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo, t)} faixa={faixaJogo} patrimonio={patrimonio} pontosAoVivo={pontosAoVivo} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} />}
+    {!visitante && teamInfo ? <TeamBuilt info={teamInfo} fechoTexto={textoFecho(alvo, t)} faixa={faixaJogo} patrimonio={patrimonio} pontosAoVivo={pontosAoVivo} /> : <TeamCreate corDodo={visitante ? "#efeadd" : corDaFaixa(faixaJogo)} patrimonio={visitante ? null : patrimonio} />}
     {/* NOTA: o aviso "equipa acima do orçamento" NÃO vive mais aqui (pedido do
         Kainan — na página inicial era demasiado). Fica no Meu Time (dojo), no
         Mercado, e nas notificações (push/sino). */}
@@ -1161,8 +1161,13 @@ function Card({ children }: { children: React.ReactNode }) {
 function CardTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: FD, fontSize: 14, fontWeight: 700, textTransform: "uppercase" }}>{children}</div>;
 }
-function TeamCreate({ corDodo = "#efeadd" }: { corDodo?: string }) {
+function TeamCreate({ corDodo = "#efeadd", patrimonio = null }: { corDodo?: string; patrimonio?: number | null }) {
   const t = useT();
+  // O "100 Judocoins" do card deixou de ser fixo: mostra o PATRIMÓNIO REAL de
+  // quem já jogou (vem de /api/orcamento no ecrã inicial). Novo utilizador ou
+  // visitante ainda não tem valor -> mostra 100 (a base de arranque). Assim o
+  // número oscila com o que a pessoa realmente tem.
+  const jc = patrimonio != null ? Math.round(patrimonio * 10) / 10 : 100;
   return (
     <div style={{ border: "1px solid #2a4d3e", borderRadius: 16, overflow: "hidden", marginBottom: 14, background: "repeating-linear-gradient(45deg,#1c3a2e 0 16px,#1a352a 16px 32px)" }}>
     <div style={{ padding: "20px 16px", textAlign: "center" }}>
@@ -1170,7 +1175,7 @@ function TeamCreate({ corDodo = "#efeadd" }: { corDodo?: string }) {
     <Mascot belt={corDodo} expression="feliz" />
     </div>
     <div style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase" }}>{t("inicio.criarEquipa")}</div>
-    <div style={{ fontSize: 12, color: "#cfe4d8", margin: "4px 0 14px" }}>{t("inicio.criarEquipaSub")}</div>
+    <div style={{ fontSize: 12, color: "#cfe4d8", margin: "4px 0 14px" }}>{t("inicio.criarEquipaSub", { jc })}</div>
     <a href="/criar-equipa" style={{ display: "block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: 13, borderRadius: 11, fontSize: 15, textDecoration: "none" }}>
     {t("inicio.criarMinhaEquipa")}
     </a>
