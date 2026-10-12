@@ -33,6 +33,7 @@ interface MembroRank {
   pontos: number;
   posicao: number;
   is_pro: boolean;
+  sensei: boolean;
 }
 export async function GET(req: Request) {
   if (!supabaseAdmin) {
@@ -82,6 +83,14 @@ const userIds = (pros || []).map((p) => p.id as string);
 if (userIds.length === 0) {
   return NextResponse.json({ ok: true, tipo, continente, nomeContinente, membros: [] });
 }
+// Selo de Sensei ativo (users.sensei_ate no futuro). Leitura à parte e defensiva:
+// se a coluna ainda não existir, o ranking funciona na mesma, só sem selos.
+const senseis = new Set<string>();
+try {
+  const nowIso = new Date().toISOString();
+  const { data: se } = await supabaseAdmin.from("users").select("id").in("id", userIds).gt("sensei_ate", nowIso);
+  for (const r of (se || []) as { id: string }[]) senseis.add(String(r.id));
+} catch { /* coluna ainda não existe: sem selos */ }
 // 4) Equipas destes utilizadores NESTA competição (nome do time, escudo, atletas).
 const { data: equipas } = await supabaseAdmin
 .from("equipas")
@@ -124,6 +133,7 @@ const linhas: MembroRank[] = userIds.map((uid) => {
       pontos,
       posicao: 0,
       is_pro: true,
+      sensei: senseis.has(uid),
     };
   });
 // 6) Ordena (quem escalou e tem mais pontos primeiro; quem não escalou ao fundo).

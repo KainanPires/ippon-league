@@ -48,6 +48,7 @@ interface MembroGeral {
   escalou: boolean; // tem equipa nesta rodada?
   posicao: number; // posição no GERAL (1 = líder)
   is_pro: boolean;
+  sensei: boolean; // selo sazonal de criador de liga (20+ ativos na semana)
 }
 export async function GET(req: Request) {
   if (!supabaseAdmin) {
@@ -240,6 +241,14 @@ for (const u of usersRows || []) {
   if (u.name) nomeContaDe.set(String(u.id), String(u.name));
   proDe.set(String(u.id), !!u.is_pro);
 }
+// Selo de Sensei ativo (users.sensei_ate no futuro). À parte e defensivo: se a
+// coluna ainda não existir, o ranking funciona na mesma, só sem selos.
+const senseiDe = new Set<string>();
+try {
+  const nowIso = new Date().toISOString();
+  const { data: se } = await supabaseAdmin.from("users").select("id").in("id", userIds).gt("sensei_ate", nowIso);
+  for (const r of (se || []) as { id: string }[]) senseiDe.add(String(r.id));
+} catch { /* coluna ainda não existe: sem selos */ }
 // Nome/escudo preferenciais: o da equipa de QUALQUER rodada (mais fiável que
   // users.name). Buscamos uma linha de equipa por utilizador para o cartão.
 const { data: idents } = await supabaseAdmin
@@ -293,6 +302,7 @@ const linhas: MembroGeral[] = userIds.map((uid) => {
       escalou,
       posicao: 0,
       is_pro: proDe.get(uid) ?? false,
+      sensei: senseiDe.has(uid),
     };
   });
 // -------------------------------------------------------------------------

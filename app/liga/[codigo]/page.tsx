@@ -7,6 +7,7 @@ import { focoMercado, CALENDARIO_TODAS, numeroDaRodada, nomeCompeticao, localiza
 import { competicaoPorId } from "@/lib/copa";
 import { CartaoCertificado, type PosicaoPodio } from "@/components/CartaoCertificado";
 import { useFundador } from "@/lib/useFundador";
+import { SeloSensei } from "@/components/SeloSensei";
 import { useT, useNomeDoMes } from "@/lib/i18n";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -21,6 +22,7 @@ interface Membro {
   pontos: number;
   posicao: number;
   is_pro: boolean;
+  sensei?: boolean;
 }
 // Linha do ranking GERAL / Judocoins (vem de /api/liga/geral).
 interface MembroGeral {
@@ -33,6 +35,7 @@ interface MembroGeral {
   escalou: boolean;
   posicao: number;
   is_pro: boolean;
+  sensei?: boolean;
 }
 // As três vistas das ligas de amigos de pontos corridos.
 type VistaLiga = "geral" | "rodada" | "jc";
@@ -784,6 +787,7 @@ export default function PaginaLiga() {
                           <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
                           {m.is_pro && <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>}
+                          {m.sensei && <SeloSensei tam="sm" style={{ flexShrink: 0 }} />}
                           {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
                           </div>
                           <div style={{ fontSize: 11, color: m.escalou ? "#7fd1a3" : "#e0894f" }}>{m.escalou ? "Escalou" : t("pl.naoEscalou")}</div>
@@ -817,6 +821,7 @@ export default function PaginaLiga() {
                           <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
                           {m.is_pro && <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>}
+                          {m.sensei && <SeloSensei tam="sm" style={{ flexShrink: 0 }} />}
                           {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
                           </div>
                           <div style={{ fontSize: 11, color: "#93a39a" }}>{m.escalou ? (mercadoAberto ? <span style={{ color: "#7fd1a3" }}>Escalou</span> : <span style={{ color: "#7fd1a3" }}>+{m.pontos_rodada} nesta rodada</span>) : t("pl.semEscalacao")}</div>
@@ -850,6 +855,7 @@ export default function PaginaLiga() {
                           <div style={{ fontSize: 14, fontWeight: 700, color: "#f1ede2", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", overflow: "hidden" }}>
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
                           {m.is_pro && <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>}
+                          {m.sensei && <SeloSensei tam="sm" style={{ flexShrink: 0 }} />}
                           {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
                           </div>
                           <div style={{ fontSize: 11, color: "#93a39a" }}>{t("pl.patrimonioTotal")}</div>
@@ -1109,6 +1115,7 @@ function CartaoCopa({ estado, fecho, inscritos, meuId, codigo }: { estado: strin
                 <div style={{ flexShrink: 0 }}><Escudo config={m.escudo || DEFAULT_IDENTITY} size={28} /></div>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: "#f1ede2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.nome_time}</span>
                 {m.is_pro && <span style={{ background: "#3a2f12", color: GOLD, fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>PRO</span>}
+                          {m.sensei && <SeloSensei tam="sm" style={{ flexShrink: 0 }} />}
                 {euMesmo && <span style={{ background: "#1c3a2e", color: "#aee9c9", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 999, flexShrink: 0 }}>TU</span>}
                 </div>
               );

@@ -15,6 +15,7 @@ import { SeletorLingua } from "@/components/SeletorLingua";
 import { useRotuloFaixa, useT, useDataPorExtenso, useLingua } from "@/lib/i18n";
 import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
 import { CartaoFaixa } from "@/components/CartaoFaixa";
+import { SeloSensei } from "@/components/SeloSensei";
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
 const GOLD = "#d9a441";
@@ -107,6 +108,7 @@ export default function Perfil() {
   const [conta, setConta] = useState<Conta | null>(null);
   const [faixaJogo, setFaixaJogo] = useState<Faixa>("branca");
   const [fundador, setFundador] = useState(false);
+  const [sensei, setSensei] = useState(false); // selo sazonal (liga com 20+ ativos na semana)
   const [historico, setHistorico] = useState<{ mes: string; belt: string; belt_anterior: string | null; situacao: string | null; posicao: number | null; total: number | null }[]>([]);
   const [cartaoFaixa, setCartaoFaixa] = useState<{ faixa: string; faixaDe: string | null; situacao: "subiu" | "desceu" | "manteve" | null; percentil: number | null; periodo?: string } | null>(null);
   const [ready, setReady] = useState(false);
@@ -217,6 +219,13 @@ export default function Perfil() {
               const { data: row } = await supabase.from("users").select("belt, fundador").eq("id", u.id).maybeSingle();
               if (active) { setFaixaJogo(normalizarFaixa(row?.belt)); setFundador(!!row?.fundador); }
             } catch { /* fica branca por defeito */ }
+            // Selo de Sensei (sazonal): leitura à parte e defensiva, para que uma
+            // coluna ainda inexistente não afete a faixa nem o Fundador acima.
+            try {
+              const { data: sr } = await supabase.from("users").select("sensei_ate").eq("id", u.id).maybeSingle();
+              const ate = (sr as { sensei_ate?: string | null } | null)?.sensei_ate;
+              if (active) setSensei(!!ate && Date.parse(String(ate)) > Date.now());
+            } catch { /* coluna ainda não existe: sem selo */ }
             try {
               const { data: hist } = await supabase.from("faixas_historico").select("mes, belt, belt_anterior, situacao, posicao, total").eq("user_id", u.id).order("mes", { ascending: false });
               if (active && Array.isArray(hist)) setHistorico(hist as { mes: string; belt: string; belt_anterior: string | null; situacao: string | null; posicao: number | null; total: number | null }[]);
@@ -343,6 +352,11 @@ export default function Perfil() {
       <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(217,145,65,0.12)", border: `1px solid ${GOLD}`, borderRadius: 999, padding: "2px 9px" }}>
         <span style={{ color: GOLD, fontSize: 11, lineHeight: 1 }}>★</span>
         <span style={{ color: GOLD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{(SELO_FUNDADOR[lingua] ?? SELO_FUNDADOR.pt).rotulo}</span>
+      </div>
+    )}
+    {sensei && (
+      <div style={{ marginTop: 6, marginLeft: fundador ? 6 : 0, display: "inline-flex" }}>
+        <SeloSensei lingua={lingua} tam="sm" />
       </div>
     )}
     <div style={{ fontSize: 11, color: "#7c8a82", marginTop: 4 }}>{abertoDados ? t("perfil.tocaFechar") : t("perfil.tocaVer")}</div>
