@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { competicaoDaSemana, competicaoFechada, focoMercado, CALENDARIO_TODAS, type SemanaCalendario } from "@/lib/calendario";
+import { competicaoDaSemana, competicaoFechada, focoMercado, competeNaEpoca, CALENDARIO_TODAS, type SemanaCalendario } from "@/lib/calendario";
 import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes } from "@/lib/ijf";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { congelarCompeticao } from "@/lib/congelar";
@@ -289,7 +289,9 @@ async function congelarRecentes(hoje: Date, t0: number): Promise<{ feitos: Resum
   const candidatas = CALENDARIO_TODAS.filter((s) => {
       const inicio = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
       const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
-      return dentroDaJanela && competicaoFechada(s, hoje); // só as JÁ TERMINADAS (60h)
+      // CORTE DA ÉPOCA: em 2026 só se congela a partir do Mundial (4/10). As
+      // anteriores (testes de pré-lançamento, clássico de 26/09) ficam de fora.
+      return dentroDaJanela && competicaoFechada(s, hoje) && competeNaEpoca(s); // só as JÁ TERMINADAS (60h) e da época
     });
   const feitos: ResumoCongelamento[] = [];
   let parouPorTempo = false;
@@ -963,12 +965,13 @@ export async function GET(req: Request) {
         const horas = Math.round(((agora - inicio) / 3600000) * 10) / 10;
         const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
         const terminada = competicaoFechada(s, hoje);
+        const naEpoca = competeNaEpoca(s);
         return {
           id: s.idCompeticao, nome: s.nome, de: s.de,
           inicio_iso: new Date(inicio).toISOString(),
           horas_desde_inicio: horas,
-          dentroDaJanela, terminada,
-          candidata: dentroDaJanela && terminada,
+          dentroDaJanela, terminada, naEpoca,
+          candidata: dentroDaJanela && terminada && naEpoca,
         };
       }).filter((l) => l.horas_desde_inicio > -720 && l.horas_desde_inicio < 1440);
     return NextResponse.json({

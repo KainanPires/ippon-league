@@ -244,6 +244,31 @@ export const CALENDARIO_2027: SemanaCalendario[] = [
 // pontos visíveis, rolling). Assim uma competição de qualquer ano é encontrada.
 export const CALENDARIO_TODAS: SemanaCalendario[] = [...CALENDARIO_2026, ...CALENDARIO_2027];
 
+// ===========================================================================
+// INÍCIO DA ÉPOCA JOGÁVEL (Kainan, 12/10/2026)
+//
+// A época de 2026 começa no MUNDIAL DE BAKU (4/10): foi aí que toda a gente
+// recomeçou com 100 JC. As competições de 2026 ANTES do Mundial (os testes de
+// pré-lançamento e o clássico de 26/09, antes do lançamento de 28/09) NÃO
+// contam para o jogo — nem para o património, nem são congeladas. A partir de
+// 2027 a época é o ano civil normal (não há corte).
+// ===========================================================================
+export const INICIO_EPOCA_2026 = "2026/10/04"; // `de` do Mundial (formato AAAA/MM/DD)
+
+/** A competição conta para a época jogável? (2026 só a partir do Mundial.) */
+export function competeNaEpoca(s: { de: string } | null | undefined): boolean {
+  if (!s || !s.de) return true;
+  const ano = parseInt(String(s.de).slice(0, 4), 10);
+  if (ano !== 2026) return true;           // outros anos: sem corte
+  return String(s.de) >= INICIO_EPOCA_2026; // AAAA/MM/DD compara bem como string
+}
+
+/** Como competeNaEpoca, mas por id de competição (procura no calendário). */
+export function competeNaEpocaPorId(idComp: string): boolean {
+  const s = CALENDARIO_TODAS.find((c) => c.idCompeticao === String(idComp));
+  return competeNaEpoca(s ?? null);
+}
+
 /**
  * A lista do ANO pedido. 2026 e 2027 têm calendário próprio; anos posteriores
  * reutilizam o de 2027 até alguém montar o seu (tal como antes de 2027 existir).

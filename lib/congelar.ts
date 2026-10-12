@@ -44,6 +44,7 @@ import { computeNewPrice } from "@/lib/engine";
 import { notificarFimDeCompeticao } from "@/lib/notificarCompeticao";
 import { lerLutasManuais, indexarManuaisPorAtleta, aplicarManuaisNoCongelamento } from "@/lib/lutasManuais";
 import { jcCompradosValidosEmLote } from "@/lib/carteira";
+import { competeNaEpocaPorId } from "@/lib/calendario";
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 // Folga de arredondamento na verificação de orçamento. Os preços vivem a 1 casa
 // (round1), por isso 0.05 JC nunca marca uma equipa como acima do orçamento por
@@ -454,12 +455,16 @@ async function recalcularPatrimonios(anoEpoca: number): Promise<number> {
   const fimAno = new Date(Date.UTC(anoEpoca + 1, 0, 1)).toISOString();
   const { data: rodadas } = await supabaseAdmin
   .from("resultados_rodada")
-  .select("user_id, ganho_patrimonio, congelado_em")
+  .select("user_id, ganho_patrimonio, congelado_em, id_competicao")
   .gte("congelado_em", inicioAno)
   .lt("congelado_em", fimAno);
-  // Soma por utilizador.
+  // Soma por utilizador. CORTE DA ÉPOCA (12/10/2026): em 2026 só contam as
+  // competições a partir do Mundial de Baku (4/10). As anteriores (testes de
+  // pré-lançamento e o clássico de 26/09) ficam de fora — toda a gente começou
+  // com 100 JC no Mundial. Ver competeNaEpoca em lib/calendario.
   const ganhoPorUser = new Map<string, number>();
   for (const r of rodadas || []) {
+    if (!competeNaEpocaPorId(String(r.id_competicao))) continue;
     const u = String(r.user_id);
     ganhoPorUser.set(u, (ganhoPorUser.get(u) ?? 0) + Number(r.ganho_patrimonio ?? 0));
   }
