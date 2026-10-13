@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { enviarPushPara } from "@/lib/pushServer";
+import { renderNotif } from "@/lib/i18nServidor";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -70,6 +71,32 @@ export async function GET(req: Request) {
   const uid = await uidPorEmail(email);
   if (!uid) {
     return NextResponse.json({ ok: false, erro: "Conta não encontrada.", email }, { status: 404 });
+  }
+
+  // MODO FAIXA (teste de conteúdo): ?secret=...&faixa=subiu  (ou &faixa=desceu)
+  // Envia UM push de mudança de faixa, com o MESMO texto da produção (renderNotif),
+  // sino + push real, só para o fundador. Subida -> Preta (top 5%); descida -> Verde
+  // (top 50%). Serve para tirar o print e provar o push no telemóvel.
+  const faixaModo = (searchParams.get("faixa") || "").trim();
+  if (faixaModo === "subiu" || faixaModo === "desceu") {
+    const subiu = faixaModo === "subiu";
+    const faixaCanonica = subiu ? "preta" : "verde";
+    const pct = subiu ? 5 : 50;
+    const titulo = renderNotif("pt", subiu ? "faixa.subiuTitulo" : "faixa.desceuTitulo", { faixaCanonica });
+    const corpo = renderNotif("pt", subiu ? "faixa.subiuCorpo" : "faixa.desceuCorpo", { faixaCanonica, pct });
+    let sinoF = 0, pushF = 0;
+    const errosF: string[] = [];
+    try {
+      await supabaseAdmin.from("notificacoes").insert({
+        user_id: uid, tipo: subiu ? "faixa_subiu" : "faixa_desceu", titulo, corpo, link: "/inicio",
+      });
+      sinoF++;
+    } catch (e) { errosF.push("sino: " + String((e as Error)?.message || e)); }
+    try {
+      await enviarPushPara([uid], { titulo, corpo, link: "/inicio" });
+      pushF++;
+    } catch (e) { errosF.push("push: " + String((e as Error)?.message || e)); }
+    return NextResponse.json({ ok: true, modo: "faixa", faixa: faixaModo, titulo, corpo, email, uid, sino: sinoF, push: pushF, erros: errosF });
   }
 
   let sino = 0;
