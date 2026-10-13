@@ -469,22 +469,26 @@ async function recalcularFaixas(mes: string): Promise<{ jogadores: number; perce
       const antes = faixaAntiga.get(a.user_id) ?? "branca";
       if (antes !== a.faixa) {
         const subiu = ordemFaixa(a.faixa) > ordemFaixa(antes);
+        // "estás no top {pct}%" — o teto da banda da nova faixa, para a mensagem
+        // explicar o PORQUÊ da mudança. Branca é a base (sem teto) -> texto próprio.
+        const pct = topPctDaFaixa(a.faixa);
         if (subiu) {
           await criarNotificacaoServidor({
               paraUserId: a.user_id,
               tipo: "faixa_subiu",
               chaveTitulo: "faixa.subiuTitulo",
               chaveCorpo: "faixa.subiuCorpo",
-              vars: { faixaCanonica: a.faixa },
+              vars: { faixaCanonica: a.faixa, pct: pct ?? 0 },
               link: "/inicio",
             });
         } else {
+          const ehBranca = a.faixa === "branca";
           await criarNotificacaoServidor({
               paraUserId: a.user_id,
               tipo: "faixa_desceu",
               chaveTitulo: "faixa.desceuTitulo",
-              chaveCorpo: "faixa.desceuCorpo",
-              vars: { faixaCanonica: a.faixa },
+              chaveCorpo: ehBranca ? "faixa.desceuBrancaCorpo" : "faixa.desceuCorpo",
+              vars: { faixaCanonica: a.faixa, pct: pct ?? 90 },
               link: "/inicio",
             });
         }
@@ -581,6 +585,16 @@ function ordemFaixa(faixa: string): number {
     branca: 0, azul: 1, amarela: 2, verde: 3, roxa: 4, marrom: 5, preta: 6,
   };
   return ordem[faixa] ?? 0;
+}
+// Teto da banda de percentil de cada faixa — "estás no top X%". Usado só na
+// notificação de mudança de faixa, para explicar o PORQUÊ (ver faixa.subiuCorpo /
+// faixa.desceuCorpo). Os cortes batem com beltFromTopFraction em lib/engine.
+// Branca é a base (sem teto) -> devolve null; nesse caso usa-se faixa.desceuBrancaCorpo.
+function topPctDaFaixa(faixa: string): number | null {
+  const teto: Record<string, number> = {
+    preta: 5, marrom: 15, roxa: 30, verde: 50, amarela: 70, azul: 90,
+  };
+  return teto[faixa] ?? null;
 }
 // (O nome da faixa para as notificações passou a ser traduzido no renderizador
 // do servidor — ver nomeFaixaEm em lib/dicionarioNotif.)
