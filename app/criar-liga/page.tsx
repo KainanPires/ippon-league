@@ -37,7 +37,7 @@ import {
   type PatternId,
   type SymbolId,
 } from "@/components/Escudo";
-import { competicoesReais, nomeCompeticao } from "@/lib/calendario";
+import { CALENDARIO_TODAS, type SemanaCalendario } from "@/lib/calendario";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -96,8 +96,25 @@ export default function CriarLigaPage() {
     return () => { vivo = false; };
   }, [router]);
 
-  // Competições do calendário (reais, sem clássicos), da mais próxima no tempo.
-  const comps = useMemo(() => competicoesReais(), []);
+  // Competições do calendário — TODAS (reais + clássicos), por data. As passadas
+  // não aparecem nos seletores (filtram-se por data mais abaixo).
+  const comps = useMemo(() => [...CALENDARIO_TODAS].sort((a, b) => a.de.localeCompare(b.de)), []);
+  // Numeração dos clássicos (1.º, 2.º… por data, no ano). O nome/ano real é
+  // SECRETO até ao dia — no seletor um clássico mostra só "Clássico Nº X".
+  const numeroClassico = useMemo(() => {
+    const m = new Map<string, number>();
+    let n = 0;
+    for (const c of comps) if (c.classico) { n++; m.set(c.idCompeticao, n); }
+    return m;
+  }, [comps]);
+  // Nome seguro de uma competição: real -> nome; clássico -> "Clássico Nº X".
+  const nomeSeguro = useCallback((c: SemanaCalendario): string =>
+    c.classico ? t("cal.classicoN", { n: numeroClassico.get(c.idCompeticao) ?? 0 }) : c.nome
+  , [numeroClassico, t]);
+  // Rótulo no seletor: data (DD/MM) + nome seguro.
+  const rotuloComp = useCallback((c: SemanaCalendario): string =>
+    `${c.de.slice(8, 10)}/${c.de.slice(5, 7)} · ${nomeSeguro(c)}`
+  , [nomeSeguro]);
   // Arranque: as que ainda não começaram (de >= hoje). Se nenhuma, cai em todas.
   const compsArranque = useMemo(() => {
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
@@ -241,8 +258,8 @@ export default function CriarLigaPage() {
   const compFimSel = comps.find((c) => c.idCompeticao === fimComp);
   const infoLinha = (() => {
     if (formato !== "pontos" || !compIni) return "";
-    const ini = nomeCompeticao(compIni);
-    if (fimTipo === "competicao" && compFimSel) return t("cl.infoAte", { ini, fim: nomeCompeticao(compFimSel) });
+    const ini = nomeSeguro(compIni);
+    if (fimTipo === "competicao" && compFimSel) return t("cl.infoAte", { ini, fim: nomeSeguro(compFimSel) });
     if (fimTipo === "mes" && /^\d{4}-\d{2}$/.test(fimMes)) {
       const [y, m] = fimMes.split("-").map(Number);
       const nomeMes = new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -348,7 +365,7 @@ export default function CriarLigaPage() {
         ) : (
           <select value={arranque} onChange={(e) => { setArranque(e.target.value); setFimComp(""); }} style={inputEstilo}>
             {compsArranque.map((c) => (
-              <option key={c.idCompeticao} value={c.idCompeticao}>{nomeCompeticao(c)}</option>
+              <option key={c.idCompeticao} value={c.idCompeticao}>{rotuloComp(c)}</option>
             ))}
           </select>
         )}
@@ -371,7 +388,7 @@ export default function CriarLigaPage() {
                 <select value={fimComp} onChange={(e) => setFimComp(e.target.value)} style={inputEstilo}>
                   <option value="">{t("cl.escolheFim")}</option>
                   {compsFim.map((c) => (
-                    <option key={c.idCompeticao} value={c.idCompeticao}>{nomeCompeticao(c)}</option>
+                    <option key={c.idCompeticao} value={c.idCompeticao}>{rotuloComp(c)}</option>
                   ))}
                 </select>
               )
