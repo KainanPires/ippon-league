@@ -34,6 +34,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { tamanhoChave, numeroDeRondas } from "@/lib/copa";
+import { numeroDaRodada } from "@/lib/calendario";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 interface Identidade {
@@ -73,6 +74,13 @@ export async function GET(req: Request) {
   .order("ronda", { ascending: true })
   .order("ordem", { ascending: true });
   const lista = confrontos || [];
+  // PLACAR AO VIVO da ronda em curso — mostra os pontos das equipas a SUBIR
+  // durante a competição, sem decidir vencedor (isso é do /api/copa/apurar, e só
+  // quando a competição fecha por completo). Serve para seguir o confronto.
+  let vivoPorConfronto: Record<string, { a: number; b: number }> = {};
+  try {
+    vivoPorConfronto = await placarAoVivoDaRonda(lista);
+  } catch { /* sem placar ao vivo: a chave desenha na mesma */ }
   // Inscritos (para saber o tamanho da chave e listar quem está, mesmo sem sorteio).
   const { data: membros } = await supabaseAdmin
   .from("league_members")
@@ -128,7 +136,10 @@ export async function GET(req: Request) {
   }
   return NextResponse.json({
       liga: { id: liga.id, name: liga.name, escudo: liga.escudo, copa_estado: liga.copa_estado },
-      confrontos: lista,
+      confrontos: lista.map((c) => {
+        const p = vivoPorConfronto[String(c.id)];
+        return p ? { ...c, pontos_a_vivo: p.a, pontos_b_vivo: p.b, ao_vivo: true } : c;
+      }),
       identidades, // { user_id: { nome_time, escudo } }
       nInscritos,
       nNaChave, // quantos saíram no sorteio (<= nInscritos)
@@ -136,6 +147,96 @@ export async function GET(req: Request) {
       totalRondas,
       podio,
     });
+}
+// ---------------------------------------------------------------------------
+// PLACAR AO VIVO da ronda em curso.
+//
+// A ronda em curso é a MAIS BAIXA com confrontos pendentes (a que está ligada à
+// competição a decorrer). Para cada confronto dela, soma os pontos ATUAIS dos 8
+// atletas de cada equipa nessa competição (capitão a dobrar) — lê TUDO o que já
+// está em resultados_atletas (o que a chave ao vivo foi escrevendo + o que já
+// congelou), não só o congelado. É a MESMA conta do ranking e do apuramento.
+//
+// NÃO decide nada: só devolve números para a tela mostrar o confronto a subir.
+// O vencedor continua a ser selado só no fim, pelo /api/copa/apurar.
+//
+// Tem herança de equipa, igual ao apuramento: quem não guardou equipa nesta
+// competição herda a última que guardou numa rodada anterior.
+function ordemComp(id: string): number {
+  const n = numeroDaRodada(String(id));
+  return n ?? -1;
+}
+async function placarAoVivoDaRonda(
+  confrontos: { id: string; ronda: number; estado: string; jogador_a: string | null; jogador_b: string | null; id_competicao: string }[]
+): Promise<Record<string, { a: number; b: number }>> {
+  const vazio: Record<string, { a: number; b: number }> = {};
+  if (!supabaseAdmin) return vazio;
+  // Ronda em curso = a mais baixa com confrontos reais pendentes (com adversário).
+  const pendentes = confrontos.filter((c) => c.estado === "pendente" && c.jogador_a && c.jogador_b);
+  if (pendentes.length === 0) return vazio;
+  const rondaAtual = Math.min(...pendentes.map((c) => c.ronda));
+  const daRonda = pendentes.filter((c) => c.ronda === rondaAtual);
+  const comp = daRonda[0].id_competicao;
+  if (!comp) return vazio;
+  // Pontos ATUAIS dos atletas desta competição (ao vivo + congelado).
+  const { data: res } = await supabaseAdmin
+    .from("resultados_atletas").select("id_person, pontos").eq("id_competicao", comp);
+  if (!res || res.length === 0) return vazio; // a competição ainda não tem resultados
+  const pontosAtleta: Record<string, number> = {};
+  for (const r of res) pontosAtleta[String(r.id_person)] = Number(r.pontos) || 0;
+  // Jogadores envolvidos nesta ronda.
+  const ids = Array.from(new Set<string>(
+    daRonda.flatMap((c) => [c.jogador_a, c.jogador_b]).filter((x): x is string => !!x)
+  ));
+  if (ids.length === 0) return vazio;
+  // Equipa de cada jogador NESTA competição.
+  const { data: equipas } = await supabaseAdmin
+    .from("equipas").select("user_id, atletas, capitao").eq("id_competicao", comp).in("user_id", ids);
+  const equipaDe = new Map<string, { atletas: string[]; capitao: string | null }>();
+  for (const e of equipas || []) {
+    const a = Array.isArray(e.atletas) ? (e.atletas as string[]).map(String) : [];
+    equipaDe.set(String(e.user_id), { atletas: a, capitao: e.capitao ? String(e.capitao) : null });
+  }
+  // HERANÇA para quem não escalou nesta rodada: última equipa de uma rodada anterior.
+  const semEquipa = ids.filter((u) => !equipaDe.has(u));
+  if (semEquipa.length > 0) {
+    const ordemAlvo = ordemComp(comp);
+    const { data: antigas } = await supabaseAdmin
+      .from("equipas").select("user_id, atletas, capitao, id_competicao").in("user_id", semEquipa);
+    const melhor = new Map<string, { ordem: number; atletas: string[]; capitao: string | null }>();
+    for (const e of antigas || []) {
+      const o = ordemComp(String(e.id_competicao));
+      if (o < 0) continue;
+      if (ordemAlvo >= 0 && o >= ordemAlvo) continue; // só rodadas anteriores
+      const a = Array.isArray(e.atletas) ? (e.atletas as string[]).map(String) : [];
+      if (a.length === 0) continue;
+      const uid = String(e.user_id);
+      const cur = melhor.get(uid);
+      if (!cur || o > cur.ordem) melhor.set(uid, { ordem: o, atletas: a, capitao: e.capitao ? String(e.capitao) : null });
+    }
+    for (const [uid, m] of melhor) equipaDe.set(uid, { atletas: m.atletas, capitao: m.capitao });
+  }
+  // Pontos por jogador (capitão a dobrar).
+  const pontosJ: Record<string, number> = {};
+  for (const uid of ids) {
+    const eq = equipaDe.get(uid);
+    if (!eq || eq.atletas.length === 0) { pontosJ[uid] = 0; continue; }
+    let total = 0;
+    for (const aid of eq.atletas) {
+      const p = pontosAtleta[aid] ?? 0;
+      total += p;
+      if (eq.capitao && aid === eq.capitao) total += p; // capitão dobra
+    }
+    pontosJ[uid] = Math.round(total * 10) / 10;
+  }
+  const out: Record<string, { a: number; b: number }> = {};
+  for (const c of daRonda) {
+    out[String(c.id)] = {
+      a: c.jogador_a ? (pontosJ[c.jogador_a] ?? 0) : 0,
+      b: c.jogador_b ? (pontosJ[c.jogador_b] ?? 0) : 0,
+    };
+  }
+  return out;
 }
 // Conta jogadores DISTINTOS DA CHAVE que escalaram (têm equipa na tabela
   // equipas) em alguma das competições desta copa.

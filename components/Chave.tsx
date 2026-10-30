@@ -296,21 +296,33 @@ export function CaixaConfronto({
   b,
   decidida,
   emDestaque,
+  aoVivo,
 }: {
   a: LadoCaixa;
   b: LadoCaixa;
   decidida?: boolean;
   emDestaque?: boolean;
+  /** Confronto a decorrer: os pontos sobem ao vivo, mas ainda não há vencedor. */
+  aoVivo?: boolean;
 }) {
   return (
-    <div style={{ position: "relative", width: CAIXA_W, background: "#121815", border: `1px solid ${emDestaque ? VERDE : "#243029"}`, borderRadius: 10, overflow: "hidden" }}>
-      {emDestaque && (
+    <div style={{ position: "relative", width: CAIXA_W, background: "#121815", border: `1px solid ${aoVivo ? VERDE : emDestaque ? VERDE : "#243029"}`, borderRadius: 10, overflow: "hidden" }}>
+      {emDestaque && !aoVivo && (
         <span
           className="ilponto"
           aria-label="Próximo confronto"
           title="Próximo confronto deste bloco"
           style={{ position: "absolute", top: -5, right: -5, width: 11, height: 11, borderRadius: "50%", background: VERDE, border: "2px solid #0c0e0d", zIndex: 2 }}
         />
+      )}
+      {aoVivo && (
+        <span
+          className="ilponto"
+          title="Pontos a atualizar ao vivo — o vencedor só é decidido no fim"
+          style={{ position: "absolute", top: -7, right: 6, fontFamily: FD, fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", color: "#0c0e0d", background: VERDE, borderRadius: 4, padding: "1px 4px", zIndex: 2 }}
+        >
+          AO VIVO
+        </span>
       )}
       <LinhaLado lado={a} decidida={decidida} />
       <div style={{ height: 1, background: "#1a221d" }} />

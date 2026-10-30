@@ -29,6 +29,12 @@ interface ConfrontoAPI {
   id_competicao: string;
   pontos_a: number | null;
   pontos_b: number | null;
+  /** Placar AO VIVO da ronda em curso (pontos a subir durante a competição).
+   *  Só vem preenchido nos confrontos da ronda a decorrer; o vencedor continua
+   *  a ser decidido só no fim. */
+  pontos_a_vivo?: number | null;
+  pontos_b_vivo?: number | null;
+  ao_vivo?: boolean;
   vencedor: string | null;
   decidido_por: string | null;
   estado: "pendente" | "decidido";
@@ -170,6 +176,8 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
   // Já existem confrontos de repescagem gerados pelo motor? Se sim, mostram-se
   // nas rondas (a sério); se não (início da copa), mostra-se a nota explicativa.
   const temRepescagemReal = confrontos.some((c) => c.fase === "repescagem");
+  // Há confrontos com placar AO VIVO? (a ronda em curso, durante a competição).
+  const temAoVivo = confrontos.some((c) => c.ao_vivo);
   // Competição a decorrer agora (mercado fechado). Confrontos desta competição
   // podem ser espreitados; os de uma ronda com mercado ainda aberto, não.
   const idADecorrer = focoMercado().aDecorrer?.idCompeticao ?? null;
@@ -220,6 +228,14 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
     </div>
     <button onClick={onAbrirTutorial} style={{ flexShrink: 0, background: "transparent", border: `1px solid ${GOLD}`, color: GOLD, fontFamily: FD, fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", padding: "7px 11px", borderRadius: 9, cursor: "pointer" }}>{t("ck.comoFunciona")}</button>
     </div>
+    {/* Nota do placar AO VIVO: os pontos sobem durante a competição, mas o
+        vencedor de cada confronto só fica decidido quando ela acaba. */}
+    {temAoVivo && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#101913", border: "1px solid #2a4a38", borderRadius: 12, padding: "9px 12px", marginBottom: 14, fontSize: 12, color: "#bfe8cf", lineHeight: 1.5 }}>
+        <span style={{ flexShrink: 0, width: 8, height: 8, borderRadius: "50%", background: "#5fd38a" }} className="ilponto" />
+        <span><strong>Ao vivo:</strong> os pontos das equipas sobem à medida que a competição avança. O vencedor de cada confronto só fica decidido quando a competição terminar.</span>
+        </div>
+      )}
     {/* Aviso: entraram na liga depois do sorteio e não disputam esta copa. */}
     {nInscritos > naChave && (
         <div style={{ background: "#101511", border: "1px dashed #2f4a3c", borderRadius: 12, padding: "10px 12px", marginBottom: 14, fontSize: 12, color: "#a9b4ac", lineHeight: 1.5 }}>
@@ -289,9 +305,10 @@ function ChaveConteudo({ dados, nome, escudoDe, meuId, onAbrirTutorial, onVerEqu
               onKeyDown={(e) => { if (e.key === "Enter") setAberto(c); }}
               title="Ver o confronto">
               <CaixaConfronto
-              a={ladoDe(c.jogador_a, c.pontos_a, c.vencedor === c.jogador_a)}
-              b={ladoDe(c.jogador_b, c.pontos_b, c.vencedor === c.jogador_b)}
+              a={ladoDe(c.jogador_a, c.ao_vivo ? (c.pontos_a_vivo ?? null) : c.pontos_a, c.vencedor === c.jogador_a)}
+              b={ladoDe(c.jogador_b, c.ao_vivo ? (c.pontos_b_vivo ?? null) : c.pontos_b, c.vencedor === c.jogador_b)}
               decidida={c.estado === "decidido" && !!c.vencedor}
+              aoVivo={!!c.ao_vivo}
               />
               </div>
             );
@@ -495,7 +512,7 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa
     {etiqueta && (
         <div style={{ fontFamily: FD, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: cor, marginBottom: 7 }}>{etiqueta}</div>
       )}
-    <LinhaJogador uid={c.jogador_a} pontos={c.pontos_a} venceu={venceuA} perdeu={decidido && !venceuA} trancado={trancado} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_a && onVerEquipa(c.jogador_a, c.id_competicao)} />
+    <LinhaJogador uid={c.jogador_a} pontos={c.ao_vivo ? (c.pontos_a_vivo ?? c.pontos_a) : c.pontos_a} venceu={venceuA} perdeu={decidido && !venceuA} trancado={trancado} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_a && onVerEquipa(c.jogador_a, c.id_competicao)} />
     {bye ? (
         <div style={{ fontSize: 11, color: "#7c8a82", textAlign: "center", padding: "4px 0", fontFamily: FD, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("ck.passouSemAdversario")}</div>
       ) : (
@@ -505,7 +522,7 @@ function CartaoConfronto({ c, nome, escudoDe, destaque, idADecorrer, onVerEquipa
         <span style={{ fontSize: 9.5, color: "#5f6f67", fontFamily: FD, fontWeight: 700 }}>{estadoLabel(c, t)}</span>
         <div style={{ flex: 1, height: 1, background: "#1a221d" }} />
         </div>
-        <LinhaJogador uid={c.jogador_b} pontos={c.pontos_b} venceu={venceuB} perdeu={decidido && !venceuB} trancado={trancado} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_b && onVerEquipa(c.jogador_b, c.id_competicao)} />
+        <LinhaJogador uid={c.jogador_b} pontos={c.ao_vivo ? (c.pontos_b_vivo ?? c.pontos_b) : c.pontos_b} venceu={venceuB} perdeu={decidido && !venceuB} trancado={trancado} nome={nome} escudoDe={escudoDe} onVerEquipa={() => c.jogador_b && onVerEquipa(c.jogador_b, c.id_competicao)} />
         </>
       )}
     {notaJanela && (
@@ -523,6 +540,7 @@ function estadoLabel(c: ConfrontoAPI, t: (k: string) => string): string {
     if (c.decidido_por === "capitao") return t("ck.decididoCapitao");
     return t("ck.decidido");
   }
+  if (c.ao_vivo) return "ao vivo";
   return t("ck.aAguardar");
 }
 function LinhaJogador({ uid, pontos, venceu, perdeu, trancado, nome, escudoDe, onVerEquipa }: {
