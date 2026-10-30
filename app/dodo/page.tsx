@@ -640,6 +640,11 @@ interface ConfrontoChave {
   jogador_b: string | null;
   pontos_a: number | null;
   pontos_b: number | null;
+  /** Placar AO VIVO da ronda em curso (pontos a subir durante a competição).
+   *  Só vem nos confrontos da ronda a decorrer; o vencedor é decidido só no fim. */
+  pontos_a_vivo?: number | null;
+  pontos_b_vivo?: number | null;
+  ao_vivo?: boolean;
   vencedor: string | null;
   decidido_por: string | null;
   estado: string;
@@ -714,6 +719,8 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
   const bloco2 = outros.length > 0 ? montar(outros, 0) : null;
   // O próximo confronto por decidir: é o que ganha o ponto verde.
   const proximo = confrontos.find((c) => c.estado !== "decidido")?.id ?? null;
+  // Há placar AO VIVO? (a ronda em curso, com a competição a decorrer).
+  const temAoVivo = confrontos.some((c) => c.ao_vivo);
   function ladoDe(uid: string | null, pts: number | null, venceu: boolean): LadoCaixa {
     if (!uid) return { titulo: "—", vazio: true };
     const i = identidades[uid];
@@ -739,10 +746,11 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
     }
     return (
       <CaixaConfronto
-      a={ladoDe(c.jogador_a, c.pontos_a, c.vencedor === c.jogador_a)}
-      b={ladoDe(c.jogador_b, c.pontos_b, c.vencedor === c.jogador_b)}
+      a={ladoDe(c.jogador_a, c.ao_vivo ? (c.pontos_a_vivo ?? null) : c.pontos_a, c.vencedor === c.jogador_a)}
+      b={ladoDe(c.jogador_b, c.ao_vivo ? (c.pontos_b_vivo ?? null) : c.pontos_b, c.vencedor === c.jogador_b)}
       decidida={decidida}
-      emDestaque={emDestaque}
+      emDestaque={emDestaque && !c.ao_vivo}
+      aoVivo={!!c.ao_vivo}
       />
     );
   }
@@ -785,6 +793,12 @@ function ChaveDaCopa({ leagueId, numero }: { leagueId: string; numero: number })
     <div style={{ fontFamily: FD, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: GOLD }}>
     {numero}ª Copa do Dôdo · {t("dd.aChave")}
     </div>
+    {temAoVivo && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#101913", border: "1px solid #2a4a38", borderRadius: 12, padding: "9px 12px", marginTop: 12, fontSize: 12, color: "#bfe8cf", lineHeight: 1.5 }}>
+        <span style={{ flexShrink: 0, width: 8, height: 8, borderRadius: "50%", background: "#5fd38a" }} className="ilponto" />
+        <span><strong>Ao vivo:</strong> os pontos das equipas sobem à medida que a competição avança. O vencedor de cada confronto só fica decidido quando a competição terminar.</span>
+        </div>
+      )}
     {usarPools ? (
       <>
       {pools.map(({ rot, sub }) => (
