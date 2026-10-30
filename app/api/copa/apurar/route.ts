@@ -84,7 +84,14 @@ async function pontuacaoCongelada(comp: string): Promise<{ pontos: Record<string
   const { data } = await supabaseAdmin
   .from("resultados_atletas")
   .select("id_person, pontos")
-  .eq("id_competicao", comp);
+  .eq("id_competicao", comp)
+  // SÓ linhas CONGELADAS. Durante a competição AO VIVO, os crons da chave
+  // (chave-viva/chave-maestro) escrevem nesta mesma tabela com os pontos mas
+  // SEM congelado_em. Sem este filtro, a Copa via linhas a meio da competição,
+  // achava que ela já tinha acabado e apurava a ronda cedo demais (com pontos
+  // ainda a 0/parciais). `congelado_em` é a marca que SÓ o congelamento põe,
+  // quando a competição termina de facto — é o sinal fiável de "já acabou".
+  .not("congelado_em", "is", null);
   const pontos: Record<string, number> = {};
   for (const r of data || []) pontos[String(r.id_person)] = Number(r.pontos) || 0;
   return { pontos, nAtletas: (data || []).length };
