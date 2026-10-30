@@ -81,6 +81,23 @@ function ordemDaComp(idComp: string): number {
 // (resultados_atletas). Devolve o mapa e o nº de atletas (para saber se já congelou).
 async function pontuacaoCongelada(comp: string): Promise<{ pontos: Record<string, number>; nAtletas: number }> {
   if (!supabaseAdmin) return { pontos: {}, nAtletas: 0 };
+  // A competição só está REALMENTE acabada quando o congelamento a FECHOU POR
+  // COMPLETO e pontuou os utilizadores: a tabela `resultados_rodada` só é
+  // escrita nesse passo final (lib/congelar -> pontuarUtilizadoresDaCompeticao),
+  // e esse passo só corre quando TODOS os atletas já congelaram. Enquanto a
+  // competição decorre — ou está só EM PARTE congelada (categorias ainda a
+  // lutar, como o Abu Dhabi a meio: já há atletas com congelado_em mas o fecho
+  // final ainda não aconteceu) — `resultados_rodada` está vazia, e NÃO apuramos
+  // a ronda. Sem esta guarda, a Copa decidia quem passa a meio da competição,
+  // com pontos incompletos. (O filtro congelado_em abaixo não chega sozinho:
+  // 374 atletas congelados > 0 já davam o apuramento por bom.)
+  {
+    const { count: nRodada } = await supabaseAdmin
+      .from("resultados_rodada")
+      .select("*", { count: "exact", head: true })
+      .eq("id_competicao", comp);
+    if (!nRodada) return { pontos: {}, nAtletas: 0 };
+  }
   const { data } = await supabaseAdmin
   .from("resultados_atletas")
   .select("id_person, pontos")
