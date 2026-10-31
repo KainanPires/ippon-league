@@ -26,7 +26,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const COMP = "3151";
+// Competição-alvo: ?comp= (default 3157 = Abu Dhabi, a que está a decorrer).
+// Era fixo em 3151 (Baku); passou a parâmetro para servir qualquer competição.
+const COMP_DEFAULT = "3157";
 type PoolId = "A" | "B" | "C" | "D";
 const POOLS: PoolId[] = ["A", "B", "C", "D"];
 
@@ -113,6 +115,51 @@ const ESTRUTURAS: Record<string, Partial<Record<PoolId, Ent[]>>> = {
       { q: "verschaere", nome: "Vicky Verschaere", pais: "BEL", bye: true },
     ],
   },
+  // -90 masculino (Abu Dhabi, comp 3157). Pools C e D (dos prints do sorteio).
+  // Pool D é limpo (8, sem byes); a moldura antiga tinha um atleta a mais
+  // (Akhalkatsi) e um bye errado (Bedel) — esta substituição corrige-os.
+  // Pool C tem UMA luta preliminar (Omarov×Renes); todos os outros passam
+  // direto à ronda de 8 (bye), por isso vão marcados com bye.
+  "-90": {
+    C: [
+      { q: "kopecky", nome: "Adam Kopecky", pais: "CZE", bye: true },
+      { q: "scharfetter", nome: "Thomas Scharfetter", pais: "AUT", bye: true },
+      { q: "safrany", nome: "Peter Safrany", pais: "HUN", bye: true },
+      { q: "eilertsen", nome: "Kornelius Eilertsen", pais: "NOR", bye: true },
+      { q: "gomes", nome: "Marcelo Gomes", pais: "BRA", bye: true },
+      { q: "sharipov", nome: "Shakhzodxuja Sharipov", pais: "UZB", bye: true },
+      { q: "omarov", nome: "Gadzhimurad Omarov", pais: "UAE" },
+      { q: "renes", nome: "Tigo Renes", pais: "NED" },
+      { q: "moorhead", nome: "Lachlan Moorhead", pais: "GBR", bye: true },
+    ],
+    D: [
+      { q: "latisev", nome: "Mihail Latisev", pais: "MDA" },
+      { q: "jayne", nome: "John Jayne", pais: "USA" },
+      { q: "bubyr", nome: "Artem Bubyr", pais: "UKR" },
+      { q: "kanatbekov", nome: "Erzhan Kanatbekov", pais: "KGZ" },
+      { q: "bedel", nome: "Kenny Komi Bedel", pais: "ITA" },
+      { q: "abazov", nome: "Astemir Abazov", pais: "RUS" },
+      { q: "mylonelis", nome: "Athanasios Mylonelis", pais: "GRE" },
+      { q: "karimzoda", nome: "Muzamir Karimzoda", pais: "TJK" },
+    ],
+  },
+  // -100 masculino (Abu Dhabi, comp 3157). Pool B (do print do sorteio).
+  // UMA preliminar (Saneblidze×Davydchuk); o vencedor enfrenta o Song na ronda
+  // de 8. Todos os outros passam direto (bye). A moldura antiga dava bye só ao
+  // Song e punha a preliminar como luta normal — esta substituição corrige.
+  "-100": {
+    B: [
+      { q: "kostoev", nome: "Dzhafar Kostoev", pais: "UAE", bye: true },
+      { q: "georgiev", nome: "Boris Georgiev", pais: "BUL", bye: true },
+      { q: "masuchi", nome: "Ryotaro Masuchi", pais: "JPN", bye: true },
+      { q: "bezdek", nome: "Martin Bezdek", pais: "CZE", bye: true },
+      { q: "sangariev", nome: "Adam Sangariev", pais: "RUS", bye: true },
+      { q: "nightingale", nome: "Axel Nightingale", pais: "AUS", bye: true },
+      { q: "saneblidze", nome: "Onise Saneblidze", pais: "GEO" },
+      { q: "davydchuk", nome: "Yaroslav Davydchuk", pais: "UKR" },
+      { q: "jiaze", nome: "Jiaze Song", pais: "CHN", bye: true },
+    ],
+  },
 };
 
 // IDs forçados à mão (preenche-se aqui SE o ensaio não resolver alguém): q -> id.
@@ -132,6 +179,7 @@ function paresR1(ents: Ent[]): [number, number][] {
 export async function GET(req: Request) {
   if (!supabaseAdmin) return NextResponse.json({ ok: false, erro: "Servidor sem ligação." }, { status: 500 });
   const { searchParams } = new URL(req.url);
+  const COMP = (searchParams.get("comp") || COMP_DEFAULT).trim();
   const key = (searchParams.get("key") || "").trim();
   if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
     return NextResponse.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
