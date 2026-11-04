@@ -14,7 +14,7 @@ import { limparCacheNivel } from "@/lib/useNivel";
 import { SeletorLingua } from "@/components/SeletorLingua";
 import { useRotuloFaixa, useT, useDataPorExtenso, useLingua } from "@/lib/i18n";
 import ApagarConta from "@/components/ApagarConta";
-import { emApp } from "@/lib/plataforma";
+import { emApp, plataforma } from "@/lib/plataforma";
 import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
 import { CartaoFaixa } from "@/components/CartaoFaixa";
 import { SeloSensei } from "@/components/SeloSensei";
@@ -666,6 +666,10 @@ function SeletorJudogui() {
   const t = useT();
   const { judogui, pode, setJudogui } = useJudogui();
   const [aberto, setAberto] = useState(false);
+  // Apps (D-02/D-03): no iPhone esta vantagem Pro não aparece; no Android só a
+  // quem já a tem (para os outros levaria à página de venda, que lá não existe).
+  const [plat, setPlat] = useState<"web" | "android" | "ios">("web");
+  useEffect(() => { setPlat(plataforma()); }, []);
   function escolher(cor: JudoguiCor) {
     if (!pode) { window.location.href = "/ippon-pro"; return; }
     void setJudogui(cor);
@@ -675,6 +679,7 @@ function SeletorJudogui() {
     { id: "azul", nome: t("pro.corAzul") },
   ];
   const judoguiProParts = t("perfil.judoguiPro").split("%D%");
+  if (plat === "ios" || (plat === "android" && !pode)) return null;
   return (
     <>
     <SectionTitle>{t("perfil.judoguiDodo")}</SectionTitle>

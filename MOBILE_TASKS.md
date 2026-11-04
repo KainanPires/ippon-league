@@ -15,7 +15,7 @@ Estados: ⏳ pendente · 🔄 em execução · ⛔ bloqueado · ✅ concluído
 | T-09 | `viewportFit: cover` + safe area na barra inferior — código no ramo `mobile`, falta ver num iPhone | 3 | Claude + Fundador | 🔄 |
 | T-10 | Build Android TWA + `assetlinks.json` | 3 | Claude | ⏳ |
 | T-11 | Projeto iOS Capacitor + build macOS na cloud | 3 | Claude | ⏳ |
-| T-12 | Push nativo iOS (APNs/FCM) + canal no servidor | 3 | Claude | ⏳ |
+| T-12 | Push nativo iOS (APNs/FCM) + canal no servidor; substituir no Perfil o bloco "Estás a abrir pelo navegador…" + diagnóstico pelo pedido de permissão nativo | 3 | Claude | ⏳ |
 | T-13 | Universal/App Links (convites, recuperação de password) | 3 | Claude | ⏳ |
 | T-14 | Plano de testes + testes manuais em dispositivo | 4 | Ambos | ⏳ |
 | T-15 | Fichas das lojas, privacidade, Data Safety, classificação etária | 5 | Ambos | ⏳ |
