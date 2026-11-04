@@ -10,3 +10,5 @@ Formato: ID · data · estado (proposta / aprovada / rejeitada) · decisão · p
 | D-04 | 2026-11-04 | **Aprovada** | Adicionar eliminação de conta self-service (web + apps) antes de qualquer submissão | Obrigatório nas duas lojas |
 | D-05 | 2026-11-04 | **Aprovada** | Todo o trabalho mobile num ramo `mobile` + Preview da Vercel; nada no ramo principal sem a tua autorização | Regra de segurança 1 e 7 |
 | D-06 | 2026-11-04 | Proposta | Publicar como pessoa singular; avaliar empresa mais tarde (dispensa o teste de 14 dias em contas novas e permite faturação alternativa) | Pedido do fundador |
+| D-07 | 2026-11-04 | **Aprovada** | Ao apagar a conta, ligas de amigos ativas criadas pela pessoa passam a um membro Pro; senão ao membro mais antigo (mesmo gratuito). Só são apagadas se não houver mais membros | Não destruir ligas de amigos |
+| D-08 | 2026-11-04 | **Aprovada** | Eliminação cancela já a assinatura Stripe; `compras_judocoins` mantém-se (registo contabilístico); Academy apagada em cascata. **Quando a Academy for paga, a eliminação terá de cancelar também essa cobrança** | Academy ainda não é paga |

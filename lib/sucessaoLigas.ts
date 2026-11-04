@@ -178,3 +178,56 @@ export async function resolverLigasAoPerderPro(uid: string): Promise<void> {
     /* best-effort */
   }
 }
+
+
+/**
+ * ELIMINAÇÃO DE CONTA (decisão D-07, 04/11/2026): o dono apagou a conta.
+ * Exceção à regra do Pro — a liga NÃO é apagada só por não haver membros Pro:
+ *   1) passa a um membro Pro (sorteio, se vários);
+ *   2) senão, ao membro mais antigo (mesmo gratuito);
+ *   3) se não sobrar nenhum membro, aí sim é apagada.
+ * Ligas terminadas e oficiais não se tocam. Best-effort, nunca lança.
+ */
+export async function entregarLigaAoApagarConta(
+  leagueId: string,
+  uid: string,
+): Promise<"transferida" | "apagada" | "mantida"> {
+  if (!supabaseAdmin || !leagueId || !uid) return "mantida";
+  try {
+    const { data: liga } = await supabaseAdmin
+      .from("leagues")
+      .select("id, name, formato, estado, copa_estado, created_by, type")
+      .eq("id", leagueId)
+      .maybeSingle();
+    if (!liga || String(liga.type) !== "amigos") return "mantida";
+    if (terminada(liga as LigaRow)) return "mantida";
+    const nome = liga.name ? String(liga.name) : "";
+
+    const pros = await membrosProDaLiga(leagueId, uid);
+    let novo: string | null = pros.length ? pros[Math.floor(Math.random() * pros.length)] : null;
+
+    if (!novo) {
+      // Membro mais antigo. Tenta ordenar por created_at; se a coluna não existir,
+      // usa a ordem natural da tabela.
+      let ids: string[] = [];
+      const ord = await supabaseAdmin
+        .from("league_members").select("user_id").eq("league_id", leagueId)
+        .order("created_at", { ascending: true });
+      if (!ord.error) ids = (ord.data || []).map((m) => String(m.user_id));
+      else {
+        const { data } = await supabaseAdmin.from("league_members").select("user_id").eq("league_id", leagueId);
+        ids = (data || []).map((m) => String(m.user_id));
+      }
+      novo = ids.find((id) => id && id !== uid) || null;
+    }
+
+    if (!novo) {
+      await apagarLiga(leagueId);
+      return "apagada";
+    }
+    await passarBastao(leagueId, nome, novo);
+    return "transferida";
+  } catch {
+    return "mantida";
+  }
+}

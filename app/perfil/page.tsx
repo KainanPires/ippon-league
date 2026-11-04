@@ -13,6 +13,7 @@ import { PRECO } from "@/lib/precos";
 import { limparCacheNivel } from "@/lib/useNivel";
 import { SeletorLingua } from "@/components/SeletorLingua";
 import { useRotuloFaixa, useT, useDataPorExtenso, useLingua } from "@/lib/i18n";
+import ApagarConta from "@/components/ApagarConta";
 import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
 import { CartaoFaixa } from "@/components/CartaoFaixa";
 import { SeloSensei } from "@/components/SeloSensei";
@@ -533,6 +534,7 @@ export default function Perfil() {
     <DoorIcon />
     {saindo ? t("perfil.aSair") : t("perfil.sair")}
     </button>
+    {conta?.email && <ApagarConta email={conta.email} />}
     <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 22 }}>Ippon League · {t("perfil.versaoTestes")}</p>
     </div>
     {cartaoFaixa && (

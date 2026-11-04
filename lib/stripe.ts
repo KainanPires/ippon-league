@@ -110,7 +110,7 @@ export function paraFormulario(obj: Record<string, unknown>, prefixo = ""): stri
  */
 export async function stripeFetch<T = Record<string, unknown>>(
   caminho: string,
-  metodo: "GET" | "POST" = "GET",
+  metodo: "GET" | "POST" | "DELETE" = "GET",
   corpo?: Record<string, unknown>,
 ): Promise<T> {
   const chave = process.env.STRIPE_SECRET_KEY;

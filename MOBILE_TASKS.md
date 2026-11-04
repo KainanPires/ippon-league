@@ -10,7 +10,7 @@ Estados: ⏳ pendente · 🔄 em execução · ⛔ bloqueado · ✅ concluído
 | T-04 | Inscrição Apple Developer (individual) | 5 | Fundador | ⏳ |
 | T-05 | Recrutar 15–20 testadores Android (contas Google) | 4 | Fundador | ⏳ |
 | T-06 | Criar ramo `mobile` (feito 4 nov) + confirmar Preview Vercel | 3 | Claude + Fundador | 🔄 |
-| T-07 | Eliminação de conta (UI + API + página web) — à espera da definição SQL de `ippon_apagar_conta_inativa` | 3 | Claude | ⛔ |
+| T-07 | Eliminação de conta (UI + API + página web `/apagar-conta`) — código no ramo `mobile`; falta testar no Preview com conta de teste | 3 | Claude + Fundador | 🔄 |
 | T-08 | Deteção "dentro da app" + esconder compras | 3 | Claude | ⏳ |
 | T-09 | `viewportFit: cover` + safe area inferior | 3 | Claude | ⏳ |
 | T-10 | Build Android TWA + `assetlinks.json` | 3 | Claude | ⏳ |
