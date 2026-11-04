@@ -33,6 +33,7 @@
 
 import { useEffect, useState } from "react";
 import { useNivel } from "@/lib/useNivel";
+import { emApp } from "@/lib/plataforma";
 import { useT } from "@/lib/i18n";
 
 const GOLD = "#d9a441";
@@ -63,6 +64,11 @@ export function BarraInferior({ ativo }: { ativo?: Ativo }) {
   const t = useT();
   const { ehPro, ehProMax } = useNivel();
   const [pulsar, setPulsar] = useState(false);
+  // Dentro das apps, o separador "Pro" só aparece a quem já é Pro (no grátis
+  // levaria à página de venda, que lá não existe). Decide-se no cliente para o
+  // HTML do servidor e o primeiro render coincidirem.
+  const [naApp, setNaApp] = useState(false);
+  useEffect(() => { setNaApp(emApp()); }, []);
 
   // So depois de montar: o localStorage nao existe no servidor, e ler ao
   // renderizar dava diferencas entre servidor e cliente (hydration mismatch).
@@ -94,7 +100,10 @@ export function BarraInferior({ ativo }: { ativo?: Ativo }) {
           left: 0,
           right: 0,
           bottom: 0,
-          height: 62,
+          // 62px da barra + a zona da barra de gestos do iPhone (0 no resto).
+          height: "calc(62px + env(safe-area-inset-bottom))",
+          paddingBottom: "env(safe-area-inset-bottom)",
+          boxSizing: "border-box",
           background: "#0f1411",
           borderTop: "1px solid #243029",
           display: "flex",
@@ -114,13 +123,13 @@ export function BarraInferior({ ativo }: { ativo?: Ativo }) {
             Assim todas as barras da app apontam para o mesmo sítio e nenhuma
             precisa de saber o nível — era essa divergência que levava um Pro Max
             à página de vendas a partir de qualquer ecrã. */}
-        <Tab
+        {(!naApp || ehPro) && <Tab
           label={t("nav.pro")}
           icon={<BoltIcon />}
           href="/pro-central"
           active={ativo === "pro"}
           pulsar={aPulsar}
-        />
+        />}
       </nav>
     </>
   );

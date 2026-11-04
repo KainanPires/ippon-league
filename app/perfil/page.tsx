@@ -14,6 +14,7 @@ import { limparCacheNivel } from "@/lib/useNivel";
 import { SeletorLingua } from "@/components/SeletorLingua";
 import { useRotuloFaixa, useT, useDataPorExtenso, useLingua } from "@/lib/i18n";
 import ApagarConta from "@/components/ApagarConta";
+import { emApp } from "@/lib/plataforma";
 import { normalizarFaixa, corDaFaixa, type Faixa } from "@/lib/faixas";
 import { CartaoFaixa } from "@/components/CartaoFaixa";
 import { SeloSensei } from "@/components/SeloSensei";
@@ -117,6 +118,8 @@ export default function Perfil() {
   // A subscrição vem da rota, que a lê à Stripe. Não se usa o is_pro do
   // metadata: ele fica desatualizado assim que alguém muda de plano.
   const [sub, setSub] = useState<Sub | null>(null);
+  const [naApp, setNaApp] = useState(false);
+  useEffect(() => { setNaApp(emApp()); }, []);
   const [aGerir, setAGerir] = useState(false);
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
   const [erroSub, setErroSub] = useState("");
@@ -473,7 +476,8 @@ export default function Perfil() {
         </div>
         </>
       )}
-    {abertoDados && ready && conta && (
+    {/* Dentro das apps não se mostra a assinatura (D-02/D-03): gere-se no site. */}
+    {abertoDados && ready && conta && !naApp && (
         <>
         <SectionTitle>{t("perfil.assinatura")}</SectionTitle>
         <CartaoSubscricao

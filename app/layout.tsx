@@ -10,6 +10,7 @@
 // <<< VOLTAR >>> aqui em baixo e volta a criar o components/BarraTopo.tsx.
 // ===================================================================
 
+import MarcadorApp from "@/components/MarcadorApp";
 import type { Metadata, Viewport } from "next";
 import { Oswald, Manrope } from "next/font/google";
 import "./globals.css";
@@ -54,6 +55,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#0c0e0d",
+  // "cover": o ecrã ocupa também a zona do notch e da barra de gestos; sem isto
+  // os env(safe-area-inset-*) valem 0 e as barras ficam por baixo do notch.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -71,6 +75,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <RegistarServiceWorker />
+        <MarcadorApp />
         <RepaintOnRestore />
         <CarregarHorarios />
         {/* <<< VOLTAR >>> <BarraTopo /> */}

@@ -7,6 +7,7 @@
 // todo o lado. Carrega a preferência do servidor (/api/tatame) uma vez quando há
 // sessão. Só Pro Max pode gravar — garantido NO SERVIDOR (a API recusa).
 
+import { plataforma } from "@/lib/plataforma";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { TATAME_DEFAULT, tatamePorId, type TatameId } from "@/lib/tatames";
@@ -47,7 +48,8 @@ export function TatameProvider({ children }: { children: React.ReactNode }) {
         .then((j) => {
           if (!active || !j?.ok) return;
           setTatameState(tatamePorId(j.tatame).id);
-          setIsProMax(!!j.is_pro_max);
+          // No iPhone as vantagens Pro Max não se aplicam (D-03).
+          setIsProMax(!!j.is_pro_max && plataforma() !== "ios");
         })
         .catch(() => {});
     });

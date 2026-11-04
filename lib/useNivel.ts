@@ -64,6 +64,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { plataforma } from "@/lib/plataforma";
 
 export type Nivel = "gratis" | "pro" | "promax";
 
@@ -86,6 +87,9 @@ export function limparCacheNivel(): void {
 }
 
 async function buscarNivel(): Promise<Resultado> {
+  // APP iPHONE (D-03): as funções Pro não aparecem a ninguém — a Apple só deixa
+  // desbloquear o que foi comprado na web se também se vender por IAP na app.
+  if (plataforma() === "ios") return { nivel: "gratis", fiavel: true };
   try {
     const { data } = await supabase.auth.getSession();
     const uid = data.session?.user?.id;

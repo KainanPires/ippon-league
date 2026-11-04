@@ -31,3 +31,20 @@ html, body { overflow-x: hidden; }
     max-width: 480px;
   }
 }
+
+
+/* ===================================================================
+   APPS DAS LOJAS (D-02 / D-03) — <html data-app="android|ios"> é posto pelo
+   components/MarcadorApp.tsx. No browser normal nada disto se aplica.
+   Dentro das apps não se vende nada: escondem-se os links de compra.
+   =================================================================== */
+html[data-app] a[href^="/loja"],
+html[data-app] a[href^="/ippon-pro"],
+html[data-app] a[href^="/pro-max"]:not([href^="/pro-max-central"]),
+html[data-app] a[href^="/sobre-pro"],
+html[data-app] a[href^="/termos-pro"],
+html[data-app] a[href*="checkout.stripe.com"],
+/* No iPhone, também as áreas Pro (toda a gente é "grátis" lá). */
+html[data-app="ios"] a[href^="/pro"] {
+  display: none !important;
+}
