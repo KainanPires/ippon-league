@@ -13,7 +13,7 @@ Estados: ⏳ pendente · 🔄 em execução · ⛔ bloqueado · ✅ concluído
 | T-07 | Eliminação de conta (UI + API + `/apagar-conta`) — testada no Preview a 4 nov (conta gratuita; tudo a 0; liga passou a outro membro). Falta: teste com Pro em Stripe modo teste | 3 | Claude + Fundador | ✅ |
 | T-08 | Deteção "dentro da app" + esconder compras; iOS tratado como grátis (só de ecrã) — revisto a 4 nov em Android/iOS com conta Pro Max e gratuita | 3 | Claude + Fundador | ✅ |
 | T-09 | `viewportFit: cover` + safe area na barra inferior — código no ramo `mobile`, falta ver num iPhone | 3 | Claude + Fundador | 🔄 |
-| T-10 | Build Android TWA (PWABuilder, `com.ipponleague.app`) + `assetlinks.json` | 3 | Fundador + Claude | 🔄 |
+| T-10 | Build Android TWA (PWABuilder) — `.aab` v1.0.0 (code 1) verificado a 4 nov: `com.ipponleague.app`, start `/inicio?app=android`, notificações por delegação, assinatura = `assetlinks.json` (ramo `mobile`). Falta: `assetlinks` em produção + impressão da Google após 1.º upload | 3 | Fundador + Claude | ✅ build |
 | T-11 | Projeto iOS Capacitor + build macOS na cloud | 3 | Claude | ⏳ |
 | T-12 | Push nativo iOS (APNs/FCM) + canal no servidor; substituir no Perfil o bloco "Estás a abrir pelo navegador…" + diagnóstico pelo pedido de permissão nativo | 3 | Claude | ⏳ |
 | T-13 | Universal/App Links (convites, recuperação de password) | 3 | Claude | ⏳ |
