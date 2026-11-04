@@ -517,7 +517,7 @@ export default function Perfil() {
     </a>
     <SectionTitle>{t("perfil.infoPoliticas")}</SectionTitle>
     <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 16, overflow: "hidden", marginBottom: 26 }}>
-    <LinhaInstalarApp />
+    {!naApp && <LinhaInstalarApp />}
     {INFO.map((it) => {
           const inner = (
             <>
@@ -539,7 +539,7 @@ export default function Perfil() {
     {saindo ? t("perfil.aSair") : t("perfil.sair")}
     </button>
     {conta?.email && <ApagarConta email={conta.email} />}
-    <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 22 }}>Ippon League · {t("perfil.versaoTestes")}</p>
+    <p style={{ fontSize: 11, color: "#5f6f67", textAlign: "center", marginTop: 22 }}>Ippon League{naApp ? "" : ` · ${t("perfil.versaoTestes")}`}</p>
     </div>
     {cartaoFaixa && (
         <CartaoFaixa

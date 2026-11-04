@@ -10,6 +10,7 @@
 
 import { useState, useEffect, Fragment } from "react";
 import { useT } from "@/lib/i18n";
+import { emApp } from "@/lib/plataforma";
 
 const FD = "var(--font-geist-mono), system-ui, sans-serif";
 const FB = "var(--font-geist-sans), system-ui, sans-serif";
@@ -143,7 +144,8 @@ export function CartaoInstalarApp() {
 
   useEffect(() => {
     let vivo = true;
-    const instalada = estaInstalada();
+    // Dentro das apps das lojas a app JÁ está instalada: o cartão não aparece.
+    const instalada = estaInstalada() || emApp();
     // Importação dinâmica do supabase para o componente ser autossuficiente.
     import("@/lib/supabase").then(async ({ supabase }) => {
       if (!vivo) return;
