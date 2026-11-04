@@ -15,7 +15,7 @@
 - [ ] Conta pessoal verificada
 - [ ] Package name definido (ex.: `com.ipponleague.app`), **não muda depois de publicado**
 - [ ] AAB assinado; chave de upload guardada fora do repositório
-- [ ] `/.well-known/assetlinks.json` em produção
+- [ ] `/.well-known/assetlinks.json` em produção (ficheiro no ramo `mobile` com a impressão da chave de upload; **acrescentar a impressão da chave de assinatura da Google** depois do 1.º upload — Play Console → Integridade da app → Assinatura de apps)
 - [ ] Data Safety preenchido
 - [ ] Teste fechado: ≥12 testadores durante 14 dias seguidos
 - [ ] Pedido de acesso a produção

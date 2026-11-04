@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ipponleague.app",
+      "sha256_cert_fingerprints": [
+        "65:BC:8E:D5:FD:CC:A0:1D:DB:5B:71:D6:5F:30:3D:99:91:9F:EC:BA:32:7D:0C:8E:46:20:91:A1:17:EF:2D:28"
+      ]
+    }
+  }
+]
