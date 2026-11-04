@@ -1,5 +1,5 @@
 "use client";
-import { plataforma } from "@/lib/plataforma";
+import { plataforma, emApp } from "@/lib/plataforma";
 import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
 import { loadSavedFor, resolve, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
@@ -1416,7 +1416,8 @@ function ModalConsentimento({ lingua, cor, onAceitar, onRecusar }: {
 function Tutorial({ step, setStep, onClose, name, target, cor, contaPro, contaProMax }: { step: number; setStep: (s: number) => void; onClose: () => void; name: string; target: TutTarget; cor: string; contaPro: boolean; contaProMax: boolean }) {
   const t = useT();
   // Pro Max já tem tudo: não vê passo de oferta. Os outros têm-no no fim.
-  const temOferta = !contaProMax;
+  // Dentro das apps das lojas não há passo de OFERTA (preços/assinar) — D-02.
+  const temOferta = !contaProMax && !emApp();
   const total = STEPS.length + 1 + (temOferta ? 1 : 0);
   const isWelcome = step === 0;
   const isPro = temOferta && step === STEPS.length + 1; // este é o passo da OFERTA
