@@ -21,3 +21,4 @@ Estados: ⏳ pendente · 🔄 em execução · ⛔ bloqueado · ✅ concluído
 | T-15 | Fichas das lojas, privacidade, Data Safety, classificação etária | 5 | Ambos | ⏳ |
 | T-16 | Teste fechado Google (14 dias) | 5 | Fundador | ⏳ |
 | T-17 | Submissões e publicação | 6 | Fundador | ⏳ |
+| T-18 | **v1.1 — Compras nas apps**: produtos nas lojas (Pro, Pro Max, subida, pacotes JC), acordos de pagamento Apple/Google, ligação ao servidor (RevenueCat), testes de compra, rever regras UE/EUA de links externos; reativar Pro no iPhone | v1.1 | Claude + Fundador | ⏳ depois do lançamento |
