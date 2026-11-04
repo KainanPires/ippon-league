@@ -7,8 +7,8 @@ Estados: ⏳ pendente · 🔄 em execução · ⛔ bloqueado · ✅ concluído
 | T-01 | Auditoria técnica (só leitura) | 1 | Claude | ✅ |
 | T-02 | Criar conta Google Play Console (pessoal) — paga e documentos submetidos a 4 nov; verificação "Em análise" | 5 | Fundador | 🔄 a aguardar Google |
 | T-03 | Aprovar arquitetura e decidir D-03 | 2 | Fundador | ✅ |
-| T-04 | Inscrição Apple Developer (individual) | 5 | Fundador | ⏳ |
-| T-05 | Recrutar 15–20 testadores Android (contas Google) | 4 | Fundador | ⏳ |
+| T-04 | Inscrição Apple Developer (individual) — paga a 4 nov (99 €/ano), à espera da aprovação da Apple (email no endereço Hotmail do Apple ID) | 5 | Fundador | 🔄 a aguardar Apple |
+| T-05 | **Recrutar 15–20 testadores Android (contas Google/Gmail)** | 4 | Fundador | ⏳ ← próxima do fundador |
 | T-06 | Criar ramo `mobile` (feito 4 nov) + confirmar Preview Vercel | 3 | Claude + Fundador | 🔄 |
 | T-07 | Eliminação de conta (UI + API + `/apagar-conta`) — testada no Preview a 4 nov (conta gratuita; tudo a 0; liga passou a outro membro). Falta: teste com Pro em Stripe modo teste | 3 | Claude + Fundador | ✅ |
 | T-08 | Deteção "dentro da app" + esconder compras; iOS tratado como grátis (só de ecrã) — revisto a 4 nov em Android/iOS com conta Pro Max e gratuita | 3 | Claude + Fundador | ✅ |
