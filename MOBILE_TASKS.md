@@ -11,7 +11,7 @@ Estados: ⏳ pendente · 🔄 em execução · ⛔ bloqueado · ✅ concluído
 | T-05 | Recrutar 15–20 testadores Android (contas Google) | 4 | Fundador | ⏳ |
 | T-06 | Criar ramo `mobile` (feito 4 nov) + confirmar Preview Vercel | 3 | Claude + Fundador | 🔄 |
 | T-07 | Eliminação de conta (UI + API + `/apagar-conta`) — testada no Preview a 4 nov (conta gratuita; tudo a 0; liga passou a outro membro). Falta: teste com Pro em Stripe modo teste | 3 | Claude + Fundador | ✅ |
-| T-08 | Deteção "dentro da app" (`lib/plataforma.ts`, `?app=android|ios`) + esconder compras; iOS tratado como grátis — código no ramo `mobile`, falta revisão visual | 3 | Claude + Fundador | 🔄 |
+| T-08 | Deteção "dentro da app" + esconder compras; iOS tratado como grátis (só de ecrã) — revisto a 4 nov em Android/iOS com conta Pro Max e gratuita | 3 | Claude + Fundador | ✅ |
 | T-09 | `viewportFit: cover` + safe area na barra inferior — código no ramo `mobile`, falta ver num iPhone | 3 | Claude + Fundador | 🔄 |
 | T-10 | Build Android TWA + `assetlinks.json` | 3 | Claude | ⏳ |
 | T-11 | Projeto iOS Capacitor + build macOS na cloud | 3 | Claude | ⏳ |
