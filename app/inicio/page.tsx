@@ -1,4 +1,5 @@
 "use client";
+import { plataforma } from "@/lib/plataforma";
 import { useState, useEffect, useRef } from "react";
 import { Mascot } from "@/components/Mascot";
 import { loadSavedFor, resolve, loadSavedCloudFor, loadIdentityCloudFor, setAthletePool, uid, type TeamState } from "@/lib/team";
@@ -231,6 +232,9 @@ export default function Inicio() {
   // limite subir e este redirecionamento deixa de disparar.
   useEffect(() => {
     if (!nivelPronto || !contagemAmigos) return;
+    // APP iPHONE: lá o nível é SEMPRE "grátis" só para efeitos de ecrã (D-03).
+    // Não pode servir para obrigar um assinante a sair das ligas.
+    if (plataforma() === "ios") return;
     const nivel = isProMax ? "promax" : isPro ? "pro" : "gratis";
     const lim = LIMITES[nivel];
     if (contagemAmigos.pontos > lim.pontos || contagemAmigos.copa > lim.copa) {

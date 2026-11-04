@@ -19,7 +19,10 @@ export default function MarcadorApp() {
     const p = plataforma();
     if (p === "web") return;
     document.documentElement.dataset.app = p;
-    if (ehPaginaVenda(caminho)) window.location.replace("/inicio");
+    if (ehPaginaVenda(caminho)) { window.location.replace("/inicio"); return; }
+    // No iPhone o nível mostrado é sempre "grátis" (D-03); o ecrã de resolver
+    // ligas leria isso como um rebaixamento verdadeiro. Lá não se entra.
+    if (p === "ios" && caminho.startsWith("/resolver-ligas")) window.location.replace("/inicio");
   }, [caminho]);
   return null;
 }
