@@ -123,6 +123,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Casca nativa da app iPhone (Capacitor) — não é código Next.
+    "mobile/**",
   ]),
 
   {

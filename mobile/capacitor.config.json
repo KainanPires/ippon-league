@@ -1,0 +1,32 @@
+{
+  "appId": "com.ipponleague.app",
+  "appName": "Ippon League",
+  "webDir": "www",
+  "server": {
+    "url": "https://www.ipponleague.com/inicio?app=ios",
+    "allowNavigation": [
+      "ipponleague.com",
+      "www.ipponleague.com",
+      "academy.ipponleague.com",
+      "*.supabase.co"
+    ]
+  },
+  "ios": {
+    "appendUserAgent": "IpponLeagueApp/ios",
+    "contentInset": "never",
+    "backgroundColor": "#0c0e0d",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "backgroundColor": "#0c0e0d",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0c0e0d",
+      "overlaysWebView": true
+    }
+  }
+}

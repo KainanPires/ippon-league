@@ -1,0 +1,57 @@
+# Build da app iPhone (Capacitor) num Mac da GitHub.
+#
+# FASE ATUAL: build de VERIFICAÇÃO, sem assinatura (simulador). Prova que o
+# projeto em /mobile compila. Não publica nada nem precisa de segredos.
+#
+# PRÓXIMA FASE (depois de a Apple aprovar a conta): build assinada + envio para
+# o TestFlight, com uma chave da App Store Connect guardada em GitHub Secrets.
+# NUNCA pôr chaves ou certificados neste ficheiro — o repositório é público.
+name: iOS build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [mobile]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/ios-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Versões
+        run: xcodebuild -version && node -v
+
+      - name: Dependências
+        run: npm ci --no-audit --no-fund
+
+      - name: Capacitor sync
+        run: npx cap sync ios
+
+      - name: Build (simulador, sem assinatura)
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath ios/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build

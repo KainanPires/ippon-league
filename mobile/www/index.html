@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ippon League</title>
+<style>
+  html,body{margin:0;height:100%;background:#0c0e0d;color:#f1ede2;font-family:-apple-system,system-ui,sans-serif}
+  main{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;box-sizing:border-box}
+  h1{font-size:20px;margin:0 0 10px}
+  p{color:#93a39a;font-size:15px;line-height:1.5;margin:0 0 22px;max-width:320px}
+  button{background:#d9a441;color:#1b211e;border:0;border-radius:12px;padding:13px 26px;font-size:15px;font-weight:700}
+</style>
+</head>
+<body>
+<!-- Mostrado só quando o telemóvel está sem internet ao abrir a app.
+     Com ligação, a app abre diretamente www.ipponleague.com. -->
+<main>
+  <h1>Sem ligação à internet</h1>
+  <p>A Ippon League precisa de internet para mostrar as tuas equipas e rankings. Verifica a ligação e tenta outra vez.</p>
+  <button onclick="location.href='https://www.ipponleague.com/inicio?app=ios'">Tentar outra vez</button>
+</main>
+</body>
+</html>

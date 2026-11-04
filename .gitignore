@@ -43,3 +43,9 @@ next-env.d.ts
 # Entregáveis do Cowork/Claude e media de marketing — não fazem parte da app
 /Claude outputs/
 /Maquina de Conteudo/
+
+# App iPhone (Capacitor) — dependências e builds locais
+/mobile/node_modules/
+/mobile/ios/App/Pods/
+/mobile/ios/App/build/
+/mobile/ios/DerivedData/
