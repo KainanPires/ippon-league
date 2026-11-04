@@ -30,7 +30,7 @@ export default function ApagarContaPage() {
       )}
 
       <h2 style={{ fontSize: 15, margin: "18px 0 6px" }}>{t("apagar.comoTitulo")}</h2>
-      <ol style={{ paddingLeft: 20, margin: 0, color: "#c7d0c9", fontSize: 14 }}>
+      <ol style={{ listStyle: "decimal", paddingLeft: 20, margin: 0, color: "#c7d0c9", fontSize: 14 }}>
         <li>{t("apagar.passo1")}</li>
         <li>{t("apagar.passo2")}</li>
         <li>{t("apagar.passo3")}</li>
@@ -41,7 +41,7 @@ export default function ApagarContaPage() {
       </p>
 
       <h2 style={{ fontSize: 15, margin: "22px 0 6px" }}>{t("apagar.oQueTitulo")}</h2>
-      <ul style={{ paddingLeft: 20, margin: 0, color: "#c7d0c9", fontSize: 14 }}>
+      <ul style={{ listStyle: "disc", paddingLeft: 20, margin: 0, color: "#c7d0c9", fontSize: 14 }}>
         <li>{t("apagar.itemDados")}</li>
         <li>{t("apagar.itemPro")}</li>
         <li>{t("apagar.itemLigas")}</li>

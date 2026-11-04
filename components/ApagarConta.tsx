@@ -72,7 +72,7 @@ export default function ApagarConta({ email }: { email: string }) {
               {t("apagar.titulo")}
             </div>
             <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 8px" }}>{t("apagar.intro")}</p>
-            <ul style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 12px", paddingLeft: 18 }}>
+            <ul style={{ listStyle: "disc", fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 12px", paddingLeft: 18 }}>
               <li>{t("apagar.itemDados")}</li>
               <li>{t("apagar.itemPro")}</li>
               <li>{t("apagar.itemLigas")}</li>
