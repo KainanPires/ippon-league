@@ -14,7 +14,7 @@ Estados: ⏳ pendente · 🔄 em execução · ⛔ bloqueado · ✅ concluído
 | T-08 | Deteção "dentro da app" + esconder compras; iOS tratado como grátis (só de ecrã) — revisto a 4 nov em Android/iOS com conta Pro Max e gratuita | 3 | Claude + Fundador | ✅ |
 | T-09 | `viewportFit: cover` + safe area na barra inferior — código no ramo `mobile`, falta ver num iPhone | 3 | Claude + Fundador | 🔄 |
 | T-10 | Build Android TWA (PWABuilder) — `.aab` v1.0.0 (code 1) verificado a 4 nov: `com.ipponleague.app`, start `/inicio?app=android`, notificações por delegação, assinatura = `assetlinks.json` (ramo `mobile`). Falta: `assetlinks` em produção + impressão da Google após 1.º upload | 3 | Fundador + Claude | ✅ build |
-| T-11 | Projeto iOS Capacitor 8 em `/mobile` (URL remota `/inicio?app=ios`, só iPhone, retrato, 1.0.0 build 1, ícone/splash provisórios do Dôdo) + workflow GitHub Actions `ios-build.yml` (build de verificação sem assinatura). Falta: build assinada + TestFlight após aprovação Apple; ícone 1024 final | 3 | Claude | 🔄 |
+| T-11 | Projeto iOS Capacitor 8 em `/mobile` (URL remota `/inicio?app=ios`, só iPhone, retrato, 1.0.0 build 1, ícone/splash provisórios do Dôdo) + workflow GitHub Actions `ios-build.yml` — **BUILD SUCCEEDED** a 4 nov (Xcode 26.6, run 41890873327). Falta: build assinada + TestFlight após aprovação Apple; ícone 1024 final | 3 | Claude | 🔄 |
 | T-12 | Push nativo iOS (APNs/FCM) + canal no servidor; substituir no Perfil o bloco "Estás a abrir pelo navegador…" + diagnóstico pelo pedido de permissão nativo | 3 | Claude | ⏳ |
 | T-13 | Universal/App Links (convites, recuperação de password) | 3 | Claude | ⏳ |
 | T-14 | Plano de testes + testes manuais em dispositivo | 4 | Ambos | ⏳ |
