@@ -11,7 +11,7 @@
 // aviso sai UMA vez por competição. USAR APENAS NO SERVIDOR.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { enviarPushPara } from "@/lib/pushServer";
-import { focoMercado, estadoMercado, formatarContagem } from "@/lib/calendario";
+import { focoMercado, estadoMercado, formatarContagem, numeroDaRodada } from "@/lib/calendario";
 import { renderNotif, agruparPorLingua, type LinguaNotif } from "@/lib/i18nServidor";
 import { criarNotificacaoServidor } from "@/lib/notificacoesServidor";
 import { jcCompradosValidosEmLote } from "@/lib/carteira";
@@ -157,12 +157,13 @@ async function notificarMuitos(
  * Verifica o estado do mercado e envia as notificações de aberto/véspera/fechado.
  * Idempotente: cada aviso sai uma vez por competição.
  */
-export async function notificarMercado(hoje: Date = new Date()): Promise<{ aberto: string | null; vespera: string | null; fechado: string | null }> {
-  if (!supabaseAdmin) return { aberto: null, vespera: null, fechado: null };
+export async function notificarMercado(hoje: Date = new Date()): Promise<{ aberto: string | null; vespera: string | null; fechado: string | null; lembrete: string | null }> {
+  if (!supabaseAdmin) return { aberto: null, vespera: null, fechado: null, lembrete: null };
   const foco = focoMercado(hoje);
   let aberto: string | null = null;
   let vespera: string | null = null;
   let fechado: string | null = null;
+  let lembrete: string | null = null;
 
   // --- MERCADO ABERTO (competição alvo) ---
   // REGRA: o mercado da PRÓXIMA competição só "abre" depois de a competição que
@@ -256,6 +257,41 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
     }
   }
 
+  // --- LEMBRETES ESCALONADOS A QUEM AINDA NÃO MONTOU ---
+  // Empurra, à medida que o fecho aproxima, quem AINDA NÃO escalou (o convite de
+  // "mercado aberto" sai 1x quando abre; a véspera só vai a quem JÁ montou — este
+  // é o empurrão para quem falta). Frequência crescente, como pedido pelo Kainan:
+  //   • 72h antes (3 dias): 1 mensagem        -> slot 72
+  //   • 48h antes (2 dias): 2 mensagens       -> slots 48, 36
+  //   • 24h antes (último dia): 3 mensagens    -> slots 24, 12, 3
+  // Cada slot sai UMA vez por competição (idempotente via eventos_notificados) e
+  // só a quem NÃO montou NAQUELE instante. Enviamos no MÁXIMO um slot por corrida
+  // (o maior ainda por enviar) — nunca uma rajada de vários pushes de uma vez.
+  // O {tempo} mostra sempre o que falta de verdade, seja qual for o slot.
+  if (foco.alvo && !foco.aDecorrer) {
+    const ms = estadoMercado(foco.alvo, hoje).msAteFecho;
+    if (ms !== null && ms > 0) {
+      const SLOTS_H = [72, 48, 36, 24, 12, 3]; // horas antes do fecho (do maior ao menor)
+      for (const h of SLOTS_H) {
+        if (ms > h * 60 * 60 * 1000) continue;                                           // janela deste slot ainda não entrou
+        if (!(await reservarEvento(`lembrete_montar:${foco.alvo.idCompeticao}:${h}h`))) continue; // já saiu antes
+        const montaram = new Set(await quemMontou(foco.alvo.idCompeticao));
+        const naoMontaram = (await todosOsUtilizadores()).filter((id) => !montaram.has(id));
+        if (naoMontaram.length > 0) {
+          await notificarMuitos(naoMontaram, {
+            tipo: "mercado",
+            chaveTitulo: "mercado.lembreteMontarTitulo",
+            chaveCorpo: "mercado.lembreteMontarCorpo",
+            vars: { comp: foco.alvo.nome, tempo: formatarContagem(ms), rodada: numeroDaRodada(foco.alvo.idCompeticao) ?? "" },
+            link: "/inicio",
+          });
+        }
+        lembrete = `${foco.alvo.idCompeticao}:${h}h`;
+        break; // um slot por corrida (evita rajada)
+      }
+    }
+  }
+
   // --- MERCADO FECHADO (competição a decorrer) ---
   if (foco.aDecorrer && (await reservarEvento(`mercado_fechado:${foco.aDecorrer.idCompeticao}`))) {
     const comp = foco.aDecorrer;
@@ -285,5 +321,5 @@ export async function notificarMercado(hoje: Date = new Date()): Promise<{ abert
     fechado = comp.idCompeticao;
   }
 
-  return { aberto, vespera, fechado };
+  return { aberto, vespera, fechado, lembrete };
 }
