@@ -22,5 +22,5 @@ Estados: ⏳ pendente · 🔄 em execução · ⛔ bloqueado · ✅ concluído
 | T-16 | Teste fechado Google (14 dias) | 5 | Fundador | ⏳ |
 | T-17 | Submissões e publicação | 6 | Fundador | ⏳ |
 | T-18 | **v1.1 — Compras nas apps**: produtos nas lojas (Pro, Pro Max, subida, pacotes JC), acordos de pagamento Apple/Google, ligação ao servidor (RevenueCat), testes de compra, rever regras UE/EUA de links externos; reativar Pro no iPhone; **atualizar na Play Console a Classificação de conteúdo ("Compras digitais" → Sim) e a Segurança dos dados, e na App Store as etiquetas de privacidade/IAP** | v1.1 | Claude + Fundador | ⏳ depois do lançamento |
-| T-19 | **Decidir D-14 (prémios nas apps)** e só depois submeter a Classificação de conteúdo na Play Console | 5 | Fundador | ⛔ à espera da decisão |
+| T-19 | Classificação de conteúdo **enviada a 6 nov** (IARC 3+ / PEGI 3 / ESRB Everyone; jogos de azar: Não; compras digitais: Não). **Refazer** se D-14 = B/C ou se as apps mostrarem prémios, e na v1.1 (compras) | 5 | Fundador | ✅ (rever com D-14) |
 | T-20 | Conta de revisão Pro Max: tirar `promo_lancamento_ate` (senão é rebaixada a 01/01/2027) ou repor Pro Max nesse dia | 5 | Fundador | ⏳ |
