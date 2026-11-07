@@ -2,14 +2,15 @@
 
 // components/MarcadorApp.tsx
 //
-// Corre uma vez em todas as páginas (está no layout). Se o site estiver dentro
-// de uma app das lojas:
-//   1. marca <html data-app="android|ios"> — o globals.css usa isto para
-//      esconder os links de compra (ver "APPS DAS LOJAS" no fim do ficheiro);
-//   2. se a página atual for de venda (loja, Pro, Pro Max), volta ao /inicio;
-//   3. no iPhone, pede à barra de estado NATIVA para não ficar por cima da
-//      webview (corrige o conteúdo cortado no topo — não depende do env()).
-// No browser normal não faz nada.
+// Corre uma vez em todas as páginas (está no layout).
+//   1. App das lojas (Capacitor): marca <html data-app="android|ios"> para o
+//      globals.css esconder os links de compra; no iPhone pede à barra de estado
+//      nativa para não ficar por cima da webview.
+//   2. PWA "adicionar ao ecrã principal" (Safari standalone): marca
+//      <html data-pwa="1"> para o globals.css empurrar o conteúdo para baixo da
+//      barra de estado translúcida (o env() do Safari funciona aqui).
+//   3. Páginas de venda dentro das apps das lojas -> volta ao /inicio.
+// No browser normal (aba do Safari/Chrome) não faz nada.
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -26,10 +27,7 @@ type StatusBarBridge = {
   getInfo?: () => Promise<{ overlays?: boolean; visible?: boolean; style?: string }>;
 };
 
-// IMPORTANTE: num site REMOTO (server.url), Capacitor.Plugins.StatusBar vem
-// VAZIO — o Plugins só é preenchido por quem importa o plugin em JS, e o nosso
-// bundle web não o importa. A forma certa de falar com o plugin NATIVO é
-// Capacitor.registerPlugin("StatusBar"), que devolve a ponte para o nativo.
+// Num site REMOTO, Capacitor.Plugins.StatusBar vem vazio — usa-se registerPlugin.
 let sbFonte = "none";
 function statusBarBridge(): StatusBarBridge | undefined {
   const cap = (window as unknown as {
@@ -45,30 +43,50 @@ function statusBarBridge(): StatusBarBridge | undefined {
   return undefined;
 }
 
+function ehStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const mm = !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+    const ios = (navigator as unknown as { standalone?: boolean }).standalone === true;
+    return mm || ios;
+  } catch {
+    return false;
+  }
+}
+
 export default function MarcadorApp() {
   const caminho = usePathname() || "/";
   const [diag, setDiag] = useState<string | null>(null);
 
   useEffect(() => {
     const p = plataforma();
-    if (p === "web") return;
-    document.documentElement.dataset.app = p;
+    const standalone = ehStandalone();
 
-    if (p === "ios") {
+    // PWA instalada (ecrã inicial): o CSS usa isto para empurrar o conteúdo para
+    // baixo da barra de estado translúcida.
+    if (standalone) document.documentElement.dataset.pwa = "1";
+
+    // App das lojas (Capacitor).
+    if (p !== "web") {
+      document.documentElement.dataset.app = p;
+      if (p === "ios") {
+        (async () => {
+          const sb = statusBarBridge();
+          try {
+            if (sb?.setOverlaysWebView) {
+              await Promise.resolve(sb.setOverlaysWebView({ overlay: false })).catch(() => {});
+              sb.setBackgroundColor?.({ color: "#0c0e0d" });
+              sb.setStyle?.({ style: "DARK" });
+            }
+          } catch { /* silencioso */ }
+        })();
+      }
+    }
+
+    // DIAGNÓSTICO — só para a conta do fundador, na app nativa OU na PWA
+    // instalada. Mede o estado real no aparelho. (Remove-se depois.)
+    if (p === "ios" || standalone) {
       (async () => {
-        const sb = statusBarBridge();
-        // FIX: tirar a barra de estado de cima da webview (webview desce para
-        // baixo da barra, com fundo sólido escuro). Não depende do env().
-        try {
-          if (sb?.setOverlaysWebView) {
-            await Promise.resolve(sb.setOverlaysWebView({ overlay: false })).catch(() => {});
-            sb.setBackgroundColor?.({ color: "#0c0e0d" });
-            sb.setStyle?.({ style: "DARK" }); // "DARK" = texto claro no fundo escuro
-          }
-        } catch { /* silencioso */ }
-
-        // DIAGNÓSTICO — só para a conta do fundador. Mede o estado real no
-        // aparelho para percebermos o que falta. (Remove-se depois.)
         try {
           const { data } = await supabase.auth.getSession();
           if (data.session?.user?.id !== FOUNDER_ID) return;
@@ -80,25 +98,18 @@ export default function MarcadorApp() {
           probe.remove();
           const pad = getComputedStyle(document.body).paddingTop;
           const cap = (window as unknown as { Capacitor?: unknown }).Capacitor ? "Y" : "N";
-          const hasSb = sb ? "Y" : "N";
-          let ov = "?";
-          let vis = "?";
-          try {
-            if (sb?.getInfo) {
-              const info = await sb.getInfo();
-              ov = String(info?.overlays);
-              vis = String(info?.visible);
-            }
-          } catch { /* ignora */ }
-          setDiag(`src=${sbFonte} env=${env} pad=${pad} cap=${cap} sb=${hasSb} ov=${ov} vis=${vis} ih=${window.innerHeight} sh=${window.screen?.height}`);
+          const dm = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ? "standalone" : "browser";
+          const nav = (navigator as unknown as { standalone?: boolean }).standalone === true ? "Y" : "N";
+          setDiag(`p=${p} sa=${standalone} dm=${dm} navSA=${nav} env=${env} pad=${pad} cap=${cap} sbsrc=${sbFonte}`);
         } catch { /* ignora */ }
       })();
     }
 
-    if (ehPaginaVenda(caminho)) { window.location.replace("/inicio"); return; }
-    // No iPhone o nível mostrado é sempre "grátis" (D-03); o ecrã de resolver
-    // ligas leria isso como um rebaixamento verdadeiro. Lá não se entra.
-    if (p === "ios" && caminho.startsWith("/resolver-ligas")) window.location.replace("/inicio");
+    // Dentro das apps das lojas, páginas de venda voltam ao início (na PWA/web não).
+    if (p !== "web") {
+      if (ehPaginaVenda(caminho)) { window.location.replace("/inicio"); return; }
+      if (p === "ios" && caminho.startsWith("/resolver-ligas")) window.location.replace("/inicio");
+    }
   }, [caminho]);
 
   if (!diag) return null;

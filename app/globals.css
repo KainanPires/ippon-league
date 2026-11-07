@@ -26,6 +26,26 @@ html[data-app="ios"] body {
    deixando o scroll vertical normal do documento. Só na app; o site fica igual. */
 html[data-app="ios"], html[data-app="ios"] body { overflow-x: clip; }
 
+/* PWA "Adicionar ao ecrã principal" (Safari em standalone). Aqui NÃO há
+   Capacitor: a barra de estado translúcida (apple-mobile-web-app-status-bar-
+   style=black-translucent) deixa o conteúdo ir para baixo do relógio. Neste
+   caso o env(safe-area-inset-top) do Safari FUNCIONA — por isso empurramos o
+   conteúdo para baixo da barra (e protegemos o fundo com a home bar). Vale para
+   iOS e Android instalados; no browser normal nada disto se aplica. */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html, body { overflow-x: clip; }
+}
+/* iOS antigo reporta a PWA por navigator.standalone (o MarcadorApp põe data-pwa). */
+html[data-pwa="1"] body {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+html[data-pwa="1"], html[data-pwa="1"] body { overflow-x: clip; }
+
 @media (min-width: 600px) {
   body {
     background:
