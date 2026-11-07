@@ -199,7 +199,7 @@ export async function GET(req: Request) {
         tipo: "atleta_indisponivel",
         titulo: T.titulo,
         corpo: T.corpo(a.n),
-        link: "/criar-equipa",
+        link: "/substituir",
       });
       enviados++;
     } catch { /* push de um não bloqueia os outros */ }
