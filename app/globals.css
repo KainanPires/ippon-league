@@ -19,6 +19,12 @@ html[data-app="ios"] body {
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+/* App iPhone (WKWebView): overflow-x:hidden no html/body transforma-os num
+   contentor de scroll e parte o scroll vertical — a página "salta para cima" ao
+   arrastar para baixo (e o fundo da chave, meias/final, fica inalcançável).
+   overflow-x:clip corta o excesso na horizontal SEM criar contentor de scroll,
+   deixando o scroll vertical normal do documento. Só na app; o site fica igual. */
+html[data-app="ios"], html[data-app="ios"] body { overflow-x: clip; }
 
 @media (min-width: 600px) {
   body {
