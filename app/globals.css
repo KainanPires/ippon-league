@@ -9,6 +9,17 @@ body {
 * { box-sizing: border-box; }
 html, body { overflow-x: hidden; }
 
+/* App iPhone: a barra de estado é translúcida e fica POR CIMA do conteúdo
+   (StatusBar overlaysWebView + ios.contentInset "never"). Sem este padding, o
+   topo de cada página esconde-se atrás da barra de estado e não é clicável — e
+   o scroll fica a "saltar". No browser normal, env(safe-area-inset-top) = 0, por
+   isso isto não afeta nada fora da app. padding-bottom protege a árvore de baixo
+   do indicador de gestos (home bar). */
+html[data-app="ios"] body {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 @media (min-width: 600px) {
   body {
     background:
