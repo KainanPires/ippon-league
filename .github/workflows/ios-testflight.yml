@@ -1,7 +1,8 @@
 # Build ASSINADA da app iPhone + envio para o TestFlight (App Store Connect).
 #
-# Como disparar: criar e enviar uma tag "ios-v*" (ex.: ios-v1.0.0-b1) no ramo mobile,
-# ou "Run workflow" no separador Actions (quando este ficheiro estiver no main).
+# Como disparar: alterar mobile/ios-release.txt no ramo mobile (ex.: anotar a
+# build nova), ou "Run workflow" no separador Actions (quando este ficheiro
+# estiver no main).
 #
 # Segredos usados (GitHub → Settings → Secrets → Actions), NUNCA neste ficheiro:
 #   ASC_KEY_ID      Key ID da chave da App Store Connect
@@ -14,8 +15,9 @@ name: iOS TestFlight
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "ios-v*"
+    branches: [mobile]
+    paths:
+      - "mobile/ios-release.txt"
 
 permissions:
   contents: read

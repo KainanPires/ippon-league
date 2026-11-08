@@ -1,0 +1,3 @@
+Pedido de envio para o TestFlight. Alterar este ficheiro dispara .github/workflows/ios-testflight.yml.
+
+2026-11-08 versão 1.0.0, primeira build
