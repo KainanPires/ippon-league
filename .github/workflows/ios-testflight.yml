@@ -75,10 +75,10 @@ jobs:
       - name: Capacitor sync
         run: npx cap sync ios
 
-      - name: Archive (Release, assinado)
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      # O archive é feito SEM assinatura: a assinatura automática do archive pede
+      # um perfil de desenvolvimento, que exige um iPhone registado. A assinatura
+      # de distribuição (App Store) é feita no passo seguinte, na exportação.
+      - name: Archive (Release, sem assinatura)
         run: |
           xcodebuild \
             -project ios/App/App.xcodeproj \
@@ -87,16 +87,12 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             -derivedDataPath ios/DerivedData \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGNING_ALLOWED=NO \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             archive
 
-      - name: Exportar e enviar para a App Store Connect
+      - name: Assinar (distribuição), exportar e enviar para a App Store Connect
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
