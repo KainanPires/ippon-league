@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
-import { loadDraftFor, saveDraftFor, setAthletePool, loadSavedCloudFor, loadSavedFor } from "@/lib/team";
+import { loadDraftFor, saveDraftFor, setAthletePool, loadSavedCloudFor, loadSavedFor, commitSavedCloudFor, loadIdentityCloudFor } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
 import { focoMercado, nomeCompeticao, textoFecho, categoriaTrancada, localizarNomeCompeticao } from "@/lib/calendario";
@@ -182,6 +182,12 @@ function MercadoInner() {
   // do rascunho vazio, e (b) o "Voltar ao Dojo" levar de volta a /meu-time?montar=1.
   const searchParams = useSearchParams();
   const montar = searchParams.get("montar") === "1";
+  // MODO SUBSTITUIÇÃO (?sub=1): só para quem tem atletas que saíram da competição
+  // A DECORRER. Abre o mercado DESSA competição (não a próxima), tranca as
+  // categorias que já lutaram e deixa reconstruir as que ainda não lutaram —
+  // igual ao rolling do Mundial, mas disparado pelo estado real da chave. Tudo o
+  // resto do mercado (modo normal) fica exatamente igual: isto só liga com ?sub=1.
+  const querSub = searchParams.get("sub") === "1";
   // Guarda de disparo único do market_viewed (Strict Mode corre o efeito 2x em dev).
   const contouMercado = useRef(false);
   // Fase I — guarda de disparo único da experiência "janela entre competições".
@@ -235,6 +241,12 @@ function MercadoInner() {
   // FASE I (afinação): a janela "monta para a próxima" só é para quem NÃO tem
   // equipa neste ciclo. null = ainda a verificar (não se pisca o bloqueio).
   const [temEquipaCiclo, setTemEquipaCiclo] = useState<boolean | null>(null);
+  // MODO SUBSTITUIÇÃO: estado por categoria (naoComecou/aDecorrer/terminada) da
+  // competição a decorrer, elegibilidade (tinha atletas que saíram?), e o guardar.
+  const [subEstados, setSubEstados] = useState<Record<string, string>>({});
+  const [subElegivel, setSubElegivel] = useState<boolean | null>(null);
+  const [subGuardando, setSubGuardando] = useState(false);
+  const [subMsg, setSubMsg] = useState<string | null>(null);
   // Faixa REAL do jogador — a cor do Dôdo em todos os modais desta página.
   // Declarado com os outros hooks, ANTES de qualquer return condicional (o ecrã
     // de "mercado fechado" faz um return cedo; hooks têm de correr sempre).
@@ -272,6 +284,13 @@ function MercadoInner() {
   // como o resto da app. Não importa por que caminho se chega aqui — fica bloqueado.
   const focoAgora = focoMercado();
   const competicaoADecorrer = focoAgora.aDecorrer;
+  // Modo substituição ATIVO = pediu-se ?sub=1 E há uma competição a decorrer.
+  // A elegibilidade real (ter atletas que saíram) confirma-se no carregamento
+  // (subElegivel); aqui já decidimos a competição-alvo e que o mercado abre.
+  const subAtivo = querSub && !!competicaoADecorrer;
+  // Competição que o mercado usa: em modo substituição é a que DECORRE (Montreal);
+  // caso contrário, a de sempre (a próxima, COMPETICAO). O modo normal fica igual.
+  const compMercado = subAtivo && competicaoADecorrer ? competicaoADecorrer.idCompeticao : COMPETICAO;
   // FASE I — janela entre competições. Quando há uma competição a decorrer, o
   // `alvo` do calendário já é a PRÓXIMA. Se o mercado dessa próxima estiver
   // ABERTO, em vez de bater no muro deixamos montar para ela (a equipa da que
@@ -321,7 +340,7 @@ function MercadoInner() {
       // Só bloqueia (não carrega nada) quando já é certo que não se monta a
       // próxima. Enquanto se verifica o ciclo, deixa carregar os atletas para
       // quem vier a poder montar não esperar por um segundo carregamento.
-      if (competicaoADecorrer && !montarProxima && !aVerificarCiclo) { setLoading(false); return; }
+      if (competicaoADecorrer && !montarProxima && !aVerificarCiclo && !subAtivo) { setLoading(false); return; }
       // ATIVAÇÃO: viu o mercado (aberto). Espera pelo consentimento e conta uma vez.
       if (!contouMercado.current) {
         contouMercado.current = true;
@@ -335,25 +354,29 @@ function MercadoInner() {
         // atletas que a pessoa já tinha escolhido (era o bug). Solução: esvaziar
         // UMA vez por ciclo (marca em sessionStorage) e, nas reentradas, RETOMAR
         // o rascunho. Fora do montar, limpa-se a marca e carrega-se o rascunho.
-        const K_CICLO = `ippon_montar_wipe_${COMPETICAO}`;
-        if (montar) {
+        const K_CICLO = `ippon_montar_wipe_${compMercado}`;
+        if (subAtivo) {
+          // Modo substituição: a equipa vem da NUVEM (no carregamento do pool,
+          // acima). Não semeamos do rascunho aqui — evita mostrar a equipa da
+          // próxima competição por um instante.
+        } else if (montar) {
           let jaLimpou = false;
           try { jaLimpou = sessionStorage.getItem(K_CICLO) === "1"; } catch {}
           if (jaLimpou) {
             // Já dentro do ciclo (voltou do Dojo para completar): retoma o que já montou.
-            draft = loadDraftFor(COMPETICAO);
+            draft = loadDraftFor(compMercado);
             setTeam(draft.ids);
             setCaptain(draft.captain);
           } else {
             // Primeira entrada do ciclo: parte do vazio, uma só vez.
-            saveDraftFor(COMPETICAO, { ids: [], captain: null });
+            saveDraftFor(compMercado, { ids: [], captain: null });
             setTeam([]);
             setCaptain(null);
             try { sessionStorage.setItem(K_CICLO, "1"); } catch {}
           }
         } else {
           try { sessionStorage.removeItem(K_CICLO); } catch {}
-          draft = loadDraftFor(COMPETICAO);
+          draft = loadDraftFor(compMercado);
           setTeam(draft.ids);
           setCaptain(draft.captain);
         }
@@ -384,13 +407,34 @@ function MercadoInner() {
             if (sess?.user?.id) setUserId(sess.user.id);
           } catch {}
         });
-      fetch(`/api/atletas?id=${COMPETICAO}`)
+      fetch(`/api/atletas?id=${compMercado}`)
       .then((r) => r.json())
-      .then((j) => {
+      .then(async (j) => {
           if (!active) return;
           const list: Athlete[] = Array.isArray(j?.atletas) ? j.atletas : [];
           setPool(list);
           setAthletePool(list);
+          // MODO SUBSTITUIÇÃO: a equipa vem da NUVEM da competição a decorrer (a
+          // que tem os atletas que saíram), não do rascunho. Os que saíram não
+          // estão no mercado reconciliado -> ficam de fora (o jogador reconstrói
+          // as categorias por lutar). Elegibilidade = tinha algum que saiu.
+          if (subAtivo) {
+            try {
+              const poolIds = new Set(list.map((a) => a.id));
+              const cloud = await loadSavedCloudFor(compMercado);
+              const idsNuvem = cloud?.ids ?? [];
+              const validos = idsNuvem.filter((id) => poolIds.has(id));
+              const capV = cloud?.captain && poolIds.has(cloud.captain) ? cloud.captain : null;
+              if (active) {
+                setTeam(validos);
+                setCaptain(capV);
+                saveDraftFor(compMercado, { ids: validos, captain: capV });
+                setSubElegivel(idsNuvem.some((id) => !poolIds.has(id)));
+              }
+              const er = await fetch(`/api/categorias-estado?comp=${compMercado}`).then((r) => r.json()).catch(() => null);
+              if (active && er?.estados) setSubEstados(er.estados as Record<string, string>);
+            } catch { if (active) setSubElegivel(false); }
+          }
           // Quem está a competir agora (vem do cron, via balcão). Só confiamos
           // nesta marca se o CALENDÁRIO também concordar que há competição a
           // decorrer — assim o aviso nunca contradiz a fonte de verdade. (Quando
@@ -423,7 +467,24 @@ function MercadoInner() {
     const cap = captain && next.includes(captain) ? captain : null;
     setTeam(next);
     setCaptain(cap);
-    saveDraftFor(COMPETICAO, { ids: next, captain: cap });
+    saveDraftFor(compMercado, { ids: next, captain: cap });
+  }
+  // MODO SUBSTITUIÇÃO: grava DIRETO na equipa da competição a decorrer (Montreal),
+  // ao contrário do mercado normal, que guarda rascunho e confirma no Meu Time
+  // para a PRÓXIMA. Aqui a mudança tem de aterrar na equipa que está em jogo.
+  async function guardarSubstituicao() {
+    setSubMsg(null);
+    if (!(await temSessao())) { setPedirLogin(true); return; }
+    setSubGuardando(true);
+    try {
+      const cap = captain && team.includes(captain) ? captain : null;
+      const ident = await loadIdentityCloudFor(compMercado).catch(() => null);
+      const res = await commitSavedCloudFor(compMercado, { ids: team, captain: cap }, ident ?? undefined);
+      setSubMsg(res?.ok ? "✅ Equipa atualizada para esta competição." : (res?.error || "Não foi possível guardar."));
+    } catch {
+      setSubMsg("Erro de rede. Tenta de novo.");
+    }
+    setSubGuardando(false);
   }
   async function toggleFav(a: Athlete) {
     // Favoritar guarda na CONTA (servidor) — é o que o alerta da chave lê. Sem
@@ -470,7 +531,7 @@ function MercadoInner() {
   // a próxima ainda não abriu, ou porque o utilizador JÁ tem equipa neste ciclo
   // (Fase I: quem já jogou só analisa durante a rodada). Enquanto se verifica o
   // ciclo (aVerificarCiclo) não se bloqueia, para não piscar o ecrã errado.
-  if (competicaoADecorrer && !montarProxima && !aVerificarCiclo) {
+  if (competicaoADecorrer && !montarProxima && !aVerificarCiclo && !subAtivo) {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "12px 14px" }}>
@@ -508,6 +569,12 @@ function MercadoInner() {
   const txtLojaMk = LOJA_MK[lingua] ?? LOJA_MK.pt;
   // MODO ROLLING: o alvo do mercado é uma competição de vários dias (Mundial)?
   const emRolling = !!focoAgora.alvo?.rolling;
+  // MODO SUBSTITUIÇÃO: uma categoria está trancada se já tem resultado na chave
+  // (estado diferente de "naoComecou"/"semChave"). Só as que faltam são editáveis.
+  const subCatTrancada = (categoria: string): boolean => {
+    const est = subEstados[categoria];
+    return !!est && est !== "naoComecou" && est !== "semChave";
+  };
   const txtRolling = ROLLING_MK[lingua] ?? ROLLING_MK.pt;
   const countM = teamAthletes.filter((a) => a.gender === "M").length;
   const countF = teamAthletes.filter((a) => a.gender === "F").length;
@@ -546,6 +613,11 @@ function MercadoInner() {
     if (emRolling && categoriaTrancada(focoAgora.alvo, a.category)) {
       return { label: txtRolling.botaoTrancada, kind: "blocked" as const };
     }
+    // MODO SUBSTITUIÇÃO: categoria que JÁ lutou (tem resultado) está trancada —
+    // só se mexe nas que ainda não começaram (estado da chave = fonte de verdade).
+    if (subAtivo && subCatTrancada(a.category)) {
+      return { label: txtRolling.botaoTrancada, kind: "blocked" as const };
+    }
     if (inTeam) return { label: "Vender", kind: "sell" as const };
     if (full) return { label: "Lotado", kind: "blocked" as const };
     if (catTaken) return { label: "Categoria ocupada", kind: "blocked" as const };
@@ -555,6 +627,8 @@ function MercadoInner() {
   async function toggle(a: Athlete) {
     // MODO ROLLING: categoria já trancada não se mexe (nem vender nem comprar).
     if (emRolling && categoriaTrancada(focoAgora.alvo, a.category)) return;
+    // MODO SUBSTITUIÇÃO: categoria que já lutou está trancada.
+    if (subAtivo && subCatTrancada(a.category)) return;
     if (team.includes(a.id)) { persist(team.filter((id) => id !== a.id)); return; }
     const st = buttonState(a);
     if (st.kind === "buy") {
@@ -603,6 +677,20 @@ function MercadoInner() {
   const notaInscritos = (msAteInicioAlvo != null && msAteInicioAlvo > 0 && msAteInicioAlvo <= 48 * 60 * 60 * 1000)
     ? txtJanela.inscritosPerto
     : txtJanela.inscritosCedo;
+  // MODO SUBSTITUIÇÃO: quem NÃO tem atletas que saíram não entra — não pode mexer
+  // na equipa a meio da ronda. (A elegibilidade confirma-se no carregamento.)
+  if (subAtivo && subElegivel === false) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+      <div style={{ maxWidth: 420, margin: "0 auto", padding: "40px 18px", textAlign: "center" }}>
+      <div style={{ width: 92, height: 92, margin: "0 auto 10px" }}><Mascot belt={corFaixa} expression="indicando" /></div>
+      <h2 style={{ fontFamily: FD, fontSize: 20, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>Nada a substituir</h2>
+      <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 20px" }}>Não tens atletas que saíram desta competição — a tua equipa está completa. O mercado só reabre para quem perdeu um atleta inscrito.</p>
+      <a href="/inicio" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px 24px", borderRadius: 12, fontSize: 15, textDecoration: "none" }}>Voltar ao início</a>
+      </div>
+      </main>
+    );
+  }
   return (
     <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
     <style>{`@keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(90,169,255,.65)}50%{box-shadow:0 0 0 8px rgba(90,169,255,.18)}} .glow{animation:glow 1.3s ease-in-out infinite;border-radius:10px} .noscroll::-webkit-scrollbar{display:none} @keyframes ilvivo{0%,100%{opacity:1}50%{opacity:.35}} .ilvivo{animation:ilvivo 1.2s ease-in-out infinite} @keyframes ilseta{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}} .ilseta{animation:ilseta 0.9s ease-in-out infinite} @keyframes ilfalta{0%,100%{box-shadow:0 0 0 0 rgba(217,164,65,0)}50%{box-shadow:0 0 0 5px rgba(217,164,65,0.32)}} .ilfalta{animation:ilfalta 1.2s ease-in-out infinite} @keyframes ilpronto{0%,100%{box-shadow:0 0 0 0 rgba(127,209,163,0)}50%{box-shadow:0 0 0 6px rgba(127,209,163,0.45)}} .ilpronto{animation:ilpronto 1.1s ease-in-out infinite}`}</style>
@@ -649,6 +737,20 @@ function MercadoInner() {
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#7fb8f5" }}>{txtRolling.titulo} · {localizarNomeCompeticao(nomeCompeticao(focoAgora.alvo), t)}</span>
         </div>
         <div style={{ fontSize: 12.5, color: "#c7d0c9", lineHeight: 1.5 }}>{txtRolling.corpo}</div>
+        </div>
+      )}
+    {subAtivo && (
+        <div style={{ background: "linear-gradient(160deg,#2a1f1c,#120d0c)", border: "1px solid #5a3a36", borderLeft: "3px solid #e2655a", borderRadius: 10, padding: "10px 12px", marginBottom: 9 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#ef8d83", marginBottom: 4 }}>
+        Substituição{competicaoADecorrer ? ` · ${localizarNomeCompeticao(nomeCompeticao(competicaoADecorrer), t)}` : ""}
+        </div>
+        <div style={{ fontSize: 12.5, color: "#f1d9d5", lineHeight: 1.5, marginBottom: 8 }}>
+        Alguns atletas teus saíram da competição. O mercado está aberto só para ti, nas categorias que <strong style={{ color: "#f1ede2" }}>ainda não lutaram</strong> — reconstrói a equipa e guarda. As que já lutaram estão trancadas.
+        </div>
+        {subMsg && <div style={{ fontSize: 12.5, color: subMsg.startsWith("✅") ? "#aee9c9" : "#ef8d83", marginBottom: 8, lineHeight: 1.45 }}>{subMsg}</div>}
+        <button onClick={guardarSubstituicao} disabled={subGuardando} style={{ width: "100%", background: GOLD, color: "#1b211e", border: "none", fontFamily: FD, fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.03em", padding: "11px", borderRadius: 10, cursor: subGuardando ? "default" : "pointer", opacity: subGuardando ? 0.7 : 1 }}>
+        {subGuardando ? "A guardar…" : "Guardar substituições"}
+        </button>
         </div>
       )}
     {montarProxima && competicaoADecorrer && (

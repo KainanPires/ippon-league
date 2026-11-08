@@ -48,7 +48,7 @@ export function AvisoSubstituicao() {
 
   return (
     <a
-      href="/substituir"
+      href="/mercado?sub=1"
       style={{
         display: "flex",
         alignItems: "center",
