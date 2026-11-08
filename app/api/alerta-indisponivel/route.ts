@@ -87,6 +87,12 @@ export async function GET(req: Request) {
   }
   // ?seco=1 => ENSAIO: não remove, não envia, não marca avisados.
   const seco = searchParams.get("seco") === "1";
+  // ?resend=1 -> RE-NOTIFICA todos os afetados ATUAIS, mesmo os já avisados na
+  // 1ª vaga (que apontava para o /criar-equipa sem saída). Usa uma chave de
+  // anti-duplicado nova (indisp-v2), por isso: a 1ª chamada com resend avisa
+  // todos uma vez; chamadas repetidas já não duplicam. Só para quem AINDA tem
+  // atletas que saíram (quem já resolveu a equipa deixou de ser afetado).
+  const resend = searchParams.get("resend") === "1";
 
   // 1) Só age se houver competição a decorrer (mercado fechado). Fora disso, ~0 custo.
   const foco = focoMercado();
@@ -183,7 +189,7 @@ export async function GET(req: Request) {
   const langs = await linguasDeVarios(ids);
   let enviados = 0;
   for (const a of afetados) {
-    const id_fight = `indisp::${comp}`;
+    const id_fight = resend ? `indisp-v2::${comp}` : `indisp::${comp}`;
     let inseriu = false;
     try {
       const { error } = await supabaseAdmin
