@@ -3,3 +3,4 @@ Pedido de envio para o TestFlight. Alterar este ficheiro dispara .github/workflo
 2026-11-08 versão 1.0.0, primeira build
 2026-11-08 versão 1.0.0, nova tentativa (archive sem assinatura)
 2026-11-08 versão 1.0.0, nova tentativa (chave de Administrador)
+2026-11-09 versão 1.0.0, ícone novo (Dôdo maior)
