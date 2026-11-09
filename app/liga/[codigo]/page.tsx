@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { plataforma, emApp } from "@/lib/plataforma";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Escudo, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
@@ -649,8 +650,8 @@ export default function PaginaLiga() {
     {!aRedirecionar && estado === "erro" && (
         <div style={{ textAlign: "center", padding: "30px 16px", background: "#1a1110", border: "1px solid #3a2420", borderRadius: 16 }}>
         <div style={{ fontFamily: FD, fontSize: 15, fontWeight: 700, textTransform: "uppercase", color: erroMsg.includes("Pro") ? GOLD : "#ef8d83", marginBottom: 8 }}>{erroMsg.includes("Pro") ? "Limite atingido" : "Ups"}</div>
-        <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{erroMsg}</p>
-        {erroMsg.includes("Pro") ? (
+        <p style={{ fontSize: 13, color: "#c7d0c9", lineHeight: 1.5 }}>{emApp() ? erroMsg.replace(/\s*Com o (Ippon Pro|Pro Max)[^.]*\./g, "") : erroMsg}</p>
+        {erroMsg.includes("Pro") && !emApp() ? (
             <a href="/ippon-pro" style={{ display: "inline-block", marginTop: 12, background: GOLD, color: "#1b211e", fontSize: 13, fontWeight: 700, textDecoration: "none", fontFamily: FD, textTransform: "uppercase", padding: "10px 18px", borderRadius: 10 }}>{t("lg.conhecerPro")}</a>
           ) : (
             <a href="/ligas" style={{ display: "inline-block", marginTop: 12, color: GOLD, fontSize: 13, textDecoration: "none", fontFamily: FD, fontWeight: 700 }}>{t("pl.verMinhasLigas")}</a>

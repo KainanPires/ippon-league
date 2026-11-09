@@ -11,6 +11,7 @@
 // sem acesso, sem dados, ok). A página só precisa de lhe passar a categoria.
 
 import { useState, useEffect } from "react";
+import { plataforma, emApp } from "@/lib/plataforma";
 import { supabase } from "@/lib/supabase";
 import { focoMercado, nomeCompeticao } from "@/lib/calendario";
 import { useT } from "@/lib/i18n";
@@ -100,6 +101,8 @@ export function AnaliseConfrontos({ comp: compProp, cat }: { comp?: string; cat:
 
   // ---- Sem acesso: convite diferente para quem já é Pro e para quem não paga ----
   if (dados.acesso === "negado") {
+    // Nas apps não há convite para subir de plano (D-02): não se mostra nada.
+    if (emApp()) return null;
     const ehPro = dados.nivel === "pro";
     return (
       <div style={{ background: "#0f1620", border: `1px solid ${AZUL_PROMAX}`, borderRadius: 14, padding: "18px 16px", textAlign: "center" }}>

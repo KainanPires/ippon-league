@@ -555,7 +555,7 @@ export default function ChaveAtletasPage() {
           )}
         </div>
         {nivel === "pro" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "0 0 10px", padding: "12px 14px", borderRadius: 11, background: "rgba(217,164,65,0.08)", border: `1px solid ${GOLD}` }}>
+            <div data-so-web style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "0 0 10px", padding: "12px 14px", borderRadius: 11, background: "rgba(217,164,65,0.08)", border: `1px solid ${GOLD}` }}>
             <span style={{ fontSize: 20, flexShrink: 0 }}>⭐</span>
             <span style={{ flex: 1, minWidth: 200, fontSize: 13, lineHeight: 1.5, color: "#e7dcc2" }}>
             {t("ck.proCardCorpo")}

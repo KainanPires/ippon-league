@@ -45,6 +45,16 @@ html[data-app] a[href^="/sobre-pro"],
 html[data-app] a[href^="/termos-pro"],
 html[data-app] a[href*="checkout.stripe.com"],
 /* No iPhone, também as áreas Pro (toda a gente é "grátis" lá). */
-html[data-app="ios"] a[href^="/pro"] {
+html[data-app="ios"] a[href^="/pro"],
+/* Blocos que falam do Pro (convites, regras de acesso): marcados com
+   data-so-web no código, só aparecem no site. */
+html[data-app] [data-so-web],
+html[data-app="ios"] [data-esconder-ios] {
   display: none !important;
+}
+/* Fundo escuro por trás das páginas: sem isto, nas apps, via-se branco nas
+   margens do ecrã (topo, por baixo da barra das horas, e no fim das páginas). */
+html[data-app],
+html[data-app] body {
+  background: #0c0e0d;
 }

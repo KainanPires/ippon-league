@@ -45,6 +45,7 @@
 
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
+import { emApp } from "@/lib/plataforma";
 
 export type Lingua = "pt" | "en" | "es" | "fr" | "de" | "ja" | "ru";
 
@@ -13246,6 +13247,83 @@ const RU: Dicionario = {
 const DICIONARIOS: Record<Lingua, Dicionario> = { pt: PT, en: EN, es: ES, fr: FR, de: DE, ja: JA, ru: RU };
 
 // ---------------------------------------------------------------------------
+// TEXTOS DAS APPS (Google Play / App Store)
+//
+// Dentro das apps não se vende nada (D-02) e as lojas recusam apps que mandem
+// comprar fora delas. Estas são as versões NEUTRAS dos textos que, no site,
+// convidam a passar a Pro. Só se usam quando a página está aberta numa app
+// (lib/plataforma → emApp). No site, nada muda. ja/ru caem no inglês.
+// ---------------------------------------------------------------------------
+const APP: Partial<Record<Lingua, Dicionario>> = {
+  pt: {
+    "cl.limGratis": "Podes ter {maximo} liga de amigos — e já lá estás. Para entrares noutra, sai primeiro da atual.",
+    "cl.limPro": "Já estás em {maximo} ligas — é o máximo. Para entrares noutra, sai primeiro de uma das atuais.",
+    "cl.limMax": "Já estás em {maximo} ligas — é o máximo. Para entrares noutra, sai primeiro de uma das atuais.",
+    "lg.limiteFreeMax": "Com a tua conta tens {pontos} liga e {copa} mata-mata.",
+    "lg.limiteProSobe": "Já estás em {pontos} ligas e {copa} mata-matas.",
+    "lg.limiteMaxPromax": "Já estás em {pontos} ligas e {copa} mata-matas — é o máximo.",
+    "lg.limiteFreeSemEspaco": "Com a tua conta tens {pontos} liga e {copa} mata-mata. Para trocar de liga, sai da atual.",
+    "of.soPro": "Ranking oficial · {comp}",
+    "of.semMembrosPro": "Ainda sem participantes nesta rodada.",
+    "apagar.itemPro": "Se tiveres uma assinatura ativa, é cancelada de imediato e não voltas a ser cobrado.",
+    "ck.bloqueadoBanner": "Estás a ver o %A% desta categoria — quem enfrenta quem. Ela está a decorrer agora. Quando a categoria terminar, vês aqui a chave toda preenchida.",
+  },
+  en: {
+    "cl.limGratis": "You can have {maximo} friends league — and you're already there. To join another, leave the current one first.",
+    "cl.limPro": "You're in {maximo} leagues — that's the max. To join another, leave one of the current ones first.",
+    "cl.limMax": "You're in {maximo} leagues — that's the max. To join another, leave one of the current ones first.",
+    "lg.limiteFreeMax": "Your account has {pontos} league and {copa} knockout.",
+    "lg.limiteProSobe": "You're already in {pontos} leagues and {copa} knockouts.",
+    "lg.limiteMaxPromax": "You're already in {pontos} leagues and {copa} knockouts — that's the max.",
+    "lg.limiteFreeSemEspaco": "Your account has {pontos} league and {copa} knockout. To switch leagues, leave the current one.",
+    "of.soPro": "Official ranking · {comp}",
+    "of.semMembrosPro": "No participants in this round yet.",
+    "apagar.itemPro": "If you have an active subscription, it is cancelled immediately and you won't be charged again.",
+    "ck.bloqueadoBanner": "You're seeing the %A% of this category — who faces whom. It's running right now. When the category ends, you'll see the full bracket filled in here.",
+  },
+  es: {
+    "cl.limGratis": "Puedes tener {maximo} liga de amigos — y ya estás en ella. Para entrar en otra, sal primero de la actual.",
+    "cl.limPro": "Estás en {maximo} ligas — es el máximo. Para entrar en otra, sal primero de una de las actuales.",
+    "cl.limMax": "Estás en {maximo} ligas — es el máximo. Para entrar en otra, sal primero de una de las actuales.",
+    "lg.limiteFreeMax": "Con tu cuenta tienes {pontos} liga y {copa} eliminatoria.",
+    "lg.limiteProSobe": "Ya estás en {pontos} ligas y {copa} eliminatorias.",
+    "lg.limiteMaxPromax": "Ya estás en {pontos} ligas y {copa} eliminatorias — es el máximo.",
+    "lg.limiteFreeSemEspaco": "Con tu cuenta tienes {pontos} liga y {copa} eliminatoria. Para cambiar de liga, sal de la actual.",
+    "of.soPro": "Ranking oficial · {comp}",
+    "of.semMembrosPro": "Todavía sin participantes en esta jornada.",
+    "apagar.itemPro": "Si tienes una suscripción activa, se cancela de inmediato y no se te volverá a cobrar.",
+    "ck.bloqueadoBanner": "Estás viendo el %A% de esta categoría — quién se enfrenta a quién. Se está disputando ahora. Cuando la categoría termine, verás aquí el cuadro completo.",
+  },
+  fr: {
+    "cl.limGratis": "Tu peux avoir {maximo} ligue d'amis — et tu y es déjà. Pour en rejoindre une autre, quitte d'abord l'actuelle.",
+    "cl.limPro": "Tu es dans {maximo} ligues — c'est le maximum. Pour en rejoindre une autre, quitte d'abord l'une des actuelles.",
+    "cl.limMax": "Tu es dans {maximo} ligues — c'est le maximum. Pour en rejoindre une autre, quitte d'abord l'une des actuelles.",
+    "lg.limiteFreeMax": "Ton compte a {pontos} ligue et {copa} coupe.",
+    "lg.limiteProSobe": "Tu es déjà dans {pontos} ligues et {copa} coupes.",
+    "lg.limiteMaxPromax": "Tu es déjà dans {pontos} ligues et {copa} coupes — c'est le maximum.",
+    "lg.limiteFreeSemEspaco": "Ton compte a {pontos} ligue et {copa} coupe. Pour changer de ligue, quitte l'actuelle.",
+    "of.soPro": "Classement officiel · {comp}",
+    "of.semMembrosPro": "Pas encore de participants dans cette journée.",
+    "apagar.itemPro": "Si tu as un abonnement actif, il est résilié immédiatement et tu ne seras plus débité.",
+    "ck.bloqueadoBanner": "Tu vois le %A% de cette catégorie — qui affronte qui. Elle se déroule en ce moment. Quand la catégorie se termine, tu vois ici le tableau complet.",
+  },
+  de: {
+    "cl.limGratis": "Du kannst {maximo} Freundesliga haben — und bist schon drin. Um einer anderen beizutreten, verlasse zuerst die aktuelle.",
+    "cl.limPro": "Du bist in {maximo} Ligen — das ist das Maximum. Um einer anderen beizutreten, verlasse zuerst eine der aktuellen.",
+    "cl.limMax": "Du bist in {maximo} Ligen — das ist das Maximum. Um einer anderen beizutreten, verlasse zuerst eine der aktuellen.",
+    "lg.limiteFreeMax": "Dein Konto hat {pontos} Liga und {copa} K.-o.-Runde.",
+    "lg.limiteProSobe": "Du bist bereits in {pontos} Ligen und {copa} K.-o.-Runden.",
+    "lg.limiteMaxPromax": "Du bist bereits in {pontos} Ligen und {copa} K.-o.-Runden — das ist das Maximum.",
+    "lg.limiteFreeSemEspaco": "Dein Konto hat {pontos} Liga und {copa} K.-o.-Runde. Um die Liga zu wechseln, verlasse die aktuelle.",
+    "of.soPro": "Offizielles Ranking · {comp}",
+    "of.semMembrosPro": "Noch keine Teilnehmer in dieser Runde.",
+    "apagar.itemPro": "Wenn du ein aktives Abo hast, wird es sofort gekündigt und nicht mehr abgebucht.",
+    "ck.bloqueadoBanner": "Du siehst den %A% dieser Gewichtsklasse — wer gegen wen. Sie läuft gerade. Wenn die Klasse endet, siehst du hier den vollständigen Baum.",
+  },
+};
+
+
+// ---------------------------------------------------------------------------
 // QUE LÍNGUA MOSTRAR
 //
 // 1. A que a pessoa escolheu (guardada na conta e em cache local)
@@ -13336,7 +13414,11 @@ function preencher(texto: string, vars?: Record<string, string | number>): strin
   return out;
 }
 
-export function traduzir(lingua: Lingua, chave: string, vars?: Record<string, string | number>): string {
+export function traduzir(lingua: Lingua, chave: string, vars?: Record<string, string | number>, naApp = false): string {
+  if (naApp) {
+    const alt = (APP[lingua] ?? APP.en)?.[chave] ?? APP.en?.[chave];
+    if (alt) return preencher(alt, vars);
+  }
   // Recurso quando falta tradução — nunca à chave crua. Para ja/ru (dicionários
   // em construção) o recurso é o INGLÊS; para as restantes, o português. A chave
   // existe sempre no dicionário completo das 5 línguas originais, por isso este
@@ -13350,8 +13432,12 @@ export function LinguaProvider({ children }: { children: ReactNode }) {
   // Arranca em português no servidor e no primeiro render, para o HTML do
   // servidor e o do cliente coincidirem. A língua real entra logo a seguir.
   const [lingua, setLingua] = useState<Lingua>("pt");
+  // Aberto numa app das lojas? Lido depois do primeiro render (como a língua),
+  // para o HTML do servidor e o do cliente coincidirem.
+  const [naApp, setNaApp] = useState(false);
 
   useEffect(() => {
+    setNaApp(emApp());
     let vivo = true;
     const local = linguaGuardadaLocal();
     const inicial = local ?? linguaDoBrowser();
@@ -13385,7 +13471,7 @@ export function LinguaProvider({ children }: { children: ReactNode }) {
   const valor: Contexto = {
     lingua,
     mudar,
-    t: (chave, vars) => traduzir(lingua, chave, vars),
+    t: (chave, vars) => traduzir(lingua, chave, vars, naApp),
   };
 
   return createElement(LinguaContexto.Provider, { value: valor }, children);

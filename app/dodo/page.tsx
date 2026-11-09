@@ -526,6 +526,7 @@ function Regras({ vagasCont, totalVagas }: { vagasCont: number; totalVagas: numb
     <>
     {/* Quem pode entrar. Uma caixa só, e curta: é a condição que faz a pessoa
       perceber num segundo se isto é para ela. */}
+    <div data-so-web>
     <Section style={{ marginTop: 22 }}>{t("dd.quemPodeEntrar")}</Section>
     <div style={{ background: "#2a2410", border: "1px solid #5a4a18", borderRadius: 14, padding: "14px 15px" }}>
     <div style={{ fontFamily: FD, fontSize: 13, fontWeight: 700, color: GOLD, marginBottom: 7 }}>{t("dd.soMembrosPro")}</div>
@@ -544,6 +545,7 @@ function Regras({ vagasCont, totalVagas }: { vagasCont: number; totalVagas: numb
     <p style={{ fontSize: 12.5, color: "#d6b3ad", lineHeight: 1.55, margin: 0 }}>
     {t("dd.regraSubAcaba")}
     </p>
+    </div>
     </div>
     <Section style={{ marginTop: 20 }}>{t("dd.vagasSorteio")}</Section>
     <div style={{ background: "#121815", border: "1px solid #243029", borderRadius: 14, padding: "14px 15px" }}>
@@ -978,11 +980,13 @@ function MeuEstado({
   const faltaPro = !nivelPronto ? false : !souPro;
   if (faltaPro) {
     return (
+      <div data-so-web>
       <Cartao borda="#5a4a18" fundo="#2a2410">
       <Titulo cor={GOLD}>{t("dd.copaParaPro")}</Titulo>
       <Texto>{t("dd.copaParaProTexto")}</Texto>
       <a href="/ippon-pro" style={botaoPrimario}>{t("lg.conhecerPro")}</a>
       </Cartao>
+      </div>
     );
   }
   return (

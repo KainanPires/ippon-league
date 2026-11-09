@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, Suspense } from "react";
+import { plataforma, emApp } from "@/lib/plataforma";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { Escudo, loadIdentity, DEFAULT_IDENTITY, type Identity } from "@/components/Escudo";
@@ -1675,7 +1676,12 @@ function DetalheLutas({ estado, captain }: { estado: EstadoDetalhe; captain: boo
 // Seletor de cor do tatame (Pro Max). Mostra os 5 temas em miniatura. Pro Max
 // escolhe; não-Pro-Max vê tudo bloqueado (cadeado + convite a subir a Pro Max).
 function SeletorTatame({ aberto, onToggle, atual, isProMax, onEscolher }: { aberto: boolean; onToggle: () => void; atual: TatameId; isProMax: boolean; onEscolher: (id: TatameId) => void }) {
+  // Apps (D-02/D-03): no iPhone esta vantagem não aparece; no Android só a quem
+  // já é Pro Max (para os outros levaria à página de venda, que lá não existe).
+  const [plat, setPlat] = useState<"web" | "android" | "ios">("web");
+  useEffect(() => { setPlat(plataforma()); }, []);
   const t = useT();
+  if (plat === "ios" || (plat === "android" && !isProMax)) return null;
   return (
     <div style={{ marginTop: 12 }}>
     <button onClick={onToggle} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "#121815", border: `1px solid ${isProMax ? "#2a4d3e" : "#243029"}`, borderRadius: 12, padding: "11px 14px", cursor: "pointer", color: "#f1ede2", fontFamily: FB }}>

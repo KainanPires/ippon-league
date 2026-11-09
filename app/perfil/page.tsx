@@ -470,9 +470,13 @@ export default function Perfil() {
     {abertoDados && ready && conta && <AlterarSenha email={conta.email} />}
     {ready && conta && (
         <>
+        {/* No iPhone as notificações da app chegam com o push nativo (T-12);
+          até lá a secção não aparece lá (as instruções eram as do Safari). */}
+        <div data-esconder-ios>
         <SectionTitle>{t("perfil.notificacoes")}</SectionTitle>
         <div style={{ marginBottom: 26 }}>
         <BotaoNotificacoes userId={conta.id} />
+        </div>
         </div>
         </>
       )}

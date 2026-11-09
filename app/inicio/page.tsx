@@ -870,7 +870,7 @@ export default function Inicio() {
         Mercado, e nas notificações (push/sino). */}
     </div>
     {/* Lembrete de notificações: aparece depois de ter equipa montada. */}
-    {!visitante && teamInfo && userIdState && <LembreteNotificacoes userId={userIdState} />}
+    {!visitante && teamInfo && userIdState && <div data-esconder-ios><LembreteNotificacoes userId={userIdState} /></div>}
     <Card>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
     <CardTitle>{ehClassico ? (emAndamento ? t("inicio.classicoAtual") : t("inicio.proximoClassico")) : (emAndamento ? t("inicio.competicaoAtual") : t("inicio.proximaCompeticao"))}</CardTitle>
