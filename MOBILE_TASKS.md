@@ -29,3 +29,8 @@ Estados: ⏳ pendente · 🔄 em execução · ⛔ bloqueado · ✅ concluído
 | T-16 | **Teste fechado: enviar para revisão** → quando aprovado, enviar link de instalação ao grupo e contar 14 dias com ≥12 testadores | 5 | Fundador | 🔄 |
 | T-23 | Antes do lançamento público: refazer capturas em alta resolução (DPR 3, ≥1080 px) + 4.ª captura (mercado aberto ou liga de demonstração sem nomes reais) | 5 | Fundador | ⏳ |
 | T-24 | Apps sem convites para o Pro (Apple 3.1.1/3.1.3, Play Billing): textos alternativos `APP` em lib/i18n.ts, `data-so-web` (esconde nas apps), `data-esconder-ios`, seletor do tatame, Análise de confrontos, mensagem de limite; fundo escuro nas apps; notificações escondidas no iPhone até T-12. Ícone novo (Dôdo maior, vetorial) na build 4. No ramo `mobile` (preview), **falta autorização para produção** | 3 | Claude | 🔄 |
+
+### Estado a 9 nov 2026
+- iOS: build 1.0.0 (4) (ícone novo) no TestFlight; página da App Store preenchida (textos, 4 capturas 1206×2622, privacidade publicada, classificação 13+ por "Concursos", categoria Desporto/Jogos, preço Grátis, lançamento MANUAL, conta de revisão + notas em inglês). DSA (comerciante) em revisão na Apple. Pronto para "Enviar para revisão" (fundador).
+- Android: teste fechado aprovado e publicado; 6 testadores inscritos (meta 12 → 14 dias).
+- Judocoins: fecho antecipado (chaves completas +2h) e mercado só depois do cálculo — em produção (9e96884).
