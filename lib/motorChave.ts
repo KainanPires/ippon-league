@@ -186,6 +186,16 @@ function resolverPool(
     if (vencedor) perdedorFinal = vencedor === a ? b : a;
   } else if (nivel.length === 1) {
     vencedor = nivel[0] ?? null;
+    // Pool de 2 atletas (ou decidida por uma única luta final): o perdedor dessa
+    // luta vai à repescagem, tal como o perdedor da final de uma pool maior.
+    // Antes isto ficava a null e a repescagem/bronze desse lado nunca resolvia
+    // (ex.: -78 Panamericano, pools B/C/D com 2 atletas). Numa pool "solo"
+    // (sem lutas) não há perdedor -> fica a null, como deve.
+    const ultima = lutas[lutas.length - 1];
+    if (vencedor && ultima && ultima.vencedor === vencedor) {
+      const la = ultima.azul.id, lb = ultima.branco.id;
+      if (la && lb) perdedorFinal = vencedor === la ? lb : la;
+    }
   }
   return { lutas, vencedor, perdedorFinal };
 }
@@ -235,9 +245,28 @@ export function desenharChave(
   // 4) Final.
   const final = mk("final", "Final", "FINAL", meia1.vencedor, meia2.vencedor);
 
-  // 5) Repescagens: perdedores das finais de pool (A×B, C×D).
-  const rep1 = mk("repescagem", "Repescagem 1", "R1", perdedorFinalPool.A, perdedorFinalPool.B);
-  const rep2 = mk("repescagem", "Repescagem 2", "R2", perdedorFinalPool.C, perdedorFinalPool.D);
+  // 5) Repescagens: perdedores das finais de pool (A×B, C×D). Uma pool "solo"
+  //    (≤1 atleta — ex.: um cabeça-de-chave sozinho numa chave de 7) NUNCA dá
+  //    perdedor para a repescagem. Nesse caso o adversário da outra pool passa
+  //    por WALKOVER — é o bye real da repescagem (ex.: -78 Panamericano, com o
+  //    Rodriguez sozinho na pool A, a Fillion passou direto ao bronze). Sem isto,
+  //    mk(null, X) devolvia null e o bronze desse lado nunca resolvia.
+  //    Só dispara quando a pool é ESTRUTURALMENTE solo; uma pool com 2 atletas
+  //    ainda por decidir continua a seguir o caminho normal (fica "a decidir").
+  const poolSolo = (p: PoolId) => (moldura.pools[p]?.length ?? 0) <= 1;
+  const fazerRepescagem = (rotulo: string, chaveId: string, pa: PoolId, pb: PoolId): Luta => {
+    const la = perdedorFinalPool[pa];
+    const lb = perdedorFinalPool[pb];
+    if (poolSolo(pa) && !poolSolo(pb) && lb) {
+      return { fase: "repescagem", rotulo, chaveId, azul: { id: null }, branco: fazerLugar(lb, identidades), vencedor: lb, estado: "decidida" };
+    }
+    if (poolSolo(pb) && !poolSolo(pa) && la) {
+      return { fase: "repescagem", rotulo, chaveId, azul: fazerLugar(la, identidades), branco: { id: null }, vencedor: la, estado: "decidida" };
+    }
+    return mk("repescagem", rotulo, chaveId, la, lb);
+  };
+  const rep1 = fazerRepescagem("Repescagem 1", "R1", "A", "B");
+  const rep2 = fazerRepescagem("Repescagem 2", "R2", "C", "D");
 
   // 6) Bronzes CRUZADOS: venc.rep1 × perdedor meia2 ; venc.rep2 × perdedor meia1.
   const bronze1 = mk("bronze", "Bronze 1", "B1", rep1.vencedor, perdedorMeia2);

@@ -31,6 +31,7 @@ import { reconciliarPush } from "@/lib/push";
 // abrir a app num dia sem competição — o buraco de retenção que o plano
 // original identificou.
 import { HubCarrossel } from "@/components/HubCarrossel";
+import { AvisoSubstituicao } from "@/components/AvisoSubstituicao";
 
 // A barra inferior deixou de estar copiada em cada página. Vive uma vez em
 // components/BarraInferior.tsx, e é lá que o separador Pro pulsa a dourado
@@ -785,6 +786,9 @@ export default function Inicio() {
     <SinoNotificacoes calcOpts={{ temEquipa: temEquipaCompleta }} />
     </div>
     </header>
+    {/* Aviso: atletas da equipa que saíram da competição a decorrer -> /substituir.
+       Só aparece a quem tem atletas que saíram; os outros não veem nada. */}
+    {!visitante && <AvisoSubstituicao />}
     {/* Convite para instalar a app (PWA). Só aparece a quem ainda não instalou. */}
     <CartaoInstalarApp />
     {/* EMAIL POR CONFIRMAR. Não bloqueia nada: a pessoa joga na mesma. Mas

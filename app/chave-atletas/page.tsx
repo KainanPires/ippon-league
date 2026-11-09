@@ -235,7 +235,23 @@ function arvorePool(
 ): { arvores: Arvore[]; arestas: Aresta[] } {
   const arestas: Aresta[] = [];
   const lutas = pool?.lutas || [];
-  if (!ordem || ordem.length === 0 || lutas.length === 0) return { arvores: [], arestas };
+  if (!ordem || ordem.length === 0) return { arvores: [], arestas };
+  // POOL DE 1 ATLETA (bye/walkover): não há luta, mas o atleta estava na pool e
+  // passa direto. Em vez de "sem lutas", mostramo-lo a passar e a VENCER O POOL
+  // — igual ao sorteio oficial (ex.: Solis no +100, Rodriguez no -78).
+  if (lutas.length === 0) {
+    if (ordem.length === 1) {
+      const id = ordem[0];
+      const info = nomes[id] || { nome: id, pais: "" };
+      const noKey = `solo-${poolKey}-${id}`;
+      const lado: Lado = { id, nome: info.nome, pais: info.pais, vencedor: false };
+      const no: No = { tipo: "bye", key: noKey, lado };
+      const vk = `venc-pool-${poolKey}`;
+      arestas.push({ de: noKey, para: vk });
+      return { arvores: [{ no, vencedor: { key: vk, lado: { ...lado, vencedor: true } } }], arestas };
+    }
+    return { arvores: [], arestas };
+  }
   const flat = buildSkeleton(ordem, byes || []);
   if (flat.length !== lutas.length) {
     const arv: Arvore[] = lutas.map((l, i) => ({ no: lutaNo(l, `f-${poolKey}-${i}`), vencedor: null }));
