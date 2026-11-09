@@ -298,8 +298,9 @@ function MercadoInner() {
   const mercadoProximaAberto = focoAgora.estadoAlvo?.estado === "aberto";
   // FASE I (afinação). A janela EXISTE, pelo calendário, quando há uma competição
   // a decorrer e a próxima já tem mercado aberto. Mas montar para a próxima é uma
-  // CORTESIA para quem ainda não jogou este ciclo: quem já tem equipa (na que
-  // decorre OU na próxima) só analisa durante a rodada — cai no ecrã "trancado".
+  // CORTESIA para quem não joga a competição que decorre: quem tem equipa NA QUE
+  // DECORRE só analisa durante a rodada — cai no ecrã "trancado". Quem só tem
+  // equipa na próxima continua a poder editá-la.
   const janelaProxima = !!competicaoADecorrer && mercadoProximaAberto;
   const montarProxima = janelaProxima && temEquipaCiclo === false;
   // Enquanto ainda não sabemos se tem equipa (só quando há janela), não se mostra
@@ -322,7 +323,12 @@ function MercadoInner() {
         ]);
         const temDec = (decCloud?.ids.length ?? 0) > 0 || loadSavedFor(idDecorrer).ids.length > 0;
         const temAlvo = (alvoCloud?.ids.length ?? 0) > 0 || loadSavedFor(idAlvo).ids.length > 0;
-        if (vivo) setTemEquipaCiclo(temDec || temAlvo);
+        // Só a equipa da competição A DECORRER tranca o mercado. Quem já montou
+        // equipa para a PRÓXIMA (ex.: conta nova durante uma competição) tem de
+        // a poder voltar a editar — antes, guardar trancava o próprio mercado
+        // (o /criar-equipa manda para aqui quem já tem equipa na próxima).
+        void temAlvo;
+        if (vivo) setTemEquipaCiclo(temDec);
       })();
       return () => { vivo = false; };
     }, [idDecorrer, idAlvo, mercadoProximaAberto]);
