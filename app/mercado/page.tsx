@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CATEGORIES, STATUS_LEGEND, type Athlete, type Gender, type AthleteStatus } from "@/lib/athletes";
-import { loadDraftFor, saveDraftFor, setAthletePool, loadSavedCloudFor, loadSavedFor, commitSavedCloudFor, loadIdentityCloudFor } from "@/lib/team";
+import { loadDraftFor, saveDraftFor, setAthletePool, loadSavedCloudFor, commitSavedCloudFor, loadIdentityCloudFor } from "@/lib/team";
 import { exigirSessao, temSessao } from "@/lib/auth";
 import { Mascot } from "@/components/Mascot";
 import { focoMercado, nomeCompeticao, textoFecho, categoriaTrancada, localizarNomeCompeticao } from "@/lib/calendario";
@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { useNivel } from "@/lib/useNivel";
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto } from "@/lib/tutorials";
 import { useLembreteSalvar } from "@/lib/useLembreteSalvar";
+import { useBloqueioCiclo } from "@/lib/cicloMercado";
 import { useFaixa } from "@/lib/useFaixa";
 import { useT, useLingua, type Lingua } from "@/lib/i18n";
 // Fase E (Ativação) — SÓ medição. track() é no-op sem consentimento; nomes vêm
@@ -240,7 +241,10 @@ function MercadoInner() {
     }, [userId]);
   // FASE I (afinação): a janela "monta para a próxima" só é para quem NÃO tem
   // equipa neste ciclo. null = ainda a verificar (não se pisca o bloqueio).
-  const [temEquipaCiclo, setTemEquipaCiclo] = useState<boolean | null>(null);
+  // Regra do ciclo (lib/cicloMercado): quem tem equipa na competição a decorrer
+  // (ou à espera do cálculo dos Judocoins) só monta a próxima depois do cálculo.
+  const bloqueioCiclo = useBloqueioCiclo(focoMercado());
+  const temEquipaCiclo = bloqueioCiclo.bloqueado;
   // MODO SUBSTITUIÇÃO: estado por categoria (naoComecou/aDecorrer/terminada) da
   // competição a decorrer, elegibilidade (tinha atletas que saíram?), e o guardar.
   const [subEstados, setSubEstados] = useState<Record<string, string>>({});
@@ -302,36 +306,17 @@ function MercadoInner() {
   // DECORRE só analisa durante a rodada — cai no ecrã "trancado". Quem só tem
   // equipa na próxima continua a poder editá-la.
   const janelaProxima = !!competicaoADecorrer && mercadoProximaAberto;
+  // Já passaram as 60h (nada "a decorrer") mas os Judocoins da competição ainda
+  // não foram calculados e o utilizador jogou-a: espera pelo cálculo.
+  const aguardaCalculo = !competicaoADecorrer && bloqueioCiclo.bloqueado === true;
   const montarProxima = janelaProxima && temEquipaCiclo === false;
   // Enquanto ainda não sabemos se tem equipa (só quando há janela), não se mostra
   // nem o bloqueio nem a próxima — evita piscar o ecrã errado antes do servidor.
   const aVerificarCiclo = janelaProxima && temEquipaCiclo === null;
-  // Verifica, uma vez por ciclo, se o utilizador já tem equipa na competição a
-  // decorrer OU na próxima. Servidor (tabela `equipas`) é a verdade; se não
-  // responder, cai no rascunho salvo local. Deps são IDs (primitivos) e não os
-  // objetos do calendário — estes são novos a cada render e dariam um ciclo.
-  const idDecorrer = competicaoADecorrer?.idCompeticao ?? null;
-  const idAlvo = focoAgora.alvo?.idCompeticao ?? null;
-  useEffect(() => {
-      // Sem janela (mercado normal, ou próxima fechada) não há nada a decidir.
-      if (!idDecorrer || !mercadoProximaAberto || !idAlvo) { setTemEquipaCiclo(false); return; }
-      let vivo = true;
-      (async () => {
-        const [decCloud, alvoCloud] = await Promise.all([
-          loadSavedCloudFor(idDecorrer),
-          loadSavedCloudFor(idAlvo),
-        ]);
-        const temDec = (decCloud?.ids.length ?? 0) > 0 || loadSavedFor(idDecorrer).ids.length > 0;
-        const temAlvo = (alvoCloud?.ids.length ?? 0) > 0 || loadSavedFor(idAlvo).ids.length > 0;
-        // Só a equipa da competição A DECORRER tranca o mercado. Quem já montou
-        // equipa para a PRÓXIMA (ex.: conta nova durante uma competição) tem de
-        // a poder voltar a editar — antes, guardar trancava o próprio mercado
-        // (o /criar-equipa manda para aqui quem já tem equipa na próxima).
-        void temAlvo;
-        if (vivo) setTemEquipaCiclo(temDec);
-      })();
-      return () => { vivo = false; };
-    }, [idDecorrer, idAlvo, mercadoProximaAberto]);
+  // Verificação do ciclo: feita pelo useBloqueioCiclo (acima). Bloqueia quem tem
+  // equipa na competição a decorrer ENQUANTO os Judocoins dela não estão
+  // calculados; depois do cálculo (que pode ser antes das 60h — fecho
+  // antecipado), pode montar a próxima.
   useEffect(() => {
       let active = true;
       // FASE I (medição): viu a experiência de mercado fechado / próxima competição.
@@ -537,6 +522,30 @@ function MercadoInner() {
   // a próxima ainda não abriu, ou porque o utilizador JÁ tem equipa neste ciclo
   // (Fase I: quem já jogou só analisa durante a rodada). Enquanto se verifica o
   // ciclo (aVerificarCiclo) não se bloqueia, para não piscar o ecrã errado.
+  // ECRÃ "A CALCULAR": já passaram as 60h, mas os Judocoins da competição que o
+  // utilizador jogou ainda não foram calculados. Espera, para montar com o valor certo.
+  if (aguardaCalculo && !subAtivo && bloqueioCiclo.comp) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+      <a href="/inicio" aria-label="Voltar" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #243029", display: "flex", alignItems: "center", justifyContent: "center", color: "#cfd8d2", textDecoration: "none" }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+      </a>
+      <span style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase" }}>{t("mk.mercado")}</span>
+      </div>
+      <div style={{ textAlign: "center", padding: "30px 18px", background: "#121815", border: `1px solid ${GOLD}`, borderRadius: 16 }}>
+      <div style={{ width: 92, height: 92, margin: "0 auto 10px" }}><Mascot belt={corFaixa} expression="sabio" /></div>
+      <h2 style={{ fontFamily: FD, fontSize: 21, fontWeight: 700, textTransform: "uppercase", margin: "0 0 10px" }}>{t("mk.aCalcularTitulo")}</h2>
+      <p style={{ fontSize: 14, color: "#c7d0c9", lineHeight: 1.55, margin: "0 0 20px" }}>
+      {t("mk.aCalcularTexto", { comp: localizarNomeCompeticao(nomeCompeticao(bloqueioCiclo.comp), t) })}
+      </p>
+      <a href="/meu-time" style={{ display: "inline-block", background: GOLD, color: "#1b211e", fontFamily: FD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", padding: "13px 24px", borderRadius: 12, fontSize: 15, textDecoration: "none" }}>{t("inicio.verEquipa")}</a>
+      </div>
+      </div>
+      </main>
+    );
+  }
   if (competicaoADecorrer && !montarProxima && !aVerificarCiclo && !subAtivo) {
     return (
       <main style={{ minHeight: "100vh", background: "#0c0e0d", color: "#f1ede2", fontFamily: FB }}>

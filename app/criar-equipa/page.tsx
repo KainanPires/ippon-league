@@ -11,6 +11,7 @@ import { focoMercado, textoFecho, numeroDaRodada, nomeCompeticao } from "@/lib/c
 import { tutorialVistoLocal, tutoriaisVistosConta, marcarTutorialVisto, deveMostrarTutorial } from "@/lib/tutorials";
 import { Avaliacao, devePedirAvaliacao } from "@/components/Avaliacao";
 import { AvisoEquipaGuardada } from "@/components/AvisoEquipaGuardada";
+import { useBloqueioCiclo } from "@/lib/cicloMercado";
 import { useFaixa } from "@/lib/useFaixa";
 // Nível da tabela `users` (a mesma fonte do servidor), não do user_metadata.
 import { useNivel } from "@/lib/useNivel";
@@ -138,34 +139,38 @@ export default function CriarEquipa() {
   //   • só montou a PRÓXIMA (o clássico) → /mercado: ecrã "trancado / analisar".
   // Quem NÃO tem equipa nenhuma fica no Dojo e monta para a próxima competição.
   const [destinoOcupado, setDestinoOcupado] = useState<string | null>(null);
-  const idDecorrer = foco.aDecorrer?.idCompeticao ?? null;
   const idAlvoCiclo = alvo.idCompeticao;
+  // Regra do ciclo (lib/cicloMercado): quem tem equipa na competição a decorrer
+  // (ou à espera do cálculo dos Judocoins) só monta a próxima DEPOIS do cálculo.
+  const bloqueioCiclo = useBloqueioCiclo(foco);
+  const bloqueado = bloqueioCiclo.bloqueado;
+  const aguardaCalculo = !emAndamento && bloqueado === true;
   useEffect(() => {
-      if (!emAndamento || !idDecorrer) { setTemEquipaCiclo(false); setDestinoOcupado(null); return; }
+      if (bloqueado === null) { setTemEquipaCiclo(null); return; }
+      // Jogou a competição e o cálculo ainda não acabou: a decorrer -> vê o seu
+      // time ao vivo; depois das 60h -> o mercado mostra "a calcular".
+      if (bloqueado) {
+        setTemEquipaCiclo(true);
+        setDestinoOcupado(emAndamento ? "/meu-time" : "/mercado");
+        return;
+      }
+      if (!emAndamento) { setTemEquipaCiclo(false); setDestinoOcupado(null); return; }
+      // Durante uma competição, quem já montou a PRÓXIMA edita-a no mercado.
       let vivo = true;
       (async () => {
-        // Servidor (tabela `equipas`) é a verdade; se não responder, cai no local.
-        const [decCloud, alvoCloud] = await Promise.all([
-          loadSavedCloudFor(idDecorrer),
-          loadSavedCloudFor(idAlvoCiclo),
-        ]);
-        const temDec = (decCloud?.ids.length ?? 0) > 0 || loadSavedFor(idDecorrer).ids.length > 0;
+        const alvoCloud = await loadSavedCloudFor(idAlvoCiclo);
         const temAlvo = (alvoCloud?.ids.length ?? 0) > 0 || loadSavedFor(idAlvoCiclo).ids.length > 0;
         if (!vivo) return;
-        setTemEquipaCiclo(temDec || temAlvo);
-        // Quem está a jogar a competição a decorrer vê o seu time ao vivo (meu-time);
-        // quem só montou a próxima vai analisar no mercado.
-        setDestinoOcupado(temDec ? "/meu-time" : temAlvo ? "/mercado" : null);
+        setTemEquipaCiclo(temAlvo);
+        setDestinoOcupado(temAlvo ? "/mercado" : null);
       })();
       return () => { vivo = false; };
-      // Deps são IDs (primitivos) e não os objetos do calendário (novos a cada render).
-    }, [emAndamento, idDecorrer, idAlvoCiclo]);
+      // Deps são primitivos (não os objetos do calendário, novos a cada render).
+    }, [bloqueado, emAndamento, idAlvoCiclo]);
   useEffect(() => {
-      // Já tem equipa e há competição a decorrer: não é no Dojo que fica. Quem tem
-      // equipa a decorrer vai VER o seu time (/meu-time); quem só montou a próxima
-      // vai ao mercado (ecrã "trancado"). replace para não deixar histórico.
-      if (emAndamento && temEquipaCiclo === true && destinoOcupado) router.replace(destinoOcupado);
-    }, [emAndamento, temEquipaCiclo, destinoOcupado, router]);
+      // Reencaminha (replace, sem histórico) quem não monta aqui agora.
+      if ((emAndamento || aguardaCalculo) && temEquipaCiclo === true && destinoOcupado) router.replace(destinoOcupado);
+    }, [emAndamento, aguardaCalculo, temEquipaCiclo, destinoOcupado, router]);
   useEffect(() => {
       let active = true;
       const idAlvo = alvo.idCompeticao;
@@ -348,7 +353,7 @@ export default function CriarEquipa() {
   // já se decidiu reencaminhar quem tem equipa (=== true), não se mostra o
   // construtor — evita piscar o Dojo antes do salto para o mercado. Só quem NÃO
   // tem equipa (=== false), ou quem não está numa competição a decorrer, passa.
-  if (emAndamento && temEquipaCiclo !== false) {
+  if ((emAndamento && temEquipaCiclo !== false) || aguardaCalculo) {
     return <main aria-busy="true" style={{ minHeight: "100vh", background: "#0c0e0d" }} />;
   }
   return (

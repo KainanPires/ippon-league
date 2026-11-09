@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
-import { competicaoDaSemana, competicaoFechada, focoMercado, competeNaEpoca, CALENDARIO_TODAS, type SemanaCalendario } from "@/lib/calendario";
+import { competicaoDaSemana, competicaoFechada, focoMercado, competeNaEpoca, estadoMercado, CALENDARIO_TODAS, type SemanaCalendario } from "@/lib/calendario";
+import { prontaParaFechoAntecipado } from "@/lib/fechoAntecipado";
 import { getCompetitionCompetitorsRaw, mapCompetitorsToAthletes } from "@/lib/ijf";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { congelarCompeticao } from "@/lib/congelar";
@@ -282,26 +283,40 @@ async function atualizarAoVivo(hoje: Date): Promise<{ ao_vivo: string | null; at
 // ORÇAMENTO: não começa uma competição nova sem MS_MARGEM_COMPETICAO de folga.
 // Se parar a meio, `parouPorTempo` fica true e a corrida seguinte apanha o resto
 // (a competição continua na janela dos 21 dias, e o motor retoma onde ficou).
-type ResumoCongelamento = { comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean; erros?: number };
+type ResumoCongelamento = { comp: string; nome: string; processados: number; faltam: number; utilizadores: number; completa: boolean; erros?: number; antecipado?: boolean };
 async function congelarRecentes(hoje: Date, t0: number): Promise<{ feitos: ResumoCongelamento[]; parouPorTempo: boolean }> {
   const agora = hoje.getTime();
   const janelaMs = JANELA_DIAS * 24 * 60 * 60 * 1000;
-  const candidatas = CALENDARIO_TODAS.filter((s) => {
+  const naJanela = CALENDARIO_TODAS.filter((s) => {
       const inicio = new Date(s.de.replace(/\//g, "-") + "T00:00:00").getTime();
       const dentroDaJanela = inicio <= agora && agora - inicio <= janelaMs;
       // CORTE DA ÉPOCA: em 2026 só se congela a partir do Mundial (4/10). As
       // anteriores (testes de pré-lançamento, clássico de 26/09) ficam de fora.
-      return dentroDaJanela && competicaoFechada(s, hoje) && competeNaEpoca(s); // só as JÁ TERMINADAS (60h) e da época
+      return dentroDaJanela && competeNaEpoca(s);
     });
+  // Só as JÁ TERMINADAS: pelas 60h (rede de segurança) OU — fecho antecipado
+  // (lib/fechoAntecipado, decidido com o Kainan a 9/11/2026) — quando todas as
+  // chaves estão completas há pelo menos 2 horas. O antecipado só se aplica a
+  // competições já começadas (mercado fechado) e não ao modo rolling (Mundial).
+  const candidatas: { s: SemanaCalendario; antecipado: boolean }[] = [];
+  for (const s of naJanela) {
+    if (competicaoFechada(s, hoje)) { candidatas.push({ s, antecipado: false }); continue; }
+    if (s.rolling || estadoMercado(s, hoje).estado !== "fechado") continue;
+    if (!haTempo(t0, MS_MARGEM_COMPETICAO)) break;
+    try {
+      const r = await prontaParaFechoAntecipado(s.idCompeticao, agora);
+      if (r.pronta) candidatas.push({ s, antecipado: true });
+    } catch { /* na dúvida, espera pelas 60h */ }
+  }
   const feitos: ResumoCongelamento[] = [];
   let parouPorTempo = false;
-  for (const s of candidatas) {
+  for (const { s, antecipado } of candidatas) {
     if (!haTempo(t0, MS_MARGEM_COMPETICAO)) { parouPorTempo = true; break; }
     const mes = s.de.slice(0, 7).replace("/", "-");
     const anoEpoca = parseInt(s.de.slice(0, 4), 10);
     try {
       const r = await congelarCompeticao(s.idCompeticao, mes, anoEpoca);
-      feitos.push({ comp: s.idCompeticao, nome: s.nome, processados: r.atletasProcessados, faltam: r.atletasEmFalta, utilizadores: r.utilizadores, completa: r.completa, erros: r.erros ?? 0 });
+      feitos.push({ comp: s.idCompeticao, nome: s.nome, processados: r.atletasProcessados, faltam: r.atletasEmFalta, utilizadores: r.utilizadores, completa: r.completa, erros: r.erros ?? 0, antecipado });
     } catch {
       feitos.push({ comp: s.idCompeticao, nome: s.nome, processados: 0, faltam: -1, utilizadores: 0, completa: false });
     }
