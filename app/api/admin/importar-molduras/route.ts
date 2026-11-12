@@ -95,6 +95,49 @@ const MOLDURAS: Record<string, CatMold> = {
     C: ["Kanan Nasibov", "Mortaza Suha", "Zhantilek Nurtilepuly", "Tieman Diaby", "Mohammed Lahboub", "Mohamed El Mehdi Lili", "Tommaso Fava"],
     D: ["Saba Inaneishvili", "Movli Borchashvilli", "Marius Fizel", "Yevheniy Balyevskyy", "Vidak Maljevic", "Andrey Coelho", "Levente Dobos"],
   }},
+  // ----------------------------- FEMININO -----------------------------
+  "-48": { genero: "F", pools: {
+    A: ["Assunta Scutto", "Erza Muminoviq", "Victoria Sibille", "Oumaima Bedioui", "Laura Bogdan", "Eduarda Francisco"],
+    B: ["Chen-Hao Lin", "Vera Wandel", "Zeynab Lepp", "Abiba Abuzhakynova", "Katryna Esposito", "Wiktoria Slazok"],
+    C: ["Eva Perez Soler", "Asia Avanzato", "Galiya Tynbayeva", "Lois Petit", "Natasha Ferreira", "Ashleigh Barnikel"],
+    D: ["Amber Gersjes", "Zuzanna Wozniak", "Tamar Malca", "Jacqueline Springer", "Rebeka Rita Koszegi"],
+  }},
+  "-52": { genero: "F", pools: {
+    A: ["Roza Gyertyas", "Gaia Stella", "Chiara Serra", "Gultaj Mammadaliyeva", "Tihea Topolovec", "Pin-Hsun Tseng", "Shraddha Kadubal Chopade"],
+    B: ["Soumiya Iraoui", "Kinga Klimczak", "Diyora Keldiyorova", "Aruzhan Yerezhepova", "Larissa Pimenta", "Carina Klaus-Sternwieser", "Andrea Stojadinov", "Fatjona Kasapi"],
+    C: ["Reka Pupp", "Yi-Hsi Shen", "Ilay Hayun", "Nicole Stakhov", "Naomi Van Krevel", "Driulys Rivas", "Francine Echevarria", "Meruyert Sarsenova"],
+    D: ["Blandine Pont", "Gabriela Dimitrova", "Jessica Pereira", "Nikolina Nisavic", "Aleksandra Kaleta", "Buketnur Karabulut", "Ilaria Finestrone", "Tinka Easton"],
+  }},
+  "-57": { genero: "F", pools: {
+    A: ["Ana Viktorija Puljiz", "Andjela Samardzic", "Flaka Loxha", "Adriana Rodriguez Salvador", "Laura Igaz", "Dana Abdirova", "Pleuni Cornelisse"],
+    B: ["Acelya Toprak", "Elise Bjoras", "Habiba Bayati", "Sarah Souza", "Veronica Toniolo", "Pihla Matikainen", "Inbal Shemesh"],
+    C: ["Shirlen Nascimento", "Laura Kallinger", "Tzu-Yun Liu", "Giulia Carna", "Binta Ndiaye", "Snezhana Gramatikova", "Chelsie Giles"],
+    D: ["Mariana Esteves", "Shannon Van De Meeberg", "Oyunchimeg Oyungerel", "Marta Garcia Martin", "Karolina Siennicka", "Luca Veg", "Anastasija Sokirjanska"],
+  }},
+  "-63": { genero: "F", pools: {
+    A: ["Joanne Van Lieshout", "Nina Cvjetko", "Himanshi Tokas", "Laura Vazquez Fernandez", "Joana Crisostomo", "Brigitta Varga", "Flavia Favorini"],
+    B: ["Jessica Klimkait", "Maeve Coughlan", "Pei Chun Yuan", "Natalia Kropska", "Esmigul Kuyulova", "Sara Golden"],
+    C: ["Kaja Kajzer Zabkar", "Anriquelis Barrios", "Ariela Sanchez Benitez", "Nina Simic", "Lisa Grabner", "Laurence Biron", "Savita Russo"],
+    D: ["Iva Oberan", "Louna-Lumia Seikkula", "Jolina Reinhold", "Anna Kriza", "Saya Middleton", "Aisa Nurkovic"],
+  }},
+  "-70": { genero: "F", pools: {
+    A: ["Aoife Coughlan", "Magdalena Schenk", "Yu-Jung Liao", "Kaillany Cardoso", "Lisa Tretnjak", "Marta Voracek", "Maya Goshen"],
+    B: ["Nauana Silva", "Ema Fizelova", "Sara Corbo", "April Lynn Fohouo", "Mariia Rytska", "Margit De Voogd"],
+    C: ["Lara Cvjetko", "Adelina Novitsky", "Laerke Olsen", "Aleksandra Kowalewska", "Nadie Jaafar", "Azhar Askhat", "Gioia Vetterli"],
+    D: ["Clemence Eme", "Sudaba Aghayeva", "Olha Tsimko", "Sanne Van Dijke", "Andela Violic", "Aina Laura Rasoanaivo Razafy", "Nadia Simeoli"],
+  }},
+  "-78": { genero: "F", pools: {
+    A: ["Kaila Issoufi", "Ekaterina Tokareva", "Inbar Lanir", "Julie Hoelterhoff", "Nisrin Bousbaa Dab", "Anna Kazakova", "Shu Huei Hsu Wang"],
+    B: ["Emma Reid", "Karla Kulic", "Emma Krapu", "Jovana Stjepanovic", "Beatriz Freitas", "Camila Figueroa", "Lieke Derks", "Eliza Wroblewska"],
+    C: ["Metka Lobnik", "Sara Fernandez Campillo", "Gaya Bar Or", "Petrunjela Pavic", "Aqulina Chayeb", "Vicky Verschaere", "Elvismar Rodriguez"],
+    D: ["Marie Branser", "Elena Dengg", "Marit Kamps", "Maria Swan", "Nikolett Sagi", "Lorena Perkovic", "Zanet Michaelidou"],
+  }},
+  "+78": { genero: "F", pools: {
+    A: ["Lea Fontaine", "Irina Zhelezarska", "Lilli Louise Wojta", "Aida Toishibekova", "Carmen Dijkstra"],
+    B: ["Beatriz Souza", "Tiziana Marini", "Gabrielle Bouvier", "Karen Leon", "Madina Kaisinova", "Kinga Wolszczak"],
+    C: ["Helena Vukovic", "Kamila Berlikash", "Ling Fang Chang", "Sydnee Andrews", "Maria Hoellwart", "Paulien Sweers"],
+    D: ["Erica Simonetti", "Rochele Nunes", "Ruslana Bulavina", "Siwar Dhawedi", "Emilia Gonsior"],
+  }},
 };
 
 export async function GET(req: Request) {
@@ -107,6 +150,7 @@ export async function GET(req: Request) {
   const comp = (searchParams.get("comp") || "3159").trim();
   const seco = searchParams.get("seco") === "1";
   const soCat = (searchParams.get("cat") || "").trim();
+  const soGen = (searchParams.get("genero") || "").trim().toUpperCase(); // "M" | "F" | ""
 
   // Cache de atletas da competição -> mapa nome normalizado -> { id, name, cat, gen }
   const { data: cacheRow } = await supabaseAdmin
@@ -139,7 +183,7 @@ export async function GET(req: Request) {
       .slice(0, 5);
   };
 
-  const cats = Object.keys(MOLDURAS).filter((c) => !soCat || c === soCat);
+  const cats = Object.keys(MOLDURAS).filter((c) => (!soCat || c === soCat) && (!soGen || MOLDURAS[c].genero.toUpperCase() === soGen));
   const relatorio: Array<Record<string, unknown>> = [];
   let gravadas = 0;
 
