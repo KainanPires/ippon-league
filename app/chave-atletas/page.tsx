@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useNivel } from "@/lib/useNivel";
+import { plataforma } from "@/lib/plataforma";
 import { uid } from "@/lib/team";
 import { AnaliseConfrontos } from "@/components/AnaliseConfrontos";
 import { useT, useLingua, type Lingua } from "@/lib/i18n";
@@ -357,7 +358,9 @@ export default function ChaveAtletasPage() {
   const { ehPro, ehProMax, pronto: nivelPronto } = useNivel();
   useEffect(() => {
       if (!nivelPronto) return;
-      if (ehProMax) setNivel("promax");
+      // App do iPhone: chave ao vivo para todos (ver /api/chave-atletas).
+      if (plataforma() === "ios") setNivel("promax");
+      else if (ehProMax) setNivel("promax");
       else if (ehPro) setNivel("pro");
       else setNivel("gratis");
     }, [nivelPronto, ehPro, ehProMax]);
@@ -509,7 +512,7 @@ export default function ChaveAtletasPage() {
     <div>
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
     <h1 style={{ fontFamily: FD, fontSize: 19, fontWeight: 700, textTransform: "uppercase", margin: 0, lineHeight: 1.05 }}>{t("ck.chaveAoVivo")}</h1>
-    <span style={{ fontSize: 10, fontWeight: 700, color: "#7fb8f5", border: "1px solid #7fb8f5", borderRadius: 4, padding: "1px 6px", letterSpacing: 0.5 }}>{nivel === "promax" ? "PRO MAX" : "PRO"}</span>
+    <span data-esconder-ios style={{ fontSize: 10, fontWeight: 700, color: "#7fb8f5", border: "1px solid #7fb8f5", borderRadius: 4, padding: "1px 6px", letterSpacing: 0.5 }}>{nivel === "promax" ? "PRO MAX" : "PRO"}</span>
     </div>
     <div style={{ fontSize: 12, color: "#93a39a", marginTop: 1 }}>{compNome ? `${compNome} · ` : ""}{cat} kg {generoCat}</div>
     </div>

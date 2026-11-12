@@ -112,6 +112,14 @@ async function nivelDoPedido(req: Request): Promise<Nivel> {
     const uid = userData?.user?.id;
     if (error || !uid) return "gratis";
 
+    // APP DO IPHONE (decisão do Kainan, 12/11/2026): na app iOS a Chave de
+    // Atletas é visível a TODOS os utilizadores com sessão, ao vivo. Lá não se
+    // podem mostrar planos pagos (D-09: no iPhone todos aparecem como grátis até
+    // haver compras na app), e a chave é das partes mais fortes do jogo. No site
+    // e no Android continua a ser uma vantagem Pro. Identificação pela
+    // assinatura que a app acrescenta ao User-Agent (mobile/capacitor.config.json).
+    if ((req.headers.get("user-agent") || "").includes("IpponLeagueApp/ios")) return "promax";
+
     // A VERDADE do nível está na tabela users (fonte segura). Lemos com o admin.
     if (!supabaseAdmin) return "gratis";
     const { data: row } = await supabaseAdmin

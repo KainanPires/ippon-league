@@ -216,6 +216,9 @@ const MUDANCA_MODAL: Record<string, { subiu: { titulo: string; texto: string }; 
   },
 };
 export default function Inicio() {
+  // App do iPhone? Lido depois do 1.º render (o HTML do servidor não sabe).
+  const [noIOS, setNoIOS] = useState(false);
+  useEffect(() => { setNoIOS(plataforma() === "ios"); }, []);
   const t = useT();
   const rotuloFaixa = useRotuloFaixa();
   const nomeFaixaTraduzida = (f: string) => rotuloFaixa(f);
@@ -923,7 +926,8 @@ export default function Inicio() {
           - Pro e Pro Max → /chave-atletas. A própria página mostra a versão
           certa: Pro vê congelada + convite Pro Max; Pro Max vê ao vivo. */}
         {(() => {
-              const temAcesso = isPro || isProMax;
+              // No iPhone a chave é para todos (decisão de 12/11/2026).
+              const temAcesso = isPro || isProMax || noIOS;
               const destinoChave = visitante
               ? "/entrar?voltar=/chave-atletas"
               : temAcesso
