@@ -73,7 +73,7 @@ const MOLDURAS: Record<string, CatMold> = {
   }},
   "-81": { genero: "M", pools: {
     A: ["Francois Gauthier Drapeau", "Alain Mikael Aprahamian", "Martin Brekke-Jenssen", "Giorgi Sherazadishvili", "Adrian Gandia", "Vladyslav Kolobov", "Oskari Makinen", "Arnaud Aregba", "Ante Ivan Begic", "Nouh Lahmouri"],
-    B: ["Arslonbek Tojiev", "Magamed Borchashvili", "Thien Oulevey", "Georgii Elbakiev", "Igor Tsurkan", "David Lima", "Bright Maddaloni Nosa", "Itay Bibitko", "Rory Tyrrell", "Jon Vrenozi"],
+    B: ["Arslonbek Tojiev", "Magamed Borchashvilli", "Thien Oulevey", "Georgii Elbakiev", "Igor Tsurkan", "David Lima", "Bright Maddaloni Nosa", "Itay Bibitko", "Rory Tyrrell", "Jon Vrenozi"],
     C: ["Mykhailo Svidrak", "Gabriel Falcao", "Ramon Hernandez Jr", "Alpha Oumar Djalo", "Nace Herkovic", "Aurelien Bonferroni", "Jose Maria Mendiola Izquieta", "Odysseas Georgakis", "Luke Davies", "Gilberto Cardoso"],
     D: ["Murodjon Yuldoshev", "Samuel Daniel Olaiya", "Antonio Esposito", "Aris Zaragkas", "Luka Zorotovic", "Zaur Dvalashvili", "Aleksa Bubalo", "Jahja Nurkovic", "Agustin Gil", "Olivier Gagnon"],
   }},
@@ -87,13 +87,13 @@ const MOLDURAS: Record<string, CatMold> = {
     A: ["Anton Savytskiy", "Bogdan Petre", "Martin Bezdek", "Ronald Proell", "Francisco Balanta", "Darko Brasnjovic", "Maksims Duinovs", "Oliver Barratt", "Jean Carletti", "Peter Kenderesi"],
     B: ["Daniel Eich", "Daryl Yamamoto", "Azhdar Baghirov", "Michael Korrel", "Nikoloz Sherazadishvili", "Bozidar Vucurevic", "Aristos Michael", "Benjamin Mataseje", "Boris Georgiev"],
     C: ["Dzhafar Kostoev", "Yaroslav Davydchuk", "Nikola Pavlovski", "Tornike Poladishvili", "Jorge Fonseca", "Giovani Ferreira", "Max Gregory", "Mathias Madsen", "Vojin Mandic", "George Udsilauri"],
-    D: ["Zsombor Veg", "Gal Bertalanic Zizek", "Adam Borchashvili", "Koussay Ben Ghares", "Iosif Simin", "Tanou Mamadou Keita", "Ivan Rozga", "Joes Schell", "Piotr Kuczera"],
+    D: ["Zsombor Veg", "Gal Bertalanic Zizek", "Adam Borchashvilli", "Koussay Ben Ghares", "Iosif Simin", "Tanou Mamadou Keita", "Ivan Rozga", "Joes Schell", "Piotr Kuczera"],
   }},
   "+100": { genero: "M", pools: {
     A: ["Ushangi Kokauri", "Igor Vracar", "Moustapha Fofana", "Yakiv Khammo", "Yerassyl Kazhybayev", "John Messe A Bessong", "Gabriel Arevalo"],
     B: ["Losseni Kone", "Darius Dobre", "Jelle Snippe", "Mikita Sviryd", "Harun Sadikovic", "Stephan Hegyi"],
     C: ["Kanan Nasibov", "Mortaza Suha", "Zhantilek Nurtilepuly", "Tieman Diaby", "Mohammed Lahboub", "Mohamed El Mehdi Lili", "Tommaso Fava"],
-    D: ["Saba Inaneishvili", "Movli Borchashvili", "Marius Fizel", "Yevheniy Balyevskyy", "Vidak Maljevic", "Andrey Coelho", "Levente Dobos"],
+    D: ["Saba Inaneishvili", "Movli Borchashvilli", "Marius Fizel", "Yevheniy Balyevskyy", "Vidak Maljevic", "Andrey Coelho", "Levente Dobos"],
   }},
 };
 
