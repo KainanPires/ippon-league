@@ -78,7 +78,7 @@ export const BANCO_CLASSICOS: BancoClassico[] = [
   c("2288", "Tbilisi Grand Slam 2022", "Grand Slam", 2022),
   c("2289", "Antalya Grand Slam 2022", "Grand Slam", 2022),
   c("2284", "Tel Aviv Grand Slam 2022", "Grand Slam", 2022, 2026),
-  c("2282", "Paris Grand Slam 2022", "Grand Slam", 2022),
+  c("2282", "Paris Grand Slam 2022", "Grand Slam", 2022, 2026),
   c("2317", "Abu Dhabi Grand Slam 2021", "Grand Slam", 2021),
   c("2267", "Baku Grand Slam 2021", "Grand Slam", 2021),
   c("2260", "Paris Grand Slam 2021", "Grand Slam", 2021),
