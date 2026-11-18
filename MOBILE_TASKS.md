@@ -34,3 +34,7 @@ Estados: ⏳ pendente · 🔄 em execução · ⛔ bloqueado · ✅ concluído
 - iOS: build 1.0.0 (4) (ícone novo) no TestFlight; página da App Store preenchida (textos, 4 capturas 1206×2622, privacidade publicada, classificação 13+ por "Concursos", categoria Desporto/Jogos, preço Grátis, lançamento MANUAL, conta de revisão + notas em inglês). DSA (comerciante) em revisão na Apple. Pronto para "Enviar para revisão" (fundador).
 - Android: teste fechado aprovado e publicado; 6 testadores inscritos (meta 12 → 14 dias).
 - Judocoins: fecho antecipado (chaves completas +2h) e mercado só depois do cálculo — em produção (9e96884).
+
+### Estado a 18 nov 2026
+- iOS: **APROVADA** pela Apple — "Lançamento pendente pelo programador" (lançamento manual). Antes de lançar: retirar China continental da disponibilidade (exige avaliação de segurança + declaração AIGC).
+- Android: 12 testadores contínuos há 5 dias (13 nov) → 14 dias completos ~27 nov → "Solicitar a produção" (questionário) → revisão Google.
